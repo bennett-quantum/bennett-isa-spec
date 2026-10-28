@@ -2,4 +2,4 @@ State: spec/Bennett-ISA-Spec.md draft 0.8 accepted by the council (2026-10-28, r
 Next: (1) port isa_check.py to the Rust reference interpreter, row by row, red-green against the two example objects; (2) conformance suites A-H as the crate, starting with B (totality, prefix reversal, the suite-B call/ret inverse test of section 3.7) and C (examples as vectors); (3) C headers in include/ regenerated from section 10/11 and compiled once; (4) bd init; (5) file the council members' round-8 suggestions (S1 and nits, in ../bennett/docs/council/isa-2026-10-28/round-8/out-*.json) as the first issues.
 Blockers: none.
 Remote: github.com/bennett-quantum/bennett-isa-spec (pushed).
-See worklog/001_2026-10-28_bootstrap.md.
+Start every session from ../bennett/HANDOFF.md. See worklog/001_2026-10-28_bootstrap.md.
