@@ -62,3 +62,11 @@ unchanged. Each entry records the applicable rule and the chosen reading.
     names, so nonempty variant identifiers are retained without inventing an
     enum. Certificate proof verification remains a separate obligation from
     validating these encodings.
+12. **Constant literal magnitude (§3.3, §4.2, §16.1).** INT has no magnitude
+    bound; the destination is a bit-vector. Interpret a const literal modulo
+    2^N, including negative literals and magnitudes wider than a host integer.
+    Address lengths and fault-code literals retain their explicit range checks.
+13. **Canonical FLOAT rendering (§16.1).** Use the shortest decimal digits and
+    exponent/fixed rendering of RFC8785, appending `.0` when the result would
+    otherwise be an INT token; retain `-0.0` for negative binary64 zero.
+    This makes finite gate-angle tokens deterministic alongside JCS metadata.

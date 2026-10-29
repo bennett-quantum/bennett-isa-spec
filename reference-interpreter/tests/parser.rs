@@ -175,9 +175,18 @@ fn quoted_service_literals_decode_for_binding_execution_and_identity() {
 
 #[test]
 fn metadata_integers_preserve_exactness_and_canonical_decimal_strings() {
-    assert_eq!(Json::parse("9007199254740991").unwrap().uint().unwrap(),9_007_199_254_740_991);
-    assert_eq!(Json::parse("\"340282366920938463463374607431768211455\"").unwrap().uint().unwrap(),u128::MAX);
-    for bad in ["9007199254740992","\"01\"","\"+1\"","\"-0\"","\"1.0\""] {
-        assert!(Json::parse(bad).unwrap().uint().is_err(),"accepted {bad}");
+    assert_eq!(
+        Json::parse("9007199254740991").unwrap().uint().unwrap(),
+        9_007_199_254_740_991
+    );
+    assert_eq!(
+        Json::parse("\"340282366920938463463374607431768211455\"")
+            .unwrap()
+            .uint()
+            .unwrap(),
+        u128::MAX
+    );
+    for bad in ["9007199254740992", "\"01\"", "\"+1\"", "\"-0\"", "\"1.0\""] {
+        assert!(Json::parse(bad).unwrap().uint().is_err(), "accepted {bad}");
     }
 }

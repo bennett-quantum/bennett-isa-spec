@@ -6,6 +6,94 @@ repository-wide worklog rule, so this file also serves as this job's worklog.
 
 ## Session 2026-10-29
 
+### Current checkpoint: wide reference execution and literal reversible machine
+
+Wide arithmetic is now connected through the reference engine, literal step
+machine, Q oracle construction and both CLI execution commands. Public APIs:
+BitVector; OracleVectorInput/Outcome; Object::run_oracle_vectors;
+OracleVectorMachine and its complete BasisVectorConfiguration snapshot.
+The previous u128 APIs remain compatible for small results; the u128 machine
+explicitly directs wide closures to OracleVectorMachine instead of panicking.
+
+Red-green: --test wide_oracle first failed on the missing vector machine.
+Implemented src/wide_machine.rs with the same printed dispatch/slot/exchange,
+call/ret and inverse lists using concrete bit-vectors; no inverse snapshots.
+The all-row comparison regression exposed callee parameters padded to128
+instead of their declared width; fixed reads to enforce the static width.
+Five tests now pass:257-bit arithmetic/faults, high-bit Q XOR delivery,
+all prefix/stack boundaries of wide calls and faults, comparisons over all
+existing arithmetic/heap/memory/nested/permutation fixtures, and legacy API
+representation diagnostics. A narrow machine test explicitly failed with a
+shift overflow before its checked adapter diagnostic was added.
+
+wide.bisa has hand expectations and valid hashes; all12 canonical fixtures
+are identity-checked. CLI --test cli wide_oracle first failed on u128 input
+parsing; now the quotient2^100-5 prints exactly as a decimal string. A second
+CLI test first failed converting the high fault code to u128; step-check now
+uses the vector machine and checks a one-input-bit oracle with257-bit target
+and fault wires. Four CLI tests pass. The --max-bits cap restricts the domain
+only, not target or fault representation.
+
+Another red-green borrow test: (CX b,t; CX t,b)^3 is identity, but the old
+qreturn version-log check rejected it before its full-domain frame proof.
+qreturn now relies on the required §5.6 frame verifier; qfree still requires
+workspace cleanup. All six borrow tests pass. Hand check: the two-gate map
+(b,t)->(t,b XOR t) has order3 over GF(2), so every b/t tuple is restored.
+
+Most recent full cargo test before the final CLI/borrow edits passed87 normal
+tests; strict Clippy passed. Current expected normal count89; rerun all tests,
+ignored sweeps, fmt, Clippy and seed at the next milestone. No user decision is
+needed. Immediate next work: audit descriptor/address/counter bounds, close
+remaining suite-F memory/uncall and borrow/cell-version checks, implement
+certificate execution/composition and target/schedule contracts. All original
+seven deliverables remain partial until their full obligations are verified.
+
+### Latest checkpoint: canonical literals, Q verification, arbitrary-width values
+
+`cargo test --manifest-path reference-interpreter/Cargo.toml --offline --quiet`
+PASSED 83 normal tests, two ignored sweeps. Both ignored sweeps were rerun
+successfully before the latest literal/bit-vector changes: u8 division262144
+cases (0.87s), recursive all n/prefixes (4.79s). The unchanged Python seed passed.
+Latest Clippy found a boolean assert in a new test; fixed it, rerun pending.
+
+New control_flow.bisa fixture and adjacent hand expectations cover coherent
+while (all selector/target values and superposition), qif interference,
+nested controlled Rz(2*pi), all128 basis tuples for a two-cell quantum-memory
+exchange, local image bytes de/ad, and a translation-lemma borrow action.
+Three --test quantum_control tests pass. An action now reclaims its private
+wire identifiers after all workspace/local factors are cleaned; the original
+while round-trip test exposed the allocator-counter residue. All11 canonical
+fixtures are now included in identity verification.
+
+Two new parser regressions first accepted redundant floats / rejected quoted
+service literals. All operands now follow canonical INT/FLOAT/STRING/index
+spellings, with strict instruction escapes. Quoted host services decode for
+binding, identity and execution. qreg/region dimensions reject leading zeros.
+A third parser regression first accepted inexact JSON integer encodings; large
+integers now require canonical decimal strings. A loop regression first
+rejected the legal string-encoded2^60 bound; signature generation now preserves
+it exactly and static cycle checking finishes immediately.
+
+A constant regression first rejected2^128+5. Constants now reduce signed
+arbitrary-length decimal literals modulo their declared width. Both engines
+check all256 x values for addends5 and251 and reverse cleanly.
+
+Active width work: src/bits.rs has arbitrary-width arithmetic, comparisons,
+shifts, signed/unsigned division/remainder, extensions and exact decimal/byte
+conversion. --test bitvectors passes two tests, including exhaustive widths1..6
+and independent257-bit hand vectors: (2^200+3)/(2^100+5) gives quotient2^100-5,
+remainder28. src/wide_oracle.rs exposes OracleVectorInput/Outcome and
+Object::run_oracle_vectors; every lifted row uses concrete BitVector values.
+--test wide_oracle passes two tests, including comparisons with the existing
+narrow interpreter across recursion/memory/arithmetic/nesting/action fixtures.
+Reg descriptors now accept wide bundles; lifted permutation calls have a
+vector-valued adapter. IMPORTANT: arbitrary widths are not complete yet:
+wire the bit-vector values into the reversible machine and quantum oracle
+adapter, update legacy/CLI interfaces to avoid their u128 assumptions, broaden
+fault-literal/descriptor/counter checks and persist wide fixtures. Do not mark
+D3/D4 done. This is the immediate next work, followed by certificate execution
+and composition and the remaining §6 audit. No user decision is required.
+
 ### Current checkpoint: deeper suite F and metadata validation
 
 `cargo test --manifest-path reference-interpreter/Cargo.toml --offline` PASSED

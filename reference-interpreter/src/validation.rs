@@ -226,7 +226,7 @@ impl Object {
                     if c.kind != if op == "qreturn" { "qborrow" } else { "qalloc" } {
                         return err("§5.1", "allocation/release kind mismatch");
                     }
-                    if s.wires(&a[0])?
+                    if op=="qfree" && s.wires(&a[0])?
                         .iter()
                         .any(|w| !s.versions.get(w).is_none_or(Vec::is_empty))
                     {

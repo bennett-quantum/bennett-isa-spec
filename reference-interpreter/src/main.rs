@@ -1,5 +1,6 @@
 use bennett_isa_ref::{
-    json::Json, Argument, Budget, Error, Object, OracleInput, OracleMachine, Result, Type,
+    json::Json, Argument, BitVector, Budget, Error, Object, OracleInput,
+    OracleVectorInput, OracleVectorMachine, Result, Type,
 };
 
 const USAGE:&str="bennett-isa-ref check <object>\nbennett-isa-ref hash <object>\nbennett-isa-ref run-oracle <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref step-check <object> <oracle> --exhaustive [--budget B[,heap,stack,depth]] [--arg value] [--max-bits N]";
@@ -18,6 +19,33 @@ fn number(n: u128) -> Json {
         Json::String(n.to_string())
     } else {
         Json::Number(n.to_string())
+    }
+}
+fn vector_number(value: &BitVector) -> Json {
+    match value.to_u128() {
+        Ok(n) => number(n),
+        Err(_) => Json::String(value.to_decimal()),
+    }
+}
+fn vector_input(width: usize, raw: &str) -> Result<BitVector> {
+    if let Some(hex) = raw.strip_prefix("0x") {
+        if hex.is_empty() {
+            return Err(fail("empty hexadecimal input"));
+        }
+        let mut value = BitVector::zero(width)?;
+        for (i, c) in hex.chars().rev().enumerate() {
+            let digit = c
+                .to_digit(16)
+                .ok_or_else(|| fail("invalid hexadecimal input"))?;
+            for bit in 0..4 {
+                if digit & (1 << bit) != 0 {
+                    value.set(i * 4 + bit, true)?;
+                }
+            }
+        }
+        Ok(value)
+    } else {
+        BitVector::parse_unsigned_exact(width, raw)
     }
 }
 fn string(s: impl Into<String>) -> Json {
@@ -108,6 +136,7 @@ fn run() -> Result<()> {
         .ok_or_else(|| fail(format!("§5.2: unknown oracle @{name}")))?;
     program.check_hashes()?;
     let mut input = OracleInput::default();
+    let mut vectors = Vec::new();
     let mut limits = program.default_budget(if command == "step-check" {
         256
     } else {
@@ -130,11 +159,23 @@ fn run() -> Result<()> {
         pos += 1;
         match option.as_str() {
             "--input" => {
-                input.ins = if value.is_empty() {
+                let values = if value.is_empty() {
                     Vec::new()
                 } else {
-                    value.split(',').map(uint).collect::<Result<_>>()?
+                    value.split(',').collect::<Vec<_>>()
                 };
+                if values.len() != oracle.params[0].len() {
+                    return Err(fail("§5.1: oracle input count differs from signature"));
+                }
+                if command == "run-oracle" {
+                    vectors = values
+                        .iter()
+                        .zip(&oracle.params[0])
+                        .map(|(raw, p)| vector_input(p.ty.width(program.ptr_width)? as usize, raw))
+                        .collect::<Result<_>>()?;
+                } else {
+                    input.ins = values.iter().map(|raw| uint(raw)).collect::<Result<_>>()?;
+                }
             }
             "--budget" => limits = budget(value, limits)?,
             "--max-bits" => max_bits = value.parse().map_err(fail)?,
@@ -183,12 +224,17 @@ fn run() -> Result<()> {
         if exhaustive {
             return Err(fail("--exhaustive is a step-check option"));
         }
-        let r = program.run_oracle(name, &input, limits)?;
+        let wide_input = OracleVectorInput {
+            ins: vectors,
+            args: input.args,
+            regions: input.regions,
+        };
+        let r = program.run_oracle_vectors(name, &wide_input, limits)?;
         println!(
             "{}",
             object([
-                ("payload".into(), number(r.payload)),
-                ("code".into(), number(r.code)),
+                ("payload".into(), vector_number(&r.payload)),
+                ("code".into(), vector_number(&r.code)),
                 ("steps".into(), number(r.steps as u128))
             ])
             .canonical()
@@ -240,8 +286,9 @@ fn run() -> Result<()> {
                 }
             }
         }
-        let expected = program.run_oracle(name, &input, limits)?;
-        let mut machine = OracleMachine::new(&program, name, &input, limits)?;
+        let vector_input=OracleVectorInput::from_input(&program,name,&input)?;
+        let expected = program.run_oracle_vectors(name, &vector_input, limits)?;
+        let mut machine = OracleVectorMachine::new(&program, name, &vector_input, limits)?;
         let before = machine.snapshot();
         for _ in 0..limits.steps {
             machine.forward_step()?;

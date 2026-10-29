@@ -64,11 +64,29 @@ impl Environment {
     }
 }
 impl Object {
-    pub(crate) fn permutation_action_values(&self,name:&str,mutables:&[u128],inputs:&[u128],regions:&BTreeMap<String,Vec<u8>>,args:&[Argument],adjoint:bool)->Result<Vec<u128>> {
-        let f=&self.functions[name];
-        let convert=|values:&[u128],params:&[crate::Param]|->Result<Vec<crate::BitVector>>{values.iter().zip(params).map(|(v,p)|crate::BitVector::from_u128(p.ty.width(self.ptr_width)? as usize,*v)).collect()};
-        let mutables=convert(mutables,&f.params[0])?;let inputs=convert(inputs,&f.params[1])?;
-        self.permutation_action_vectors(name,&mutables,&inputs,regions,args,adjoint)?.iter().map(crate::BitVector::to_u128).collect()
+    pub(crate) fn permutation_action_values(
+        &self,
+        name: &str,
+        mutables: &[u128],
+        inputs: &[u128],
+        regions: &BTreeMap<String, Vec<u8>>,
+        args: &[Argument],
+        adjoint: bool,
+    ) -> Result<Vec<u128>> {
+        let f = &self.functions[name];
+        let convert = |values: &[u128], params: &[crate::Param]| -> Result<Vec<crate::BitVector>> {
+            values
+                .iter()
+                .zip(params)
+                .map(|(v, p)| crate::BitVector::from_u128(p.ty.width(self.ptr_width)? as usize, *v))
+                .collect()
+        };
+        let mutables = convert(mutables, &f.params[0])?;
+        let inputs = convert(inputs, &f.params[1])?;
+        self.permutation_action_vectors(name, &mutables, &inputs, regions, args, adjoint)?
+            .iter()
+            .map(crate::BitVector::to_u128)
+            .collect()
     }
     pub(crate) fn permutation_action_vectors(
         &self,
@@ -138,7 +156,14 @@ impl Object {
         q.release(&idle)?;
         f.params[0]
             .iter()
-            .map(|p| {let wires=&b.bundles[&p.name];let mut value=crate::BitVector::zero(wires.len())?;for (i,wire)in wires.iter().enumerate(){value.set(i,q.read_basis(&[*wire])?!=0)?;}Ok(value)})
+            .map(|p| {
+                let wires = &b.bundles[&p.name];
+                let mut value = crate::BitVector::zero(wires.len())?;
+                for (i, wire) in wires.iter().enumerate() {
+                    value.set(i, q.read_basis(&[*wire])? != 0)?;
+                }
+                Ok(value)
+            })
             .collect()
     }
     fn borrow_capacity(&self, root: &str) -> Result<usize> {
@@ -762,6 +787,58 @@ impl Object {
         q.permute(|bits| {
             let mut result = bits.to_vec();
             if controls.iter().any(|(p, v)| bits[*p] != *v) {
+                return Ok(result);
+            }
+            let wide = self
+                .functions
+                .values()
+                .filter(|f| matches!(f.kind.as_str(), "oracle" | "lproc"))
+                .flat_map(|f| f.params.iter().flatten().chain(&f.regs))
+                .any(|p| matches!(p.ty,Type::Wire(w)|Type::Reg(w) if w>128));
+            if wide {
+                let vectors = input_positions
+                    .iter()
+                    .map(|positions| {
+                        let mut value = crate::BitVector::zero(positions.len())?;
+                        for (i, p) in positions.iter().enumerate() {
+                            value.set(i, bits[*p])?;
+                        }
+                        Ok(value)
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                let mut input = crate::OracleVectorInput {
+                    ins: vectors,
+                    args: args.to_vec(),
+                    ..Default::default()
+                };
+                for (n, cells) in &regions {
+                    input.regions.insert(
+                        n.clone(),
+                        cells
+                            .iter()
+                            .map(|p| read_bits(bits, p).map(|v| v as u8))
+                            .collect::<Result<_>>()?,
+                    );
+                }
+                let mut machine =
+                    crate::OracleVectorMachine::new(self, &callee.name, &input, budget)?;
+                let entry = machine.snapshot();
+                for _ in 0..budget.steps {
+                    machine.forward_step()?;
+                }
+                let outcome = machine.outcome();
+                for _ in 0..budget.steps {
+                    machine.inverse_step()?;
+                }
+                if machine.snapshot() != entry || !machine.frames_clean() {
+                    return err("§5.2", "wide oracle workspace failed prefix reversal");
+                }
+                for (i, p) in target.iter().enumerate() {
+                    result[*p] ^= outcome.payload.bit(i)?;
+                }
+                for (i, p) in fault.iter().enumerate() {
+                    result[*p] ^= outcome.code.bit(i)?;
+                }
                 return Ok(result);
             }
             let mut input = OracleInput::bits(

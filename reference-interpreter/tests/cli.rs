@@ -71,3 +71,27 @@ fn exhaustive_step_check_and_diagnostics() {
         assert!(!output.stderr.is_empty());
     }
 }
+
+#[test]
+fn wide_oracle_cli_preserves_exact_decimal_inputs_and_outputs() {
+    let output=cli(&["run-oracle",&fixture("wide"),"div257","--input","1606938044258990275541962092341162602522202993782792835301379,1267650600228229401496703205381","--budget","2,0,16,4"]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let value =
+        bennett_isa_ref::json::Json::parse(std::str::from_utf8(&output.stdout).unwrap()).unwrap();
+    assert_eq!(
+        value.get("payload").unwrap().string().unwrap(),
+        "1267650600228229401496703205371"
+    );
+    assert_eq!(value.get("code").unwrap().uint().unwrap(), 0);
+}
+
+#[test]
+fn step_check_accepts_a_small_domain_with_wide_output_and_fault_wires(){
+    let output=cli(&["step-check",&fixture("wide"),"fault_small257","--exhaustive","--budget","2,0,16,4"]);
+    assert!(output.status.success(),"{}",String::from_utf8_lossy(&output.stderr));
+    let value=bennett_isa_ref::json::Json::parse(std::str::from_utf8(&output.stdout).unwrap()).unwrap();assert_eq!(value.get("cases").unwrap().uint().unwrap(),2);
+}

@@ -3,7 +3,7 @@
 Rust 2021, standard library only, ISA 0.8. The implementation is in progress;
 [PROGRESS.md](PROGRESS.md) records verified work and remaining obligations.
 It is not yet a complete conformance reference. In particular
-certificate composition, borrow proofs and comprehensive static validation
+certificate composition, general borrow certificates and comprehensive static validation
 are unfinished. The numerical simulator uses `f64`; it does
 not implement the rigorous certificate checker of §12.
 
@@ -90,6 +90,20 @@ live/viewed/consumed handles and clean preparation. Pass it to
 `ClassicalMachine::with_quantum_registers` for qreg entry arguments. Measurement
 uses a reproducible xoshiro256** stream; `push_measurement_draw` supplies a
 specific uniform draw for differential tests. Measured traces cannot reverse.
+`designate_idle_registers` supplies the ordinary live qregs available for
+callee borrowing. Region calls return those systems unchanged.
+
+`BitVector` provides arbitrary-width concrete arithmetic. The vector-valued
+`Object::run_oracle_vectors` uses `OracleVectorInput` and returns
+`OracleVectorOutcome`; `OracleVectorInput::from_input` converts the small
+integer API without losing declared widths. `OracleVectorMachine` provides
+the literal forward/inverse machine and explicit commit for these values.
+Both execution CLI commands use vector values; wide decimal results remain
+exact strings in their JSON output. Type descriptors still use a finite host
+width and their remaining bounds are under audit.
+Schedule/coverage/certificate parsing now checks nested schemas, program-point
+bindings, domains, selectors and claim references. Parsing a claim does not
+establish it: rigorous certificate execution and composition remain unfinished.
 
 Canonical `.bisa` fixtures have adjacent `.comments` files with hand-derived
 expected outcomes; comments are not an extension to the §16 grammar.

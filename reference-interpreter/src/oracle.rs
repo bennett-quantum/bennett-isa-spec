@@ -334,6 +334,21 @@ impl Object {
         self.validate_budget(budget)?;
         let program = Program::new(self, name)?;
         let root = &self.functions[name];
+        if program.rows.iter().any(|(f, _)| {
+            f.params
+                .iter()
+                .flatten()
+                .chain(&f.regs)
+                .any(|p| matches!(p.ty,Type::Wire(w)|Type::Reg(w) if w>128))
+        }) {
+            let vector_input = crate::OracleVectorInput::from_input(self, name, input)?;
+            let out = self.run_oracle_vectors(name, &vector_input, budget)?;
+            return Ok(OracleOutcome {
+                payload: out.payload.to_u128()?,
+                code: out.code.to_u128()?,
+                steps: out.steps,
+            });
+        }
         if input.ins.len() != root.params[0].len()
             || input.args.len() != root.params[4].len()
             || input.regions.len() != root.params[3].len()

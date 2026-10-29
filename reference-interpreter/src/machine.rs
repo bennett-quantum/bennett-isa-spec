@@ -101,6 +101,18 @@ impl<'a> OracleMachine<'a> {
         object.validate_budget(budget)?;
         let program = Program::new(object, name)?;
         let root = &object.functions[name];
+        if program.rows.iter().any(|(f, _)| {
+            f.params
+                .iter()
+                .flatten()
+                .chain(&f.regs)
+                .any(|p| matches!(p.ty,Type::Wire(w)|Type::Reg(w) if w>128))
+        }) {
+            return err(
+                "§3.3",
+                "u128 machine values cannot represent this closure; use OracleVectorMachine",
+            );
+        }
         if root.params[0].len() != input.ins.len()
             || root.params[4].len() != input.args.len()
             || root.params[3].len() != input.regions.len()

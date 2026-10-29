@@ -59,7 +59,9 @@ impl Type {
             _ if s.starts_with("wire[") && s.ends_with(']') => {
                 Self::Wire(bundle_width(&s[5..s.len() - 1])?)
             }
-            _ if s.starts_with("reg[") && s.ends_with(']') => Self::Reg(bundle_width(&s[4..s.len() - 1])?),
+            _ if s.starts_with("reg[") && s.ends_with(']') => {
+                Self::Reg(bundle_width(&s[4..s.len() - 1])?)
+            }
             _ if s.starts_with("qreg[") && s.ends_with(']') => {
                 let raw = &s[5..s.len() - 1];
                 let n = raw
@@ -365,7 +367,13 @@ impl Function {
                     Json::Array(
                         self.bounds
                             .iter()
-                            .map(|n| if *n>9_007_199_254_740_991 {Json::String(n.to_string())}else{Json::Number(n.to_string())})
+                            .map(|n| {
+                                if *n > 9_007_199_254_740_991 {
+                                    Json::String(n.to_string())
+                                } else {
+                                    Json::Number(n.to_string())
+                                }
+                            })
                             .collect(),
                     ),
                 );
@@ -1104,7 +1112,7 @@ impl Object {
         if containing.kind == "oracle" {
             return containing.params[2][0].ty.width(self.ptr_width);
         }
-        let mut width = 128;
+        let mut width = u16::MAX;
         for oracle in self.functions.values().filter(|f| f.kind == "oracle") {
             let mut pending = vec![oracle.name.clone()];
             let mut seen = BTreeSet::new();
@@ -1208,13 +1216,8 @@ impl Object {
             }
         };
         let code = |s: &str| -> Result<()> {
-            let n = s
-                .parse::<u128>()
-                .map_err(|_| Error("§3.3: fault code requires nonnegative literal".into()))?;
             let fw = self.fault_width(f)?;
-            if fw < 128 && n >= 1u128 << fw {
-                return err("§3.3", "fault code does not fit fault register");
-            }
+            crate::BitVector::parse_unsigned_exact(fw as usize, s)?;
             Ok(())
         };
         if let Some(n) = op.strip_prefix("lift.const.i") {
