@@ -6,6 +6,6 @@ found=0
 while IFS= read -r toml; do
   d=$(dirname "$toml"); found=1
   echo "== cargo test in $d"; (cd "$d" && cargo test)
-done < <(find . -name Cargo.toml -not -path './target/*' -not -path '*/target/*')
+done < <(find . -name Cargo.toml -not -path './target/*' -not -path '*/target/*' -not -path '*/.isa-ref/*' -not -path '*/.tmp/*')
 [ "$found" = 1 ] || echo 'no Rust crates; nothing to test'
 exit 0
