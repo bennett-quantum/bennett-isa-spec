@@ -108,3 +108,23 @@ pub fn object_with_data(
 }
 pub const ACTION_1_1: &str =
     r#"{"abi":"0.8","args":[],"bounds":[],"in":[1],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
+
+/// Invalid objects must fail before producing any CLI data.
+pub fn reject_cli(text: &str, rule: &str, tag: &str) {
+    let e = Object::parse(text).expect_err("malformed object accepted");
+    assert!(e.to_string().contains(rule), "{e}");
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(".tmp");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join(format!("r3-{tag}.bisa"));
+    std::fs::write(&path, text).unwrap();
+    for cmd in ["hash", "check"] {
+        let out = std::process::Command::new(env!("CARGO_BIN_EXE_bennett-isa-ref"))
+            .arg(cmd)
+            .arg(&path)
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(1), "{out:?}");
+        assert!(out.stdout.is_empty());
+        assert!(String::from_utf8_lossy(&out.stderr).contains(rule));
+    }
+}

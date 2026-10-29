@@ -420,3 +420,62 @@ fn r2_codex_changed_second_input_and_two_memory_regions() {
         );
     }
 }
+
+#[test]
+fn r3_nested_oracle_deliveries_invalidate_outstanding_inputs() {
+    let si =
+        r#"{"abi":"0.8","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}"#;
+    let so = si
+        .replace("\"args\":[]", "\"args\":[\"token\"]")
+        .replace("[8],\"kind", "[8,8],\"kind");
+    let inc = "oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()\nregs { one:reg[8], r:reg[8] }\n^entry():\none = lift.const.i8 1\nr = lift.add x one\nlift.retval r";
+    let build = |before: &str, middle: &str| {
+        object(&[("inc8",si,inc),("p",&so,&format!("oracle @p (a:wire[8] in, b:wire[8] in) (t:wire[8]) (f:wire[4]) () (tk:token)\nregs {{ x:reg[8], out:reg[8], fr:reg[4], fr2:reg[4] }}\n^entry():\nx = lift.mov a\n{before}lift.oracle_call @inc8 tk (x) out fr () ()\n{middle}lift.oracle_uncall @inc8 tk (x) out fr () ()\nlift.retval out"))],"{}", "")
+    };
+    support::reject_cli(
+        &build("", "lift.oracle_call @inc8 tk (b) x fr2 () ()\n"),
+        "§5.5",
+        "nested-target",
+    );
+    // The other uncall has a matching earlier call; its delivery still writes x.
+    support::reject_cli(
+        &build(
+            "lift.oracle_call @inc8 tk (b) x fr2 () ()\n",
+            "lift.oracle_uncall @inc8 tk (b) x fr2 () ()\n",
+        ),
+        "§5.5",
+        "nested-uncall",
+    );
+    // Fault delivery can clobber a four-bit input just as payload delivery can.
+    let fault = build("", "lift.oracle_call @inc8 tk (b) out x () ()\n")
+        .replace("x:reg[8]", "x:reg[4]")
+        .replace("x = lift.mov a", "x = lift.trunc.i4 a")
+        .replace(
+            "lift.oracle_call @inc8 tk (x)",
+            "lift.oracle_call @id4 tk (x)",
+        )
+        .replace(
+            "lift.oracle_uncall @inc8 tk (x)",
+            "lift.oracle_uncall @id4 tk (x)",
+        );
+    let id = "oracle @id4 (x:wire[4] in) (t:wire[8]) (f:wire[4]) () ()\nregs { r:reg[8] }\n^entry():\nr = lift.zext.i8 x\nlift.retval r";
+    let fault = fault.replace("section functions\n", &format!("section functions\n{id}\n"));
+    // Add id4 through the object builder so the symbol table remains well-formed.
+    let parsed_sig = si.replace("[8],\"kind", "[4],\"kind");
+    let parent = fault.split("oracle @p").nth(1).unwrap();
+    let fault = object(
+        &[
+            ("inc8", si, inc),
+            ("id4", &parsed_sig, id),
+            ("p", &so, &format!("oracle @p{parent}")),
+        ],
+        "{}",
+        "",
+    );
+    support::reject_cli(&fault, "§5.5", "nested-fault");
+    let o = rehash(&build("", ""));
+    let mut input = OracleInput::bits(&[1, 0]);
+    input.args.push(Argument::Token(Budget::steps(3)));
+    // move + call + uncall + retval: (1+1) XOR (1+1) = 0.
+    assert_eq!(check(&o, "p", &input, Budget::steps(4)), (0, 0, 4));
+}

@@ -161,8 +161,9 @@ impl Object {
     /// §5.5 matched cleanup: each `lift.oracle_uncall` pairs with one
     /// outstanding `lift.oracle_call` of identical operands (callee, token,
     /// ins, tgt, fr, mem, args) on EVERY incoming path, with no intervening row
-    /// writing its ins, tgt or fr locations (other than XOR delivery of oracle
-    /// calls, which commute) or possibly writing a cell of a supplied region.
+    /// writing its ins or possibly writing a supplied cell. XOR deliveries commute
+    /// on outputs only; they still invalidate any invocation reading an output.
+    /// Non-delivery writes to tgt/fr also invalidate the invocation.
     /// A forward dataflow over the row CFG: the outstanding multiset meets by
     /// pointwise minimum, address constants (from lift.addr) by agreement.
     pub(crate) fn validate_matched_oracle_calls(&self, f: &Function) -> Result<()> {
@@ -219,7 +220,22 @@ impl Object {
             let mut next = state.clone();
             let op = row.op.as_str();
 
+            // Consume the matched inverse before its delivery invalidates readers.
+            // Final validation below checks the pre-row outstanding identity.
+            if op == "lift.oracle_uncall" {
+                let key = Invocation::from_row(row)?;
+                if let Some(n) = next.outstanding.get_mut(&key) {
+                    *n -= 1;
+                    if *n == 0 {
+                        next.outstanding.remove(&key);
+                    }
+                }
+            }
+            let delivery = matches!(op, "lift.oracle_call" | "lift.oracle_uncall");
             let mut writes: BTreeSet<String> = row.lhs.iter().cloned().collect();
+            if delivery {
+                writes.extend([row.operands[3].clone(), row.operands[4].clone()]);
+            }
             if op == "lift.perm_call" {
                 writes.extend(list(&row.operands[1])?);
             }
@@ -242,11 +258,8 @@ impl Object {
                 }
             }
             next.outstanding.retain(|k, _| {
-                let touches = k
-                    .ins
-                    .iter()
-                    .chain([&k.target, &k.fault])
-                    .any(|w| writes.contains(w));
+                let touches = k.ins.iter().any(|w| writes.contains(w))
+                    || (!delivery && [&k.target, &k.fault].iter().any(|w| writes.contains(*w)));
                 let clobbers = k.mem.iter().any(|r| {
                     mut_regions.contains(r)
                         || cells.iter().any(|c| match (c, regions.get(r)) {
@@ -268,15 +281,6 @@ impl Object {
                         .outstanding
                         .entry(Invocation::from_row(row)?)
                         .or_default() += 1
-                }
-                "lift.oracle_uncall" => {
-                    let key = Invocation::from_row(row)?;
-                    if let Some(n) = next.outstanding.get_mut(&key) {
-                        *n -= 1;
-                        if *n == 0 {
-                            next.outstanding.remove(&key);
-                        }
-                    }
                 }
                 "lift.addr" => {
                     if let Some(base) = addresses.get(row.operands[0].trim_start_matches('@')) {

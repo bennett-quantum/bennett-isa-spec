@@ -6,6 +6,13 @@ under `reference-interpreter/`; commit own paths
 (`git add -A -- reference-interpreter && git commit -- reference-interpreter`),
 never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
+## Council round 3 (2026-10-29)
+
+Received SOL-R3-B01..B05 on snapshot 2e61144; response-round-3.md is appendable
+for the pending seats. B01 resolved with a witnessed RED then GREEN (16
+r1_rules tests): nested target/fault/uncall deliveries invalidate outstanding
+input readers while commuting output deliveries remain legal. Bead zq2.
+
 ## Council round 2: sol/codex implementation (2026-10-29)
 
 The 15 blockers from the dc46d07 round-2 snapshot are implemented in ten
