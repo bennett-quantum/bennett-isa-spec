@@ -1,8 +1,9 @@
 # Editor response: council round 3
 
-Input so far: SOL out-sol.json, reviewed snapshot 2e61144. This response is
-appendable for the pending astra/codex and muse second pass. Only the five
-received SOL blockers are covered by this pass. No spec or Python seed edits.
+Inputs: SOL out-sol.json and codex out-codex.json, both reviewing snapshot
+2e61144. The first pass resolves five SOL blockers; the codex second pass below
+covers R3-B01..B03 after rechecking the overlaps against 788a5e0. This response
+remains appendable for muse. No spec or Python seed edits.
 
 ## SOL-R3-B01 — resolved
 
@@ -87,8 +88,8 @@ preserves every t,d basis input plus a superposed input, forward/adjoint.
 RED: exact ctl witness accepted. GREEN: all 6 active r1_borrow tests pass.
 No SPEC-QUESTIONS entry: §§4.7, 5.6 and 14.2 explicitly include controls.
 
-All five received blocker IDs are resolved; no declines or partials. Pending
-astra/codex and muse reviews are a subsequent pass. Deliverables 8–11 remain
+All five first-pass SOL blocker IDs are resolved; no declines or partials.
+The codex second pass is appended below; muse remains a subsequent pass. Deliverables 8–11 remain
 staged as documented in PROGRESS.md, outside this round's received blockers.
 
 ## Final verification of this pass
@@ -167,3 +168,22 @@ equals_entry=true for every variant; hashes check. All **9 active borrow tests
 pass** (1 ignored), and the full normal suite is **214 passed, 0 failed,
 5 ignored**. Re-read §§4.6, 5.3 and 5.6; no new ambiguity. SPEC-QUESTIONS 28
 retains its proposed wording and now references these local-lifetime pins.
+
+## Codex second-pass final verification
+
+All three codex blockers resolved, no declines or partials. Commits: 377e807
+(B01 exact pins, resolved-by c2d97f8), faf6dff (B02 pins/generated coverage,
+resolved-by f83fc71), fbe8320 (B03 lifetime fix and pins).
+
+After the fixes, rebuilt offline and ran the documented standalone conformance
+harness with the absolute reference `--bin`: **445 pass, 0 fail, 45 unavailable
+of 490**, exit **2** for explicit staged work, unchanged from baseline.
+`CARGO_TARGET_DIR` redirected build artefacts into the interpreter's ignored
+`.tmp`; conformance sources remained read-only. Then the normal Rust suite
+passed **214 tests, 0 failed, 5 ignored**; the ignored suite passed **5 tests,
+0 failed**. Strict all-target Clippy, formatting check and unchanged Python seed
+check pass. The 200,000-program sweep again reports **64,717 accepted, all
+clean / 135,283 rejected**, with the original seeds unchanged. PROGRESS.md
+records each exhaustive sweep's cases and timing. All validation was headless
+with the requested absolute project-local TMPDIR and absolute manifest paths.
+No spec changes, dependency additions or pushes.

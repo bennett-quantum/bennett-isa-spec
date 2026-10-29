@@ -30,7 +30,44 @@ t,b bases, superposition and an entangled external reference, plus CLI t=0/1
 run/reverse and checked hashes. 9 active borrow tests pass, 1 ignored; full
 normal suite: 214 passed, 0 failed, 5 ignored. SPEC-QUESTIONS 28 gains pin
 references, without new ambiguity. All three second-pass blockers resolved;
-no declines, no scope narrowed. Final conformance/quality gates follow below.
+no declines, no scope narrowed. Blocker commits: 377e807 (B01 pin), faf6dff
+(B02 pins/generator), fbe8320 (B03 fix/pins).
+
+### Second-pass final verification
+
+After the fixes, rebuilt the reference binary offline and ran the standalone
+conformance command documented in conformance/PROGRESS.md:
+`cargo run --offline --manifest-path /home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/Cargo.toml -- --bin /home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/target/debug/bennett-isa-ref`.
+Conformance source is read-only; `CARGO_TARGET_DIR` was redirected to
+`reference-interpreter/.tmp/conformance-target`. Result: **445 pass, 0 fail,
+45 unavailable / 490**, exit **2** for the existing staged capabilities.
+
+Then ran the required Rust commands with absolute `--manifest-path
+/home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/Cargo.toml`.
+Every command ran headlessly with DISPLAY, WAYLAND_DISPLAY,
+DBUS_SESSION_BUS_ADDRESS and BROWSER unset, and
+TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/.tmp.
+Logs: ignored `.tmp/r3-codex-{tests,ignored,conformance,clippy}.log`.
+
+| Command | Result |
+|---|---|
+| `cargo test --offline` | **214 passed**, 0 failed, 5 ignored (213 integration + 1 unit; 0 doctests; 2.90 s summed runner time) |
+| `cargo test --offline -- --ignored --nocapture` | **5 passed**, 0 failed |
+| `cargo clippy --offline --all-targets -- -D warnings` | clean |
+| `cargo fmt -- --check` | clean |
+| unchanged `python3 isa_check.py` | passes; seed diff against 788a5e0 empty |
+| conformance harness | **445 pass, 0 fail, 45 unavailable**, same staging as baseline |
+
+| Ignored sweep | Cases | Runner time |
+|---|---|---|
+| u8 division/remainder | 65,536 operand pairs × 4 operations = 262,144 oracle executions | 2.30 s |
+| 17-wire borrow execution | 2^17 basis entries | 12.42 s |
+| checked borrow-frame certificate | 2^18 claim elements, both programs | 84.11 s |
+| extended §6 differential | 200,000 programs: **64,717 accepted, all clean**, 135,283 rejected | 280.77 s |
+| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 10.78 s |
+
+No spec, docs, conformance, include, worklog, or Python seed edits; no new
+dependencies; no push. Bead b-isa-spec-zq2 remains open for the full-ISA work.
 
 ## Council round 3 (2026-10-29)
 
@@ -52,7 +89,7 @@ borrowed-H negatives reject; paired borrowed-controlled X calls preserve all
 basis inputs and a superposition. All five received blockers resolved, no
 declines or partials. Bead b-isa-spec-zq2.
 
-### Final round-3 verification
+### First-pass round-3 verification
 
 Every command used the absolute manifest path and ran headlessly with
 DISPLAY, WAYLAND_DISPLAY, DBUS_SESSION_BUS_ADDRESS and BROWSER unset;
