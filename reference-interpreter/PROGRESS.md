@@ -14,6 +14,13 @@ and fault-to-input variant reject at load and CLI hash/check (§5.5). New pin
 five-row positive (0,0,5) and full prefix reversal. All 17 r1_rules tests pass.
 No source change needed for this blocker; no spec/Python seed edits.
 
+R3-B02 is resolved-by f83fc71 (SOL-R3-B02): exact swap/CX-child negatives
+reject §6.2 in parser and hash/check; mutable-region analogue also rejects.
+Doubled-CX controls restore all basis and superposed entries forward/adjoint.
+The call-wrapping generator now covers swap, CX and mutable-region exchange:
+36 cases, 18 accepted / 18 rejected by independent parity, full execution of
+accepts. 17 discipline + 4 active generator tests pass; random seeds unchanged.
+
 ## Council round 3 (2026-10-29)
 
 Received SOL-R3-B01..B05 on snapshot 2e61144; response-round-3.md is appendable

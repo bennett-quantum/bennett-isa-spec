@@ -121,3 +121,24 @@ also passes. All **17 r1_rules tests pass**. No new development RED claimed:
 the earlier SOL fix already handles these witnesses; its RED is recorded above.
 Re-read §§4.2 and 5.5 and SPEC-QUESTIONS: implicit deliveries explicitly write
 both destinations, and unchanged ins are mandatory. No ambiguity or decline.
+
+## Codex R3-B02 — resolved-by f83fc71 (SOL-R3-B02)
+
+Re-ran the exact call-wrapped swap witness against HEAD: rejects §6.2.
+Extended `r1_discipline::r3_action_calls_transfer_the_old_joint_dependencies`
+with the CX-child witness; both reject in parser and CLI hash/check, exit 1,
+empty stdout. The existing mutable-region analogue also rejects. Doubled-CX
+positives preserve every t,m basis input (and region address) and a superposed
+entry, forward and adjoint, with exact state equality and no workspace.
+No semantic change needed: f83fc71 already jointly transfers old mut/ins/cell
+and effective-control dependencies and cancels complete inverse output groups.
+
+`r1_fuzz_discipline::generated_child_call_wrapping_preserves_bell_cleanup_obligations`
+now generates **36** cases (swap, CX, mutable-region exchange; direct/called;
+0..5 middle CXs). Independent parity demands **18 rejects / 18 accepts**;
+all accepts execute over the eight-entry interface and a superposed input and
+reverse exactly. Random seeds unchanged. All **17 discipline + 4 active
+generator tests pass** (1 ignored sweep deferred to final verification).
+No new semantic RED: these witnesses already pass after the SOL commit.
+Re-read §§5.1, 5.7, 6.1–6.3 and SPEC-QUESTIONS: full joint dependency union
+and exact inverse obligations are explicit; no new ambiguity or decline.

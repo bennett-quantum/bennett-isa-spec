@@ -376,28 +376,45 @@ fn generated_child_call_wrapping_preserves_bell_cleanup_obligations() {
     let ps = cs
         .replace("\"in\":[]", "\"in\":[1]")
         .replace("perm_action", "action");
-    for count in 0..6 {
-        for wrapped in [false, true] {
-            let (compute, uncompute) = if wrapped {
-                (
-                    "action_call @child (d, m) () () ()",
-                    "adj action_call @child (d, m) () () ()",
-                )
-            } else {
-                ("swap d m", "swap d m")
-            };
-            let body = format!("action @a (t:wire mut, m:wire mut) (p:wire in) () () ()\n^entry():\nd = qalloc any 1\nh d\n{compute}\n{}{uncompute}\nh d\nqfree d", "cx m t\n".repeat(count));
-            let text = support::object(&[("child",cs,"perm_action @child (a:wire mut, b:wire mut) () () () ()\n^entry():\nswap a b"),("a",&ps,&body)],"{}", "");
-            // Odd CX count copies the H-created bit into t: Bell entanglement
-            // survives uncompute. Even count is exactly the identity.
-            if count % 2 == 1 {
-                assert!(Object::parse(&text)
-                    .unwrap_err()
-                    .to_string()
-                    .contains("§6.2"));
-            } else {
-                let o = Object::parse(&text).unwrap();
-                runs_clean(&o).unwrap();
+    for kind in ["swap", "cx", "region"] {
+        for count in 0..6 {
+            for wrapped in [false, true] {
+                let (child_sig, child, decl, direct, forward, inverse, middle) = if kind == "region"
+                {
+                    (
+                        r#"{"abi":"0.8","args":[],"bounds":[],"in":[1],"kind":"perm_action","mem":[{"A":1,"W":1,"role":"mut"}],"mut":[1],"tier":"q"}"#,
+                        "perm_action @child (d:wire mut) (p:wire in) (r:region[1,1] mut) () ()\n^entry():\nqexchm r p d".to_string(),
+                        "qregion r 1 1\n",
+                        "qexchm r p d".to_string(),
+                        "action_call @child (d) (p) (r) ()",
+                        "adj action_call @child (d) (p) (r) ()",
+                        format!("z = qload r p\n{}qunload r p z\n", "cx z t\n".repeat(count)),
+                    )
+                } else {
+                    (cs, format!("perm_action @child (a:wire mut, b:wire mut) () () () ()\n^entry():\n{kind} a b"), "", format!("{kind} d m"),
+                     "action_call @child (d, m) () () ()", "adj action_call @child (d, m) () () ()", "cx m t\n".repeat(count))
+                };
+                let (compute, uncompute) = if wrapped {
+                    (forward, inverse)
+                } else {
+                    (direct.as_str(), direct.as_str())
+                };
+                let body = format!("action @a (t:wire mut, m:wire mut) (p:wire in) () () ()\n^entry():\n{decl}d = qalloc any 1\nh d\n{compute}\n{middle}{uncompute}\nh d\nqfree d");
+                let text = support::object(&[("child",child_sig,&child),("a",&ps,&body)],"{}", "\nsection layout\n{\"A_tab\":0,\"H\":0,\"S_cells\":0,\"globals\":{},\"heap_base\":1,\"heap_limit_max\":0,\"interface_regions\":{},\"null_size\":1,\"ptr_width\":32}\n");
+                // For each operation, odd CX copies the H-created bit into t;
+                // even CX is identity. Calling must preserve this obligation.
+                if count % 2 == 1 {
+                    assert!(
+                        Object::parse(&text)
+                            .unwrap_err()
+                            .to_string()
+                            .contains("§6.2"),
+                        "{kind}, wrapped={wrapped}, count={count}"
+                    );
+                } else {
+                    let o = Object::parse(&text).unwrap();
+                    runs_clean(&o).unwrap();
+                }
             }
         }
     }

@@ -362,8 +362,16 @@ fn r3_action_calls_transfer_the_old_joint_dependencies() {
     let build = |body: &str| {
         support::object(&[("child",cs,child),("a",&ps,&format!("action @a (t:wire mut, m:wire mut) () () () ()\n^entry():\n{body}"))],"{}", "\nsection layout\n{\"A_tab\":0,\"H\":0,\"S_cells\":0,\"globals\":{},\"heap_base\":1,\"heap_limit_max\":0,\"interface_regions\":{},\"null_size\":1,\"ptr_width\":32}\n")
     };
-    reject(&build(body), "§6.2");
-    run_three_identity(&accept(&build(&body.replace("cx m t", "cx m t\ncx m t"))));
+    for gate in ["swap a b", "cx a b"] {
+        let bad = build(body).replace("swap a b", gate);
+        support::reject_cli(
+            &bad,
+            "§6.2",
+            &format!("codex-call-{}", gate.split_once(' ').unwrap().0),
+        );
+        let good = bad.replace("cx m t", "cx m t\ncx m t");
+        run_three_identity(&accept(&good));
+    }
     // Mutable cell outputs carry the old workspace's H provenance too.
     let cs = r#"{"abi":"0.8","args":[],"bounds":[],"in":[1],"kind":"perm_action","mem":[{"A":1,"W":1,"role":"mut"}],"mut":[1],"tier":"q"}"#;
     let child = "perm_action @child (d:wire mut) (p:wire in) (r:region[1,1] mut) () ()\n^entry():\nqexchm r p d";
