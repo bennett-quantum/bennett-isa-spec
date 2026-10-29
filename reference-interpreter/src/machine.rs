@@ -16,7 +16,9 @@
 use crate::{
     err,
     object::{integer, is_binop, is_div, list},
-    oracle::{literal_u128, operand_width, power_of_two, region_bytes, Allocation, Memory, Program},
+    oracle::{
+        literal_u128, operand_width, power_of_two, region_bytes, Allocation, Memory, Program,
+    },
     Argument, BitVector, Budget, Error, Function, Instruction, Object, OracleInput, OracleOutcome,
     OracleVectorInput, OracleVectorOutcome, Result, Type,
 };
@@ -317,7 +319,8 @@ impl<'a> OracleVectorMachine<'a> {
     /// §5.2 commit, with caller-owned target/fault entry values. These writes
     /// persist while all internal state is subsequently prefix-reversed.
     pub fn commit(&self, target: &BitVector, fault: &BitVector) -> Result<(BitVector, BitVector)> {
-        if target.width() != self.state.result_val.width() || fault.width() != self.state.code.width()
+        if target.width() != self.state.result_val.width()
+            || fault.width() != self.state.code.width()
         {
             return err("§3.3", "commit width mismatch");
         }
@@ -503,7 +506,10 @@ impl<'a> OracleVectorMachine<'a> {
         let loc = self.location_mut(f, n)?;
         let w = loc.width();
         if !value.high_clear(w) {
-            return err("§3.7", "exchange partner has dirty bits above the location width");
+            return err(
+                "§3.7",
+                "exchange partner has dirty bits above the location width",
+            );
         }
         loc.swap_low(value, w)
     }
@@ -517,7 +523,9 @@ impl<'a> OracleVectorMachine<'a> {
             .map(|l| l.get("A_tab").and_then(|a| a.uint()))
             .transpose()?
             .unwrap_or(0);
-        Ok(used.checked_add(n.max(1)).is_none_or(|t| t > self.budget.heap)
+        Ok(used
+            .checked_add(n.max(1))
+            .is_none_or(|t| t > self.budget.heap)
             || power_of_two(table).is_some_and(|cap| atop >= cap))
     }
     fn live_entries(&self) -> Result<&[Allocation]> {
@@ -880,7 +888,9 @@ impl<'a> OracleVectorMachine<'a> {
         self.stack_xor(sp + 1, &self.word(fp)?)?;
         self.stack_xor(sp + 2, &self.word(id)?)?;
         for (j, p) in callee.params[0].iter().enumerate() {
-            let value = frame.slots[j].word.resize(p.ty.bits(self.object.ptr_width)?, false)?;
+            let value = frame.slots[j]
+                .word
+                .resize(p.ty.bits(self.object.ptr_width)?, false)?;
             self.location_mut(&callee.name, &p.name)?.xor_low(&value)?; // C4
         }
         let cells = callee.frame_cells() as u128;
@@ -925,7 +935,9 @@ impl<'a> OracleVectorMachine<'a> {
             .xor_low(&counter(self.widths.sc, sp + cells)?)?;
         frame.slots[m].word.xor_low(&counter(self.widths.sc, sp)?)?;
         for (j, p) in callee.params[0].iter().enumerate() {
-            let value = frame.slots[j].word.resize(p.ty.bits(self.object.ptr_width)?, false)?;
+            let value = frame.slots[j]
+                .word
+                .resize(p.ty.bits(self.object.ptr_width)?, false)?;
             self.location_mut(&callee.name, &p.name)?.xor_low(&value)?; // C4^-1
         }
         let fp = number(&self.state.fp)?;
@@ -956,7 +968,9 @@ impl<'a> OracleVectorMachine<'a> {
         }
         let fp = number(&self.state.fp)?;
         frame.succ ^= number(&self.stack_read(fp)?)? as usize; // R1
-        frame.slots[0].word.xor_low(&self.read(f, &i.operands[0])?)?; // R2
+        frame.slots[0]
+            .word
+            .xor_low(&self.read(f, &i.operands[0])?)?; // R2
         self.push_pop_locations(f, fp)?; // R3
         let mut delivery = frame.slots[0].clone();
         self.deliver(&mut delivery)?; // R4
@@ -988,7 +1002,9 @@ impl<'a> OracleVectorMachine<'a> {
         self.deliver(&mut delivery)?; // R4^-1 at the restored fp
         frame.slots[0] = delivery;
         self.push_pop_locations(f, fp)?; // R3^-1
-        frame.slots[0].word.xor_low(&self.read(f, &i.operands[0])?)?; // R2^-1
+        frame.slots[0]
+            .word
+            .xor_low(&self.read(f, &i.operands[0])?)?; // R2^-1
         frame.succ ^= number(&self.stack_read(fp)?)? as usize; // R1^-1
         Ok(())
     }
@@ -1033,7 +1049,10 @@ impl<'a> OracleVectorMachine<'a> {
             child.inverse_step()?;
         }
         if child.snapshot() != entry || !child.frames_clean() {
-            return err("§5.2", "nested oracle prefix reversal did not restore its workspace");
+            return err(
+                "§5.2",
+                "nested oracle prefix reversal did not restore its workspace",
+            );
         }
         let target = self.location_mut(&f.name, &a[3])?;
         *target = target.binary("xor", &outcome.payload)?;
@@ -1116,7 +1135,9 @@ impl<'a> OracleMachine<'a> {
             );
         }
         let input = OracleVectorInput::from_input(object, name, input)?;
-        Ok(Self(OracleVectorMachine::new(object, name, &input, budget)?))
+        Ok(Self(OracleVectorMachine::new(
+            object, name, &input, budget,
+        )?))
     }
     pub fn snapshot(&self) -> BasisConfiguration {
         self.0.snapshot()

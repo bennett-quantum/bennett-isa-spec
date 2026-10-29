@@ -3,8 +3,8 @@ use crate::{
     object::list,
     quantum::Wire,
     validation::{gate, normalize_call},
-    Argument, Error, Function, Instruction, Object, QuantumBindings,
-    QuantumRegion, QuantumState, Result, Type,
+    Argument, Error, Function, Instruction, Object, QuantumBindings, QuantumRegion, QuantumState,
+    Result, Type,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -283,7 +283,9 @@ impl Object {
             let w = crate::object::host_count(&i.operands[2], "qregion cell width")?;
             let count = crate::oracle::power_of_two(a as u128)
                 .and_then(|n| usize::try_from(n).ok())
-                .ok_or_else(|| Error("host limit: local region exceeds host address space".into()))?;
+                .ok_or_else(|| {
+                    Error("host limit: local region exceeds host address space".into())
+                })?;
             let n = count
                 .checked_mul(w as usize)
                 .ok_or_else(|| Error("§4.6: region bit size overflow".into()))?;

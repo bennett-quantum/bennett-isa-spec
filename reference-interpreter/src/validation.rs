@@ -224,9 +224,10 @@ impl Object {
                     if c.kind != if op == "qreturn" { "qborrow" } else { "qalloc" } {
                         return err("§5.1", "allocation/release kind mismatch");
                     }
-                    if op=="qfree" && s.wires(&a[0])?
-                        .iter()
-                        .any(|w| !s.versions.get(w).is_none_or(Vec::is_empty))
+                    if op == "qfree"
+                        && s.wires(&a[0])?
+                            .iter()
+                            .any(|w| !s.versions.get(w).is_none_or(Vec::is_empty))
                     {
                         return err("§6.2", "released value has not been uncomputed");
                     }
@@ -609,12 +610,12 @@ impl Object {
                     .ok_or_else(|| Error(format!("§3.3: unknown call operand {v}")))?;
                 let compatible = match (&p.ty, ty) {
                     (Type::Wire(n), Type::Wire(m)) | (Type::Wire(n), Type::Reg(m)) => n == m,
-                    (Type::Wire(n), Type::Qreg(m)) => *n as u64 == *m,
+                    (Type::Wire(n), Type::Qreg(m)) => n == m,
                     (Type::Region(a, w), Type::Region(b, z)) => a == b && w == z,
                     (Type::Region(a, w), Type::Qreg(n)) => {
                         crate::oracle::power_of_two(*a as u128)
                             .and_then(|cells| cells.checked_mul(*w as u128))
-                            == Some(*n)
+                            == Some(u128::from(*n))
                     }
                     _ => &p.ty == ty,
                 };

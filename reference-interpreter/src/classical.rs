@@ -5,8 +5,8 @@ use crate::{
     oracle::Memory,
     registers::RegisterUndo,
     validation::normalize_call,
-    Argument, Budget, Error, Instruction, Object, QuantumBindings, QuantumRegion,
-    QuantumRegisters, Result, Type,
+    Argument, Budget, Error, Instruction, Object, QuantumBindings, QuantumRegion, QuantumRegisters,
+    Result, Type,
 };
 use std::collections::{BTreeMap, VecDeque};
 
@@ -493,8 +493,7 @@ impl<'a> ClassicalMachine<'a> {
             let Type::Region(a, w) = p.ty else {
                 unreachable!("validated region")
             };
-            if crate::oracle::power_of_two(a as u128)
-                .and_then(|cells| cells.checked_mul(w as u128))
+            if crate::oracle::power_of_two(a as u128).and_then(|cells| cells.checked_mul(w as u128))
                 != Some(wires.len() as u128)
             {
                 return err("§3.3", "qreg does not fill region dimensions");
@@ -877,7 +876,10 @@ impl<'a> ClassicalMachine<'a> {
                 if !self.state.memory.valid(p, (w / 8) as u128) {
                     fault = Some(7);
                 } else {
-                    output = Some(ClassicalValue::Int(w, self.state.memory.load_u128(p, w as u64)?));
+                    output = Some(ClassicalValue::Int(
+                        w,
+                        self.state.memory.load_u128(p, w as u64)?,
+                    ));
                 }
             } else if let Some(t) = op.strip_prefix("store.") {
                 let w = Type::parse(t)?.width(object.ptr_width)? as u16;
@@ -1179,7 +1181,12 @@ pub(crate) fn binop(op: &str, a: u128, b: u128, w: u16) -> Result<u128> {
     Ok(v & mask(w))
 }
 /// Ok(Err(code)) is the trap / fault record of §4.1.
-pub(crate) fn divide(op: &str, a: u128, b: u128, w: u16) -> Result<std::result::Result<u128, u128>> {
+pub(crate) fn divide(
+    op: &str,
+    a: u128,
+    b: u128,
+    w: u16,
+) -> Result<std::result::Result<u128, u128>> {
     if b == 0 {
         return Ok(Err(5));
     }

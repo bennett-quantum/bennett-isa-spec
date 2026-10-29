@@ -1,6 +1,6 @@
 use bennett_isa_ref::{
-    json::Json, Argument, BitVector, Budget, Error, Object, OracleInput,
-    OracleVectorInput, OracleVectorMachine, Result, Type,
+    json::Json, Argument, BitVector, Budget, Error, Object, OracleInput, OracleVectorInput,
+    OracleVectorMachine, Result, Type,
 };
 
 const USAGE:&str="bennett-isa-ref check <object>\nbennett-isa-ref hash <object>\nbennett-isa-ref run-oracle <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref step-check <object> <oracle> --exhaustive [--budget B[,heap,stack,depth]] [--arg value] [--max-bits N]";
@@ -286,7 +286,7 @@ fn run() -> Result<()> {
                 }
             }
         }
-        let vector_input=OracleVectorInput::from_input(&program,name,&input)?;
+        let vector_input = OracleVectorInput::from_input(&program, name, &input)?;
         let expected = program.run_oracle_vectors(name, &vector_input, limits)?;
         let mut machine = OracleVectorMachine::new(&program, name, &vector_input, limits)?;
         let before = machine.snapshot();

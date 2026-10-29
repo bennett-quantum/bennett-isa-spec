@@ -20,9 +20,10 @@ impl Object {
             let (base, index) = if let Some((base, index)) = operand.split_once('[') {
                 (
                     base,
-                    Some(
-                        crate::object::host_count(index.trim_end_matches(']'), "wire index")?,
-                    ),
+                    Some(crate::object::host_count(
+                        index.trim_end_matches(']'),
+                        "wire index",
+                    )?),
                 )
             } else {
                 (operand, None)

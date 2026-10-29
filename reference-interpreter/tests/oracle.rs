@@ -257,8 +257,14 @@ fn const_literals_outside_the_destination_range_are_rejected_not_reduced() {
             .replace("lift.const.i8 1", &format!("lift.const.i8 {literal}"));
         let o = support::rehash(&text);
         for x in [0u128, 1, 127, 128, 255] {
-            let r = o.run_oracle("inc8", &OracleInput::bits(&[x]), Budget::steps(3)).unwrap();
-            assert_eq!((r.payload, r.code), ((x + addend) & 255, 0), "{literal} {x}");
+            let r = o
+                .run_oracle("inc8", &OracleInput::bits(&[x]), Budget::steps(3))
+                .unwrap();
+            assert_eq!(
+                (r.payload, r.code),
+                ((x + addend) & 255, 0),
+                "{literal} {x}"
+            );
         }
     }
 }

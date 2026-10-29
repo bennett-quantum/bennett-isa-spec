@@ -142,8 +142,16 @@ pub(crate) fn power_of_two(exponent: u128) -> Option<u128> {
     (exponent < 128).then(|| 1u128 << exponent)
 }
 impl Memory {
-    pub fn initial(object: &Object, oracle: &Function, regions: &BTreeMap<String, Vec<u8>>) -> Result<Self> {
-        let expected = if oracle.kind == "oracle" { oracle.params[3].len() } else { 0 };
+    pub fn initial(
+        object: &Object,
+        oracle: &Function,
+        regions: &BTreeMap<String, Vec<u8>>,
+    ) -> Result<Self> {
+        let expected = if oracle.kind == "oracle" {
+            oracle.params[3].len()
+        } else {
+            0
+        };
         if regions.len() != expected {
             return err("§5.1", "interface region count mismatch");
         }
@@ -420,10 +428,12 @@ impl Activation {
         })
     }
     fn read(&self, n: &str) -> Result<BitVector> {
-        self.values
-            .get(n)
-            .cloned()
-            .ok_or_else(|| Error(format!("§3.7: unreadable operand {n} in @{}", self.function)))
+        self.values.get(n).cloned().ok_or_else(|| {
+            Error(format!(
+                "§3.7: unreadable operand {n} in @{}",
+                self.function
+            ))
+        })
     }
     fn write(&mut self, f: &Function, n: &str, value: BitVector, ptr: u16) -> Result<()> {
         let p = f
@@ -444,7 +454,10 @@ impl Activation {
 fn token(arguments: &BTreeMap<String, Argument>, n: &str) -> Result<Budget> {
     match arguments.get(n) {
         Some(Argument::Token(b)) => Ok(*b),
-        _ => err("§4.2", format!("tk operand {n} is not a token argument of the oracle")),
+        _ => err(
+            "§4.2",
+            format!("tk operand {n} is not a token argument of the oracle"),
+        ),
     }
 }
 /// Bytes of a mapped interface region passed by name to a nested region call.
@@ -456,7 +469,9 @@ pub(crate) fn region_bytes(memory: &Memory, n: &str, address_width: u64) -> Resu
     let len = power_of_two(address_width as u128)
         .and_then(|n| usize::try_from(n).ok())
         .ok_or_else(|| Error("host limit: region exceeds host address space".into()))?;
-    (0..len).map(|i| Ok(memory.byte(offset(base, i)?))).collect()
+    (0..len)
+        .map(|i| Ok(memory.byte(offset(base, i)?)))
+        .collect()
 }
 
 impl Object {
@@ -818,7 +833,11 @@ impl Object {
     }
     /// A classical argument forwarded to a nested region call: one of the
     /// calling oracle's own classical arguments (validate_region_call).
-    fn forward_argument(&self, arguments: &BTreeMap<String, Argument>, n: &str) -> Result<Argument> {
+    fn forward_argument(
+        &self,
+        arguments: &BTreeMap<String, Argument>,
+        n: &str,
+    ) -> Result<Argument> {
         arguments
             .get(n)
             .cloned()

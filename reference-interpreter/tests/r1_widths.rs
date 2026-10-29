@@ -1,10 +1,16 @@
 //! Council round 1: fable R1-B1, codex B01, muse B1 (§3.3 bounds only iN).
 //! Every expected value below is derived by hand from §3.3, §3.6, §4.2, §5.2.
 mod support;
-use bennett_isa_ref::{BitVector, Budget, Object, OracleInput, OracleVectorInput, OracleVectorMachine};
+use bennett_isa_ref::{
+    BitVector, Budget, Object, OracleInput, OracleVectorInput, OracleVectorMachine,
+};
 
 fn oracle(name: &str, header: &str, regs: &str, body: &str, inputs: &[u64], tgt: u64) -> Object {
-    let ins = inputs.iter().map(u64::to_string).collect::<Vec<_>>().join(",");
+    let ins = inputs
+        .iter()
+        .map(u64::to_string)
+        .collect::<Vec<_>>()
+        .join(",");
     let signature = format!(
         r#"{{"abi":"0.8","args":[],"fault":4,"in":[{ins}],"kind":"oracle","mem":[],"tgt":{tgt},"tier":"q"}}"#
     );
@@ -91,13 +97,19 @@ fn fable_r1_b1_wide_add_is_2x_mod_2_256_in_both_engines() {
         &[256],
         256,
     );
-    let all_ones = BitVector::zero(256).unwrap().binary("sub", &pow2(256, 0)).unwrap();
+    let all_ones = BitVector::zero(256)
+        .unwrap()
+        .binary("sub", &pow2(256, 0))
+        .unwrap();
     let cases = [
         (BitVector::zero(256).unwrap(), BitVector::zero(256).unwrap()),
         (pow2(256, 0), pow2(256, 1)),
         (pow2(256, 200), pow2(256, 201)),
         // 2(2^256 - 1) mod 2^256 = 2^256 - 2.
-        (all_ones.clone(), all_ones.binary("sub", &pow2(256, 0)).unwrap()),
+        (
+            all_ones.clone(),
+            all_ones.binary("sub", &pow2(256, 0)).unwrap(),
+        ),
     ];
     for (x, twice) in cases {
         for b in 0..=3u64 {
@@ -123,9 +135,13 @@ fn fable_r1_b1_unused_wide_input_through_the_small_integer_api() {
         &[256],
         8,
     );
-    let r = o.run_oracle("wide", &OracleInput::bits(&[0]), Budget::steps(2)).unwrap();
+    let r = o
+        .run_oracle("wide", &OracleInput::bits(&[0]), Budget::steps(2))
+        .unwrap();
     assert_eq!((r.payload, r.code, r.steps), (1, 0, 2));
-    let r = o.run_oracle("wide", &OracleInput::bits(&[7]), Budget::steps(1)).unwrap();
+    let r = o
+        .run_oracle("wide", &OracleInput::bits(&[7]), Budget::steps(1))
+        .unwrap();
     assert_eq!((r.payload, r.code, r.steps), (0, 1, 1));
 }
 
@@ -215,7 +231,8 @@ fn derived_counter_widths_follow_section_3_7() {
 section layout
 {"A_tab":3,"H":127,"S_cells":5,"globals":{},"heap_base":16,"heap_limit_max":1024,"interface_regions":{},"null_size":16,"ptr_width":128}
 "#;
-    let signature = r#"{"abi":"0.8","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}"#;
+    let signature =
+        r#"{"abi":"0.8","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}"#;
     let text = support::object(
         &[(
             "h",

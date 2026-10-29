@@ -716,7 +716,10 @@ impl Object {
         // SPEC-QUESTIONS 14: hostcall's rlen is iN with N = ptr_width (§4.8), and
         // iN exists only for 1 <= N <= 128 (§3.3).
         if !(1..=128).contains(&ptr_width) {
-            return err("§3.3", "ptr_width must satisfy 1 <= ptr_width <= 128 (iN rlen, §4.8)");
+            return err(
+                "§3.3",
+                "ptr_width must satisfy 1 <= ptr_width <= 128 (iN rlen, §4.8)",
+            );
         }
         let ptr_width = ptr_width as u16;
         let mut obj = Object {

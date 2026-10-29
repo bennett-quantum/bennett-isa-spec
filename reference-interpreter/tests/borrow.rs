@@ -168,12 +168,28 @@ fn lifted_permutation_actions_can_borrow_workspace_and_reverse() {
 }
 
 #[test]
-fn exhaustive_borrow_identity_need_not_be_adjacent_gate_cancellation(){
+fn exhaustive_borrow_identity_need_not_be_adjacent_gate_cancellation() {
     // The linear map (b,t) -> (t,b XOR t) has order three over GF(2).
-    let text=borrowed("cx b t\ncx t b\ncx b t\ncx t b\ncx b t\ncx t b");
-    let o=Object::parse(&text).unwrap();
-    for b in 0..2{for t in 0..2{
-        let mut q=QuantumState::new();let wires=q.allocate(5).unwrap();for (wire,value)in [(wires[0],t),(wires[4],b)]{if value==1{q.gate("x",&[wire],None,&[]).unwrap();}}
-        let mut bindings=QuantumBindings::default();for (name,wire)in ["t","y","z","x"].iter().zip(&wires){bindings.bundles.insert((*name).into(),vec![*wire]);}bindings.borrowed.push(vec![wires[4]]);let before=q.clone();o.execute_action("a",&mut q,&bindings,false,&[]).unwrap();assert_eq!(q,before);
-    }}
+    let text = borrowed("cx b t\ncx t b\ncx b t\ncx t b\ncx b t\ncx t b");
+    let o = Object::parse(&text).unwrap();
+    for b in 0..2 {
+        for t in 0..2 {
+            let mut q = QuantumState::new();
+            let wires = q.allocate(5).unwrap();
+            for (wire, value) in [(wires[0], t), (wires[4], b)] {
+                if value == 1 {
+                    q.gate("x", &[wire], None, &[]).unwrap();
+                }
+            }
+            let mut bindings = QuantumBindings::default();
+            for (name, wire) in ["t", "y", "z", "x"].iter().zip(&wires) {
+                bindings.bundles.insert((*name).into(), vec![*wire]);
+            }
+            bindings.borrowed.push(vec![wires[4]]);
+            let before = q.clone();
+            o.execute_action("a", &mut q, &bindings, false, &[])
+                .unwrap();
+            assert_eq!(q, before);
+        }
+    }
 }
