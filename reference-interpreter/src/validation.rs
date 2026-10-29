@@ -364,18 +364,35 @@ impl Object {
                 }
                 "qinplace" => {
                     arity(4, 0)?;
+                    // §4.5 expansion: t = qalloc any n; f = qalloc any F;
+                    // oracle_call @g tk (x) t f; qexch x t; oracle_call @ginv tk (x) t f.
+                    // Both are oracles in (n) -> tgt n with no mem or args and one F.
+                    let n = s.wires(&a[3])?.len() as u64;
+                    let mut fault = None;
                     for callee in &a[..2] {
-                        let callee = callee
+                        let name = callee
                             .strip_prefix('@')
-                            .and_then(|n| self.functions.get(n))
-                            .filter(|f| f.kind == "oracle")
-                            .ok_or_else(|| Error("§4.5: qinplace requires oracle pair".into()))?;
+                            .ok_or_else(|| Error("§4.5: qinplace names @g @ginv".into()))?;
+                        let callee = self.declaration(name)?;
+                        if callee.kind != "oracle" {
+                            return err("§4.5", "qinplace requires an oracle pair");
+                        }
                         if callee.params[0].len() != 1
-                            || callee.params[0][0].ty != callee.params[1][0].ty
+                            || callee.params[0][0].ty != Type::Wire(n)
+                            || callee.params[1][0].ty != Type::Wire(n)
+                            || !callee.params[3].is_empty()
+                            || !callee.params[4].is_empty()
                         {
                             return err(
                                 "§4.5",
-                                "qinplace requires equal-width single-input oracles",
+                                "qinplace oracles map one wire[n] input to a wire[n] target, with no mem or args",
+                            );
+                        }
+                        let f = callee.params[2][0].ty.clone();
+                        if fault.get_or_insert(f.clone()) != &f {
+                            return err(
+                                "§4.5",
+                                "@g and @ginv share one fault bundle f: equal fault widths",
                             );
                         }
                     }

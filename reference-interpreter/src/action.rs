@@ -693,6 +693,10 @@ impl Object {
                         .ok_or_else(|| Error("§4.5: qinplace token".into()))?;
                     let gf = &self.functions[g.trim_start_matches('@')];
                     let gif = &self.functions[gi.trim_start_matches('@')];
+                    // §4.5 requires, under tk, FAULT_NONE on every input and
+                    // g∘ginv = ginv∘g = id. Decided here exactly, on the full
+                    // n-bit domain at this token's budget, before any state change.
+                    self.verify_inverse_pair(gf, gif, token)?;
                     let fw = gf.params[2][0].ty.width(self.ptr_width)? as usize;
                     let t = q.allocate(x.len())?;
                     let fault = q.allocate(fw)?;
@@ -726,6 +730,56 @@ impl Object {
             }
         }
         Ok(())
+    }
+    /// §4.5: both oracles are fault-free on every n-bit input under `budget`
+    /// and inverse to each other; otherwise the qinplace is not executed.
+    pub(crate) fn verify_inverse_pair(
+        &self,
+        g: &Function,
+        ginv: &Function,
+        budget: crate::Budget,
+    ) -> Result<()> {
+        let n = g.params[0][0].ty.bits(self.ptr_width)?;
+        let run = |f: &Function, x: &crate::BitVector| -> Result<crate::BitVector> {
+            let input = crate::OracleVectorInput {
+                ins: vec![x.clone()],
+                ..Default::default()
+            };
+            let r = self.run_oracle_vectors(&f.name, &input, budget)?;
+            if !r.code.is_zero() {
+                return err(
+                    "§4.5",
+                    format!(
+                        "qinplace oracle @{} faults with code {} on input {} under this token",
+                        f.name,
+                        r.code.to_decimal(),
+                        x.to_decimal()
+                    ),
+                );
+            }
+            Ok(r.payload)
+        };
+        let mut x = crate::BitVector::zero(n)?;
+        let one = crate::BitVector::from_u128(n, 1)?;
+        loop {
+            for (first, second) in [(g, ginv), (ginv, g)] {
+                if run(second, &run(first, &x)?)? != x {
+                    return err(
+                        "§4.5",
+                        format!(
+                            "@{} is not the inverse of @{} at input {}",
+                            second.name,
+                            first.name,
+                            x.to_decimal()
+                        ),
+                    );
+                }
+            }
+            x = x.binary("add", &one)?;
+            if x.is_zero() {
+                return Ok(());
+            }
+        }
     }
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn oracle_quantum(
