@@ -383,8 +383,8 @@ to one register (by such transfers or by `qreg.from_id`) are
 made through either is observed through both. The wire operands of one
 region call, with its effective control context, MUST denote pairwise
 disjoint wires (§3.3 disjointness); aliases violate it. **Static and
-run-time verdicts.** Suite F rejects exactly: two operands of one
-instruction that are the same name; and, on some path from a
+run-time verdicts.** Suite F rejects exactly: two `qreg` operands of one
+region call or of one `qreg.concat` that are the same name; and, on some path from a
 `qreg.slice`, a use of the view's name other than as the operand of one
 region call (a `br`, `call` or `ret` transfer included), its reaching a
 `ret` or the end of the function unconsumed, or a use of the slice's
