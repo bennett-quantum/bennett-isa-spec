@@ -27,13 +27,18 @@ fn ok(args: &[&str]) -> Json {
 }
 fn fails(args: &[&str], needle: &str) {
     let output = cli(args);
-    assert!(
-        !output.status.success(),
+    assert_eq!(
+        output.status.code(),
+        Some(1),
         "stdout: {}",
         String::from_utf8_lossy(&output.stdout)
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains(needle), "{stderr} must contain {needle}");
+    assert!(
+        stderr.contains('§'),
+        "diagnostic must cite the ISA: {stderr}"
+    );
     assert!(output.stdout.is_empty(), "no partial JSON on a diagnostic");
 }
 fn field<'a>(v: &'a Json, key: &str) -> &'a Json {
@@ -74,6 +79,7 @@ fn run_cc_sum_reports_every_step_with_register_deltas() {
     //   + final pass (icmp, br) + ret = 3 + 15 + 2 + 1 = 21 steps.
     let v = ok(&["run-cc", &fixture("classical"), "sum", "--args", "3"]);
     assert_eq!(text(&v, "status"), "COMPLETED");
+    assert_eq!(array(&v, "budgets").len(), 0);
     assert_eq!(uint(&v, "steps"), 21);
     assert_eq!(field(&v, "fault"), &Json::Null);
     assert_eq!(array(&v, "faults").len(), 0);
@@ -873,10 +879,23 @@ fn run_program_rejects_non_cc_entries_and_staged_inputs() {
         "--target",
         &target,
     ]);
-    assert!(!output.status.success());
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty(), "no partial JSON on a diagnostic");
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("staged deliverable 9"), "{stderr}");
     assert!(stderr.contains("§8"), "{stderr}");
+    // Even a missing target names the staged path rather than implying
+    // that supplying an existing file could execute a §8 target.
+    fails(
+        &[
+            "run-program",
+            &fixture("registers"),
+            "views",
+            "--target",
+            &format!("{target}/missing"),
+        ],
+        "staged deliverable 9",
+    );
     // A schedule section needs verbatim scheduled execution: staged
     // deliverable 10 (§11 schedule consumer). The schedule JSON is the
     // valid inc8 schedule of tests/r1_certificates.rs.
@@ -896,8 +915,135 @@ fn run_program_rejects_non_cc_entries_and_staged_inputs() {
         ),
     );
     let output = cli(&["run-program", &scheduled, "inc8", "--args", ""]);
-    assert!(!output.status.success());
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty(), "no partial JSON on a diagnostic");
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("staged deliverable 10"), "{stderr}");
     assert!(stderr.contains("§11"), "{stderr}");
+}
+
+#[test]
+fn run_action_mem_cells_wider_than_128_bits() {
+    // A mem region of 2 cells of wire[300]: cell hex is 38 little-endian
+    // bytes per cell. Cell 0 is 2^299 + 1 (byte 0 = 0x01, byte 37 = 0x08)
+    // and cell 1 is zero; qexchm with a = 0 swaps it with t = 5, so t ends
+    // at 2^299 + 1 and the cells are [5, 0]. Widths above 128 must not be
+    // narrowed through u128 anywhere in the --mem path.
+    let sig = r#"{"abi":"0.8","args":[],"bounds":[],"in":[1],"kind":"perm_action","mem":[{"A":1,"W":300,"role":"mut"}],"mut":[300],"tier":"q"}"#;
+    let body = "perm_action @wex (t:wire[300] mut) (a:wire in) (m:region[1,300] mut) () ()\n^entry():\nqexchm m a t";
+    let layout = "\nsection layout\n{\"A_tab\":0,\"H\":4,\"S_cells\":0,\"globals\":{},\"heap_base\":1,\"heap_limit_max\":0,\"interface_regions\":{},\"null_size\":1,\"ptr_width\":32}\n";
+    let text = support::rehash(&support::object(&[("wex", sig, body)], "{}", layout)).text;
+    let path = tmp_file("xam-wide.bisa", &text);
+    let mut cell0 = [0u8; 38];
+    cell0[0] = 1;
+    cell0[37] = 8;
+    let mem: String = cell0
+        .iter()
+        .chain(&[0u8; 38])
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let v = ok(&[
+        "run-action",
+        &path,
+        "wex",
+        "--mut",
+        "5",
+        "--in",
+        "0",
+        "--mem",
+        &format!("m={mem}"),
+    ]);
+    // Decimal expansion of 2^299 + 1, independent of the interpreter.
+    assert_eq!(array(&v, "mut")[0].string().unwrap(), "1018517988167243043134222844204689080525734196832968125318070224677190649881668353091698689");
+    assert_eq!(
+        field(field(&v, "mem"), "m")
+            .array()
+            .unwrap()
+            .iter()
+            .map(|c| c.uint().unwrap())
+            .collect::<Vec<_>>(),
+        [5, 0]
+    );
+}
+
+#[test]
+fn classical_commands_report_each_bound_budget_in_order() {
+    // §10 positional binding: tk0 and tk1 are separated by an i8 argument.
+    // The sole row returns x = 255; tokens consume no oracle steps because
+    // this entry calls no oracle. §5.4 memoryless tokens have h=s=d=0.
+    let sig =
+        r#"{"abi":"0.8","kind":"cc","params":["token","i8","token"],"results":["i8"],"tier":"cc"}"#;
+    let body = "fn cc @tokens (tk0:token, x:i8, tk1:token) (r:i8) () () ()\n^entry():\nret x";
+    let object = support::rehash(&support::object(&[("tokens", sig, body)], "{}", ""));
+    let path = tmp_file("xam-tokens.bisa", &object.text);
+    let expected = Json::parse(
+        r#"[{"depth":0,"heap":0,"stack":0,"steps":3},{"depth":0,"heap":0,"stack":0,"steps":7}]"#,
+    )
+    .unwrap();
+    for command in ["run-cc", "reverse", "run-program"] {
+        let v = ok(&[
+            command, &path, "tokens", "--arg", "token:3", "--arg", "-1", "--arg", "token:7",
+        ]);
+        assert_eq!(field(&v, "budgets"), &expected);
+        assert_eq!(
+            field(&v, "results").canonical(),
+            r#"[{"type":"i8","value":"255"}]"#
+        );
+        assert_eq!(uint(&v, "steps"), 1);
+        if command == "reverse" {
+            assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
+        }
+    }
+}
+
+#[test]
+fn measurement_json_preserves_the_high_bit_of_i128() {
+    // §3.3/§14.2: measurement of a definite 128-wire register with only
+    // wire 127 set returns 2^127 exactly. §9.1 encodes it as a decimal
+    // string, both as an i128 result and as the measurement's value.
+    let sig = r#"{"abi":"0.8","kind":"cc","params":["qreg[128]"],"results":["i128"],"tier":"cc"}"#;
+    let body = "fn cc @wide (q:qreg[128]) (r:i128) () () ()\n^entry():\nr = measure q\nret r";
+    let object = support::rehash(&support::object(&[("wide", sig, body)], "{}", ""));
+    let path = tmp_file("xam-measure128.bisa", &object.text);
+    let bits = format!("{}1", "0".repeat(127));
+    for command in ["run-cc", "run-program"] {
+        let v = ok(&[command, &path, "wide", "--arg", &format!("qreg:{bits}")]);
+        assert_eq!(
+            field(&v, "results").canonical(),
+            r#"[{"type":"i128","value":"170141183460469231731687303715884105728"}]"#
+        );
+        let measurements = array(&v, "measurements");
+        assert_eq!(measurements.len(), 1);
+        assert_eq!(text(&measurements[0], "bits"), bits);
+        assert_eq!(
+            text(&measurements[0], "value"),
+            "170141183460469231731687303715884105728"
+        );
+    }
+}
+
+#[test]
+fn malformed_cli_inputs_are_cited_diagnostics_without_json() {
+    // A malformed CLI input is an error, never a partial execution result.
+    for command in ["run-cc", "reverse", "run-program"] {
+        fails(
+            &[command, &fixture("classical"), "sum", "--entropy", "z"],
+            "HEX",
+        );
+    }
+    fails(
+        &["run-action", &fixture("registers"), "bell", "--state"],
+        "missing value",
+    );
+    let replies = tmp_file("xam-malformed-replies.json", "{}");
+    fails(
+        &[
+            "run-program",
+            &fixture("classical"),
+            "host",
+            "--replies",
+            &replies,
+        ],
+        "expected JSON array",
+    );
 }

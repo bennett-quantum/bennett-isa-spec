@@ -185,10 +185,11 @@ fn measurements_json(m: &ClassicalMachine) -> Json {
         m.measurements()
             .into_iter()
             .map(|(reg, bits)| {
-                let value = bits
-                    .iter()
-                    .enumerate()
-                    .fold(0u128, |v, (i, b)| v | ((*b as u128) << i));
+                // Wide measurements keep their exact bit-vector value.
+                let mut value = BitVector::zero(bits.len()).expect("measured width");
+                for (i, b) in bits.iter().enumerate() {
+                    value.set(i, *b).expect("measured bit");
+                }
                 object([
                     (
                         "bits".into(),
@@ -199,7 +200,7 @@ fn measurements_json(m: &ClassicalMachine) -> Json {
                         ),
                     ),
                     ("reg".into(), number(reg as u128)),
-                    ("value".into(), number(value)),
+                    ("value".into(), vector_number(&value)),
                 ])
             })
             .collect(),
@@ -652,13 +653,30 @@ fn classical_entry<'a>(program: &'a Object, name: &str) -> Result<&'a Function> 
         .filter(|f| matches!(f.kind.as_str(), "cc" | "r"))
         .ok_or_else(|| fail(format!("§3.4: unknown CC/R entry @{name}")))
 }
+/// The §5.4 tokens among the bound arguments, in argument order.
+fn budgets_json(args: &[ClassicalValue]) -> Json {
+    Json::Array(
+        args.iter()
+            .filter_map(|a| match a {
+                ClassicalValue::Token(b) => Some(object([
+                    ("depth".into(), number(b.depth)),
+                    ("heap".into(), number(b.heap)),
+                    ("stack".into(), number(b.stack)),
+                    ("steps".into(), number(b.steps as u128)),
+                ])),
+                _ => None,
+            })
+            .collect(),
+    )
+}
 fn classical_machine<'a>(
     program: &'a Object,
     name: &str,
     options: &CcOptions,
-) -> Result<ClassicalMachine<'a>> {
+) -> Result<(ClassicalMachine<'a>, Json)> {
     let entry = classical_entry(program, name)?;
     let (args, registers) = classical_args(program, entry, &options.args, options.token_defaults)?;
+    let budgets = budgets_json(&args);
     let mut machine = ClassicalMachine::with_quantum_registers_and_globals(
         program,
         name,
@@ -670,11 +688,11 @@ fn classical_machine<'a>(
     for draw in &options.draws {
         machine.push_measurement_draw(*draw)?;
     }
-    Ok(machine)
+    Ok((machine, budgets))
 }
 fn run_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> {
     let mut replies = load_replies(options.replies.as_deref())?;
-    let mut machine = classical_machine(program, name, &options)?;
+    let (mut machine, budgets) = classical_machine(program, name, &options)?;
     let mut trace = Vec::new();
     let steps = drive(
         &mut machine,
@@ -686,6 +704,7 @@ fn run_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> {
     check_replies_consumed(&replies)?;
     let outcome = machine.outcome();
     Ok(object([
+        ("budgets".into(), budgets),
         ("clock".into(), number(machine.clock() as u128)),
         ("console".into(), console_json(&machine)),
         ("console_hex".into(), string(hex(machine.console()))),
@@ -877,7 +896,7 @@ fn build_action_state(
         }
     }
     let mut regions = Vec::new();
-    let mut region_cell_values: Vec<Vec<u128>> = Vec::new();
+    let mut region_cell_values: Vec<Vec<BitVector>> = Vec::new();
     for p in &f.params[2] {
         let Type::Region(a, w) = p.ty else {
             return Err(fail("§5.1: mem slot requires region type"));
@@ -886,8 +905,12 @@ fn build_action_state(
             .then(|| 1usize.checked_shl(a as u32))
             .flatten()
             .ok_or_else(|| fail("host limit: interface region exceeds host memory"))?;
-        let cell_bytes = (w as usize).div_ceil(8);
-        let mut values = vec![0u128; cells];
+        let cell_width =
+            usize::try_from(w).map_err(|_| fail("host limit: cell width exceeds host storage"))?;
+        let cell_bytes = cell_width.div_ceil(8);
+        let mut values = (0..cells)
+            .map(|_| BitVector::zero(cell_width))
+            .collect::<Result<Vec<_>>>()?;
         if let Some((_, bytes)) = options.mem.iter().find(|(n, _)| *n == p.name) {
             if bytes.len() != cells * cell_bytes {
                 return Err(fail(format!(
@@ -900,24 +923,12 @@ fn build_action_state(
                 )));
             }
             for (i, chunk) in bytes.chunks_exact(cell_bytes).enumerate() {
-                values[i] = chunk
-                    .iter()
-                    .enumerate()
-                    .fold(0u128, |v, (j, b)| v | ((*b as u128) << (8 * j)));
-                if w < 128 && values[i] >> w != 0 {
-                    return Err(fail(format!(
-                        "§5.1: --mem cell {i} of region {} does not fit wire[{w}]",
-                        p.name
-                    )));
-                }
+                values[i] = BitVector::from_le_bytes(cell_width, chunk)?;
             }
         }
         let mut all = Vec::new();
         for _ in 0..cells {
-            let cell = q.allocate(
-                usize::try_from(w)
-                    .map_err(|_| fail("host limit: cell width exceeds host storage"))?,
-            )?;
+            let cell = q.allocate(cell_width)?;
             interface_wires.extend(&cell);
             all.push(cell);
         }
@@ -1001,8 +1012,7 @@ fn build_action_state(
         }
         for ((_, cells), values) in regions.iter().zip(&region_cell_values) {
             for (cell, value) in cells.iter().zip(values) {
-                let bits = BitVector::from_u128(cell.len(), *value)?;
-                prepare(&mut q, &cell.clone(), &bits)?;
+                prepare(&mut q, &cell.clone(), value)?;
             }
         }
     } else {
@@ -1152,7 +1162,7 @@ fn first_state_difference(a: &QuantumState, b: &QuantumState, total: usize) -> O
 }
 fn reverse_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> {
     let mut replies = load_replies(options.replies.as_deref())?;
-    let mut machine = classical_machine(program, name, &options)?;
+    let (mut machine, budgets) = classical_machine(program, name, &options)?;
     let entry = machine.snapshot();
     let entry_digest = machine.memory_digest();
     let steps = drive(
@@ -1172,6 +1182,7 @@ fn reverse_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> 
     let after = machine.snapshot();
     let equals = after == entry;
     Ok(object([
+        ("budgets".into(), budgets),
         ("clock".into(), number(machine.clock() as u128)),
         ("console".into(), console_json(&machine)),
         ("console_hex".into(), string(hex(machine.console()))),
@@ -1484,8 +1495,7 @@ fn run_action(program: &Object, name: &str, options: ActionOptions) -> Result<Js
 /// bennett_run_close. Paths that need staged deliverables 8-11 (PROGRESS)
 /// fail by name before any run is reported.
 fn run_program(program: &Object, name: &str, options: CcOptions) -> Result<Json> {
-    if let Some(target) = &options.target {
-        std::fs::read(target).map_err(|e| fail(format!("{target}: {e}")))?;
+    if options.target.is_some() {
         return Err(fail(
             "§10 bennett_load: a target description cannot be honoured yet (staged deliverable 9: §8 target descriptions, suite E; PROGRESS.md deliverables 8-11); no run is reported",
         ));
@@ -1506,19 +1516,7 @@ fn run_program(program: &Object, name: &str, options: CcOptions) -> Result<Json>
         )));
     }
     let (args, registers) = classical_args(program, f, &options.args, options.token_defaults)?;
-    let budgets = Json::Array(
-        args.iter()
-            .filter_map(|a| match a {
-                ClassicalValue::Token(b) => Some(object([
-                    ("depth".into(), number(b.depth)),
-                    ("heap".into(), number(b.heap)),
-                    ("stack".into(), number(b.stack)),
-                    ("steps".into(), number(b.steps as u128)),
-                ])),
-                _ => None,
-            })
-            .collect(),
-    );
+    let budgets = budgets_json(&args);
     let mut machine = ClassicalMachine::with_quantum_registers_and_globals(
         program,
         name,
@@ -1678,43 +1676,46 @@ fn run() -> Result<()> {
         );
         return Ok(());
     }
-    if command == "run-program" {
-        let name = args
-            .get(2)
-            .ok_or_else(|| fail(USAGE))?
-            .trim_start_matches('@');
-        program.check_hashes()?;
-        let options = parse_cc_options(&program, command, &args, 3)?;
-        println!("{}", run_program(&program, name, options)?.canonical());
-        return Ok(());
-    }
-    if command == "run-action" {
-        let name = args
-            .get(2)
-            .ok_or_else(|| fail(USAGE))?
-            .trim_start_matches('@');
-        program.check_hashes()?;
-        let options = parse_action_options(&args, 3)?;
-        println!("{}", run_action(&program, name, options)?.canonical());
-        return Ok(());
-    }
-    if command == "reverse" {
-        let name = args
-            .get(2)
-            .ok_or_else(|| fail(USAGE))?
-            .trim_start_matches('@');
-        program.check_hashes()?;
-        println!("{}", reverse(&program, name, &args)?.canonical());
-        return Ok(());
-    }
-    if command == "run-cc" {
-        let name = args
-            .get(2)
-            .ok_or_else(|| fail(USAGE))?
-            .trim_start_matches('@');
-        program.check_hashes()?;
-        let options = parse_cc_options(&program, command, &args, 3)?;
-        println!("{}", run_cc(&program, name, options)?.canonical());
+    if matches!(command, "run-cc" | "reverse" | "run-action" | "run-program") {
+        // Give CLI/IO/JSON input errors the relevant ISA context; preserve
+        // more specific citations from the library. Print only a complete
+        // result, so every error exits without partial JSON.
+        let rule = match command {
+            "run-action" => "§5.3",
+            "reverse" => "§14.1 / §7.4 / §10",
+            _ => "§10",
+        };
+        let output = (|| -> Result<Json> {
+            let name = args
+                .get(2)
+                .ok_or_else(|| fail(USAGE))?
+                .trim_start_matches('@');
+            program.check_hashes()?;
+            match command {
+                "run-program" => {
+                    let options = parse_cc_options(&program, command, &args, 3)?;
+                    run_program(&program, name, options)
+                }
+                "run-action" => {
+                    let options = parse_action_options(&args, 3)?;
+                    run_action(&program, name, options)
+                }
+                "reverse" => reverse(&program, name, &args),
+                "run-cc" => {
+                    let options = parse_cc_options(&program, command, &args, 3)?;
+                    run_cc(&program, name, options)
+                }
+                _ => unreachable!(),
+            }
+        })()
+        .map_err(|e| {
+            if e.0.contains('§') {
+                e
+            } else {
+                fail(format!("{rule}: {e}"))
+            }
+        })?;
+        println!("{}", output.canonical());
         return Ok(());
     }
     let name = args

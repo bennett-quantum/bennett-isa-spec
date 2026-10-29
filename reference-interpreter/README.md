@@ -70,11 +70,185 @@ Output: `cases`, `input_and_memory_bits`, `mode` (`exhaustive` or `sampled`),
 `fixed_regions`, `status`. Default B is 256; `--budget`, `--mem` and `--arg`
 apply.
 
+The four commands below share these conventions. A classical value is
+`{"type","value"}`: `iN` and `ptr` values are unsigned decimal strings of
+their bit-vector values (a signed reading at width N is the caller's), `f64`
+is a JSON number, `token` is an object with `steps`, `heap`, `stack` and
+`depth` (§9.1 integers), and `qreg` is the register id. Fault records are
+`faults`, a list of `{"code","name"}` with the §5.4 code and name (`name` is
+null outside the §5.4 table), plus `fault`, that code or null. Tape entries
+are `{"args","bytes","dev","op"}`: the §7.3 tape triple plus the bytes the
+operation transferred, hex. Measurements are `{"bits","reg","value"}` with
+`bits` in wire order (wire 0 first). Console output is `console_hex` always
+and `console` when it is valid UTF-8, else null. `memory_digest` is the
+SHA-256 of the complete §7.1 memory (allocation table, heap bump, every
+nonzero byte).
+
+For CC/R entries, arguments bind positionally to the entry signature (§10, `E_ARG` on a type
+or count mismatch): `--args a,b`, `--input a,b`, or repeated `--arg value`,
+at most one form (omission means no arguments). An `iN`/`ptr` value is decimal (negatives accepted within
+the signed range) or `0x` hex, range-checked at the width; `f64:` prefixes a
+binary64; `token:B[,heap,stack,depth]` is a §5.4-validated budget token
+(the four-component `--budget` supplies its defaults, as for `run-oracle`);
+`qreg:<bits>` allocates a fresh register and prepares those basis bits
+(first character is wire 0). `--entropy hex` is the entropy tape. `--draws
+d,...` queues measurement draws in [0, 1). `--replies file` is a JSON array
+of `{"service","payload","reply"}` objects (payload/reply hex) consumed in
+HOST_REQUEST order: each request must match the next entry's service and
+payload, every request must find a reply, and every reply must be consumed,
+else the run is a §10 diagnostic and no JSON is printed. `--mem global=hex`
+replaces a layout global's image in the entry state, at exactly its size.
+For CC/R entries `--budget B[,heap,stack,depth]`'s first component is
+execution fuel (CC/R has no ISA step budget; exhaustion is a §3.4
+diagnostic, default 1,000,000) and the rest are token defaults.
+
+`run-cc <object> <entry> [options]` runs a CC or R entry on the
+`ClassicalMachine` and prints the complete run. Output: `entry`, `status`
+(`COMPLETED` or `FAILED`), `steps`, `budgets` (one per `token:` argument, as
+for `run-program`), `results`, `fault`, `faults`, `tape`,
+`console`, `console_hex`, `clock`, `effect_tape_length`, `memory_digest`,
+`host_requests` (`{"address","capacity","payload","reply","service"}`),
+`measurements`, and `trace`. Each trace record is one executed instruction:
+`step` (counting from 0), `function`, `block`, `index` within the block,
+`line` (the object text line), `op`, `lhs`, `operands`, `registers` (each
+`{"activation","name","pre","post"}`, the changed dynamic instances with
+their previous and new current values, null when absent) and `memory` (each
+`{"address","pre","post"}`, every changed byte). A hostcall record includes
+its reply's deltas. A fault or trap is a `FAILED` result with no values,
+not a diagnostic.
+
+`reverse <object> <symbol> [options]` runs forward, then reverses, and
+reports whether the complete entry state is restored byte for byte:
+`equals_entry` and `first_difference` (null when equal, else a description of the first
+differing component). `status` is `REVERSED` when equal and `FAILED`
+otherwise; a reversal the ISA forbids is a diagnostic citing its rule. The
+form depends on the symbol kind. For a CC/R entry, `reverse` takes the
+`run-cc` options plus `--steps N` (reverse only after N forward
+instructions; without it the whole run); it is §7.4 whole-run or prefix
+reversal of the retained history. It also reports `memory_equals_entry`
+(the §7.1 memory component). Output: `entry`, the forward `results`, `fault`,
+`faults`, `budgets`, `steps`, `tape` and `host_requests`, then the post-reversal
+`console`, `console_hex`, `clock`, `effect_tape_length`, `memory_digest`
+and `entry_memory_digest`. A faulted prefix reverses like any prefix
+(§7.4); a run containing `measure` is a §10 `E_NOT_REVERSIBLE` diagnostic.
+For an oracle, `reverse` takes the `run-oracle` options (`--input`,
+`--budget`, `--mem`, `--arg`) plus `--steps k` (default B, above B is a
+§5.4 diagnostic): it runs k forward steps of the literal §3.6 machine, then
+k inverse steps (§14.1 prefix reversal, T2). Output: `oracle`, `budget`,
+`payload` and `code` of F_k as read off the machine, `steps` (its executed
+rows), `forward_steps` and `reverse_steps` (both k), `frames_clean`, and
+`state_after_reversal` with `pc`, `pc_prime`, `faulted`, `counters`
+(heap_used, atop, sp, fp, depth) and `locations` (`function.name` to its
+bit-vector value). For an action, `reverse` takes the `run-action` options,
+executes the action and then its adjoint (§10 reversal of a top-level Q
+call), and prints `forward_state` and the post-reversal `state`, `mut` and
+`in`.
+
+`run-action <object> <action> [options]` executes a Q action once (its
+adjoint with `--adjoint`) on a basis state or a small state vector.
+Exactly one input form: `--mut v,... [--in v,...] [--mem region=hex]` (one
+integer per bundle, decimal or `0x`; `in` bundles and region cells default
+to zero; region hex is one little-endian value per cell in cell order, of
+exactly the region's byte count), `--basis <bits>`, or `--state
+<bits>=<re>[,<im>][;...]`. Classical arguments take `--args` or `--arg` in
+the `run-oracle` spellings. Bit strings and the output state use the
+interface order: mut bundles, then in bundles, then mem regions with cells
+in order, wire 0 of each bundle or cell first (bundles little-endian,
+§14.2); `--basis`/`--state` bits cover that whole order. Output: `action`,
+`adjoint`, `wires` (the interface wire count), `state`, `mut`, `in` and
+`mem`. `state` maps each exactly nonzero component's bit string to
+`[re, im]`, the binary64 values of the exact amplitudes (a component
+appears iff its exact amplitude is nonzero; `--state` amplitudes are held
+exactly as the dyadic values they denote). `mut`, `in` and each `mem` cell
+give the exact integer when that bundle or cell is basis-definite on every
+component, else null. Borrowed wires start in |0⟩ from the borrow pool and
+must be returned to |0⟩ on every component, else the run is a §5.6
+diagnostic.
+
+`run-program <object> <cc-entry> [options]` is a one-shot §10 launch:
+`bennett_load` (parse and stored-hash verification), positional
+`bennett_run` of a device CC entry with the `run-cc` argument, entropy,
+reply and draw options, result reporting, and `bennett_run_close`;
+`--reverse` applies `bennett_reverse` before closing. The entry must have
+kind `cc` (§10; other kinds are `E_ARG`). Output: `entry`, `status`
+(`COMPLETED`, `FAILED`, or `REVERSED` with `--reverse`), `run_state`
+(`CLOSED`), `reversed`, `steps`, `results` (a FAILED run exposes no values),
+`fault`, `faults`, `measurements`, `tape`, `host_requests`, `budgets` (one
+`{"steps","heap","stack","depth"}` per `token:` argument, §5.4-validated at
+creation), `console`, `console_hex`, `clock`, `effect_tape_length`,
+`memory_digest`, `entry_memory_digest`, and the final state's
+`equals_entry`, `memory_equals_entry` and `first_difference` against the
+entry state. `--reverse` on a FAILED run is `E_INVALID_STATE` and on a run
+that measured is `E_NOT_REVERSIBLE` (§10), both diagnostics. Two inputs are
+explicit staged diagnostics, never silently ignored: `--target file`
+(`bennett_load`'s target, staged deliverable 9: §8) and an object with a
+`schedule` section (verbatim scheduled execution, staged deliverable 10:
+§11). The rest of deliverable 8 (the full §10 C API as a library, estimates,
+coverage) remains staged as PROGRESS records.
+
+Exact output schemas follow. This structural notation describes JSON:
+`T[]` is an array, `Record<string,T>` an object with arbitrary string keys,
+`&` combines object fields, and `|` is a union. Every listed field is
+required; no other fields are emitted. `U` is a nonnegative integer,
+a JSON number through 2^53 − 1 and a decimal string above it (§9.1);
+`Decimal` is always an unsigned decimal string; `Hex` is an even-length
+hex string; `Digest` is a 64-character lowercase SHA-256 hex string.
+`number` denotes a finite binary64 JSON number.
+
+```text
+Budget = {steps: U, heap: U, stack: U, depth: U}
+Value = {type: "iN" | "ptr", value: Decimal}
+      | {type: "f64", value: number}
+      | {type: "token", value: Budget}
+      | {type: "qreg", value: U}
+Fault = {code: U, name: string | null}
+Tape = {args: U[], bytes: Hex, dev: string, op: string}
+Measurement = {bits: string, reg: U, value: U}
+HostRequest = {address: U, capacity: U, payload: Hex, reply: Hex, service: string}
+Trace = {step: U, function: string, block: string, index: U, line: U,
+         op: string, lhs: string[], operands: string[],
+         registers: {activation: U, name: string,
+                     pre: Value | null, post: Value | null}[],
+         memory: {address: U, pre: U, post: U}[]}
+State = Record<string, [number, number]>
+Reported = {entry: string, steps: U, budgets: Budget[], results: Value[],
+            fault: U | null, faults: Fault[], tape: Tape[],
+            host_requests: HostRequest[]}
+Effects = {console: string | null, console_hex: Hex, clock: U,
+           effect_tape_length: U, memory_digest: Digest}
+Equality = {equals_entry: boolean, first_difference: string | null}
+Reversal = Equality & {status: "REVERSED" | "FAILED"}
+MemoryEquality = {memory_equals_entry: boolean, entry_memory_digest: Digest}
+
+run-cc = Reported & Effects & {status: "COMPLETED" | "FAILED",
+                              measurements: Measurement[], trace: Trace[]}
+reverse (CC/R) = Reported & Effects & MemoryEquality & Reversal
+reverse (oracle) = Reversal & {
+    oracle: string, budget: Budget, payload: U, code: U, steps: U,
+    forward_steps: U, reverse_steps: U, frames_clean: boolean,
+    state_after_reversal: {pc: U, pc_prime: U, faulted: boolean,
+                          counters: [U, U, U, U, U],
+                          locations: Record<string, U>}}
+reverse (action) = Reversal & {
+    action: string, adjoint: boolean, wires: U, forward_state: State,
+    state: State, mut: (U | null)[], in: (U | null)[]}
+run-action = {action: string, adjoint: boolean, wires: U, state: State,
+              mut: (U | null)[], in: (U | null)[],
+              mem: Record<string, (U | null)[]>}
+run-program = Reported & Effects & Equality & MemoryEquality & {
+    status: "COMPLETED" | "FAILED" | "REVERSED", run_state: "CLOSED",
+    reversed: boolean, measurements: Measurement[]}
+```
+
 ```sh
 reference-interpreter/target/debug/bennett-isa-ref check reference-interpreter/tests/fixtures/inc8.bisa
 reference-interpreter/target/debug/bennett-isa-ref run-oracle reference-interpreter/tests/fixtures/inc8.bisa inc8 --input 8 --budget 3
 reference-interpreter/target/debug/bennett-isa-ref step-check reference-interpreter/tests/fixtures/inc8.bisa inc8 --suite --budget 4
 reference-interpreter/target/debug/bennett-isa-ref run-oracle reference-interpreter/tests/fixtures/sum_db.bisa sum_db --input 3 --mem db=0102030405060708090a0b0c0d0e0f10 --budget 1000,4080,512,64
+reference-interpreter/target/debug/bennett-isa-ref run-cc reference-interpreter/tests/fixtures/classical.bisa sum --args 3
+reference-interpreter/target/debug/bennett-isa-ref reverse reference-interpreter/tests/fixtures/inc8.bisa inc8 --input 8 --budget 3
+reference-interpreter/target/debug/bennett-isa-ref run-action reference-interpreter/tests/fixtures/registers.bisa bell --mut 0
+reference-interpreter/target/debug/bennett-isa-ref run-program reference-interpreter/tests/fixtures/registers.bisa measurement --args "" --draws 0.9
 ```
 
 ## Library
@@ -90,12 +264,21 @@ reference-interpreter/target/debug/bennett-isa-ref run-oracle reference-interpre
   `outcome` and complete snapshots.
 - `ClassicalMachine` executes CC/R with dynamic SSA, retained history, the four
   §7.3 device models, tapes, hostcall request/reply, segment `uncall` and
-  whole-run reversal; `QuantumRegisters` holds §3.3 qreg handles.
+  whole-run reversal; `QuantumRegisters` holds §3.3 qreg handles. It also
+  exposes single stepping (`step_once`, `StepPoint`), the current `outcome`,
+  the `effect_tape` with transferred bytes, `memory_digest`, caller-seeded
+  globals (`with_quantum_registers_and_globals`), and snapshot comparison
+  (`ClassicalSnapshot::delta`, `first_difference`, `memory_equals`); the
+  step machine snapshot likewise (`BasisVectorConfiguration::locations`,
+  `counter_values`, `first_difference`).
 - `QuantumState` is the §14.2 simulator: a basis fast path and a sparse
   superposition over any number of wires, each with an exact amplitude shadow
   in Q(√2, i)[z, 1/z] (`src/exact.rs`). Cleanliness, basis reads and state
   equality are exact; binary64 amplitudes serve Born probabilities only.
-  `Object::execute_action` runs structured Q bodies and their adjoints.
+  `QuantumState::set_state_vector` installs a sparse superposition with each
+  binary64 amplitude held exactly as its dyadic value.
+  `Object::execute_action` runs structured Q bodies and their adjoints;
+  `Object::borrow_capacity` sizes an action's §5.6 borrow pool.
 - `Object::verify_certificate` and `verify_claim` re-execute exhaustive and
   sampled claims (`ClaimVerdict::Proof` only for exhaustive claims over D),
   check translation-lemma and library structural claims, and report interval

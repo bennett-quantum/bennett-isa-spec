@@ -1,7 +1,7 @@
 # Bennett ISA reference interpreter progress
 
 Resume from this file. Scope is the entire accepted ISA 0.8 (BRIEF.md); the
-current brief is `docs/briefs/2026-10-29-isa-ref-council-fixes.md`. Write only
+current CLI brief is `docs/briefs/2026-10-29-isa-ref-cli-xam.md`. Write only
 under `reference-interpreter/`; commit own paths
 (`git add -A -- reference-interpreter && git commit -- reference-interpreter`),
 never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
@@ -16,10 +16,39 @@ hand-derived in the test comments.
 
 | Command | Status | Test | Commit |
 |---|---|---|---|
-| `run-cc` | done | `tests/cli_xam.rs` | bc63483 |
-| `reverse` | done | `tests/cli_xam.rs` | d987500 |
-| `run-action` | done | `tests/cli_xam.rs` | 9d4c0dc |
-| `run-program` | done | `tests/cli_xam.rs` | — |
+| `run-cc` | done | `cli_xam::run_cc_sum_reports_every_step_with_register_deltas` | bc63483 |
+| `reverse` | done | `cli_xam::reverse_oracle_prefix_reversal_restores_the_basis_tuple` | d987500 |
+| `run-action` | done | `cli_xam::run_action_permutation_basis_and_adjoint` | 9d4c0dc |
+| `run-program` | done | `cli_xam::run_program_region_calls_complete_and_close` | 623a9bb |
+
+Resumption review preserved and completed the uncommitted README, budget
+reporting and arbitrary-width CLI input work. README Commands now has exact
+structural JSON schemas for all four commands (including each reverse form)
+and an invocation per command. All 26 `cli_xam` tests were copied into an
+archived pre-CLI `ddf356c` source tree and failed there; they pass on the
+current implementation. The expectations derive from fixture rows and ISA
+rules, including an independent decimal expansion of 2^299 + 1.
+
+Three diagnostics regressions were red in the resumed tree: ambiguous
+arguments and a misplaced `--steps` lacked ISA citations; a nonexistent
+`--target` reported only an I/O error instead of naming staged deliverable 9.
+They now pass with exit 1, a rule citation and empty stdout. Extra tests pin
+ordered token budgets across CC/reverse/program commands and exact i128
+measurement reporting. No spec or Python seed changes. Deliverables 8–11
+remain staged as detailed below; no capability was declined.
+
+Final xam verification (headless, project-local `.tmp`, all four display /
+browser variables unset):
+
+| Command | Result |
+|---|---|
+| `cargo test --offline` | 178 passed, 0 failed, 5 ignored (26 CLI tests) |
+| `cargo test --offline -- --ignored` | 5 passed, 0 failed |
+| `cargo clippy --offline --all-targets -- -D warnings` | clean, no tests executed |
+| `cargo fmt -- --check` | clean, no tests executed |
+
+Each command used the absolute `--manifest-path` to this crate. The normal
+suite and the ignored sweeps were run after the final Rust changes.
 
 ## Session 2026-10-29 (Opus, council fix loop): milestone 1 reached
 
@@ -78,7 +107,7 @@ Ignored sweeps (debug build, this machine):
 | 4. Step machine | Literal forward/inverse steps, derived widths, T2/T6 sweeps | `step_machine.rs`, `wide_oracle.rs`, `r1_widths.rs`, recursive sweep |
 | 5. CC/R tiers | History, tapes, devices, hostcall, uncall, tiers, traps | `classical.rs`, `registers.rs`, `r1_rules.rs` |
 | 6. Q tier and §6 | Exact simulator, actions, borrow frames, qinplace, §6 checker | `quantum*.rs`, `borrow.rs`, `r1_exact.rs`, `r1_borrow.rs`, `r1_qinplace.rs` |
-| 7. CLI and docs | check/hash/run-oracle/step-check, README | `cli.rs` |
+| 7. CLI and docs | check/hash/run-oracle/step-check plus run-cc/reverse/run-action/run-program, README schemas and examples | `cli.rs`, `cli_xam.rs` |
 | 8–11 | Staged (below) | — |
 
 ### Staging of deliverables 8–11 (codex B19)
@@ -87,7 +116,10 @@ The whole-ISA scope includes §8, §10–§12 and suites D, E, G, H. They are st
 in this order after milestone 1; nothing is exempt, and every claim or path
 that needs them already reports so explicitly (`ClaimVerdict::Unverified`).
 
-8. **Launch ABI (§10), suite G.** A Rust API mirroring every C entry point
+8. **Launch ABI (§10), suite G.** The one-shot `run-program` CLI now exposes
+   positional launch, HOST_REQUEST/reply, results/faults/measurements, optional
+   reversal and close. The full library ABI remains staged: a Rust API
+   mirroring every C entry point
    (`bennett_load` … `bennett_coverage_get`) over `ClassicalMachine`: the
    CREATED → … → CLOSED state machine with E_INVALID_STATE checks (waiting on
    SUSPENDED/REVERSED/CLOSED, unload with an unclosed run), positional binding
