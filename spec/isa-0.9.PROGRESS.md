@@ -177,10 +177,11 @@ every symbol to the last hash computed. Full list (count of occurrences in the d
 | 7, g / 7, ginv / 7, addya / 7, run | 1 each | ex 7 symbols line (plus `<closure hash of g>`, `<closure hash of ginv>` in the prose certificate fragment, which the precheck fills when it generates the certificate) |
 | 8, main / 8, work | 1 each | ex 8 symbols line |
 | 9, zero_cause / 9, zero_cc | 1 each | ex 9 symbols line |
+| 10, through / 10, worker / 10, plus_db / 10, flip_arg | 1 each | ex 10 symbols line (Q14 continuation) |
 
 **Cross-check values (NOT normative, not in the draft).** Computed by importing the *unmodified* seed
 `reference-interpreter/isa_check.py` (functions `extract_examples`, `parse_object`, `compute_hashes`) on the
-draft text before the placeholders were made distinct. The seed has no CC/R closure set and no part-(5c) device
+draft text before the placeholders were made distinct; examples 2 and 10 were recomputed after Q14. The seed has no CC/R closure set and no part-(5c) device
 lines, so examples 4 and 8 (CC/R functions with a layout; example 8 also a device) are omitted as unreliable;
 for the others the seed's model is complete (oracle, lproc, data, action, and memoryless CC/R with no devices).
 The 0.9 precheck must compute its own values; these are only for comparison.
@@ -188,8 +189,8 @@ The 0.9 precheck must compute its own values; these are only for comparison.
 ```
 ex1 inc8        ed9865300b85a519c2379de98e36e635e72b5b78d8bdfca03dccf9a09aa3df5e
 ex2 zero        43e032f98d7aff20f6864d6368b20ab4ef9d810938999acff8d71ed16e6b17d7
-ex2 sum         069abdb5b7239c403c2687bcd317c0de85710f955de3cb790444ccbc9aa09592
-ex2 sum_db      e78f97e074907edfc724df7577dfb12684a05db21656477f9235fe71ed0572d8
+ex2 sum         498cfae2ec3e3d3322997010572345b34be5459fb7ad69edc5c9e51e10dc1e00
+ex2 sum_db      443e5ab7fd4f005efbde4664972d709b0e9c7995eb8842271aebbdc78a52570f
 ex3 borrow_demo 6f4782e9bde4267acd1afddd650093722a056d9d50ee465b79cb86a4606b2a94
 ex5 flip        3860ea712b2d70fc495834586bb397656a467c85235aa069768318a06e9fa89b
 ex5 scratch     05525834cbe5a518aa97444912254f3c12c75dd86314a98ba550f45187208a0b
@@ -203,10 +204,14 @@ ex7 addya       5999b6d3d2362f8c1971ef6f37b404766aa5c18f6ba1880d767bfde351e47392
 ex7 run         562ab7270a0f508d6a2f4a757f3f90964da0b60541bac2c5efa421bad009056a
 ex9 zero_cause  badf7dd2a59afa879f092921946539dfb918cedd35f6fbbaa838c630577eaed4
 ex9 zero_cc     0403d76ff065acab57cb9165cfe1d3d73bbf8dad60bbc1348fb0305ee4f37611
+ex10 plus_db    cab2fb72ce9ebea9f5942ca9956e4f1906535f095c6cf0a840f45bf4baa37c5a
+ex10 flip_arg   bfa13d9a564e3f8562098c4ea39330d947efa64521310afad6a329dc594bd671
+ex10 worker     ab885fe1ec4d35b98ddb1cfbcde0ad18e747343af5155bb2beff1aa618fc1563
+ex10 through    fbd06a460dd2bf2cd6b19ab101f023f1ed2002eaf35117ac2e83c52dce4ac76c
 ```
 
 Precheck notes: the seed's printed-table regex needs 64-hex values (the placeholders will fail it until
-patched, as intended); its `--repatch` and its executable checks of inc8/sum_db need `0.9` acceptance; examples 4–9
+patched, as intended); its `--repatch` and its executable checks of inc8/sum_db need `0.9` acceptance; examples 4–10
 need a 0.9 interpreter (new instructions) — the brief forbids changing the crate here.
 
 ## Open questions for the maintainer (each with a recommendation)
@@ -388,7 +393,7 @@ was checked against the text and all were accepted:
 - S0-8 T4's quantum-state clause false for ε > 0 adjoints → exactness hypothesis stated; ledger claim restricted to
   registers the run created or touched; qreg.new reversal releases without a test (residual within bounds).
 - S0-9 lifted-call args from locations would be superposed "classical" values → E17.14 (classical args only);
-  consequence filed as bd 7u6 (lprocs have no token/args source), open question Q14.
+  consequence filed as bd 7u6 (lprocs have no token/args source); resolved by the applied Q14 edit below.
 - S1s: from_id ownership not undone, host calls on owned registers E_INVALID_STATE; measure.iN on qreg[n] with
   N = n; literal qreg.new 0 ill-formed (literal n ≥ 1); slice out of range traps even when literal; executor class
   includes inverse-pair checking; "verifying executor" defined (E17.17) and used for qreg.free and host calls;
@@ -401,6 +406,60 @@ Not changed: T1's "halts within B + 1 rows" (0.8 text, counts the halting check;
 executed"); `fn` result names (0.8 convention); `bennett_qreg_new`'s `uint32_t n` (host-side allocation; device
 widths are unbounded through `qreg.new`).
 
-Q14 (new). Lprocs cannot obtain tokens or classical args for lifted calls (0.8 limitation made explicit by E17.14;
-bd 7u6). Recommend raising it as a blocker candidate for the dialect council: either lprocs read the enclosing
-oracle's classical arguments as pseudo-locations, or lprocs take token/classical params.
+Q14 — **APPLIED (2026-10-29, b-isa-spec-7u6)**. The second alternative is applied: lprocs take explicit
+token/classical parameters. Source: the maintainer's acceptance recorded in
+`worklog/001_2026-10-28_bootstrap.md` line 26 as "the Q14 edit (lproc token/classical params)";
+the orchestrator's 2026-10-29 decision selects that alternative. The draft's §0.2 now records the applied edit
+and source; the earlier pseudo-location/captured-environment alternative is not the adopted mechanism.
+
+Sections edited: §0.1 (E17.14), §0.2 (applied/source), §2 (terminology), §3.3 (argument matching),
+§3.6–§3.7 (header groups, explicit forwarding, fixed binding instances, location/stack layout and charge),
+§4.2 (lifted-call operands), §4.7–§4.8 (types and opcode schema), §5.1 (roles), §5.4–§5.5 (token validity,
+nested budgets and matched cleanup), §9.1–§9.2 (signature, hash and link consequences), §15 (suites C/F),
+§16.2–§16.3 (grammar, example 2's empty signature arrays and new example 10).
+
+Header: `lproc @f (params..) (result) (tokens..) (classical..) (mem..)`.
+Groups are `reg[N]` parameters; one `reg[T]` result; `token` parameters; `iN ptr f64` parameters;
+`region[A,W] in` parameters. Optional `token` / `classical` suffixes agree with their header group.
+The full call is `w = lift.call @f (a_1..a_m) (tokens..) (classical..) (mem..)`; the original one-list form
+is canonical exactly when the three new groups are empty. Tokens keep their identity and validity; classical
+values remain fixed before oracle entry. Instantiating each lproc for the finite set of forwarded entry-binding
+keys handles different coherent call paths and recursion without selecting classical data from wire values.
+The fifth group forwards mapped regions so every lifted call available to an oracle remains available in an
+lproc, including calls with memory interfaces. Bindings add no rows, captures or stack cells; ordinary
+`lift.call` / `lift.ret` and lifted region-call charges remain unchanged. Nested oracles use their explicit
+token's tuple, not the enclosing oracle's tuple. The required signature arrays `tokens`, `args`, `mem`
+(including empty arrays) and canonical operand lists enter existing identity/hash rules.
+
+D19 (Q14, hand derivation and independent check). Example 10 has two outer rows and six worker rows:
+call, nested oracle call, const, compare, faultif, permutation call, ret, retval = 8 executed outer steps.
+The worker has five locations, hence R_worker = 3 + 5 = 8 cells; token/classical/region bindings add none.
+Binding key [0,1,0]; HALT = 8, P = 4. The nested oracle has six rows and computes
+(x + a + (d mod 4)) mod 4, and the permutation action XORs bit 0, giving that value XOR 1. Outer B = 7
+misses retval (code 1); stack_limit = 7 or depth_limit = 0 faults at the first call (code 3); nested B = 5
+returns code 1, propagated by faultif at outer step 5 as code 9. The two mapped bases (16, 17) alias the same
+passed region cells across invocations; neither passes a location as a classical argument.
+
+Q14 verification (headless, only the two owned Markdown paths edited):
+- The independent Python row model reads example 10's printed instruction lists: all 4,096 (x,a,d) inputs
+  pass eight budget/boundary cases; all 262,144 input/target/fault tuples satisfy the XOR involution.
+  This checks the numerical witness, not an implemented 0.9 executor or a full circuit-level inverse.
+- Recursive binding forwarding closes on a finite, deterministically ordered key set in an independent model;
+  17 complete JCS metadata/envelope lines parse and are canonical; all printed lproc signatures carry the
+  three new arrays. Example 10's row counts, header and forwarding lists match the derivation.
+- `python3 /home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/isa_check.py`:
+  PASS (two accepted 0.8 example objects, their hashes, two envelopes and stated execution).
+- The unmodified seed parses all ten objects and computes their hashes as a structural cross-check;
+  example 2's changed lproc/caller hashes and example 10's hashes are recorded above as non-normative values.
+- Draft SHA-256: `25641147f345491a69a27208e4cbd1812011a364daf3e1821c31a8e1562233f0`.
+- The 0.8→0.9 unified diff is regenerated in memory: 2103 lines, SHA-256
+  `8ede5c269a6b455656f68312b9f792614246c680a69c4ce9b9ea03b386eded79`. The earlier
+  job's tracked `spec/isa-0.8-to-0.9.diff` is outside this task's two owned paths and is not rewritten.
+- The accepted 0.8 file's SHA-256 remains
+  `90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e`.
+- `git diff --check -- spec/Bennett-ISA-Spec-0.9-draft.md spec/isa-0.9.PROGRESS.md`: PASS.
+
+Remaining lproc mechanics: none deferred by Q14. Implementation and the 0.9 precheck (including executable
+conformance for example 10 and hash patching) remain pending under the draft's existing gate; this task does
+not change the read-only reference interpreter. General §17 defaults (notably the unpublished `ref` expansion
+bytes and optional checkpointed realisations) continue to apply to lproc rows as to other lifted rows.
