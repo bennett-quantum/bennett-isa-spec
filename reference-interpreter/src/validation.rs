@@ -497,12 +497,15 @@ impl Object {
                     let version = format!(
                         "{op}:{}:{:?}:{:?}",
                         normalized.join(" "),
-                        s.snapshot(
+                        // Control and effective-control VERSIONS (fable R1-B3): a
+                        // flipped predicate wire changes the operation identity.
+                        s.read_snapshot(
                             &controls
                                 .iter()
-                                .flat_map(|w| s.wires(w).unwrap_or_default())
-                                .collect::<Vec<_>>()
-                        ),
+                                .map(|w| s.wires(w))
+                                .collect::<Result<Vec<_>>>()?
+                                .concat()
+                        )?,
                         s.predicates
                     );
                     let reads = controls
@@ -511,6 +514,33 @@ impl Object {
                         .collect::<Result<Vec<_>>>()?
                         .concat();
                     s.note_reads(&version, &reads)?;
+                    if diagonal {
+                        // A diagonal gate applies a phase that is a function of its
+                        // operands' values: an outstanding phase is an entangling
+                        // read of every `other` value those values depend on.
+                        // `other` operands record the diagonal gate in their own
+                        // version log (record_change below); the phase entry covers
+                        // the perm operands, whose values may depend on `other` ones.
+                        let mut operands = Vec::new();
+                        for w in controls.iter().chain(&targets) {
+                            if !s.is_other(w)? {
+                                operands.extend(s.wires(w)?);
+                            }
+                        }
+                        let mut phase_reads = operands.clone();
+                        for p in &s.predicates {
+                            phase_reads.extend(s.wires(p)?);
+                        }
+                        let key = format!(
+                            "{op}:{}:{:?}",
+                            normalized.join(" "),
+                            s.snapshot(&phase_reads)
+                        );
+                        if !operands.is_empty() {
+                            s.note_reads(&key, &operands)?;
+                            s.toggle_phase(key);
+                        }
+                    }
                     for t in targets {
                         s.check_target(&t, diagonal)?;
                         if !diagonal {
@@ -1234,6 +1264,8 @@ struct Discipline {
     /// calls): a window opens at its computation (§6.2), so cleanups compare
     /// counts snapshotted at the computation rather than a permanent set.
     closed: BTreeMap<String, u64>,
+    /// Outstanding diagonal operations (phase functions of their operands).
+    phases: Vec<String>,
     reads: BTreeMap<String, Vec<(String, Vec<String>)>>,
     other_versions: BTreeSet<String>,
     local_regions: BTreeSet<String>,
@@ -1257,6 +1289,7 @@ impl Discipline {
             created: BTreeMap::new(),
             versions: BTreeMap::new(),
             closed: BTreeMap::new(),
+            phases: Vec::new(),
             reads: BTreeMap::new(),
             other_versions: BTreeSet::new(),
             local_regions: BTreeSet::new(),
@@ -1322,6 +1355,16 @@ impl Discipline {
         reads.dedup();
         Ok(self.snapshot(&reads))
     }
+    /// Diagonal operations commute: an inverse anywhere in the outstanding
+    /// list cancels (same operand versions are part of the key).
+    fn toggle_phase(&mut self, key: String) {
+        match operation_inverse(&key).and_then(|inv| self.phases.iter().position(|p| *p == inv)) {
+            Some(i) => {
+                self.phases.remove(i);
+            }
+            None => self.phases.push(key),
+        }
+    }
     fn closures(&self, wires: &[String]) -> Vec<(String, u64)> {
         wires
             .iter()
@@ -1353,9 +1396,20 @@ impl Discipline {
         }
         out
     }
+    /// Records what an operation read: its operands, the effective control
+    /// context and, transitively, every wire their current versions depend on
+    /// (§6.1 dependency sets are unions of the read operands' sets). An
+    /// entangling read through an intermediate value therefore still blocks
+    /// the adjoint of an `other` value it read (found by the §6 fuzzer:
+    /// `h d0; ccx d0 p d1; cx d1 t; ccx d0 p d1; h d0` leaves d0 entangled with t).
     fn note_reads(&mut self, version: &str, wires: &[String]) -> Result<()> {
-        self.reads
-            .insert(version.into(), self.read_snapshot(wires)?);
+        let direct = self.read_snapshot(wires)?;
+        let mut all: Vec<String> = direct.iter().map(|(w, _)| w.clone()).collect();
+        all.extend(self.dependencies(&all));
+        all.sort();
+        all.dedup();
+        let snapshot = self.snapshot(&all);
+        self.reads.insert(version.into(), snapshot);
         Ok(())
     }
     fn produce(&mut self, n: &str, ty: Type, c: Creation) -> Result<()> {
@@ -1367,10 +1421,17 @@ impl Discipline {
         Ok(())
     }
     fn consume(&mut self, n: &str) -> Result<()> {
-        for wire in self.wires(n)? {
-            self.versions.remove(&wire);
-            self.closed.remove(&wire);
-            self.modified.remove(&wire);
+        let consumed = self.wires(n)?;
+        for wire in &consumed {
+            self.versions.remove(wire);
+            self.closed.remove(wire);
+            self.modified.remove(wire);
+        }
+        // A cleaned value no longer carries information: records that read it
+        // keep its transitive dependencies (note_reads) but not its name, which
+        // a later value may reuse.
+        for reads in self.reads.values_mut() {
+            reads.retain(|(w, _)| !consumed.contains(w));
         }
         self.types.remove(n);
         self.created.remove(n);
@@ -1392,15 +1453,14 @@ impl Discipline {
     fn change(&mut self, n: &str, version: String, other: bool) -> Result<()> {
         self.check_target(n, false)?;
         let context = self.read_snapshot(&[])?;
-        let version = format!("{version}:context{context:?}");
         // Keep the dependency metadata under the complete operation identity.
-        let original = version
-            .rsplit_once(":context")
-            .expect("operation context")
-            .0;
-        let reads = self.reads.get(original).cloned().unwrap_or(context);
+        // (The context snapshot itself contains earlier ":context" suffixes, so
+        // the operation key is taken before formatting, never re-split.)
+        let original = version;
+        let version = format!("{original}:context{context:?}");
+        let reads = self.reads.get(&original).cloned().unwrap_or(context);
         self.reads.insert(version.clone(), reads);
-        if self.other_versions.contains(original) {
+        if self.other_versions.contains(&original) {
             self.other_versions.insert(version.clone());
         }
         let needs_adjoint = other || self.is_other(n)?;
@@ -1409,7 +1469,11 @@ impl Discipline {
                 *self.closed.entry(w.clone()).or_default() += 1;
             }
             let blocked = needs_adjoint
-                && (self.versions.iter().any(|(target, log)| {
+                && (self.phases.iter().any(|v| {
+                    self.reads
+                        .get(v)
+                        .is_some_and(|reads| reads.iter().any(|(source, _)| source == &w))
+                }) || self.versions.iter().any(|(target, log)| {
                     target != &w
                         && log.iter().any(|v| {
                             self.reads

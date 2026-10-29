@@ -203,3 +203,44 @@ fn muse_b5_loop_bodies_are_validated_per_iteration() {
     ));
     run_basis(&o, |t, p| t ^ p);
 }
+
+/// action @a (t:wire mut, m:wire mut) (p:wire in): the fuzzer's interface.
+fn tmp(body: &str) -> String {
+    let sig = r#"{"abi":"0.8","args":[],"bounds":[],"in":[1],"kind":"action","mem":[],"mut":[1,1],"tier":"q"}"#;
+    object(
+        &[(
+            "a",
+            sig,
+            &format!("action @a (t:wire mut, m:wire mut) (p:wire in) () () ()\n^entry():\n{body}"),
+        )],
+        "{}",
+        "",
+    )
+}
+#[test]
+fn fuzz_witnesses_of_entangling_reads_are_rejected() {
+    // Found by tests/r1_fuzz_discipline.rs; each releases d0 dirty at run time.
+    // (1) t reads d0 through the perm value d1 (transitive dependency).
+    reject(
+        &tmp("d0 = qalloc any 1\nd1 = qcopy p\nh d0\nrz 0.5 d0\nccx d0 p d1\ncx d1 t\nccx d0 p d1\nrz -0.5 d0\nh d0\nquncopy p d1\nqfree d0"),
+        "§6.2",
+    );
+    // (2) the same through a predicate instead of a control.
+    reject(
+        &tmp("d0 = qalloc any 1\nd1 = qcopy m\nh d0\ncx d0 d1\nqpred d1\nx t\nqunpred d1\ncx d0 d1\nh d0\nquncopy m d1\nqfree d0"),
+        "§6.2",
+    );
+    // (3) a diagonal phase on a perm value that depends on d0 kicks back onto d0.
+    reject(
+        &tmp("d0 = qalloc any 1\nd1 = qcopy t\nh d0\ncx d0 d1\ncz d1 t\ncx d0 d1\nh d0\nquncopy t d1\nqfree d0"),
+        "§6.2",
+    );
+    // (4) a flipped effective-control wire between t and tdg on an `other` value.
+    reject(
+        &tmp("d0 = qalloc any 1\nry 0.75 d0\nqpred t\nqpred m\nt d0\nqunpred m\nqunpred t\nx t\nqpred t\nqpred m\ntdg d0\nqunpred m\nqunpred t\nry -0.75 d0\nqfree d0"),
+        "§6.2",
+    );
+    // Positive controls: the readers are undone before the adjoint.
+    accept(&tmp("d0 = qalloc any 1\nd1 = qcopy p\nh d0\nccx d0 p d1\ncx d1 t\ncx d1 t\nccx d0 p d1\nh d0\nquncopy p d1\nqfree d0"));
+    accept(&tmp("d0 = qalloc any 1\nd1 = qcopy t\nh d0\ncx d0 d1\ncz d1 t\ncz d1 t\ncx d0 d1\nh d0\nquncopy t d1\nqfree d0"));
+}
