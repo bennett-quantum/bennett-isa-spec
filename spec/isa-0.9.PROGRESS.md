@@ -158,11 +158,84 @@ D9 (E8, approximate witnesses). Given certified λ_min(Y−J) ≥ −η₊, λ_m
 Every hash in §16.3 of the draft is `<to be computed by the 0.9 precheck>`: the reference binary
 (`reference-interpreter/target/debug/bennett-isa-ref`) hard-codes `0.8` in its header, signature and envelope
 checks (src/object.rs:708, :975, :1017; src/identity.rs:258), so it does not accept the 0.9 version string even
-for unchanged bodies, and it has no 0.9 instructions. The crate was not edited. List: below.
+for unchanged bodies, and it has no 0.9 instructions. The crate was not edited.
 
-## Open questions for the maintainer
+Placeholders are **distinct per example and symbol** (`<to be computed by the 0.9 precheck: example k, name>`),
+because the seed's `--repatch` maps old string → new hash by plain replacement: one shared placeholder would map
+every symbol to the last hash computed. Full list (count of occurrences in the draft):
 
-(see below)
+| placeholder (example, symbol) | occurrences | where |
+|---|---|---|
+| 1, inc8 | 2 | ex 1 symbols line; ex 2 hash list |
+| 2, zero | 4 | ex 2 symbols line, hash list, sum envelope (`@…` and part-(6) line) |
+| 2, sum | 2 | ex 2 symbols line, hash list |
+| 2, sum_db | 2 | ex 2 symbols line, hash list |
+| 3, borrow_demo | 1 | ex 3 symbols line |
+| 4, ones / 4, flip | 1 each | ex 4 symbols line |
+| 5, main / 5, scratch / 5, flip | 1 each | ex 5 symbols line |
+| 6, adaptive / 6, overdraw / 6, inc8 | 1 each | ex 6 symbols line |
+| 7, g / 7, ginv / 7, addya / 7, run | 1 each | ex 7 symbols line (plus `<closure hash of g>`, `<closure hash of ginv>` in the prose certificate fragment, which the precheck fills when it generates the certificate) |
+| 8, main / 8, work | 1 each | ex 8 symbols line |
+| 9, zero_cause / 9, zero_cc | 1 each | ex 9 symbols line |
+
+**Cross-check values (NOT normative, not in the draft).** Computed by importing the *unmodified* seed
+`reference-interpreter/isa_check.py` (functions `extract_examples`, `parse_object`, `compute_hashes`) on the
+draft text before the placeholders were made distinct. The seed has no CC/R closure set and no part-(5c) device
+lines, so examples 4 and 8 (CC/R functions with a layout; example 8 also a device) are omitted as unreliable;
+for the others the seed's model is complete (oracle, lproc, data, action, and memoryless CC/R with no devices).
+The 0.9 precheck must compute its own values; these are only for comparison.
+
+```
+ex1 inc8        ed9865300b85a519c2379de98e36e635e72b5b78d8bdfca03dccf9a09aa3df5e
+ex2 zero        43e032f98d7aff20f6864d6368b20ab4ef9d810938999acff8d71ed16e6b17d7
+ex2 sum         069abdb5b7239c403c2687bcd317c0de85710f955de3cb790444ccbc9aa09592
+ex2 sum_db      e78f97e074907edfc724df7577dfb12684a05db21656477f9235fe71ed0572d8
+ex3 borrow_demo 6f4782e9bde4267acd1afddd650093722a056d9d50ee465b79cb86a4606b2a94
+ex5 flip        3860ea712b2d70fc495834586bb397656a467c85235aa069768318a06e9fa89b
+ex5 scratch     05525834cbe5a518aa97444912254f3c12c75dd86314a98ba550f45187208a0b
+ex5 main        5cebd5a72ee7873edda0d2c35afed2a5ab79eba60f2b242b2a856d5fa4074634
+ex6 inc8        ed9865300b85a519c2379de98e36e635e72b5b78d8bdfca03dccf9a09aa3df5e (= ex1, as it must be)
+ex6 adaptive    b80aed1639a9ac6a6856f02b0b3264d905e4eea3fa3f9081c01e56283ea398cf
+ex6 overdraw    c0d9835844fa882c1864044acc6fa26dba3935e0d6a9d33f9cdbf1e7c877d250
+ex7 g           0d65d926275688cfebf2831c1de960b03a6b8ea6400866e6d9fef8f393ca2c2e
+ex7 ginv        786f1970ca3d78ef3d5de795411ee276286711c89b756872757c24f9bd569cc9
+ex7 addya       5999b6d3d2362f8c1971ef6f37b404766aa5c18f6ba1880d767bfde351e47392
+ex7 run         562ab7270a0f508d6a2f4a757f3f90964da0b60541bac2c5efa421bad009056a
+ex9 zero_cause  badf7dd2a59afa879f092921946539dfb918cedd35f6fbbaa838c630577eaed4
+ex9 zero_cc     0403d76ff065acab57cb9165cfe1d3d73bbf8dad60bbc1348fb0305ee4f37611
+```
+
+Precheck notes: the seed's printed-table regex needs 64-hex values (the placeholders will fail it until
+patched, as intended); its `--repatch` and its executable checks of inc8/sum_db need `0.9` acceptance; examples 4–9
+need a 0.9 interpreter (new instructions) — the brief forbids changing the crate here.
+
+## Open questions for the maintainer (each with a recommendation)
+
+Q1 SCC order key of a self-recursive singleton (E2): its member closure hash (SPEC-Q 7, adopted) or its scc_hash
+   (evidence note)? Recommend the adopted reading: it is what the interpreter does and keeps 0.8's wording.
+Q2 Const literal range (E16.9): reject literals outside [−2^(N−1), 2^N) (adopted, RC fable R1-B2) or read every
+   literal modulo 2^N (SPEC-Q 12)? Recommend the range; the interpreter fix loop should align.
+Q3 R faults terminal (K6) versus "an R call returns a fault status to its CC caller" (DL B-BLK ISA-8 row, which
+   contradicts DL §17.6). Recommend terminal now; a catch API, if ever wanted, is an addition, not a change.
+Q4 budget.mint in R as well as CC (K3; departs from EN and DL). Recommend yes (BLK-4 analogue; R is classical).
+Q5 qreg.from_id pure (K1; departs from EN and DL). Recommend pure: it keeps the compute–copy–uncall idiom able
+   to look up handles; dangling aliases after an uncall trap deterministically.
+Q6 qinplace inverse-pair check at the CC/R call (run-time trap 4) rather than "ill-formed object" (EN). Recommend
+   the run-time check: tokens and args are run-time values, so applicability is only decidable at the call.
+Q7 Token-to-region binding (K3, bd 8wn): any region call of the program may use any token. Recommend as drafted
+   (the §5.4 checks are object-level); the alternative (trap on region mismatch) adds a check with no benefit.
+Q8 Registers wider than 128 bits cannot be measured directly (bd 04w). Capability kept by copy + measure + reset;
+   recommend leaving `qreg.split` / wide measurement as an efficiency item for 1.0.
+Q9 §17 item 14 (K7): accept the reconciliation (hardware releases unverified, excluded from uncall/reversal)?
+   Recommend yes; 0.8's default was untestable.
+Q10 E17.5 drops the static "cells" check between matched lift.oracle_call/uncall (accepts more). Recommend yes
+   (sound: the uncall is the same permutation; prefix reversal cleans an unmatched clear).
+Q11 E17.13 lift.free/free flip only unpinned entries (semantic corner change). Recommend yes (0.8 killed a pinned
+   size-0 global's entry, making a later boundscheck of length 0 fault wrongly).
+Q12 Hashes: keep placeholders until the 0.9 precheck exists (as the brief says), or accept the cross-check values
+   above now? Recommend placeholders: the seed lacks CC/R closure sets and device lines (examples 4, 8).
+Q13 Deferred r8 items (zsw.4 rest, .5, .14, .16): recommend publishing `ref` (zsw.14) before grading 0.9,
+   since the controlled-action fixture (zsw.4) depends on it.
 
 ### Group 2 decisions
 
