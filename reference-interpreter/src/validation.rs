@@ -138,6 +138,7 @@ impl Object {
                         Vec::new()
                     };
                     let selector_versions = s.snapshot(&selectors);
+                    let selector_closures = s.closures(&selectors);
                     let selector_dependencies = s.dependencies(&selectors);
                     if a.len() == 3 && s.is_other(&a[2])? {
                         return err("§4.6", "while selectors require permutation provenance");
@@ -174,7 +175,7 @@ impl Object {
                         }
                         s.predicates = initial_predicates.clone();
                         if s.snapshot(&selectors) != selector_versions
-                            || selectors.iter().any(|w| s.closed.contains(w))
+                            || s.closures(&selectors) != selector_closures
                         {
                             return err("§4.6", "while body modifies selector dependencies");
                         }
@@ -207,6 +208,7 @@ impl Object {
                             sources: Vec::new(),
                             versions: Vec::new(),
                             controls: Vec::new(),
+                            closures: Vec::new(),
                         },
                     )?;
                 }
@@ -233,10 +235,13 @@ impl Object {
                     arity(1, 1)?;
                     let wires = s.wires(&a[0])?;
                     s.disjoint(&[a[0].as_str()])?;
+                    let versions = s.read_snapshot(&wires)?;
                     let c = Creation {
                         kind: op.into(),
                         sources: vec![a[0].clone()],
-                        versions: s.read_snapshot(&wires)?,
+                        closures: s
+                            .closures(&versions.iter().map(|(w, _)| w.clone()).collect::<Vec<_>>()),
+                        versions,
                         controls: s.predicates.clone(),
                     };
                     s.produce(&i.lhs[0], Type::Wire(wires.len() as u64), c)?;
@@ -256,7 +261,7 @@ impl Object {
                         || s.wires(&a[1])?
                             .iter()
                             .any(|w| !s.versions.get(w).is_none_or(Vec::is_empty))
-                        || c.versions.iter().any(|(w, _)| s.closed.contains(w))
+                        || s.window_closed(c)
                     {
                         return err("§6.2", "quncopy outside its computing window");
                     }
@@ -301,16 +306,18 @@ impl Object {
                     if load {
                         let mut deps = s.wires(&a[1])?;
                         deps.push(format!("{}[*]", a[0]));
-                        s.produce(
-                            &i.lhs[0],
-                            Type::Wire(w),
+                        s.produce(&i.lhs[0], Type::Wire(w), {
+                            let versions = s.read_snapshot(&deps)?;
                             Creation {
                                 kind: op.into(),
                                 sources: a.clone(),
-                                versions: s.read_snapshot(&deps)?,
+                                closures: s.closures(
+                                    &versions.iter().map(|(w, _)| w.clone()).collect::<Vec<_>>(),
+                                ),
+                                versions,
                                 controls: s.predicates.clone(),
-                            },
-                        )?;
+                            }
+                        })?;
                     } else {
                         if s.wires(&a[2])?.len() != w as usize {
                             return err("§3.3", "memory value width mismatch");
@@ -331,7 +338,7 @@ impl Object {
                                 || s.wires(&a[2])?
                                     .iter()
                                     .any(|w| !s.versions.get(w).is_none_or(Vec::is_empty))
-                                || c.versions.iter().any(|(w, _)| s.closed.contains(w))
+                                || s.window_closed(c)
                             {
                                 return err("§6.2", "qunload outside computing window");
                             }
@@ -453,7 +460,7 @@ impl Object {
                             s.modified.insert(cell.clone());
                             *s.cell_epochs.entry(cell.clone()).or_default() += 1;
                             if other {
-                                s.closed.insert(cell);
+                                *s.closed.entry(cell).or_default() += 1;
                             }
                         }
                     }
@@ -1213,6 +1220,8 @@ struct Creation {
     sources: Vec<String>,
     versions: Vec<(String, Vec<String>)>,
     controls: Vec<String>,
+    /// Closure counts of the dependency wires at the computation.
+    closures: Vec<(String, u64)>,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Discipline {
@@ -1221,7 +1230,10 @@ struct Discipline {
     predicates: Vec<String>,
     created: BTreeMap<String, Creation>,
     versions: BTreeMap<String, Vec<String>>,
-    closed: BTreeSet<String>,
+    /// Window-closing events per wire (non-diagonal gates, non-permutation
+    /// calls): a window opens at its computation (§6.2), so cleanups compare
+    /// counts snapshotted at the computation rather than a permanent set.
+    closed: BTreeMap<String, u64>,
     reads: BTreeMap<String, Vec<(String, Vec<String>)>>,
     other_versions: BTreeSet<String>,
     local_regions: BTreeSet<String>,
@@ -1244,7 +1256,7 @@ impl Discipline {
             predicates: Vec::new(),
             created: BTreeMap::new(),
             versions: BTreeMap::new(),
-            closed: BTreeSet::new(),
+            closed: BTreeMap::new(),
             reads: BTreeMap::new(),
             other_versions: BTreeSet::new(),
             local_regions: BTreeSet::new(),
@@ -1309,6 +1321,19 @@ impl Discipline {
         reads.sort();
         reads.dedup();
         Ok(self.snapshot(&reads))
+    }
+    fn closures(&self, wires: &[String]) -> Vec<(String, u64)> {
+        wires
+            .iter()
+            .map(|w| (w.clone(), self.closed.get(w).copied().unwrap_or(0)))
+            .collect()
+    }
+    /// §6.2: a non-diagonal gate or non-permutation call on a dependency
+    /// since the computation closed the window.
+    fn window_closed(&self, c: &Creation) -> bool {
+        c.closures
+            .iter()
+            .any(|(w, n)| self.closed.get(w).copied().unwrap_or(0) != *n)
     }
     fn dependencies(&self, wires: &[String]) -> BTreeSet<String> {
         let mut out = BTreeSet::new();
@@ -1381,7 +1406,7 @@ impl Discipline {
         let needs_adjoint = other || self.is_other(n)?;
         for w in self.wires(n)? {
             if other {
-                self.closed.insert(w.clone());
+                *self.closed.entry(w.clone()).or_default() += 1;
             }
             let blocked = needs_adjoint
                 && (self.versions.iter().any(|(target, log)| {

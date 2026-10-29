@@ -1,5 +1,15 @@
-//! Small state-vector semantics and a sparse basis-permutation fast path.
-use crate::{err, Argument, Error, Result};
+//! §14.2 state semantics: a sparse basis-permutation fast path and a state
+//! vector, each carrying an exact shadow (src/exact.rs) beside the binary64
+//! amplitudes. The binary64 amplitudes serve Born probabilities; every
+//! cleanliness and basis-value decision uses the exact amplitudes, so a
+//! component is zero iff it is exactly zero (no tolerance, council B15).
+//! The vector has no fixed wire limit: it is bounded only by host memory,
+//! and an allocation the host cannot provide fails loudly.
+use crate::{
+    err,
+    exact::{self, Amplitude},
+    Argument, Error, Result,
+};
 use std::collections::{BTreeMap, BTreeSet};
 pub type Wire = u64;
 
@@ -39,10 +49,67 @@ impl std::ops::Mul for Complex {
         )
     }
 }
+/// A basis index over arbitrarily many wires: little-endian words, no
+/// trailing zero word (so allocating |0> wires leaves every key unchanged).
+type Key = Vec<u64>;
+fn key_bit(k: &Key, p: usize) -> bool {
+    k.get(p / 64).is_some_and(|w| w >> (p % 64) & 1 == 1)
+}
+fn key_with(mut k: Key, p: usize, v: bool) -> Key {
+    if k.len() <= p / 64 {
+        if !v {
+            return k;
+        }
+        k.resize(p / 64 + 1, 0);
+    }
+    if v {
+        k[p / 64] |= 1 << (p % 64);
+    } else {
+        k[p / 64] &= !(1 << (p % 64));
+    }
+    while k.last() == Some(&0) {
+        k.pop();
+    }
+    k
+}
+fn key_of(bits: &[bool]) -> Key {
+    let mut k = Vec::new();
+    for (p, b) in bits.iter().enumerate() {
+        if *b {
+            k = key_with(k, p, true);
+        }
+    }
+    k
+}
+fn key_bits(k: &Key, n: usize) -> Vec<bool> {
+    (0..n).map(|p| key_bit(k, p)).collect()
+}
+/// Drops the removed positions (release, measurement).
+fn compress(k: &Key, remove: &[bool]) -> Key {
+    let mut out = Vec::new();
+    let mut next = 0;
+    for (p, removed) in remove.iter().enumerate() {
+        if !removed {
+            if key_bit(k, p) {
+                out = key_with(out, next, true);
+            }
+            next += 1;
+        }
+    }
+    out
+}
 #[derive(Clone, Debug, PartialEq)]
 enum State {
-    Basis { bits: Vec<bool>, phase: Complex },
-    Vector(Vec<Complex>),
+    Basis {
+        bits: Vec<bool>,
+        phase: Complex,
+        exact: Amplitude,
+    },
+    /// Sparse superposition: exactly the components whose exact amplitude is
+    /// nonzero, each with its binary64 value for Born probabilities.
+    Vector {
+        amplitudes: BTreeMap<Key, (Complex, Amplitude)>,
+    },
 }
 #[derive(Clone, Debug)]
 pub struct QuantumState {
@@ -51,23 +118,21 @@ pub struct QuantumState {
     state: State,
 }
 impl PartialEq for QuantumState {
+    /// Exact equality of the states (binary64 values are not compared).
     fn eq(&self, other: &Self) -> bool {
         if self.ids != other.ids || self.next != other.next {
             return false;
         }
-        let close =
-            |a: Complex, b: Complex| (a.re - b.re).abs() <= 1e-12 && (a.im - b.im).abs() <= 1e-12;
-        match (&self.state, &other.state) {
-            (State::Basis { bits: a, phase: p }, State::Basis { bits: b, phase: q }) => {
-                a == b && close(*p, *q)
+        let support = |s: &State| -> BTreeMap<Key, Amplitude> {
+            match s {
+                State::Basis { bits, exact, .. } => BTreeMap::from([(key_of(bits), exact.clone())]),
+                State::Vector { amplitudes } => amplitudes
+                    .iter()
+                    .map(|(k, (_, e))| (k.clone(), e.clone()))
+                    .collect(),
             }
-            _ => match (self.amplitudes(), other.amplitudes()) {
-                (Ok(a), Ok(b)) => {
-                    a.len() == b.len() && a.into_iter().zip(b).all(|(a, b)| close(a, b))
-                }
-                _ => false,
-            },
-        }
+        };
+        support(&self.state) == support(&other.state)
     }
 }
 impl Default for QuantumState {
@@ -94,6 +159,13 @@ pub struct QuantumRegion {
     pub cell_width: u64,
     pub cells: Vec<Vec<Wire>>,
 }
+fn insert(map: &mut BTreeMap<Key, (Complex, Amplitude)>, k: Key, f: Complex, e: Amplitude) {
+    if e.is_zero() {
+        map.remove(&k);
+    } else {
+        map.insert(k, (f, e));
+    }
+}
 
 impl QuantumState {
     pub(crate) fn next_wire_id(&self) -> u64 {
@@ -106,6 +178,7 @@ impl QuantumState {
         self.next = next;
         Ok(())
     }
+    /// Re-inserts clean released wires at their former positions (§7.4 reversal).
     pub(crate) fn restore_clean(&mut self, positions: &[(usize, Wire)]) -> Result<()> {
         let n = self
             .ids
@@ -121,43 +194,45 @@ impl QuantumState {
         let mut ids = Vec::with_capacity(n);
         let mut source = self.ids.iter();
         for i in 0..n {
-            ids.push(if let Some(w) = removed.get(&i) {
-                *w
-            } else {
-                *source.next().expect("restored wire count")
+            ids.push(match removed.get(&i) {
+                Some(w) => *w,
+                None => *source
+                    .next()
+                    .ok_or_else(|| Error("§7.4: restored wire count".into()))?,
             });
         }
+        let expand = |k: &Key| {
+            let mut out = Vec::new();
+            let mut bit = 0;
+            for pos in 0..n {
+                if !removed.contains_key(&pos) {
+                    if key_bit(k, bit) {
+                        out = key_with(out, pos, true);
+                    }
+                    bit += 1;
+                }
+            }
+            out
+        };
         match &mut self.state {
             State::Basis { bits, .. } => {
                 let mut old = bits.iter();
-                let next = (0..n)
-                    .map(|i| {
-                        if removed.contains_key(&i) {
-                            false
-                        } else {
-                            *old.next().expect("basis width")
-                        }
-                    })
-                    .collect();
+                let mut next = Vec::with_capacity(n);
+                for i in 0..n {
+                    next.push(if removed.contains_key(&i) {
+                        false
+                    } else {
+                        *old.next()
+                            .ok_or_else(|| Error("§7.4: basis width".into()))?
+                    });
+                }
                 *bits = next;
             }
-            State::Vector(vector) => {
-                if n > 24 {
-                    return err("§14.2", "restored state exceeds vector limit");
-                }
-                let mut next = vec![Complex::ZERO; 1usize << n];
-                for (i, a) in vector.iter().enumerate() {
-                    let mut bit = 0;
-                    let mut destination = 0;
-                    for pos in 0..n {
-                        if !removed.contains_key(&pos) {
-                            destination |= ((i >> bit) & 1) << pos;
-                            bit += 1;
-                        }
-                    }
-                    next[destination] = *a;
-                }
-                *vector = next;
+            State::Vector { amplitudes } => {
+                *amplitudes = std::mem::take(amplitudes)
+                    .into_iter()
+                    .map(|(k, a)| (expand(&k), a))
+                    .collect();
             }
         }
         self.ids = ids;
@@ -170,6 +245,7 @@ impl QuantumState {
             state: State::Basis {
                 bits: Vec::new(),
                 phase: Complex::ONE,
+                exact: Amplitude::one(),
             },
         }
     }
@@ -184,20 +260,16 @@ impl QuantumState {
             .next
             .checked_add(n as u64)
             .ok_or_else(|| Error("§4.3: wire identity overflow".into()))?;
-        if let State::Vector(v) = &mut self.state {
-            let bits = self
-                .ids
-                .len()
-                .checked_add(n)
-                .ok_or_else(|| Error("§14.2: vector size overflow".into()))?;
-            if bits > 24 {
-                return err("§14.2", "state-vector simulation limit is 24 live wires");
-            }
-            v.resize(1usize << bits, Complex::ZERO);
-        } else if let State::Basis { bits, .. } = &mut self.state {
+        let total = self
+            .ids
+            .len()
+            .checked_add(n)
+            .ok_or_else(|| Error("§4.3: wire count overflow".into()))?;
+        // New wires are |0> at the high positions: sparse keys are unchanged.
+        if let State::Basis { bits, .. } = &mut self.state {
             bits.try_reserve(n)
-                .map_err(|e| Error(format!("§4.3: wire allocation failed: {e}")))?;
-            bits.resize(bits.len() + n, false);
+                .map_err(|e| Error(format!("host limit: wire allocation failed ({e})")))?;
+            bits.resize(total, false);
         }
         let wires: Vec<_> = (self.next..end).collect();
         self.next = end;
@@ -219,38 +291,82 @@ impl QuantumState {
             })
             .collect()
     }
+    /// Dense binary64 amplitudes in allocation order (bundles little-endian).
+    /// Materialising 2^n entries is a host-memory operation and fails loudly.
     pub fn amplitudes(&self) -> Result<Vec<Complex>> {
+        let n = self.ids.len();
+        if n >= usize::BITS as usize - 1 {
+            return err(
+                "host limit",
+                format!("2^{n} dense amplitudes exceed the host address space"),
+            );
+        }
+        let len = 1usize << n;
+        let mut out = Vec::new();
+        out.try_reserve_exact(len).map_err(|e| {
+            Error(format!(
+                "host limit: cannot allocate {len} amplitudes ({e})"
+            ))
+        })?;
+        out.resize(len, Complex::ZERO);
+        let dense = |k: &Key| {
+            k.iter()
+                .enumerate()
+                .fold(0usize, |n, (i, w)| n | ((*w as usize) << (64 * i)))
+        };
         match &self.state {
-            State::Vector(v) => Ok(v.clone()),
-            State::Basis { bits, phase } => {
-                if bits.len() > 24 {
-                    return err(
-                        "§14.2",
-                        "basis tuple exceeds vector materialisation limit of 24 wires",
-                    );
+            State::Basis { bits, phase, .. } => out[dense(&key_of(bits))] = *phase,
+            State::Vector { amplitudes } => {
+                for (k, (a, _)) in amplitudes {
+                    out[dense(k)] = *a;
                 }
-                let mut out = vec![Complex::ZERO; 1usize << bits.len()];
-                out[bits
-                    .iter()
-                    .enumerate()
-                    .fold(0, |n, (i, b)| n | ((*b as usize) << i))] = *phase;
-                Ok(out)
+            }
+        }
+        Ok(out)
+    }
+    /// The exact support as (basis bits, approximate amplitude), for diagnostics.
+    pub fn exact_support(&self) -> Vec<(Vec<bool>, (f64, f64))> {
+        let n = self.ids.len();
+        match &self.state {
+            State::Basis { bits, exact, .. } => vec![(bits.clone(), exact.approximate())],
+            State::Vector { amplitudes } => amplitudes
+                .iter()
+                .map(|(k, (_, e))| (key_bits(k, n), e.approximate()))
+                .collect(),
+        }
+    }
+    /// The value of `wires` when it is the same on every component of the
+    /// exact state; otherwise an error.
+    pub fn read_basis(&self, wires: &[Wire]) -> Result<u128> {
+        if wires.len() > 128 {
+            return err(
+                "§3.3",
+                "integer bundle read exceeds 128 bits; read bit by bit",
+            );
+        }
+        let positions = self.positions(wires)?;
+        let read = |bit: &dyn Fn(usize) -> bool| {
+            positions
+                .iter()
+                .enumerate()
+                .fold(0u128, |n, (j, p)| n | ((bit(*p) as u128) << j))
+        };
+        match &self.state {
+            State::Basis { bits, .. } => Ok(read(&|p| bits[p])),
+            State::Vector { amplitudes } => {
+                let values: BTreeSet<u128> = amplitudes
+                    .keys()
+                    .map(|k| read(&|p| key_bit(k, p)))
+                    .collect();
+                match values.len() {
+                    1 => Ok(*values.iter().next().expect("one value")),
+                    _ => err("§14.2", "wires are not in a basis state"),
+                }
             }
         }
     }
-    pub fn read_basis(&self, wires: &[Wire]) -> Result<u128> {
-        if wires.len() > 128 {
-            return err("§3.3", "integer bundle read exceeds 128 bits");
-        }
-        let positions = self.positions(wires)?;
-        match &self.state {
-            State::Basis { bits, .. } => Ok(positions
-                .iter()
-                .enumerate()
-                .fold(0, |n, (i, p)| n | ((bits[*p] as u128) << i))),
-            State::Vector(_) => err("§14.2", "basis read requested on a state vector"),
-        }
-    }
+    /// §4.3 qfree / §3.3 qreg.free: release wires that are |0> on every
+    /// component, decided exactly; on failure nothing changes.
     pub fn release(&mut self, wires: &[Wire]) -> Result<()> {
         let positions = self.positions(wires)?;
         let mut remove = vec![false; self.ids.len()];
@@ -269,20 +385,24 @@ impl QuantumState {
                     keep
                 });
             }
-            State::Vector(v) => {
-                if v.iter()
-                    .enumerate()
-                    .any(|(i, a)| positions.iter().any(|p| i & (1 << p) != 0) && a.norm2() > 1e-24)
+            State::Vector { amplitudes } => {
+                if let Some((k, (_, e))) = amplitudes
+                    .iter()
+                    .find(|(k, _)| positions.iter().any(|p| key_bit(k, *p)))
                 {
-                    return err("§4.3", "E_QREG_NOT_CLEAN: released factor is not zero");
+                    return err(
+                        "§4.3",
+                        format!(
+                            "E_QREG_NOT_CLEAN: released factor has an exactly nonzero component {:?} (about {:?})",
+                            key_bits(k, remove.len()),
+                            e.approximate()
+                        ),
+                    );
                 }
-                let mut next = vec![Complex::ZERO; 1usize << (self.ids.len() - positions.len())];
-                for (i, a) in v.iter().enumerate() {
-                    if positions.iter().all(|p| i & (1 << p) == 0) {
-                        next[compress(i, &remove)] = *a;
-                    }
-                }
-                *v = next;
+                *amplitudes = std::mem::take(amplitudes)
+                    .into_iter()
+                    .map(|(k, a)| (compress(&k, &remove), a))
+                    .collect();
             }
         }
         let mut index = 0;
@@ -335,7 +455,7 @@ impl QuantumState {
             return err("§4.4", "rotation needs a finite angle");
         }
         let mut controls: Vec<_> = positions[..own].iter().map(|p| (*p, true)).collect();
-        let targets = &positions[own..];
+        let targets = positions[own..].to_vec();
         for (w, value) in predicate {
             let p = self.positions(&[*w])?[0];
             if targets.contains(&p) {
@@ -345,10 +465,59 @@ impl QuantumState {
                 controls.push((p, *value));
             }
         }
-        let active = |bits: &[bool]| controls.iter().all(|(p, v)| bits[*p] == *v);
         let permutation = matches!(op, "x" | "cx" | "ccx" | "mcx" | "swap");
-        if let State::Basis { bits, phase } = &mut self.state {
-            if !active(bits) {
+        let diagonal = matches!(op, "s" | "sdg" | "t" | "tdg" | "cz" | "rz");
+        let f64_matrix = |op: &str| -> Result<[Complex; 4]> {
+            let zero = Complex::ZERO;
+            let one = Complex::ONE;
+            let h = std::f64::consts::FRAC_1_SQRT_2;
+            Ok(match op {
+                "x" | "cx" | "ccx" | "mcx" => [zero, one, one, zero],
+                "h" => [one.scale(h), one.scale(h), one.scale(h), one.scale(-h)],
+                "s" => [one, zero, zero, Complex::new(0.0, 1.0)],
+                "sdg" => [one, zero, zero, Complex::new(0.0, -1.0)],
+                "t" => [one, zero, zero, Complex::phase(std::f64::consts::FRAC_PI_4)],
+                "tdg" => [
+                    one,
+                    zero,
+                    zero,
+                    Complex::phase(-std::f64::consts::FRAC_PI_4),
+                ],
+                "cz" => [one, zero, zero, one.scale(-1.0)],
+                _ => {
+                    let a = angle.ok_or_else(|| Error("§4.4: rotation angle".into()))? / 2.0;
+                    match op {
+                        "rx" => [
+                            one.scale(a.cos()),
+                            Complex::new(0.0, -a.sin()),
+                            Complex::new(0.0, -a.sin()),
+                            one.scale(a.cos()),
+                        ],
+                        "ry" => [
+                            one.scale(a.cos()),
+                            one.scale(-a.sin()),
+                            one.scale(a.sin()),
+                            one.scale(a.cos()),
+                        ],
+                        _ => [Complex::phase(-a), zero, zero, Complex::phase(a)],
+                    }
+                }
+            })
+        };
+        let exact_matrix = || -> Result<[Amplitude; 4]> {
+            if op == "cz" {
+                return Ok([
+                    Amplitude::one(),
+                    Amplitude::zero(),
+                    Amplitude::zero(),
+                    exact::minus_one(),
+                ]);
+            }
+            exact::gate_matrix(op, angle)
+                .ok_or_else(|| Error(format!("§4.4: no exact entries for {op}")))
+        };
+        if let State::Basis { bits, phase, exact } = &mut self.state {
+            if !controls.iter().all(|(p, v)| bits[*p] == *v) {
                 return Ok(());
             }
             if permutation {
@@ -359,103 +528,80 @@ impl QuantumState {
                 }
                 return Ok(());
             }
-            if !matches!(op, "h" | "rx" | "ry") {
-                let theta = match op {
-                    "s" => std::f64::consts::FRAC_PI_2,
-                    "sdg" => -std::f64::consts::FRAC_PI_2,
-                    "t" => std::f64::consts::FRAC_PI_4,
-                    "tdg" => -std::f64::consts::FRAC_PI_4,
-                    "cz" => {
-                        if bits[targets[0]] && bits[targets[1]] {
-                            std::f64::consts::PI
-                        } else {
-                            0.0
-                        }
-                    }
-                    "rz" => angle.expect("angle") * if bits[targets[0]] { 0.5 } else { -0.5 },
-                    _ => 0.0,
-                };
-                if op == "rz" || op == "cz" || bits[targets[0]] {
-                    *phase = *phase * Complex::phase(theta);
+            if diagonal {
+                // cz acts as a phase on its first target when the second is 1.
+                let on = if op == "cz" { bits[targets[1]] } else { true };
+                if on {
+                    let bit = bits[targets[0]];
+                    let (f, e) = (f64_matrix(op)?, exact_matrix()?);
+                    let j = if bit { 3 } else { 0 };
+                    *phase = *phase * f[j];
+                    *exact = exact.mul(&e[j]);
                 }
                 return Ok(());
             }
+            let key = key_of(bits);
+            self.state = State::Vector {
+                amplitudes: BTreeMap::from([(key, (*phase, exact.clone()))]),
+            };
         }
-        if matches!(self.state, State::Basis { .. }) {
-            self.state = State::Vector(self.amplitudes()?);
-        }
-        let State::Vector(vector) = &mut self.state else {
-            unreachable!("materialised vector")
+        let State::Vector { amplitudes } = &mut self.state else {
+            return err("§14.2", "state vector materialisation failed");
         };
-        let enabled = |index: usize| {
-            controls
-                .iter()
-                .all(|(p, v)| (index & (1usize << p) != 0) == *v)
-        };
+        let enabled = |k: &Key| controls.iter().all(|(p, v)| key_bit(k, *p) == *v);
         if op == "swap" {
-            let (a, b) = (1usize << targets[0], 1usize << targets[1]);
-            for i in 0..vector.len() {
-                if enabled(i) && i & a == 0 && i & b != 0 {
-                    vector.swap(i, i ^ a ^ b);
-                }
+            let (a, b) = (targets[0], targets[1]);
+            let moved: Vec<Key> = amplitudes
+                .keys()
+                .filter(|k| enabled(k) && key_bit(k, a) != key_bit(k, b))
+                .cloned()
+                .collect();
+            let values: Vec<_> = moved
+                .iter()
+                .map(|k| (k.clone(), amplitudes.remove(k).expect("listed key")))
+                .collect();
+            for (k, v) in values {
+                let flipped = key_with(key_with(k.clone(), a, !key_bit(&k, a)), b, !key_bit(&k, b));
+                amplitudes.insert(flipped, v);
             }
             return Ok(());
         }
         if op == "cz" {
-            for (i, a) in vector.iter_mut().enumerate() {
-                if enabled(i) && targets.iter().all(|p| i & (1usize << p) != 0) {
-                    *a = a.scale(-1.0);
+            for (k, (f, e)) in amplitudes.iter_mut() {
+                if enabled(k) && key_bit(k, targets[0]) && key_bit(k, targets[1]) {
+                    *f = f.scale(-1.0);
+                    *e = e.mul(&exact::minus_one());
                 }
             }
             return Ok(());
         }
-        let zero = Complex::ZERO;
-        let one = Complex::ONE;
-        let h = std::f64::consts::FRAC_1_SQRT_2;
-        let matrix = match op {
-            "x" | "cx" | "ccx" | "mcx" => [zero, one, one, zero],
-            "h" => [one.scale(h), one.scale(h), one.scale(h), one.scale(-h)],
-            "s" => [one, zero, zero, Complex::new(0.0, 1.0)],
-            "sdg" => [one, zero, zero, Complex::new(0.0, -1.0)],
-            "t" => [one, zero, zero, Complex::phase(std::f64::consts::FRAC_PI_4)],
-            "tdg" => [
-                one,
-                zero,
-                zero,
-                Complex::phase(-std::f64::consts::FRAC_PI_4),
-            ],
-            "rx" => {
-                let a = angle.expect("angle") / 2.0;
-                [
-                    one.scale(a.cos()),
-                    Complex::new(0.0, -a.sin()),
-                    Complex::new(0.0, -a.sin()),
-                    one.scale(a.cos()),
-                ]
-            }
-            "ry" => {
-                let a = angle.expect("angle") / 2.0;
-                [
-                    one.scale(a.cos()),
-                    one.scale(-a.sin()),
-                    one.scale(a.sin()),
-                    one.scale(a.cos()),
-                ]
-            }
-            "rz" => {
-                let a = angle.expect("angle") / 2.0;
-                [Complex::phase(-a), zero, zero, Complex::phase(a)]
-            }
-            _ => unreachable!("gate validated"),
-        };
-        let bit = 1usize << targets[0];
-        for i in 0..vector.len() {
-            if i & bit == 0 && enabled(i) {
-                let a = vector[i];
-                let b = vector[i | bit];
-                vector[i] = matrix[0] * a + matrix[1] * b;
-                vector[i | bit] = matrix[2] * a + matrix[3] * b;
-            }
+        let (fm, em) = (f64_matrix(op)?, exact_matrix()?);
+        let t = targets[0];
+        let lows: BTreeSet<Key> = amplitudes
+            .keys()
+            .filter(|k| enabled(k))
+            .map(|k| key_with(k.clone(), t, false))
+            .collect();
+        for low in lows {
+            let high = key_with(low.clone(), t, true);
+            let (fa, ea) = amplitudes
+                .remove(&low)
+                .unwrap_or((Complex::ZERO, Amplitude::zero()));
+            let (fb, eb) = amplitudes
+                .remove(&high)
+                .unwrap_or((Complex::ZERO, Amplitude::zero()));
+            insert(
+                amplitudes,
+                low,
+                fm[0] * fa + fm[1] * fb,
+                em[0].mul(&ea).add(&em[1].mul(&eb)),
+            );
+            insert(
+                amplitudes,
+                high,
+                fm[2] * fa + fm[3] * fb,
+                em[2].mul(&ea).add(&em[3].mul(&eb)),
+            );
         }
         Ok(())
     }
@@ -465,7 +611,13 @@ impl QuantumState {
         for p in &positions {
             remove[*p] = true;
         }
-        if let State::Basis { bits, phase } = &self.state {
+        let kept_ids: Vec<Wire> = self
+            .ids
+            .iter()
+            .enumerate()
+            .filter_map(|(p, w)| (!remove[p]).then_some(*w))
+            .collect();
+        if let State::Basis { bits, phase, exact } = &self.state {
             let mut state = self.clone();
             let result = positions.iter().map(|p| bits[*p]).collect();
             let kept: Vec<_> = bits
@@ -473,15 +625,11 @@ impl QuantumState {
                 .enumerate()
                 .filter_map(|(p, b)| (!remove[p]).then_some(*b))
                 .collect();
-            state.ids = self
-                .ids
-                .iter()
-                .enumerate()
-                .filter_map(|(p, w)| (!remove[p]).then_some(*w))
-                .collect();
+            state.ids = kept_ids;
             state.state = State::Basis {
                 bits: kept,
                 phase: *phase,
+                exact: exact.clone(),
             };
             return Ok(vec![MeasurementBranch {
                 probability: 1.0,
@@ -489,53 +637,48 @@ impl QuantumState {
                 state,
             }]);
         }
-        if wires.len() > 24 {
-            return err("§14.2", "measurement outcome enumeration exceeds 24 wires");
-        }
-        let vector = self.amplitudes()?;
-        let mut probabilities = vec![0.0; 1usize << positions.len()];
-        let outcome = |i: usize| {
+        let State::Vector { amplitudes } = &self.state else {
+            return err("§14.2", "unreachable state form");
+        };
+        let outcome = |k: &Key| {
             positions
                 .iter()
-                .enumerate()
-                .fold(0, |n, (j, p)| n | (((i >> p) & 1) << j))
+                .map(|p| key_bit(k, *p))
+                .collect::<Vec<bool>>()
         };
-        for (i, a) in vector.iter().enumerate() {
-            probabilities[outcome(i)] += a.norm2();
+        // Outcomes with an exactly nonzero component; the exact projection is
+        // left unnormalised (cleanliness and basis values are scale-invariant).
+        let mut groups: BTreeMap<Vec<bool>, BTreeMap<Key, (Complex, Amplitude)>> = BTreeMap::new();
+        for (k, a) in amplitudes {
+            groups
+                .entry(outcome(k))
+                .or_default()
+                .insert(compress(k, &remove), a.clone());
         }
         let mut branches = Vec::new();
-        for (k, probability) in probabilities.into_iter().enumerate() {
-            if probability == 0.0 {
-                continue;
-            }
-            let mut amplitudes = vec![Complex::ZERO; 1usize << (self.ids.len() - positions.len())];
-            for (i, a) in vector.iter().enumerate() {
-                if outcome(i) == k {
-                    amplitudes[compress(i, &remove)] = a.scale(1.0 / probability.sqrt());
-                }
+        for (bits, mut group) in groups {
+            let probability: f64 = group.values().map(|(f, _)| f.norm2()).sum();
+            for (f, _) in group.values_mut() {
+                *f = f.scale(1.0 / probability.sqrt());
             }
             let mut state = self.clone();
-            state.ids = self
-                .ids
-                .iter()
-                .enumerate()
-                .filter_map(|(p, w)| (!remove[p]).then_some(*w))
-                .collect();
-            state.state = State::Vector(amplitudes);
+            state.ids = kept_ids.clone();
+            state.state = State::Vector { amplitudes: group };
             branches.push(MeasurementBranch {
                 probability,
-                bits: (0..positions.len())
-                    .map(|i| k & (1usize << i) != 0)
-                    .collect(),
+                bits,
                 state,
             });
         }
         Ok(branches)
     }
+    /// Applies a basis permutation (oracle constructions, §5.2). On a sparse
+    /// superposition the map must be injective on the support.
     pub(crate) fn permute(
         &mut self,
         mut permutation: impl FnMut(&[bool]) -> Result<Vec<bool>>,
     ) -> Result<()> {
+        let n = self.ids.len();
         match &mut self.state {
             State::Basis { bits, .. } => {
                 let next = permutation(bits)?;
@@ -544,28 +687,18 @@ impl QuantumState {
                 }
                 *bits = next;
             }
-            State::Vector(v) => {
-                let mut out = vec![Complex::ZERO; v.len()];
-                let mut seen = vec![false; v.len()];
-                for (i, a) in v.iter().enumerate() {
-                    let bits: Vec<_> = (0..self.ids.len())
-                        .map(|p| i & (1usize << p) != 0)
-                        .collect();
-                    let mapped = permutation(&bits)?;
-                    if mapped.len() != self.ids.len() {
+            State::Vector { amplitudes } => {
+                let mut out = BTreeMap::new();
+                for (k, a) in std::mem::take(amplitudes) {
+                    let mapped = permutation(&key_bits(&k, n))?;
+                    if mapped.len() != n {
                         return err("§14.2", "permutation changes wire count");
                     }
-                    let j = mapped
-                        .iter()
-                        .enumerate()
-                        .fold(0, |n, (p, b)| n | ((*b as usize) << p));
-                    if seen[j] {
+                    if out.insert(key_of(&mapped), a).is_some() {
                         return err("§5.3", "action mapping is not a permutation");
                     }
-                    seen[j] = true;
-                    out[j] = *a;
                 }
-                *v = out;
+                *amplitudes = out;
             }
         }
         Ok(())
@@ -573,15 +706,4 @@ impl QuantumState {
     pub(crate) fn position(&self, w: Wire) -> Result<usize> {
         Ok(self.positions(&[w])?[0])
     }
-}
-fn compress(index: usize, remove: &[bool]) -> usize {
-    let mut out = 0;
-    let mut next = 0;
-    for (p, removed) in remove.iter().enumerate() {
-        if !removed {
-            out |= ((index >> p) & 1) << next;
-            next += 1;
-        }
-    }
-    out
 }
