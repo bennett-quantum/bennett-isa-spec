@@ -1,8 +1,123 @@
 # Bennett ISA reference interpreter progress
 
-Resume from this file. Scope remains the entire accepted ISA 0.8. No git commands;
-write only under reference-interpreter/. The user limits take precedence over the
-repository-wide worklog rule, so this file also serves as this job's worklog.
+Resume from this file. Scope is the entire accepted ISA 0.8 (BRIEF.md); the
+current brief is `docs/briefs/2026-10-29-isa-ref-council-fixes.md`. Write only
+under `reference-interpreter/`; commit own paths
+(`git add -A -- reference-interpreter && git commit -- reference-interpreter`),
+never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
+
+## Session 2026-10-29 (Opus, council fix loop): milestone 1 reached
+
+All 30 round-1 blocking issues are resolved, declined with a spec quote, or
+(B19) partial with staging; the editor's response is
+`council/response-round-1.md`, the readings `SPEC-QUESTIONS.md` (entries 4, 6,
+11, 12 revised, 14–27 new). Each witness is a test in `tests/r1_*.rs`, run red
+against the handover checkpoint `0164b5a` before its fix (results in the
+response file).
+
+### Verification (this commit)
+
+| Command | Result |
+|---|---|
+| `cargo test --manifest-path reference-interpreter/Cargo.toml --offline` | 152 passed, 0 failed, 5 ignored |
+| `cargo test ... --offline -- --ignored` | 5 passed in 4 min 57 s wall time: see the sweep table |
+| `cargo clippy ... --offline --all-targets -- -D warnings` | clean |
+| `cargo fmt --manifest-path reference-interpreter/Cargo.toml -- --check` | clean |
+| `python3 reference-interpreter/isa_check.py` (unchanged) | passes |
+
+Ignored sweeps (debug build, this machine):
+
+| Sweep | Cases | Time |
+|---|---|---|
+| `tests/oracle.rs` `exhaustive_unsigned_and_signed_division_u8` | 262,144 (a, b) × 4 ops | 1.64 s |
+| `tests/step_machine.rs` recursive prefixes (all 8-bit n, every prefix) | 256 inputs × every B to completion | 8.87 s |
+| `tests/r1_borrow.rs` 17-wire swap frame, exhaustive execution | 2^17 × 2 | 9.02 s |
+| `tests/r1_certificates.rs` 17-wire frame with its checked claim | 2^18 claim elements, both programs | 50.16 s |
+| `tests/r1_fuzz_discipline.rs` §6 differential sweep | 200,000 programs, 82,797 accepted and all exactly clean, 117,203 rejected | 227.05 s |
+
+### What changed in milestone 1 (summary; details per blocker in the response)
+
+- One engine pair on bit-vectors of any width (`oracle.rs`, `machine.rs`), u128
+  adapters only; machine counters/cells/slots at the §3.7 derived widths.
+- Canonical INT/FLOAT everywhere; const range; iN suffix schema; one call spelling.
+- `schema.rs`: §4.8 schemas before interprocedural passes; §5.1 region graph.
+- §5.5 dataflow pairing of oracle uncalls; §7.4 whole-run reversal ends at entry.
+- §6: windows open at computation; transitive reads; phase kickback; predicate
+  versions; a differential fuzzer against the exact simulator.
+- `exact.rs` + sparse `quantum.rs`: exact cleanliness, no wire limit.
+- `borrow.rs`: exact ANF decision of §5.6 frames; no 16-wire or loop caps.
+- `claims.rs`: exhaustive/sampled/structural claim checking, the library
+  borrow route, `verify_certificate`.
+- qinplace §4.5 conditions checked exactly under the actual token.
+- Linking composes certificates; closure hashes over pinned imports.
+- Tiers (R → R only; CC → CC/R), typed CC traps, §7.3 effect table at load.
+- CLI: `step-check --exhaustive|--suite|--samples`, `check` reports `unlinked`.
+
+### Deliverable status
+
+| Deliverable | Status | Evidence |
+|---|---|---|
+| 1. Parser and well-formedness | Implemented for every §16.2 production and the suite-F rules named in round 1; §6 checker cross-checked by the differential fuzzer | `tests/parser.rs`, `structured.rs`, `discipline.rs`, `r1_literals.rs`, `r1_rules.rs`, `r1_discipline.rs`, `r1_fuzz_discipline.rs` |
+| 2. Identity and linking | Envelopes, SCCs, the four §16.3 hashes, pins (closures over pinned imports), dedup, certificate composition | `identity.rs`, `linking.rs`, `r1_linking.rs`, `r1_fixtures.rs` |
+| 3. §14.1 interpreter | Every §4.2 row on bit-vectors of any width; every fault code | `oracle.rs`, `r1_widths.rs`, division sweep |
+| 4. Step machine | Literal forward/inverse steps, derived widths, T2/T6 sweeps | `step_machine.rs`, `wide_oracle.rs`, `r1_widths.rs`, recursive sweep |
+| 5. CC/R tiers | History, tapes, devices, hostcall, uncall, tiers, traps | `classical.rs`, `registers.rs`, `r1_rules.rs` |
+| 6. Q tier and §6 | Exact simulator, actions, borrow frames, qinplace, §6 checker | `quantum*.rs`, `borrow.rs`, `r1_exact.rs`, `r1_borrow.rs`, `r1_qinplace.rs` |
+| 7. CLI and docs | check/hash/run-oracle/step-check, README | `cli.rs` |
+| 8–11 | Staged (below) | — |
+
+### Staging of deliverables 8–11 (codex B19)
+
+The whole-ISA scope includes §8, §10–§12 and suites D, E, G, H. They are staged
+in this order after milestone 1; nothing is exempt, and every claim or path
+that needs them already reports so explicitly (`ClaimVerdict::Unverified`).
+
+8. **Launch ABI (§10), suite G.** A Rust API mirroring every C entry point
+   (`bennett_load` … `bennett_coverage_get`) over `ClassicalMachine`: the
+   CREATED → … → CLOSED state machine with E_INVALID_STATE checks (waiting on
+   SUSPENDED/REVERSED/CLOSED, unload with an unclosed run), positional binding
+   with E_ARG, copied arguments and entropy, HOST_REQUEST/reply, results and
+   fault records, reverse eligibility (no measure, untouched registers,
+   E_NOT_REVERSIBLE), the invocation tree and post-order reversal, tape
+   iteration (64-bit fields), `bennett_budget` validation. Tests: every
+   transition, the inc8 launch with budget (3,0,0,0) → 9 and its
+   reverse/close lifecycle. First, because it needs only the CC/R machine.
+9. **Target descriptions (§8), suite E.** JCS target parsing and `target_hash`;
+   the closed expression AST over exact rationals with the per-context variable
+   binding table and load-time errors (division by zero, table index,
+   unbound variable, `log2inv_eps` outside (0, 1]); resources, classes, gates,
+   schemes, capabilities (`mbu` false); matching (first `gates` entry by op,
+   classes, total control count and epsilon, else schemes; template expansion
+   with `repeat`); aggregation from scheduled event lists (count, time,
+   occupancy, peak); timing; imports.
+10. **Schedule consumer (§11), suite H (consumer side).** The `ref` expansion
+    library (§17 item 7) with generated-operation ordinals; invocation chains;
+    path matching with the specificity order and the invalid-schedule rules;
+    defaults; timing constraints; binding validation against object and target;
+    verbatim execution or E_SCHEDULE_INFEASIBLE.
+11. **Rigorous certificate checker (§12.1), suites C and D.** Interval
+    arithmetic at `precision_bits` with outward rounding, §17 item 8 Taylor
+    enclosures, realised versus reference unitaries per invocation context
+    (needs 9 and 10), the Frobenius operator-norm bound, the diamond-norm dual
+    witness check with interval Cholesky (strictly positive pivots), fault-rate
+    verification and the inclusive-error recursion; `expected: "oracle"` claims.
+
+### Resume here: outstanding work, in priority order
+
+1. Deliverables 8–11 above, in that order.
+2. Extend the §6 differential fuzzer to region calls (child actions with mut
+   regions, oracle calls) and borrowed systems; extend the borrow-frame
+   symbolic decision to black-box calls whose inputs depend on borrowed wires
+   (currently the claim route).
+3. Claims on regions with classical arguments (the claim domain carries none;
+   SPEC-QUESTIONS 21).
+4. Independent second-implementation checks of the CC/R fixture hashes (the
+   Python seed cannot hash CC closures; the stored hashes are the crate's own).
+5. Rerun every gate after each change: tests, ignored sweeps, clippy, fmt, seed.
+
+---
+
+# History (codex job, superseded where the milestone-1 section above differs)
 
 ## Session 2026-10-29
 
