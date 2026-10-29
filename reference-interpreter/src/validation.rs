@@ -78,30 +78,30 @@ impl Object {
     }
     fn declare_region(&self, i: &Instruction, s: &mut Discipline) -> Result<()> {
         let a = &i.operands;
-                    if !i.lhs.is_empty() || !matches!(a.len(), 3 | 4) || !name(&a[0]) {
-                        return err("§4.8", "qregion operand schema");
-                    }
-                    let aw = crate::object::host_count(&a[1], "qregion address width")?;
-                    let w = crate::object::host_count(&a[2], "qregion cell width")?;
-                    if w == 0 {
-                        return err("§3.3", "qregion cell width must be positive");
-                    }
-                    if a.len() == 4 {
-                        let img = a[3]
-                            .strip_prefix('@')
-                            .ok_or_else(|| Error("§4.6: qregion image must be @data".into()))?;
-                        let size = self.data_size(img)?;
-                        // 2^A * W bits = 8 * size bytes (§4.6), compared exactly.
-                        let bits = crate::oracle::power_of_two(aw as u128)
-                            .and_then(|cells| cells.checked_mul(w as u128));
-                        if bits.is_none_or(|bits| bits % 8 != 0 || bits / 8 != size) {
-                            return err("§4.6", "image size differs from 2^A*W/8 bytes");
-                        }
-                    }
-                    if s.types.insert(a[0].clone(), Type::Region(aw, w)).is_some() {
-                        return err("§3.3", "region name already defined");
-                    }
-                    s.local_regions.insert(a[0].clone());
+        if !i.lhs.is_empty() || !matches!(a.len(), 3 | 4) || !name(&a[0]) {
+            return err("§4.8", "qregion operand schema");
+        }
+        let aw = crate::object::host_count(&a[1], "qregion address width")?;
+        let w = crate::object::host_count(&a[2], "qregion cell width")?;
+        if w == 0 {
+            return err("§3.3", "qregion cell width must be positive");
+        }
+        if a.len() == 4 {
+            let img = a[3]
+                .strip_prefix('@')
+                .ok_or_else(|| Error("§4.6: qregion image must be @data".into()))?;
+            let size = self.data_size(img)?;
+            // 2^A * W bits = 8 * size bytes (§4.6), compared exactly.
+            let bits = crate::oracle::power_of_two(aw as u128)
+                .and_then(|cells| cells.checked_mul(w as u128));
+            if bits.is_none_or(|bits| bits % 8 != 0 || bits / 8 != size) {
+                return err("§4.6", "image size differs from 2^A*W/8 bytes");
+            }
+        }
+        if s.types.insert(a[0].clone(), Type::Region(aw, w)).is_some() {
+            return err("§3.3", "region name already defined");
+        }
+        s.local_regions.insert(a[0].clone());
         Ok(())
     }
     fn validate_action_sequence(
@@ -138,16 +138,23 @@ impl Object {
                         return err("§4.8", "qif needs two arms");
                     }
                     let outer = s.predicates.clone();
+                    let outer_floor = s.predicate_floor;
                     for (arm, body) in i.bodies.iter().enumerate() {
                         let mut expected = outer.clone();
-                        expected.push(if arm == 0 { a[0].clone() } else { format!("!{}", a[0]) });
+                        expected.push(if arm == 0 {
+                            a[0].clone()
+                        } else {
+                            format!("!{}", a[0])
+                        });
                         s.predicates = expected.clone();
+                        s.predicate_floor = expected.len();
                         self.validate_action_sequence(f, body, s)?;
                         if s.predicates != expected {
                             return err("§3.5", "qif body altered predicate stack");
                         }
                     }
                     s.predicates = outer;
+                    s.predicate_floor = outer_floor;
                 }
                 "qloop" => {
                     if !i.lhs.is_empty() || !matches!(a.len(), 1 | 3) || i.bodies.len() != 1 {
@@ -162,6 +169,7 @@ impl Object {
                         continue;
                     }
                     let initial_predicates = s.predicates.clone();
+                    let initial_floor = s.predicate_floor;
                     let selectors = if a.len() == 3 {
                         s.wires(&a[2])?
                     } else {
@@ -190,6 +198,11 @@ impl Object {
                             s.predicates
                                 .extend((0..=iteration).map(|k| format!("{}[{k}]", a[2])));
                         }
+                        s.predicate_floor = if selectors.is_empty() {
+                            initial_floor
+                        } else {
+                            s.predicates.len()
+                        };
                         let prior_modified = std::mem::take(&mut s.modified);
                         self.validate_action_sequence(f, &i.bodies[0], s)?;
                         if !s.modified.is_disjoint(&selector_dependencies) {
@@ -204,6 +217,7 @@ impl Object {
                             return err("§3.5", "loop body altered predicate stack");
                         }
                         s.predicates = initial_predicates.clone();
+                        s.predicate_floor = initial_floor;
                         if s.snapshot(&selectors) != selector_versions
                             || s.closures(&selectors) != selector_closures
                         {
@@ -219,6 +233,12 @@ impl Object {
                 }
                 "qunpred" => {
                     arity(1, 0)?;
+                    if s.predicates.len() <= s.predicate_floor {
+                        return err(
+                            "§3.5",
+                            "body cannot consume a structured instruction's predicate",
+                        );
+                    }
                     if s.predicates.pop().as_deref() != Some(&a[0]) {
                         return err("§3.5", "unmatched predicate pop");
                     }
@@ -544,8 +564,14 @@ impl Object {
                         .collect::<Result<Vec<_>>>()?
                         .concat();
                     if op == "swap" {
-                        for t in &targets { s.check_target(t, false)?; }
-                        let wires = targets.iter().map(|t| s.wires(t)).collect::<Result<Vec<_>>>()?.concat();
+                        for t in &targets {
+                            s.check_target(t, false)?;
+                        }
+                        let wires = targets
+                            .iter()
+                            .map(|t| s.wires(t))
+                            .collect::<Result<Vec<_>>>()?
+                            .concat();
                         s.exchange(&wires, version, &reads)?;
                         continue;
                     }
@@ -596,7 +622,12 @@ impl Object {
                     if op == "qexch" {
                         s.check_target(&a[0], false)?;
                         let wires = [s.wires(&a[0])?, s.wires(&a[1])?].concat();
-                        let version = format!("qexch:{}:{:?}:{:?}", a.join(" "), s.read_snapshot(&[])?, s.predicates);
+                        let version = format!(
+                            "qexch:{}:{:?}:{:?}",
+                            a.join(" "),
+                            s.read_snapshot(&[])?,
+                            s.predicates
+                        );
                         s.exchange(&wires, version, &[])?;
                         continue;
                     }
@@ -1303,6 +1334,8 @@ struct Discipline {
     types: BTreeMap<String, Type>,
     inputs: BTreeSet<String>,
     predicates: Vec<String>,
+    /// qif/qloop expansion-owned selectors cannot be popped by their bodies.
+    predicate_floor: usize,
     created: BTreeMap<String, Creation>,
     versions: BTreeMap<String, Vec<String>>,
     /// Window-closing events per wire (non-diagonal gates, non-permutation
@@ -1313,6 +1346,7 @@ struct Discipline {
     phases: Vec<String>,
     reads: BTreeMap<String, Vec<(String, Vec<String>)>>,
     other_versions: BTreeSet<String>,
+    exchanges: BTreeMap<String, (String, Vec<String>)>,
     local_regions: BTreeSet<String>,
     cell_epochs: BTreeMap<String, u128>,
     modified: BTreeSet<String>,
@@ -1331,12 +1365,14 @@ impl Discipline {
                 .map(|p| p.name.clone())
                 .collect(),
             predicates: Vec::new(),
+            predicate_floor: 0,
             created: BTreeMap::new(),
             versions: BTreeMap::new(),
             closed: BTreeMap::new(),
             phases: Vec::new(),
             reads: BTreeMap::new(),
             other_versions: BTreeSet::new(),
+            exchanges: BTreeMap::new(),
             local_regions: BTreeSet::new(),
             cell_epochs: BTreeMap::new(),
             modified: BTreeSet::new(),
@@ -1498,33 +1534,74 @@ impl Discipline {
     /// Exchange outputs depend on the union of the OLD operand dependencies.
     /// Commit their logs simultaneously: the matching exchange may discharge
     /// its own outputs' mutual reads, but never an outstanding external reader.
-    fn exchange(&mut self, wires: &[String], version: String, extra_reads: &[String]) -> Result<()> {
+    fn exchange(
+        &mut self,
+        wires: &[String],
+        version: String,
+        extra_reads: &[String],
+    ) -> Result<()> {
         let other = wires.iter().any(|w| self.wire_is_other(w));
-        let mut reads = wires.to_vec();
-        reads.extend_from_slice(extra_reads);
-        self.note_reads(&version, &reads)?;
         let context = self.read_snapshot(&[])?;
-        let complete = format!("{version}:context{context:?}");
-        self.reads.insert(complete.clone(), self.reads[&version].clone());
-        if other { self.other_versions.insert(complete.clone()); }
-        let reads_group = |v: &String| self.reads.get(v).is_some_and(|r| r.iter().any(|(w,_)| wires.contains(w)));
-        let blocked = other && (
-            self.phases.iter().any(reads_group)
-            || self.versions.iter().any(|(w, log)| !wires.contains(w) && log.iter().any(reads_group))
-            || self.created.values().any(|c| c.versions.iter().any(|(w,_)| wires.contains(w)))
-        );
-        // An exchange is one joint computation. It cannot cancel on one
-        // output while the partner has an intervening write (fuzzer witness).
-        let matching: Vec<bool> = wires.iter().map(|w| self.versions.get(w)
-            .and_then(|log| log.last()).is_some_and(|v| operation_inverse(v).as_deref() == Some(&complete))).collect();
-        let blocked = blocked || (matching.iter().any(|v| *v) && !matching.iter().all(|v| *v));
-        for w in wires { self.update_log(w, &complete, blocked); }
+        let base = format!("{version}:context{context:?}");
+        let prior = wires
+            .first()
+            .and_then(|w| self.versions.get(w))
+            .and_then(|v| v.last());
+        let inverse = prior
+            .filter(|prior| {
+                self.exchanges
+                    .get(*prior)
+                    .is_some_and(|(op, outputs)| op == &base && outputs == wires)
+                    && wires
+                        .iter()
+                        .all(|w| self.versions.get(w).and_then(|v| v.last()) == Some(*prior))
+            })
+            .cloned();
+        let complete = if let Some(prior) = inverse {
+            // The whole joint computation is still current: use the captured
+            // entry versions, rather than treating its outputs as new inputs.
+            prior
+        } else {
+            let complete = format!("{base}:exchange_inputs{:?}", self.snapshot(wires));
+            let mut reads = wires.to_vec();
+            reads.extend_from_slice(extra_reads);
+            self.note_reads(&complete, &reads)?;
+            self.exchanges
+                .insert(complete.clone(), (base, wires.to_vec()));
+            complete
+        };
+        if other {
+            self.other_versions.insert(complete.clone());
+        }
+        let reads_group = |v: &String| {
+            self.reads
+                .get(v)
+                .is_some_and(|r| r.iter().any(|(w, _)| wires.contains(w)))
+        };
+        let blocked = other
+            && (self.phases.iter().any(reads_group)
+                || self
+                    .versions
+                    .iter()
+                    .any(|(w, log)| !wires.contains(w) && log.iter().any(reads_group))
+                || self
+                    .created
+                    .values()
+                    .any(|c| c.versions.iter().any(|(w, _)| wires.contains(w))));
+        for w in wires {
+            self.update_log(w, &complete, blocked);
+        }
         Ok(())
     }
     fn wire_is_other(&self, w: &str) -> bool {
-        self.versions.get(w).is_some_and(|log| log.iter().any(|v| {
-            self.other_versions.contains(v) || ["h:", "rx:", "ry:", "call_other_"].iter().any(|p| v.starts_with(p))
-        }))
+        self.versions.get(w).is_some_and(|log| {
+            log.iter().any(|v| {
+                self.other_versions.contains(v)
+                    || ["h:", "rx:", "ry:", "call_other_"]
+                        .iter()
+                        .any(|p| v.starts_with(p))
+            })
+        })
     }
     fn change(&mut self, n: &str, version: String, other: bool) -> Result<()> {
         self.check_target(n, false)?;
@@ -1709,11 +1786,17 @@ pub(crate) fn normalize_call(i: &Instruction) -> Result<NormalCall> {
 pub(crate) fn region_declarations(f: &Function) -> Vec<&Instruction> {
     fn gather<'a>(seq: &'a [Instruction], out: &mut Vec<&'a Instruction>) {
         for i in seq {
-            if i.op == "qregion" { out.push(i); }
-            for body in &i.bodies { gather(body, out); }
+            if i.op == "qregion" {
+                out.push(i);
+            }
+            for body in &i.bodies {
+                gather(body, out);
+            }
         }
     }
     let mut out = Vec::new();
-    for block in &f.blocks { gather(&block.instructions, &mut out); }
+    for block in &f.blocks {
+        gather(&block.instructions, &mut out);
+    }
     out
 }

@@ -1051,15 +1051,28 @@ fn malformed_cli_inputs_are_cited_diagnostics_without_json() {
 #[test]
 fn r2_finite_rotations_render_when_the_combined_angle_exceeds_binary64() {
     for literal in [true, false] {
-        let sig = if literal { r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"# } else { r#"{"abi":"0.8","args":["f64"],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"# };
+        let sig = if literal {
+            r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#
+        } else {
+            r#"{"abi":"0.8","args":["f64"],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#
+        };
         let angle = if literal { "1e+308" } else { "theta" };
         let params = if literal { "" } else { "theta:f64" };
         let body = format!("action @a (t:wire mut) () () ({params}) ()\n^entry():\nrz {angle} t\nrz {angle} t\nrz {angle} t\nrz {angle} t");
         let o = support::rehash(&support::object(&[("a", sig, &body)], "{}", ""));
-        let path = tmp_file(if literal { "r2-large-literal.bisa" } else { "r2-large-arg.bisa" }, &o.text);
+        let path = tmp_file(
+            if literal {
+                "r2-large-literal.bisa"
+            } else {
+                "r2-large-arg.bisa"
+            },
+            &o.text,
+        );
         for t in ["0", "1"] {
             let mut args = vec!["run-action", &path, "a", "--mut", t];
-            if !literal { args.extend(["--arg", "f64:1e308"]); }
+            if !literal {
+                args.extend(["--arg", "f64:1e308"]);
+            }
             let v = ok(&args);
             let state = field(&v, "state").object().unwrap();
             assert_eq!(state.len(), 1);
@@ -1071,11 +1084,57 @@ fn r2_finite_rotations_render_when_the_combined_angle_exceeds_binary64() {
             assert!((re - 0.588863244801576).abs() < 1e-12, "{re}");
             let sign = if t == "0" { 1.0 } else { -1.0 };
             assert!((im - sign * 0.8082326886001081).abs() < 1e-12, "{im}");
-            assert!((re*re+im*im-1.0).abs() < 1e-12);
+            assert!((re * re + im * im - 1.0).abs() < 1e-12);
             args[0] = "reverse";
             let v = ok(&args);
             assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
             assert_eq!(field(&v, "state").canonical(), format!("{{\"{t}\":[1,0]}}"));
         }
     }
+}
+
+#[test]
+fn r2_qinplace_identity_workspace_cleanup_runs_and_reverses() {
+    let os =
+        r#"{"abi":"0.8","args":[],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#;
+    let ac = r#"{"abi":"0.8","args":["token"],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
+    let text = support::object(&[("g", os, "oracle @g (x:wire in) (t:wire) (f:wire[4]) () ()\n^entry():\nlift.retval x"), ("a", ac, "action @a (t:wire mut) () () (tk:token) ()\n^entry():\nd = qalloc any 1\nqinplace @g @g tk d\nqinplace @g @g tk d\nqfree d")], "{}", "");
+    let path = tmp_file("r2-qinplace-cli.bisa", &support::rehash(&text).text);
+    for t in ["0", "1"] {
+        for adj in [false, true] {
+            let mut args = vec![
+                "run-action",
+                &path,
+                "a",
+                "--mut",
+                t,
+                "--arg",
+                "token:1,0,0,0",
+            ];
+            if adj {
+                args.push("--adjoint");
+            }
+            assert_eq!(
+                field(&ok(&args), "state").canonical(),
+                format!("{{\"{t}\":[1,0]}}")
+            );
+        }
+        let v = ok(&["reverse", &path, "a", "--mut", t, "--arg", "token:1,0,0,0"]);
+        assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
+    }
+    // Published sum_db's n=0 path: wrapper 4 + callee 6 = 10 rows;
+    // 13 saved locations + 3 record cells = stack 16, payload and code zero.
+    let v = ok(&[
+        "run-oracle",
+        &fixture("sum_db"),
+        "sum_db",
+        "--input",
+        "0",
+        "--budget",
+        "10,4080,16,64",
+    ]);
+    assert_eq!(
+        (uint(&v, "payload"), uint(&v, "code"), uint(&v, "steps")),
+        (0, 0, 10)
+    );
 }

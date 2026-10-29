@@ -250,12 +250,21 @@ fn r2_regions_are_lexical_function_entry_declarations() {
     for (body, bounds) in [
         ("qloop 2 {\nqregion r 1 1\n}", vec![2]),
         ("d = qload r p\nqunload r p d\nqregion r 1 1", vec![]),
-        ("d = qload r p\nqunload r p d\nqloop 0 {\nqregion r 1 1\n}", vec![0]),
-        ("qif p {\nqregion r 1 1\n} {\nd = qload r p\nqunload r p d\n}", vec![]),
+        (
+            "d = qload r p\nqunload r p d\nqloop 0 {\nqregion r 1 1\n}",
+            vec![0],
+        ),
+        (
+            "qif p {\nqregion r 1 1\n} {\nd = qload r p\nqunload r p d\n}",
+            vec![],
+        ),
     ] {
         run_basis(&accept(&action(body, &bounds)), |t, _| t);
     }
-    reject(&action("qregion r 1 1\nqloop 0 {\nqregion r 1 1\n}", &[0]), "§3.3");
+    reject(
+        &action("qregion r 1 1\nqloop 0 {\nqregion r 1 1\n}", &[0]),
+        "§3.3",
+    );
     // Exercise borrow Compiler too: region use before a zero-trip declaration.
     let text = action("b = qborrow any 1\nd = qload r p\nqxor d b\nqxor d b\nqunload r p d\nqreturn b\nqloop 0 {\nqregion r 1 1\n}", &[0]);
     accept(&text);
@@ -264,7 +273,8 @@ fn r2_regions_are_lexical_function_entry_declarations() {
 #[test]
 fn r2_exchanges_preserve_transitive_entangling_read_dependencies() {
     for exchange in ["swap", "qexch"] {
-        let body = format!("d = qalloc any 1\nh d\n{exchange} d m\ncx m t\n{exchange} d m\nh d\nqfree d");
+        let body =
+            format!("d = qalloc any 1\nh d\n{exchange} d m\ncx m t\n{exchange} d m\nh d\nqfree d");
         reject(&tmp(&body), "§6.2");
         let good = body.replace("cx m t", "cx m t\ncx m t");
         run_three_identity(&accept(&tmp(&good)));
@@ -277,13 +287,18 @@ fn run_three_identity(o: &Object) {
     for input in 0..9u32 {
         let mut q = QuantumState::new();
         let wires = q.allocate(3).unwrap();
-        for (bit,w) in wires.iter().enumerate() {
-            if input == 8 { q.gate("h", &[*w], None, &[]).unwrap(); }
-            else if input >> bit & 1 == 1 { q.gate("x", &[*w], None, &[]).unwrap(); }
+        for (bit, w) in wires.iter().enumerate() {
+            if input == 8 {
+                q.gate("h", &[*w], None, &[]).unwrap();
+            } else if input >> bit & 1 == 1 {
+                q.gate("x", &[*w], None, &[]).unwrap();
+            }
         }
         let before = q.clone();
         let mut b = QuantumBindings::default();
-        for (n,w) in ["t", "m", "p"].iter().zip(&wires) { b.bundles.insert((*n).into(), vec![*w]); }
+        for (n, w) in ["t", "m", "p"].iter().zip(&wires) {
+            b.bundles.insert((*n).into(), vec![*w]);
+        }
         o.execute_action("a", &mut q, &b, false, &[]).unwrap();
         assert_eq!(q, before);
         o.execute_action("a", &mut q, &b, true, &[]).unwrap();
@@ -294,4 +309,25 @@ fn run_three_identity(o: &Object) {
 #[test]
 fn r2_exchange_inverse_must_cancel_both_outputs_together() {
     reject(&tmp("qregion r 1 1\nd0 = qalloc any 1\nd1 = qalloc any 1\nqexch d0 d1\nqexch d1 t\nx t\nqpred d0\nx t\nqunpred d0\nqexch d1 t\nqexch d0 d1\nqfree d1\nqfree d0"), "§6.2");
+}
+
+#[test]
+fn r2_qif_cross_arm_unconditional_lifetimes_reverse_the_expansion() {
+    // §3.5 lifetimes are unconditional; §4.6 expands then before else.
+    // The adjoint therefore recreates d (inverse else) before releasing it.
+    let o = accept(&action("qif p {\nd = qalloc any 1\n} {\nqfree d\n}", &[]));
+    run_basis(&o, |t, _| t);
+}
+
+#[test]
+fn r2_qif_body_cannot_temporarily_consume_its_implicit_selector() {
+    reject(
+        &two_mut("qif m {\nqunpred m\nx m\nqpred m\n} {\nx t\n}"),
+        "§3.5",
+    );
+}
+
+#[test]
+fn r2_exchange_computations_pin_their_entry_versions() {
+    reject(&tmp("qregion r 1 1\nd0 = qload r p\nd1 = qcopy p\nqexch d1 m\nccx d1 t d0\nqexch d1 m\nqxor t m\nqexch d1 m\nccx d1 t d0\nqexch d1 m\nquncopy p d1\nqunload r p d0"), "§6.2");
 }

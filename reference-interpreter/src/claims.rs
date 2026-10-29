@@ -553,7 +553,7 @@ impl Object {
                 }
             }
             _ => ClaimVerdict::Unverified(format!(
-                "{kind} claims need the rigorous interval checker (§12.1), staged as deliverable 10"
+                "{kind} claims need the rigorous interval checker (§12.1), staged as deliverable 11"
             )),
         };
         active.remove(&(closure.to_string(), index));

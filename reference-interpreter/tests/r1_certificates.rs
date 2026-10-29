@@ -214,3 +214,31 @@ fn b16_muse_b7_certificate_values_and_claims_are_typed() {
         rejects(&fixed, "§");
     }
 }
+
+#[test]
+fn r2_interval_claim_diagnostics_name_deliverable_eleven() {
+    let text = swap_frame(1);
+    let o = Object::parse(&text).unwrap();
+    let closure = o.identity().unwrap().closure_hashes["a"].clone().unwrap();
+    for kind in ["numerical", "channel"] {
+        let metric = if kind == "channel" {
+            "diamond"
+        } else {
+            "operator_norm"
+        };
+        let dual = if kind == "channel" {
+            ",\"dual\":[]"
+        } else {
+            ""
+        };
+        let claim = format!(
+            r#"{{"kind":"{kind}","subject":{{"closure_hash":"{closure}","variant":"fwd","inherited_controls":0,"schedule_hash":"{}"}},"metric":"{metric}","precision_bits":128,"bound":0{dual}}}"#,
+            "4".repeat(64)
+        );
+        let o = Object::parse(&certificate(&text, 1, &claim, "")).unwrap();
+        match o.verify_claim(&closure, 0).unwrap() {
+            ClaimVerdict::Unverified(why) => assert!(why.contains("deliverable 11"), "{why}"),
+            other => panic!("staged interval checker cannot prove a claim: {other:?}"),
+        }
+    }
+}

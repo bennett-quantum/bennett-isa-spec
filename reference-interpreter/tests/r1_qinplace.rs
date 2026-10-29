@@ -97,16 +97,32 @@ fn b07_interfaces_are_checked_at_load() {
 
 #[test]
 fn r2_qinplace_explicit_adjoint_cleans_workspace() {
-    for (oracle_body, steps) in [("lift.retval x", 1), ("one = lift.const.i1 1\nr = lift.xor x one\nlift.retval r", 3)] {
+    for (oracle_body, steps) in [
+        ("lift.retval x", 1),
+        (
+            "one = lift.const.i1 1\nr = lift.xor x one\nlift.retval r",
+            3,
+        ),
+    ] {
         let g = format!("oracle @g (x:wire in) (t:wire) (f:wire[4]) () ()\nregs {{ one:reg[1], r:reg[1] }}\n^entry():\n{oracle_body}");
         let gi = g.replace("@g ", "@gi ");
         let body = "action @a (t:wire mut, c:wire mut) () () (tk:token) ()\n^entry():\nd = qalloc any 1\nqxor t d\nqinplace @g @gi tk d\nqinplace @gi @g tk d\nqxor t d\nqfree d";
-        let build = |body: &str| support::object(&[("g", ORACLE1, &g),("gi", ORACLE1, &gi),("a", ACTION, body)], "{}", "");
+        let build = |body: &str| {
+            support::object(
+                &[
+                    ("g", ORACLE1, &g),
+                    ("gi", ORACLE1, &gi),
+                    ("a", ACTION, body),
+                ],
+                "{}",
+                "",
+            )
+        };
         let o = support::rehash(&build(body));
         for t in 0..2 {
             for c in 0..2 {
-                assert_eq!(run(&o, t, c, steps, false).unwrap(), (t,c));
-                assert_eq!(run(&o, t, c, steps, true).unwrap(), (t,c));
+                assert_eq!(run(&o, t, c, steps, false).unwrap(), (t, c));
+                assert_eq!(run(&o, t, c, steps, true).unwrap(), (t, c));
             }
         }
         // Same text pair but different captured effective-control versions.

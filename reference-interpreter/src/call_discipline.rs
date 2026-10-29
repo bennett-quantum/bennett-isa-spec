@@ -19,8 +19,15 @@ struct Invocation {
 impl Invocation {
     fn from_row(row: &Instruction) -> Result<Self> {
         let o = &row.operands;
-        Ok(Self { callee: o[0].clone(), token: o[1].clone(), ins: list(&o[2])?,
-            target: o[3].clone(), fault: o[4].clone(), mem: list(&o[5])?, args: list(&o[6])? })
+        Ok(Self {
+            callee: o[0].clone(),
+            token: o[1].clone(),
+            ins: list(&o[2])?,
+            target: o[3].clone(),
+            fault: o[4].clone(),
+            mem: list(&o[5])?,
+            args: list(&o[6])?,
+        })
     }
 }
 impl Object {
@@ -235,7 +242,8 @@ impl Object {
                 }
             }
             next.outstanding.retain(|k, _| {
-                let touches = k.ins
+                let touches = k
+                    .ins
                     .iter()
                     .chain([&k.target, &k.fault])
                     .any(|w| writes.contains(w));
@@ -255,7 +263,12 @@ impl Object {
                 next.constants.remove(w);
             }
             match op {
-                "lift.oracle_call" => *next.outstanding.entry(Invocation::from_row(row)?).or_default() += 1,
+                "lift.oracle_call" => {
+                    *next
+                        .outstanding
+                        .entry(Invocation::from_row(row)?)
+                        .or_default() += 1
+                }
                 "lift.oracle_uncall" => {
                     let key = Invocation::from_row(row)?;
                     if let Some(n) = next.outstanding.get_mut(&key) {

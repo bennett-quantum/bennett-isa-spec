@@ -138,3 +138,42 @@ RED: run-action exited 1 with non-finite JSON diagnostic. No new question.
 ## codex R2-B06 — resolved
 
 Same change and tests as SOL-R2-B08; finite f64 1e308 is not rejected.
+
+## Nonblocking suggestions and additional controls
+
+- codex S1 (qif cross-arm lifetimes): SPEC-QUESTIONS **28** records the
+  §5.3 shorthand / §4.6 expansion conflict and the full-expansion reading.
+  `action.rs::action_sequence` reverses else before then under adjoint, so
+  unconditional lifetime operations reverse in the right order.
+  `r1_discipline::r2_qif_cross_arm_unconditional_lifetimes_reverse_the_expansion`
+  was red with "unknown live bundle d", now checks both p,t values and full
+  restoration. No lifetime restriction was added.
+- codex S1 (staging diagnostics): SPEC-QUESTIONS 21 now names 9–11 for
+  target/schedule/interval work; `claims.rs::verify_claim_guarded` names
+  deliverable **11** for interval claims. Numerical/channel claims remain
+  Unverified. `r1_certificates::r2_interval_claim_diagnostics_name_deliverable_eleven`
+  was red naming 10 and now passes for both claim kinds.
+- `cli_xam::r2_qinplace_identity_workspace_cleanup_runs_and_reverses` pins
+  the exact codex @g/@g workspace witness through forward, adjoint and reverse
+  CLI forms for both t values, plus canonical sum_db(0), stack 16, B=10.
+- `r1_fuzz_discipline::generated_borrow_frames_keep_differing_classical_bindings_distinct`
+  generates 80 borrowed frames with differing x/y argument lists; an independent
+  parity formula determines acceptance, and every accepted frame executes and
+  reverses for all x/y and sampled borrowed/fault entries.
+
+### Follow-up pinning from the extended sweep
+
+The first extended ignored run found an additional unsound accept in the
+exchange class (SOL-R2-B01): identical exchange text was reused after a partner
+operand changed, so a later control snapshot could alias an earlier value.
+`Discipline::exchanges` now binds each joint computation to its entry versions;
+only an inverse whose **every** output still has that same joint computation
+on top can reuse that identity. Pin:
+`r1_discipline::r2_exchange_computations_pin_their_entry_versions` (red accepted,
+now §6.2 rejection). The earlier joint-cancellation pin remains green.
+
+For SOL-R2-B05 / codex R2-B07, a stack floor also prevents a body from consuming
+an expansion-owned selector and pushing it back later. Pin:
+`r1_discipline::r2_qif_body_cannot_temporarily_consume_its_implicit_selector`
+(red accepted, now §3.5 rejection). Balanced user-owned predicate pairs remain
+legal. No new specification question.

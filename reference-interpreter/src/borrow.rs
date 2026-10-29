@@ -198,7 +198,10 @@ struct Compiler<'a> {
 }
 impl Compiler<'_> {
     fn classical(&self, name: &str) -> Result<String> {
-        self.classical.get(name).cloned().ok_or_else(|| Error(format!("§3.3: unknown classical binding {name}")))
+        self.classical
+            .get(name)
+            .cloned()
+            .ok_or_else(|| Error(format!("§3.3: unknown classical binding {name}")))
     }
     fn bundle(&self, name: &str) -> Result<Vec<String>> {
         if let Some((base, index)) = name.split_once('[') {
@@ -246,32 +249,30 @@ impl Compiler<'_> {
     fn declare_regions(&mut self, f: &Function, out: &mut Vec<Node>) -> Result<()> {
         for i in crate::validation::region_declarations(f) {
             let a = &i.operands;
-                    let aw = crate::object::host_count(&a[1], "qregion address width")?;
-                    let w = crate::object::host_count(&a[2], "qregion cell width")? as usize;
-                    let cells = crate::oracle::power_of_two(aw as u128)
-                        .and_then(|n| usize::try_from(n).ok())
-                        .ok_or_else(|| {
-                            Error("host limit: region exceeds host address space".into())
-                        })?;
-                    let image = match a.get(3) {
-                        Some(img) => self
-                            .object
-                            .data
-                            .get(img.trim_start_matches('@'))
-                            .cloned()
-                            .ok_or_else(|| Error("§4.6: unresolved qregion image".into()))?,
-                        None => vec![0; (cells * w).div_ceil(8)],
-                    };
-                    let mut all = Vec::new();
-                    for _ in 0..cells {
-                        all.push(self.fresh(w));
-                    }
-                    let flat: Vec<String> = all.iter().flatten().cloned().collect();
-                    let bits = (0..flat.len())
-                        .map(|b| image[b / 8] >> (b % 8) & 1 == 1)
-                        .collect();
-                    out.push(Node::Alloc(flat, bits));
-                    self.regions.insert(a[0].clone(), (aw, all));
+            let aw = crate::object::host_count(&a[1], "qregion address width")?;
+            let w = crate::object::host_count(&a[2], "qregion cell width")? as usize;
+            let cells = crate::oracle::power_of_two(aw as u128)
+                .and_then(|n| usize::try_from(n).ok())
+                .ok_or_else(|| Error("host limit: region exceeds host address space".into()))?;
+            let image = match a.get(3) {
+                Some(img) => self
+                    .object
+                    .data
+                    .get(img.trim_start_matches('@'))
+                    .cloned()
+                    .ok_or_else(|| Error("§4.6: unresolved qregion image".into()))?,
+                None => vec![0; (cells * w).div_ceil(8)],
+            };
+            let mut all = Vec::new();
+            for _ in 0..cells {
+                all.push(self.fresh(w));
+            }
+            let flat: Vec<String> = all.iter().flatten().cloned().collect();
+            let bits = (0..flat.len())
+                .map(|b| image[b / 8] >> (b % 8) & 1 == 1)
+                .collect();
+            out.push(Node::Alloc(flat, bits));
+            self.regions.insert(a[0].clone(), (aw, all));
         }
         Ok(())
     }
@@ -426,8 +427,17 @@ impl Compiler<'_> {
                             memory.extend(cells.into_iter().flatten());
                         }
                         out.push(Node::Opaque {
-                            key: format!("oracle:{:?}", (&callee.name, self.classical(&ca[1])?,
-                                list(&ca[6])?.iter().map(|n| self.classical(n)).collect::<Result<Vec<_>>>()?)),
+                            key: format!(
+                                "oracle:{:?}",
+                                (
+                                    &callee.name,
+                                    self.classical(&ca[1])?,
+                                    list(&ca[6])?
+                                        .iter()
+                                        .map(|n| self.classical(n))
+                                        .collect::<Result<Vec<_>>>()?
+                                )
+                            ),
                             controls: c,
                             inputs: [inputs, memory].concat(),
                             outputs,
@@ -791,9 +801,13 @@ impl Object {
             bundles: BTreeMap::new(),
             regions: BTreeMap::new(),
             borrowed: BTreeSet::new(),
-            classical: f.params.iter().flatten()
+            classical: f
+                .params
+                .iter()
+                .flatten()
                 .filter(|p| !matches!(p.ty, Type::Wire(_) | Type::Region(_, _)))
-                .map(|p| (p.name.clone(), format!("{}:{}", f.name, p.name))).collect(),
+                .map(|p| (p.name.clone(), format!("{}:{}", f.name, p.name)))
+                .collect(),
             generation: 0,
         };
         for p in f.params.iter().flatten() {

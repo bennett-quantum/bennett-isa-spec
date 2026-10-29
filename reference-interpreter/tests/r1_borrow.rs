@@ -123,10 +123,20 @@ fn r2_opaque_borrow_calls_bind_classical_args_and_tokens_through_inlining() {
     let oracle = "oracle @o () (t:wire) (f:wire[4]) () (n:i1)\n^entry():\nlift.retval n";
     let child = "perm_action @child (d:wire mut, f:wire[4] mut) () () (token:token, value:i1) ()\n^entry():\noracle_call @o token () d f () (value)";
     for inline in [false, true] {
-        let call = |v| if inline { format!("action_call @child (d, f) () () (tk, {v})") } else { format!("oracle_call @o tk () d f () ({v})") };
+        let call = |v| {
+            if inline {
+                format!("action_call @child (d, f) () () (tk, {v})")
+            } else {
+                format!("oracle_call @o tk () d f () ({v})")
+            }
+        };
         let build = |second| {
             let body = format!("perm_action @a (f:wire[4] mut) () () (tk:token, x:i1, y:i1) ()\n^entry():\nd = qborrow any 1\n{}\n{}\nqreturn d", call("x"), call(second));
-            support::object(&[("o", os, oracle),("child", cs, child),("a", ps, &body)], "{}", "")
+            support::object(
+                &[("o", os, oracle), ("child", cs, child), ("a", ps, &body)],
+                "{}",
+                "",
+            )
         };
         let e = Object::parse(&build("y")).expect_err("x and y are not the same classical binding");
         assert!(e.to_string().contains("§5.6"), "{e}");
@@ -138,16 +148,19 @@ fn r2_opaque_borrow_calls_bind_classical_args_and_tokens_through_inlining() {
                     let mut q = QuantumState::new();
                     let fw = q.allocate(4).unwrap();
                     let dw = q.allocate(1).unwrap();
-                    for (j,w) in fw.iter().chain(&dw).enumerate() {
-                        if (f | (d << 4)) >> j & 1 == 1 { q.gate("x", &[*w], None, &[]).unwrap(); }
+                    for (j, w) in fw.iter().chain(&dw).enumerate() {
+                        if (f | (d << 4)) >> j & 1 == 1 {
+                            q.gate("x", &[*w], None, &[]).unwrap();
+                        }
                     }
                     let before = q.clone();
                     let mut b = QuantumBindings::default();
                     b.bundles.insert("f".into(), fw);
                     b.borrowed.push(dw);
-                    b.args.insert("tk".into(), Argument::Token(Budget::steps(1)));
+                    b.args
+                        .insert("tk".into(), Argument::Token(Budget::steps(1)));
                     b.args.insert("x".into(), Argument::Bits(x));
-                    b.args.insert("y".into(), Argument::Bits(1-x));
+                    b.args.insert("y".into(), Argument::Bits(1 - x));
                     o.execute_action("a", &mut q, &b, false, &[]).unwrap();
                     assert_eq!(q, before);
                     o.execute_action("a", &mut q, &b, true, &[]).unwrap();

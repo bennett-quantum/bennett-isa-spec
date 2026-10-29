@@ -305,3 +305,67 @@ fn accepted_random_actions_run_exactly_clean_sweep() {
     let (accepted, rejected) = total;
     println!("§6 differential sweep: {accepted} accepted (all clean), {rejected} rejected");
 }
+
+#[test]
+fn generated_borrow_frames_keep_differing_classical_bindings_distinct() {
+    use bennett_isa_ref::{Argument, Budget};
+    let os = r#"{"abi":"0.8","args":["i1"],"fault":4,"in":[],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#;
+    let ac = r#"{"abi":"0.8","args":["token","i1","i1"],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[4],"tier":"q"}"#;
+    let mut r = Rng(0x0b07_7002);
+    for _ in 0..80 {
+        let mut parity = [false; 2];
+        let mut body = "perm_action @a (f:wire[4] mut) () () (tk:token, x:i1, y:i1) ()\n^entry():\nd = qborrow any 1\n".to_string();
+        for _ in 0..2 * (1 + r.below(3)) {
+            let j = r.below(2) as usize;
+            parity[j] ^= true;
+            body.push_str(&format!(
+                "oracle_call @o tk () d f () ({})\n",
+                ["x", "y"][j]
+            ));
+        }
+        body.push_str("qreturn d");
+        let text = support::object(
+            &[
+                (
+                    "o",
+                    os,
+                    "oracle @o () (t:wire) (f:wire[4]) () (n:i1)\n^entry():\nlift.retval n",
+                ),
+                ("a", ac, &body),
+            ],
+            "{}",
+            "",
+        );
+        let parsed = Object::parse(&text);
+        // d' = d XOR parity_x*x XOR parity_y*y. This is identity for ALL
+        // classical bindings iff both formal-argument occurrence counts are even.
+        if parity.iter().any(|v| *v) {
+            assert!(parsed.unwrap_err().to_string().contains("§5.6"));
+            continue;
+        }
+        let o = parsed.unwrap();
+        for input in 0..16u32 {
+            let mut q = QuantumState::new();
+            let wires = q.allocate(5).unwrap();
+            for (bit, w) in wires.iter().enumerate() {
+                if (input & 3) >> (bit % 2) & 1 == 1 {
+                    q.gate("x", &[*w], None, &[]).unwrap();
+                }
+            }
+            let before = q.clone();
+            let mut b = QuantumBindings::default();
+            b.bundles.insert("f".into(), wires[..4].to_vec());
+            b.borrowed.push(vec![wires[4]]);
+            b.args
+                .insert("tk".into(), Argument::Token(Budget::steps(1)));
+            b.args
+                .insert("x".into(), Argument::Bits((input >> 2 & 1) as u128));
+            b.args
+                .insert("y".into(), Argument::Bits((input >> 3 & 1) as u128));
+            o.execute_action("a", &mut q, &b, false, &[]).unwrap();
+            assert_eq!(q, before, "{body}");
+            o.execute_action("a", &mut q, &b, true, &[]).unwrap();
+            assert_eq!(q, before, "{body}");
+        }
+    }
+}

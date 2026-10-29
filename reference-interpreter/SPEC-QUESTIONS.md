@@ -151,7 +151,7 @@ changed in response to the council's round-1 review
     §12.1 xoshiro256** draws and yield evidence; only an exhaustive claim over D is
     a proof. `expected: "oracle"`, `numerical` and `channel` compare realisations
     under a schedule and are reported unverified until the target/schedule and
-    interval machinery lands (deliverables 8–10). *Proposed 0.9:* specify the
+    interval machinery lands (deliverables 9–11). *Proposed 0.9:* specify the
     tuple and table encodings and a `budget` field for oracle claims.
 22. **Certificate composition at link time (§9.3, §12.3)** *new (round 1)*.
     Reading: linking unites region records (equal where they meet) and
@@ -198,3 +198,16 @@ changed in response to the council's round-1 review
     `step-check --suite` applies the default (exhaustive at ≤ 16 bits, else 2^16
     xoshiro256** samples, reported as `"mode":"sampled"`); `--exhaustive` and
     `--samples N` are explicit, with no fixed size limit. No change proposed.
+
+28. **qif adjoints with cross-arm lifetimes (§3.5, §4.6, §5.3)** *new (round 2)*.
+    Question: §5.3 prints `qif w {A}{B} ↦ qif w {adj A}{adj B}`, but §3.5
+    makes allocation/release unconditional, and §4.6 expands then before else.
+    A legal `qif p { d = qalloc any 1 } { qfree d }` must recreate d in the
+    inverse else before releasing it in the inverse then. Reading: reverse the
+    complete §4.6 expansion, including unconditional lifetime operations, so the
+    adjoint visits inverse else before inverse then. Disjoint controlled gates
+    commute across arms; their lifetimes need not. No arm-local lifetime
+    restriction is added. *Proposed 0.9:* "The qif adjoint shorthand assumes
+    each arm's workspace lifetimes are self-contained; otherwise take the
+    adjoint of the complete §4.6 expansion, reversing unconditional lifetime
+    operations as well."

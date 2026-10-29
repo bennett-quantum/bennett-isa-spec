@@ -408,10 +408,17 @@ impl Object {
                     let w = e.scalar(&a[0])?;
                     let mut yes = context.clone();
                     yes.push((w, true));
-                    self.action_sequence(&i.bodies[0], q, e, adjoint, &yes)?;
                     let mut no = context.clone();
                     no.push((w, false));
-                    self.action_sequence(&i.bodies[1], q, e, adjoint, &no)?;
+                    // Reverse the complete §4.6 expansion, including its
+                    // unconditional lifetime operations (SPEC-QUESTIONS 28).
+                    if adjoint {
+                        self.action_sequence(&i.bodies[1], q, e, true, &no)?;
+                        self.action_sequence(&i.bodies[0], q, e, true, &yes)?;
+                    } else {
+                        self.action_sequence(&i.bodies[0], q, e, false, &yes)?;
+                        self.action_sequence(&i.bodies[1], q, e, false, &no)?;
+                    }
                 }
                 "qloop" => {
                     let n = a[0]

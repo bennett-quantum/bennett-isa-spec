@@ -296,3 +296,22 @@ Canonical `.bisa` fixtures in `tests/fixtures/` have adjacent `.comments` files
 with hand-derived expected outcomes (comments are not a §16 extension). Every
 fixture's stored hashes are audited (`tests/r1_fixtures.rs`), and the inc8 and
 sum_db fixtures are compared byte for byte with §16.3.
+
+### Round-2 static and display semantics
+
+Function-local `qregion` declarations are established once at function entry,
+including declarations inside zero-trip loops or after their first use. Each
+lexical region name is unique. `qif` arms must restore their predicate stacks;
+its adjoint reverses the complete expansion, including unconditional lifetimes
+(SPEC-QUESTIONS 28). `qinplace` explicit adjoints exchange the oracle pair and
+retain token and effective-control versions. Exchanges retain the dependency
+union and other provenance on all outputs, and their inverse histories cancel
+jointly. Borrow proofs distinguish the complete classical argument and token
+bindings through inlined calls. Matched lifted oracle calls preserve all tuple
+boundaries and account for every possible numeric `qjumpr` destination.
+
+Integer comparisons require integer or pointer operands; lifted memory width
+suffixes use canonical INT spelling at load. State JSON selects support exactly
+and approximates rotation phases using bounded finite factors, even when their
+combined symbolic angle exceeds binary64. Numerical/channel certificate claims
+still report the staged rigorous interval checker as deliverable 11.

@@ -395,23 +395,29 @@ impl Amplitude {
             // angle is binary64. Converting their sum first can overflow.
             let (mut co, mut si) = (1.0, 0.0);
             for (j, limb) in e.limbs.iter().enumerate() {
-                if *limb == 0 { continue; }
+                if *limb == 0 {
+                    continue;
+                }
                 let scale = 32 * j as i64 - 1075;
-                // A u32 limb times 2^991 is finite and represented exactly.
-                let bounded = scale.min(991);
+                // Keep as much argument as binary64 can represent exactly;
+                // extra squarings amplify phase rounding error unnecessarily.
+                let highest_bit = 31 - limb.leading_zeros();
+                let bounded = scale.min(1023 - i64::from(highest_bit));
                 let angle = if bounded < -1022 {
                     // Scale the limb before rounding a subnormal phase.
                     (*limb as f64 * 2f64.powi((bounded + 1022) as i32)) * 2f64.powi(-1022)
-                } else { *limb as f64 * 2f64.powi(bounded as i32) };
+                } else {
+                    *limb as f64 * 2f64.powi(bounded as i32)
+                };
                 let (mut s, mut c) = angle.sin_cos();
                 for _ in bounded..scale {
-                    (c, s) = (c*c-s*s, 2.0*c*s);
+                    (c, s) = (c * c - s * s, 2.0 * c * s);
                     // Squaring a rounded unit complex otherwise amplifies
                     // radial error; this affects display only, never equality.
                     let norm = c.hypot(s);
-                    (c, s) = (c/norm, s/norm);
+                    (c, s) = (c / norm, s / norm);
                 }
-                (co, si) = (co*c-si*s, co*s+si*c);
+                (co, si) = (co * c - si * s, co * s + si * c);
             }
             let s = if e.negative { -si } else { si };
             let (x, y) = (c.re.to_f64(), c.im.to_f64());
