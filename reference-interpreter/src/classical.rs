@@ -2,10 +2,10 @@
 use crate::{
     err,
     object::{is_binop, is_div, list, mask, parse_bits},
-    oracle::{binop, compare, divide, signed, Memory},
+    oracle::Memory,
     registers::RegisterUndo,
     validation::normalize_call,
-    Argument, Budget, Error, Instruction, Object, OracleInput, QuantumBindings, QuantumRegion,
+    Argument, Budget, Error, Instruction, Object, QuantumBindings, QuantumRegion,
     QuantumRegisters, Result, Type,
 };
 use std::collections::{BTreeMap, VecDeque};
@@ -217,7 +217,7 @@ impl<'a> ClassicalMachine<'a> {
         }
         let state = ClassicalSnapshot {
             instances,
-            memory: Memory::initial(object, f, &OracleInput::default())?,
+            memory: Memory::initial(object, f, &BTreeMap::new())?,
             devices,
             control: vec![Activation {
                 id: 0,
@@ -493,7 +493,10 @@ impl<'a> ClassicalMachine<'a> {
             let Type::Region(a, w) = p.ty else {
                 unreachable!("validated region")
             };
-            if wires.len() as u128 != (1u128 << a) * (w as u128) {
+            if crate::oracle::power_of_two(a as u128)
+                .and_then(|cells| cells.checked_mul(w as u128))
+                != Some(wires.len() as u128)
+            {
                 return err("§3.3", "qreg does not fill region dimensions");
             }
             bindings.regions.insert(
@@ -731,7 +734,7 @@ impl<'a> ClassicalMachine<'a> {
                 self.save_bytes(p, 8, undo);
                 let c = self.state.devices.clock;
                 undo.device = Some(DeviceUndo::Clock(c));
-                self.state.memory.store(p, 64, c as u128);
+                self.state.memory.store_u128(p, 64, c as u128)?;
                 self.state.devices.clock = c.wrapping_add(1);
             }
             ("entropy", "read") => {
@@ -832,9 +835,9 @@ impl<'a> ClassicalMachine<'a> {
                 let left = av.bits()?;
                 let right = self.bits(&a[1])?;
                 let value = if is_binop(op) {
-                    Some(binop(op, left, right, w))
+                    Some(binop(op, left, right, w)?)
                 } else {
-                    match divide(op, left, right, w) {
+                    match divide(op, left, right, w)? {
                         Ok(v) => Some(v),
                         Err(c) => {
                             fault = Some(c);
@@ -852,7 +855,7 @@ impl<'a> ClassicalMachine<'a> {
                         av.bits()?,
                         self.bits(&a[1])?,
                         av.width(object.ptr_width)?,
-                    ) as u128,
+                    )? as u128,
                 ));
             } else if let Some((cast, t)) = op
                 .split_once('.')
@@ -869,22 +872,22 @@ impl<'a> ClassicalMachine<'a> {
                 };
                 output = Some(ClassicalValue::Int(w, value & mask(w)));
             } else if let Some(t) = op.strip_prefix("load.") {
-                let w = Type::parse(t)?.width(object.ptr_width)?;
+                let w = Type::parse(t)?.width(object.ptr_width)? as u16;
                 let p = self.bits(&a[0])?;
                 if !self.state.memory.valid(p, (w / 8) as u128) {
                     fault = Some(7);
                 } else {
-                    output = Some(ClassicalValue::Int(w, self.state.memory.load(p, w)));
+                    output = Some(ClassicalValue::Int(w, self.state.memory.load_u128(p, w as u64)?));
                 }
             } else if let Some(t) = op.strip_prefix("store.") {
-                let w = Type::parse(t)?.width(object.ptr_width)?;
+                let w = Type::parse(t)?.width(object.ptr_width)? as u16;
                 let p = self.bits(&a[0])?;
                 let v = self.bits(&a[1])?;
                 if !self.state.memory.valid(p, (w / 8) as u128) {
                     fault = Some(7);
                 } else {
                     self.save_bytes(p, (w / 8) as usize, &mut undo);
-                    self.state.memory.store(p, w, v);
+                    self.state.memory.store_u128(p, w as u64, v)?;
                 }
             } else {
                 match op {
@@ -900,14 +903,14 @@ impl<'a> ClassicalMachine<'a> {
                     "alloc" => {
                         let n = self.bits(&a[0])?;
                         let b = object.default_budget(0)?;
-                        if self.state.memory.allocation_fails(n, b) {
+                        if self.state.memory.allocation_fails(n, b.heap) {
                             fault = Some(2);
                         } else {
                             undo.allocation = Some((
                                 self.state.memory.heap_used,
                                 self.state.memory.allocations.len(),
                             ));
-                            output = Some(ClassicalValue::Ptr(self.state.memory.allocate(n)));
+                            output = Some(ClassicalValue::Ptr(self.state.memory.allocate(n)?));
                         }
                     }
                     "free" => {
@@ -1148,4 +1151,57 @@ impl<'a> ClassicalMachine<'a> {
         });
         Ok(())
     }
+}
+
+/// CC/R integer arithmetic on iN (N <= 128) and ptr (ptr_width <= 128) values (§4.1).
+pub(crate) fn signed(v: u128, width: u16) -> i128 {
+    let shift = 128 - width as u32;
+    ((v << shift) as i128) >> shift
+}
+pub(crate) fn binop(op: &str, a: u128, b: u128, w: u16) -> Result<u128> {
+    let shift_out = b >= w as u128;
+    let v = match op {
+        "add" => a.wrapping_add(b),
+        "sub" => a.wrapping_sub(b),
+        "mul" => a.wrapping_mul(b),
+        "and" => a & b,
+        "or" => a | b,
+        "xor" => a ^ b,
+        // §4.1: "wrap; shift >= N -> 0" for all three shifts.
+        "shl" if shift_out => 0,
+        "lshr" if shift_out => 0,
+        "ashr" if shift_out => 0,
+        "shl" => a << (b as u32),
+        "lshr" => a >> (b as u32),
+        "ashr" => (signed(a, w) >> (b as u32)) as u128,
+        _ => return err("§4.8", format!("unknown binop {op}")),
+    };
+    Ok(v & mask(w))
+}
+/// Ok(Err(code)) is the trap / fault record of §4.1.
+pub(crate) fn divide(op: &str, a: u128, b: u128, w: u16) -> Result<std::result::Result<u128, u128>> {
+    if b == 0 {
+        return Ok(Err(5));
+    }
+    if op.starts_with('s') && a == 1u128 << (w - 1) && b == mask(w) {
+        return Ok(Err(6));
+    }
+    Ok(Ok(match op {
+        "udiv" => a / b,
+        "urem" => a % b,
+        "sdiv" => (signed(a, w) / signed(b, w)) as u128,
+        "srem" => (signed(a, w) % signed(b, w)) as u128,
+        _ => return err("§4.8", format!("unknown division {op}")),
+    } & mask(w)))
+}
+pub(crate) fn compare(pred: &str, a: u128, b: u128, w: u16) -> Result<bool> {
+    Ok(match pred {
+        "eq" => a == b,
+        "ne" => a != b,
+        "ult" => a < b,
+        "ule" => a <= b,
+        "slt" => signed(a, w) < signed(b, w),
+        "sle" => signed(a, w) <= signed(b, w),
+        _ => return err("§4.8", format!("unknown comparison {pred}")),
+    })
 }

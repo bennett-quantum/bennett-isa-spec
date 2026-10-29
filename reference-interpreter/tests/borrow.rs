@@ -158,7 +158,7 @@ fn lifted_permutation_actions_can_borrow_workspace_and_reverse() {
             for _ in 0..steps {
                 m.forward_step().unwrap();
             }
-            assert_eq!(m.outcome(), result);
+            assert_eq!(m.outcome().unwrap(), result);
             for _ in 0..steps {
                 m.inverse_step().unwrap();
             }

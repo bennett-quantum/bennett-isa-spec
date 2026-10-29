@@ -114,7 +114,7 @@ fn lifted_permutation_calls_use_the_action_and_its_adjoint() {
         for _ in 0..5 {
             m.forward_step().unwrap();
         }
-        assert_eq!(m.outcome(), result);
+        assert_eq!(m.outcome().unwrap(), result);
         for _ in 0..5 {
             m.inverse_step().unwrap();
         }

@@ -199,9 +199,7 @@ impl Object {
                 "qalloc" | "qborrow" => {
                     arity(2, 1)?;
                     crate::object::literal_name(&a[0])?;
-                    let n = a[1]
-                        .parse::<u16>()
-                        .map_err(|_| Error("§3.3: invalid allocation width".into()))?;
+                    let n = crate::object::host_count(&a[1], "allocation width")?;
                     if n == 0 {
                         return err("§3.3", "allocation width must be positive");
                     }
@@ -244,7 +242,7 @@ impl Object {
                         versions: s.read_snapshot(&wires)?,
                         controls: s.predicates.clone(),
                     };
-                    s.produce(&i.lhs[0], Type::Wire(wires.len() as u16), c)?;
+                    s.produce(&i.lhs[0], Type::Wire(wires.len() as u64), c)?;
                 }
                 "quncopy" => {
                     arity(2, 0)?;
@@ -271,25 +269,21 @@ impl Object {
                     if !i.lhs.is_empty() || !matches!(a.len(), 3 | 4) || !name(&a[0]) {
                         return err("§4.8", "qregion operand schema");
                     }
-                    let aw = a[1]
-                        .parse::<u16>()
-                        .map_err(|_| Error("§4.8: qregion address width".into()))?;
-                    let w = a[2]
-                        .parse::<u16>()
-                        .map_err(|_| Error("§4.8: qregion cell width".into()))?;
-                    if aw > 127 || w == 0 {
-                        return err("§3.3", "invalid region dimensions");
+                    let aw = crate::object::host_count(&a[1], "qregion address width")?;
+                    let w = crate::object::host_count(&a[2], "qregion cell width")?;
+                    if w == 0 {
+                        return err("§3.3", "qregion cell width must be positive");
                     }
                     if a.len() == 4 {
                         let img = a[3]
                             .strip_prefix('@')
-                            .ok_or_else(|| Error("§4.6: unknown qregion image".into()))?;
+                            .ok_or_else(|| Error("§4.6: qregion image must be @data".into()))?;
                         let size = self.data_size(img)?;
-                        let bits = (1u128 << aw)
-                            .checked_mul(w as u128)
-                            .ok_or_else(|| Error("§4.6: image size overflow".into()))?;
-                        if bits % 8 != 0 || bits / 8 != size {
-                            return err("§4.6", "image size mismatch");
+                        // 2^A * W bits = 8 * size bytes (§4.6), compared exactly.
+                        let bits = crate::oracle::power_of_two(aw as u128)
+                            .and_then(|cells| cells.checked_mul(w as u128));
+                        if bits.is_none_or(|bits| bits % 8 != 0 || bits / 8 != size) {
+                            return err("§4.6", "image size differs from 2^A*W/8 bytes");
                         }
                     }
                     if s.types.insert(a[0].clone(), Type::Region(aw, w)).is_some() {
@@ -618,7 +612,9 @@ impl Object {
                     (Type::Wire(n), Type::Qreg(m)) => *n as u64 == *m,
                     (Type::Region(a, w), Type::Region(b, z)) => a == b && w == z,
                     (Type::Region(a, w), Type::Qreg(n)) => {
-                        *a < 64 && (1u128 << *a) * (*w as u128) == *n as u128
+                        crate::oracle::power_of_two(*a as u128)
+                            .and_then(|cells| cells.checked_mul(*w as u128))
+                            == Some(*n)
                     }
                     _ => &p.ty == ty,
                 };
@@ -1215,10 +1211,12 @@ impl Discipline {
     fn wires(&self, n: &str) -> Result<Vec<String>> {
         let n = n.strip_prefix('!').unwrap_or(n);
         let (base, index) = if let Some((base, index)) = n.split_once('[') {
-            let index = index
-                .strip_suffix(']')
-                .and_then(|s| s.parse::<u16>().ok())
-                .ok_or_else(|| Error("§3.3: invalid indexed wire".into()))?;
+            let index = crate::object::host_count(
+                index
+                    .strip_suffix(']')
+                    .ok_or_else(|| Error("§16.2: invalid indexed wire".into()))?,
+                "wire index",
+            )?;
             (base, Some(index))
         } else {
             (n, None)

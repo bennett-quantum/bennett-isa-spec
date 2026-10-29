@@ -2,7 +2,7 @@ use crate::{
     err,
     object::list,
     validation::{gate, gate_operands, normalize_call},
-    Error, Function, Instruction, Object, Result, Type,
+    Function, Instruction, Object, Result, Type,
 };
 use std::collections::{BTreeMap, BTreeSet};
 impl Object {
@@ -10,21 +10,18 @@ impl Object {
         &self,
         name: &str,
         active: &mut BTreeSet<String>,
-    ) -> Result<BTreeSet<(String, u16)>> {
+    ) -> Result<BTreeSet<(String, u64)>> {
         if !active.insert(name.into()) {
             return err("§5.1", "recursive region graph");
         }
         let f = self.declaration(name)?;
         let mut out = BTreeSet::new();
-        let add = |out: &mut BTreeSet<(String, u16)>, operand: &str| -> Result<()> {
+        let add = |out: &mut BTreeSet<(String, u64)>, operand: &str| -> Result<()> {
             let (base, index) = if let Some((base, index)) = operand.split_once('[') {
                 (
                     base,
                     Some(
-                        index
-                            .trim_end_matches(']')
-                            .parse::<u16>()
-                            .map_err(|_| Error("§3.3: wire index".into()))?,
+                        crate::object::host_count(index.trim_end_matches(']'), "wire index")?,
                     ),
                 )
             } else {

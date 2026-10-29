@@ -7,7 +7,7 @@ fn compare(o: &Object, name: &str, input: &OracleInput, budget: Budget) {
     for _ in 0..budget.steps {
         m.forward_step().unwrap();
     }
-    assert_eq!(m.outcome(), expected, "{name}:B={}", budget.steps);
+    assert_eq!(m.outcome().unwrap(), expected, "{name}:B={}", budget.steps);
     for _ in 0..budget.steps {
         m.inverse_step().unwrap();
     }
@@ -142,7 +142,7 @@ fn full_small_domain_includes_memory_and_nonzero_target_and_fault() {
                 for _ in 0..steps {
                     machine.forward_step().unwrap();
                 }
-                assert_eq!(machine.outcome(), result);
+                assert_eq!(machine.outcome().unwrap(), result);
                 for target in 0..=1 {
                     for fault in 0..16 {
                         assert_eq!(

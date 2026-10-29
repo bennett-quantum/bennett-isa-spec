@@ -112,7 +112,7 @@ fn vector_execution_matches_narrow_reference_for_recursion_memory_and_all_rows()
                         });
                     }
                     assert_eq!(
-                        machine.outcome(),
+                        machine.outcome().unwrap(),
                         large,
                         "vector machine {fixture} @{} B={steps}",
                         f.name
@@ -206,7 +206,7 @@ fn wide_literal_step_machine_restores_every_prefix_and_activation_cell() {
                     assert_eq!(machine.snapshot(), before);
                     machine.forward_step().unwrap();
                 }
-                assert_eq!(machine.outcome(), result, "@{name} stack={stack} B={steps}");
+                assert_eq!(machine.outcome().unwrap(), result, "@{name} stack={stack} B={steps}");
                 let target = BitVector::parse_decimal(257, "-1").unwrap();
                 let fw = o.functions[name].params[2][0]
                     .ty

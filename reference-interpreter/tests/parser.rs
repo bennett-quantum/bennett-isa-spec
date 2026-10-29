@@ -106,7 +106,8 @@ fn json_is_strict_and_canonical() {
 fn empty_hex_data_and_canonical_type_widths() {
     let data=format!("bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=32\n\nsection symbols\n{{\"0\":{{\"interface_hash\":\"{}\",\"kind\":\"data\",\"name\":\"empty\",\"signature\":{{\"abi\":\"0.8\",\"kind\":\"data\",\"size\":0,\"tier\":\"-\"}}}}}}\n\nsection data\nempty \n","0".repeat(64));
     assert!(Object::parse(&data).unwrap().data["empty"].is_empty());
-    rejects(&INC.replace("reg[8]", "reg[08]"), "§3.3");
+    // INT := -?(0|[1-9][0-9]*) (§16.1) governs every width token.
+    rejects(&INC.replace("reg[8]", "reg[08]"), "§16.1");
 }
 
 #[test]
@@ -142,7 +143,7 @@ fn every_operand_uses_canonical_int_float_string_and_index_spellings() {
     assert!(bennett_isa_ref::Type::parse("qreg[02]")
         .unwrap_err()
         .to_string()
-        .contains("§3.3"));
+        .contains("§16.1"));
     rejects(&text.replace("x t\n}", "cx p[00] t\n}"), "§16.1");
 }
 

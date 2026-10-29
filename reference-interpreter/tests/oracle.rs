@@ -1,3 +1,4 @@
+mod support;
 use bennett_isa_ref::{Argument, Budget, Object, OracleInput};
 
 #[test]
@@ -236,31 +237,28 @@ fn exhaustive_unsigned_and_signed_division_u8() {
     }
 }
 #[test]
-fn integer_literals_are_reduced_at_the_destination_width_without_host_overflow() {
-    use bennett_isa_ref::{Budget, Object, OracleInput, OracleMachine};
-    // 2^128+5 is 5 mod256; its negative is251 mod256.
-    for (literal, addend) in [
-        ("340282366920938463463374607431768211461", 5),
-        ("-340282366920938463463374607431768211461", 251),
+fn const_literals_outside_the_destination_range_are_rejected_not_reduced() {
+    // SPEC-QUESTIONS 12 (revised): -2^(N-1) <= c < 2^N; reducing 2^128+5 to 5
+    // would be the silent truncation §3.3 forbids. Hand check for N = 8:
+    // -128 and 255 are the extremes; -129 and 256 are outside.
+    for literal in [
+        "340282366920938463463374607431768211461",
+        "-340282366920938463463374607431768211461",
+        "256",
+        "-129",
     ] {
         let text = include_str!("fixtures/inc8.bisa")
             .replace("lift.const.i8 1", &format!("lift.const.i8 {literal}"));
-        let o = Object::parse(&text).unwrap();
-        for x in 0..256 {
-            let input = OracleInput::bits(&[x]);
-            let budget = Budget::steps(3);
-            let result = o.run_oracle("inc8", &input, budget).unwrap();
-            assert_eq!((result.payload, result.code), ((x + addend) & 255, 0));
-            let mut machine = OracleMachine::new(&o, "inc8", &input, budget).unwrap();
-            let before = machine.snapshot();
-            for _ in 0..3 {
-                machine.forward_step().unwrap();
-            }
-            assert_eq!(machine.outcome(), result);
-            for _ in 0..3 {
-                machine.inverse_step().unwrap();
-            }
-            assert_eq!(machine.snapshot(), before);
+        let e = Object::parse(&text).unwrap_err().to_string();
+        assert!(e.contains("§3.3"), "{literal}: {e}");
+    }
+    for (literal, addend) in [("255", 255u128), ("-128", 128), ("-1", 255)] {
+        let text = include_str!("fixtures/inc8.bisa")
+            .replace("lift.const.i8 1", &format!("lift.const.i8 {literal}"));
+        let o = support::rehash(&text);
+        for x in [0u128, 1, 127, 128, 255] {
+            let r = o.run_oracle("inc8", &OracleInput::bits(&[x]), Budget::steps(3)).unwrap();
+            assert_eq!((r.payload, r.code), ((x + addend) & 255, 0), "{literal} {x}");
         }
     }
 }

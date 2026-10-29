@@ -15,36 +15,43 @@ pub const SECTIONS: [&str; 9] = [
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Type {
+    /// iN, 1 <= N <= 128 (§3.3).
     Int(u16),
     Ptr,
     F64,
     Token,
     Qreg(u64),
-    Wire(u16),
-    Reg(u16),
-    Region(u16, u16),
+    /// wire / wire[N]: no upper bound in §3.3; N is held exactly as u64.
+    Wire(u64),
+    /// reg[N]: no upper bound in §3.3.
+    Reg(u64),
+    /// region[A,W]: 2^A cells of wire[W]; neither dimension is bounded by §3.3.
+    Region(u64, u64),
+}
+/// A canonical unsigned INT (§16.1) held exactly in a host u64. A larger INT is
+/// well-formed text but names more bits or cells than any host can address;
+/// it is reported as a host-resource limit, never silently reduced.
+pub(crate) fn host_count(s: &str, what: &str) -> Result<u64> {
+    if !integer(s) || s.starts_with('-') {
+        return err("§16.1", format!("{what} must be a canonical unsigned INT"));
+    }
+    s.parse::<u64>().map_err(|_| {
+        Error(format!(
+            "host limit: {what} {s} exceeds the host's 64-bit descriptor range (not an ISA rule)"
+        ))
+    })
 }
 impl Type {
     pub fn parse(s: &str) -> Result<Self> {
         let width = |s: &str| -> Result<u16> {
-            if !integer(s) || s.starts_with('-') {
-                return err("§3.3", "width must use canonical unsigned INT");
-            }
-            let n = s
-                .parse::<u16>()
-                .map_err(|_| Error(format!("§3.3: invalid width {s}")))?;
+            let n = host_count(s, "integer width")?;
             if !(1..=128).contains(&n) {
-                return err("§3.3", "width outside 1..128");
+                return err("§3.3", "iN requires 1 <= N <= 128");
             }
-            Ok(n)
+            Ok(n as u16)
         };
-        let bundle_width = |s: &str| -> Result<u16> {
-            if !integer(s) || s.starts_with('-') {
-                return err("§3.3", "bundle width requires canonical positive INT");
-            }
-            let n = s
-                .parse::<u16>()
-                .map_err(|_| Error("§3.3: bundle width exceeds host descriptor range".into()))?;
+        let bundle_width = |s: &str| -> Result<u64> {
+            let n = host_count(s, "bundle width")?;
             if n == 0 {
                 return err("§3.3", "bundle width must be positive");
             }
@@ -55,7 +62,7 @@ impl Type {
             "f64" => Self::F64,
             "token" => Self::Token,
             "wire" => Self::Wire(1),
-            _ if s.starts_with("i") => Self::Int(width(&s[1..])?),
+            _ if s.starts_with('i') => Self::Int(width(&s[1..])?),
             _ if s.starts_with("wire[") && s.ends_with(']') => {
                 Self::Wire(bundle_width(&s[5..s.len() - 1])?)
             }
@@ -63,42 +70,34 @@ impl Type {
                 Self::Reg(bundle_width(&s[4..s.len() - 1])?)
             }
             _ if s.starts_with("qreg[") && s.ends_with(']') => {
-                let raw = &s[5..s.len() - 1];
-                let n = raw
-                    .parse::<u64>()
-                    .map_err(|_| Error("§3.3: invalid qreg size".into()))?;
-                if !integer(raw) || raw.starts_with('-') || n == 0 {
-                    return err("§3.3", "qreg width must use positive canonical INT");
-                }
-                Self::Qreg(n)
+                Self::Qreg(bundle_width(&s[5..s.len() - 1])?)
             }
             _ if s.starts_with("region[") && s.ends_with(']') => {
                 let (a, w) = s[7..s.len() - 1]
                     .split_once(',')
-                    .ok_or_else(|| Error("§3.3: malformed region type".into()))?;
-                if !integer(a) || a.starts_with('-') {
-                    return err(
-                        "§3.3",
-                        "region address width must use canonical unsigned INT",
-                    );
-                }
-                let a = a
-                    .parse()
-                    .map_err(|_| Error("§3.3: invalid address width".into()))?;
-                if a > 127 {
-                    return err("§3.3", "region address width exceeds 127");
-                }
-                Self::Region(a, bundle_width(w)?)
+                    .ok_or_else(|| Error("§16.2: malformed region type".into()))?;
+                Self::Region(host_count(a, "region address width")?, bundle_width(w)?)
             }
             _ => return err("§3.3", format!("unknown type {s}")),
         })
     }
-    pub fn width(&self, ptr: u16) -> Result<u16> {
+    /// The bit width of a bit-vector type; ptr has width ptr_width.
+    pub fn width(&self, ptr: u16) -> Result<u64> {
         match self {
-            Self::Int(n) | Self::Wire(n) | Self::Reg(n) => Ok(*n),
-            Self::Ptr => Ok(ptr),
+            Self::Int(n) => Ok(*n as u64),
+            Self::Wire(n) | Self::Reg(n) => Ok(*n),
+            Self::Ptr => Ok(ptr as u64),
             _ => err("§3.3", "expected bit-vector type"),
         }
+    }
+    /// Host index form of a width, for storage allocation.
+    pub fn bits(&self, ptr: u16) -> Result<usize> {
+        let w = self.width(ptr)?;
+        usize::try_from(w).map_err(|_| {
+            Error(format!(
+                "host limit: width {w} exceeds the host address space (not an ISA rule)"
+            ))
+        })
     }
     pub fn text(&self) -> String {
         match self {
@@ -710,13 +709,16 @@ impl Object {
                 return err("§1", format!("expected {k}=0.8"));
             }
         }
-        let ptr_width = header[8]
+        let raw = header[8]
             .strip_prefix("ptr_width=")
-            .and_then(|s| s.parse::<u16>().ok())
-            .ok_or_else(|| Error("§16.2: invalid ptr_width".into()))?;
+            .ok_or_else(|| Error("§16.2: header requires ptr_width=INT".into()))?;
+        let ptr_width = host_count(raw, "ptr_width")?;
+        // SPEC-QUESTIONS 14: hostcall's rlen is iN with N = ptr_width (§4.8), and
+        // iN exists only for 1 <= N <= 128 (§3.3).
         if !(1..=128).contains(&ptr_width) {
-            return err("§3.3", "pointer width outside 1..128");
+            return err("§3.3", "ptr_width must satisfy 1 <= ptr_width <= 128 (iN rlen, §4.8)");
         }
+        let ptr_width = ptr_width as u16;
         let mut obj = Object {
             text: text.into(),
             ptr_width,
@@ -1108,11 +1110,11 @@ impl Object {
         }
         Ok(maximum)
     }
-    fn fault_width(&self, containing: &Function) -> Result<u16> {
+    fn fault_width(&self, containing: &Function) -> Result<u64> {
         if containing.kind == "oracle" {
             return containing.params[2][0].ty.width(self.ptr_width);
         }
-        let mut width = u16::MAX;
+        let mut width = u64::MAX;
         for oracle in self.functions.values().filter(|f| f.kind == "oracle") {
             let mut pending = vec![oracle.name.clone()];
             let mut seen = BTreeSet::new();
@@ -1148,7 +1150,7 @@ impl Object {
         if !i.bodies.is_empty() {
             return err("§4.8", "structured instructions are not lifted rows");
         }
-        let rd = |n: &str| -> Result<u16> {
+        let rd = |n: &str| -> Result<u64> {
             let p = if f.kind == "oracle" {
                 f.regs
                     .iter()
@@ -1166,7 +1168,7 @@ impl Object {
                 .ty
                 .width(self.ptr_width)
         };
-        let dest = |n: &str| -> Result<u16> {
+        let dest = |n: &str| -> Result<u64> {
             if !f.locations().iter().any(|p| p.name == n) {
                 return err("§3.7", format!("not a writable location: {n}"));
             }
@@ -1185,7 +1187,7 @@ impl Object {
                 Ok(())
             }
         };
-        let eq = |a: u16, b: u16| -> Result<()> {
+        let eq = |a: u64, b: u64| -> Result<()> {
             if a != b {
                 err("§3.3", format!("width mismatch in {op}: {a} != {b}"))
             } else {
@@ -1201,7 +1203,7 @@ impl Object {
                 Ok(())
             }
         };
-        let addr = |s: &str| -> Result<()> { eq(rd(s)?, self.ptr_width) };
+        let addr = |s: &str| -> Result<()> { eq(rd(s)?, self.ptr_width as u64) };
         let length = |s: &str| -> Result<()> {
             if integer(s) {
                 let n = s
@@ -1217,16 +1219,19 @@ impl Object {
         };
         let code = |s: &str| -> Result<()> {
             let fw = self.fault_width(f)?;
-            crate::BitVector::parse_unsigned_exact(fw as usize, s)?;
+            crate::BitVector::parse_unsigned_exact(
+                usize::try_from(fw).map_err(|_| Error("host limit: fault width".into()))?,
+                s,
+            )?;
             Ok(())
         };
         if let Some(n) = op.strip_prefix("lift.const.i") {
             arity(1, 1)?;
-            let w = Type::parse(&format!("i{n}"))?.width(self.ptr_width)?;
+            // SPEC-QUESTIONS 15: a lifted suffix names the reg[N] width; it is
+            // not bounded by iN's 128.
+            let w = lifted_suffix(n)?;
             eq(dest(&i.lhs[0])?, w)?;
-            if !integer(&args[0]) || parse_bits(&args[0], w).is_err() {
-                return err("§16.1", "invalid integer literal");
-            }
+            const_literal(&args[0], w)?;
         } else if let Some(base) = op
             .strip_prefix("lift.")
             .filter(|s| is_binop(s) || is_div(s))
@@ -1253,7 +1258,7 @@ impl Object {
             .filter(|(c, _)| ["zext", "sext", "trunc"].contains(c))
         {
             arity(1, 1)?;
-            let out = Type::parse(&format!("i{n}"))?.width(self.ptr_width)?;
+            let out = lifted_suffix(n)?;
             eq(dest(&i.lhs[0])?, out)?;
             let input = rd(&args[0])?;
             if if cast == "trunc" {
@@ -1295,7 +1300,7 @@ impl Object {
                 }
                 "lift.addr" => {
                     arity(1, 1)?;
-                    eq(dest(&i.lhs[0])?, self.ptr_width)?;
+                    eq(dest(&i.lhs[0])?, self.ptr_width as u64)?;
                     let n = args[0]
                         .strip_prefix('@')
                         .ok_or_else(|| Error("§4.8: addr requires @name".into()))?;
@@ -1316,7 +1321,7 @@ impl Object {
                 "lift.alloc" => {
                     arity(1, 1)?;
                     length(&args[0])?;
-                    eq(dest(&i.lhs[0])?, self.ptr_width)?;
+                    eq(dest(&i.lhs[0])?, self.ptr_width as u64)?;
                 }
                 "lift.free" => {
                     arity(1, 0)?;
@@ -1387,7 +1392,7 @@ impl Object {
                         .rsplit_once(".i")
                         .expect("suffix")
                         .1
-                        .parse::<u16>()
+                        .parse::<u64>()
                         .map_err(|_| Error("§4.8: malformed memory width".into()))?;
                     if n == 0 || n > 128 || n % 8 != 0 {
                         return err("§3.3", "load/store width must be a byte multiple up to 128");
@@ -1456,12 +1461,14 @@ impl Object {
         }
         let h = l.get("H")?.uint()?;
         let a = l.get("A_tab")?.uint()?;
-        let s = l.get("S_cells")?.uint()?;
-        if h > self.ptr_width as u128 || h > 127 || a > 127 || s > 127 {
-            return err("§7.2", "invalid layout size exponent");
+        l.get("S_cells")?.uint()?;
+        // §7.2: H <= ptr_width; A_tab and S_cells carry no bound.
+        if h > self.ptr_width as u128 {
+            return err("§7.2", "H exceeds ptr_width");
         }
-        let capacity = 1u128 << (h as u32);
-        let entries = 1u128 << (a as u32);
+        let capacity = h;
+        // 2^A_tab table entries; None means at least 2^128 (never reached).
+        let entries = crate::oracle::power_of_two(a);
         let globals = l.get("globals")?.object()?;
         let null = l.get("null_size")?.uint()?;
         if null == 0 {
@@ -1514,9 +1521,11 @@ impl Object {
                     .get(&p.name)
                     .ok_or_else(|| Error("§7.2: missing interface mapping".into()))?;
                 r.fields(&["base"], &[])?;
-                ranges.push((r.get("base")?.uint()?, 1u128 << a, p.name.clone()));
+                let size = crate::oracle::power_of_two(a as u128)
+                    .ok_or_else(|| Error("§7.2: interface region exceeds 2^H".into()))?;
+                ranges.push((r.get("base")?.uint()?, size, p.name.clone()));
             }
-            if globals.len() as u128 + regions.len() as u128 > entries {
+            if entries.is_some_and(|e| globals.len() as u128 + regions.len() as u128 > e) {
                 return err("§7.2", "too many allocation pre-entries");
             }
             validate_ranges(&ranges, capacity)?;
@@ -1530,7 +1539,7 @@ impl Object {
                 return err("§7.2", "missing oracle interface layout");
             }
         }
-        if globals.len() as u128 > entries {
+        if entries.is_some_and(|e| globals.len() as u128 > e) {
             return err("§7.2", "too many globals");
         }
         validate_ranges(&shared, capacity)
@@ -1557,6 +1566,41 @@ pub(crate) fn is_binop(op: &str) -> bool {
 }
 pub(crate) fn is_div(op: &str) -> bool {
     ["udiv", "urem", "sdiv", "srem"].contains(&op)
+}
+/// The width suffix of a lifted row (`lift.const.iN`, `lift.zext.iM`, ...).
+pub(crate) fn lifted_suffix(n: &str) -> Result<u64> {
+    let w = host_count(n, "lifted width suffix")?;
+    if w == 0 {
+        return err("§3.3", "lifted width suffix must be positive");
+    }
+    Ok(w)
+}
+/// A const literal of an N-bit destination: canonical INT (§16.1) with
+/// -2^(N-1) <= c < 2^N, i.e. representable as a signed or an unsigned N-bit
+/// value; anything else would be a silent truncation (SPEC-QUESTIONS 12).
+pub(crate) fn const_literal(s: &str, width: u64) -> Result<()> {
+    if !integer(s) {
+        return err("§16.1", format!("invalid or noncanonical INT literal {s}"));
+    }
+    let w = usize::try_from(width).map_err(|_| Error("host limit: const width".into()))?;
+    let magnitude = s.trim_start_matches('-');
+    let in_range = match crate::BitVector::parse_unsigned_exact(w + 1, magnitude) {
+        Ok(m) if s.starts_with('-') => {
+            // |c| <= 2^(N-1): bits >= N-1 must be zero, except exactly 2^(N-1).
+            let mut limit = crate::BitVector::zero(w + 1)?;
+            limit.set(w - 1, true)?;
+            m.unsigned_cmp(&limit)? != std::cmp::Ordering::Greater
+        }
+        Ok(m) => !m.bit(w)?,
+        Err(_) => false,
+    };
+    if !in_range {
+        return err(
+            "§3.3",
+            format!("const literal {s} is outside [-2^(N-1), 2^N) for N = {width}"),
+        );
+    }
+    Ok(())
 }
 pub(crate) fn parse_bits(s: &str, width: u16) -> Result<u128> {
     if !integer(s) {
@@ -1668,14 +1712,23 @@ fn validate_header(f: &Function) -> Result<()> {
     }
     Ok(())
 }
-fn validate_ranges(ranges: &[(u128, u128, String)], capacity: u128) -> Result<()> {
+/// §7.1/§7.2: every range lies in [0, 2^H) and nonempty ranges are disjoint.
+/// Ends are exact: `None` is the end 2^128 (H = ptr_width = 128).
+fn validate_ranges(ranges: &[(u128, u128, String)], h: u128) -> Result<()> {
     let mut sorted = Vec::new();
     for (base, size, n) in ranges {
-        let end = base
-            .checked_add(*size)
-            .ok_or_else(|| Error("§7.2: range overflow".into()))?;
-        if end > capacity {
-            return err("§7.2", format!("{n} exceeds address space"));
+        let end = match base.overflowing_add(*size) {
+            (end, false) => Some(end),
+            (0, true) => None,
+            _ => return err("§7.2", format!("{n} exceeds 2^128")),
+        };
+        let inside = match (end, crate::oracle::power_of_two(h)) {
+            (_, None) => true,
+            (None, Some(_)) => false,
+            (Some(end), Some(cap)) => end <= cap,
+        };
+        if !inside {
+            return err("§7.2", format!("{n} exceeds the 2^H address space"));
         }
         if *size != 0 {
             sorted.push((*base, end, n));
@@ -1683,7 +1736,7 @@ fn validate_ranges(ranges: &[(u128, u128, String)], capacity: u128) -> Result<()
     }
     sorted.sort();
     for p in sorted.windows(2) {
-        if p[0].1 > p[1].0 {
+        if p[0].1.is_none_or(|end| end > p[1].0) {
             return err(
                 "§7.2",
                 format!("overlapping layout ranges {} and {}", p[0].2, p[1].2),

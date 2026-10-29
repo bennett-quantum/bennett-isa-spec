@@ -293,7 +293,7 @@ fn run() -> Result<()> {
         for _ in 0..limits.steps {
             machine.forward_step()?;
         }
-        if machine.outcome() != expected {
+        if machine.outcome()? != expected {
             return Err(fail(format!("§14.3 T6: disagreement at input {value}")));
         }
         for _ in 0..limits.steps {

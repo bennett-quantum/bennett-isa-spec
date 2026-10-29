@@ -23,6 +23,41 @@ impl BitVector {
         words.resize(count, 0);
         Ok(Self { width, words })
     }
+    /// `value` as a bit-vector of `width` bits; an unrepresentable value is an
+    /// error, never a truncation.
+    pub fn from_u128_exact(width: usize, value: u128) -> Result<Self> {
+        if width < 128 && value >> width != 0 {
+            return err("§3.3", format!("value {value} does not fit {width} bits"));
+        }
+        Self::from_u128(width, value)
+    }
+    /// XOR `src` into the low `src.width()` bits of `self`.
+    pub fn xor_low(&mut self, src: &Self) -> Result<()> {
+        if src.width > self.width {
+            return err("§3.6", "XOR source is wider than its destination");
+        }
+        for (d, s) in self.words.iter_mut().zip(&src.words) {
+            *d ^= s;
+        }
+        Ok(())
+    }
+    /// True iff every bit at index >= n is zero.
+    pub fn high_clear(&self, n: usize) -> bool {
+        (n..self.width).all(|i| !self.get(i))
+    }
+    /// Exchange the low `n` bits of two vectors (§3.7: a location of width N
+    /// exchanged with a wider cell exchanges the cell's low N bits).
+    pub fn swap_low(&mut self, other: &mut Self, n: usize) -> Result<()> {
+        if n > self.width || n > other.width {
+            return err("§3.6", "exchange wider than an operand");
+        }
+        for i in 0..n {
+            let (a, b) = (self.get(i), other.get(i));
+            self.put(i, b);
+            other.put(i, a);
+        }
+        Ok(())
+    }
     pub fn width(&self) -> usize {
         self.width
     }
@@ -228,6 +263,9 @@ impl BitVector {
                 for i in 0..self.width {
                     let bit = if op == "shl" {
                         i.checked_sub(shift).is_some_and(|j| self.get(j))
+                    } else if shift >= self.width {
+                        // §4.1: "shift >= N -> 0", for ashr as for shl and lshr.
+                        false
                     } else if let Some(j) = i.checked_add(shift).filter(|j| *j < self.width) {
                         self.get(j)
                     } else {
@@ -244,6 +282,41 @@ impl BitVector {
         }
         out.trim();
         Ok(out)
+    }
+    /// The §4.2 lift.div flag: Some(5) for a zero divisor, Some(6) for signed
+    /// MIN / -1, else None.
+    pub fn division_fault(&self, other: &Self, signed: bool) -> Result<Option<u128>> {
+        self.same(other)?;
+        if other.is_zero() {
+            return Ok(Some(5));
+        }
+        let min = {
+            let mut m = Self::zero(self.width)?;
+            m.put(self.width - 1, true);
+            m
+        };
+        let minus_one = Self::zero(self.width)?.negate_one();
+        Ok((signed && *self == min && *other == minus_one).then_some(6))
+    }
+    fn negate_one(mut self) -> Self {
+        self.words.fill(u64::MAX);
+        self.trim();
+        self
+    }
+    /// icmp.{eq,ne,ult,ule,slt,sle}.
+    pub fn compare(&self, pred: &str, other: &Self) -> Result<bool> {
+        let order = if pred.starts_with('s') {
+            self.signed_cmp(other)?
+        } else {
+            self.unsigned_cmp(other)?
+        };
+        Ok(match pred {
+            "eq" => order.is_eq(),
+            "ne" => !order.is_eq(),
+            "ult" | "slt" => order.is_lt(),
+            "ule" | "sle" => !order.is_gt(),
+            _ => return err("§4.8", format!("unknown comparison predicate {pred}")),
+        })
     }
     pub fn div_rem(&self, other: &Self, signed: bool) -> Result<(Self, Self)> {
         self.same(other)?;

@@ -37,10 +37,9 @@ fn exhaustive_small_width_bitvector_arithmetic_and_signed_division() {
                     ("lshr", if b < width as u128 { a >> b } else { 0 }),
                     (
                         "ashr",
+                        // §4.1: "wrap; shift >= N -> 0" covers ashr too.
                         if b < width as u128 {
                             (signed(a) >> b) as u128 & mask
-                        } else if signed(a) < 0 {
-                            mask
                         } else {
                             0
                         },

@@ -17,21 +17,21 @@ mod quantum;
 mod registers;
 mod sha256;
 mod validation;
-mod wide_machine;
-mod wide_oracle;
 pub use bits::BitVector;
 pub use borrow::validate_translation_lemma;
 pub use classical::{ClassicalMachine, ClassicalOutcome, ClassicalSnapshot, ClassicalValue};
 pub use classical::{HostExchange, HostRequest};
 pub use identity::Identity;
-pub use machine::{BasisConfiguration, OracleMachine};
+pub use machine::{
+    BasisConfiguration, BasisVectorConfiguration, DerivedWidths, OracleMachine, OracleVectorMachine,
+};
 pub use object::*;
-pub use oracle::{Argument, Budget, OracleInput, OracleOutcome};
+pub use oracle::{
+    Argument, Budget, OracleInput, OracleOutcome, OracleVectorInput, OracleVectorOutcome,
+};
 pub use quantum::{Complex, MeasurementBranch, QuantumBindings, QuantumRegion, QuantumState};
 pub use registers::QuantumRegisters;
 pub use sha256::{sha256, sha256_hex};
-pub use wide_machine::{BasisVectorConfiguration, OracleVectorMachine};
-pub use wide_oracle::{OracleVectorInput, OracleVectorOutcome};
 
 /// A diagnostic always names the normative rule that was violated.
 #[derive(Clone, Debug, PartialEq, Eq)]

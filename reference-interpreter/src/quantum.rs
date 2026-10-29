@@ -90,8 +90,8 @@ pub struct QuantumBindings {
 }
 #[derive(Clone, Debug)]
 pub struct QuantumRegion {
-    pub address_width: u16,
-    pub cell_width: u16,
+    pub address_width: u64,
+    pub cell_width: u64,
     pub cells: Vec<Vec<Wire>>,
 }
 

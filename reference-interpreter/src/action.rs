@@ -3,7 +3,7 @@ use crate::{
     object::list,
     quantum::Wire,
     validation::{gate, normalize_call},
-    Argument, Error, Function, Instruction, Object, OracleInput, OracleMachine, QuantumBindings,
+    Argument, Error, Function, Instruction, Object, QuantumBindings,
     QuantumRegion, QuantumState, Result, Type,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -64,30 +64,6 @@ impl Environment {
     }
 }
 impl Object {
-    pub(crate) fn permutation_action_values(
-        &self,
-        name: &str,
-        mutables: &[u128],
-        inputs: &[u128],
-        regions: &BTreeMap<String, Vec<u8>>,
-        args: &[Argument],
-        adjoint: bool,
-    ) -> Result<Vec<u128>> {
-        let f = &self.functions[name];
-        let convert = |values: &[u128], params: &[crate::Param]| -> Result<Vec<crate::BitVector>> {
-            values
-                .iter()
-                .zip(params)
-                .map(|(v, p)| crate::BitVector::from_u128(p.ty.width(self.ptr_width)? as usize, *v))
-                .collect()
-        };
-        let mutables = convert(mutables, &f.params[0])?;
-        let inputs = convert(inputs, &f.params[1])?;
-        self.permutation_action_vectors(name, &mutables, &inputs, regions, args, adjoint)?
-            .iter()
-            .map(crate::BitVector::to_u128)
-            .collect()
-    }
     pub(crate) fn permutation_action_vectors(
         &self,
         name: &str,
@@ -262,7 +238,7 @@ impl Object {
                 .ok_or_else(|| Error("§5.1: missing interface region".into()))?;
             if r.address_width != a
                 || r.cell_width != w
-                || r.cells.len() as u128 != 1u128 << a
+                || crate::oracle::power_of_two(a as u128) != Some(r.cells.len() as u128)
                 || r.cells.iter().any(|c| c.len() != w as usize)
             {
                 return err("§3.3", "action interface region dimensions mismatch");
@@ -303,10 +279,11 @@ impl Object {
         }
         let mut local = Vec::new();
         for i in regions {
-            let a = i.operands[1].parse::<u16>().expect("address width");
-            let w = i.operands[2].parse::<u16>().expect("cell width");
-            let count = usize::try_from(1u128 << a)
-                .map_err(|_| Error("§4.6: local region exceeds host address space".into()))?;
+            let a = crate::object::host_count(&i.operands[1], "qregion address width")?;
+            let w = crate::object::host_count(&i.operands[2], "qregion cell width")?;
+            let count = crate::oracle::power_of_two(a as u128)
+                .and_then(|n| usize::try_from(n).ok())
+                .ok_or_else(|| Error("host limit: local region exceeds host address space".into()))?;
             let n = count
                 .checked_mul(w as usize)
                 .ok_or_else(|| Error("§4.6: region bit size overflow".into()))?;
@@ -789,95 +766,54 @@ impl Object {
             if controls.iter().any(|(p, v)| bits[*p] != *v) {
                 return Ok(result);
             }
-            let wide = self
-                .functions
-                .values()
-                .filter(|f| matches!(f.kind.as_str(), "oracle" | "lproc"))
-                .flat_map(|f| f.params.iter().flatten().chain(&f.regs))
-                .any(|p| matches!(p.ty,Type::Wire(w)|Type::Reg(w) if w>128));
-            if wide {
-                let vectors = input_positions
-                    .iter()
-                    .map(|positions| {
-                        let mut value = crate::BitVector::zero(positions.len())?;
-                        for (i, p) in positions.iter().enumerate() {
-                            value.set(i, bits[*p])?;
-                        }
-                        Ok(value)
-                    })
-                    .collect::<Result<Vec<_>>>()?;
-                let mut input = crate::OracleVectorInput {
-                    ins: vectors,
-                    args: args.to_vec(),
-                    ..Default::default()
-                };
-                for (n, cells) in &regions {
-                    input.regions.insert(
-                        n.clone(),
-                        cells
-                            .iter()
-                            .map(|p| read_bits(bits, p).map(|v| v as u8))
-                            .collect::<Result<_>>()?,
-                    );
-                }
-                let mut machine =
-                    crate::OracleVectorMachine::new(self, &callee.name, &input, budget)?;
-                let entry = machine.snapshot();
-                for _ in 0..budget.steps {
-                    machine.forward_step()?;
-                }
-                let outcome = machine.outcome();
-                for _ in 0..budget.steps {
-                    machine.inverse_step()?;
-                }
-                if machine.snapshot() != entry || !machine.frames_clean() {
-                    return err("§5.2", "wide oracle workspace failed prefix reversal");
-                }
-                for (i, p) in target.iter().enumerate() {
-                    result[*p] ^= outcome.payload.bit(i)?;
-                }
-                for (i, p) in fault.iter().enumerate() {
-                    result[*p] ^= outcome.code.bit(i)?;
-                }
-                return Ok(result);
-            }
-            let mut input = OracleInput::bits(
-                &input_positions
-                    .iter()
-                    .map(|p| read_bits(bits, p))
-                    .collect::<Result<Vec<_>>>()?,
-            );
-            input.args = args.to_vec();
+            let vectors = input_positions
+                .iter()
+                .map(|positions| {
+                    let mut value = crate::BitVector::zero(positions.len())?;
+                    for (i, p) in positions.iter().enumerate() {
+                        value.set(i, bits[*p])?;
+                    }
+                    Ok(value)
+                })
+                .collect::<Result<Vec<_>>>()?;
+            let mut input = crate::OracleVectorInput {
+                ins: vectors,
+                args: args.to_vec(),
+                ..Default::default()
+            };
             for (n, cells) in &regions {
-                input.regions.insert(
-                    n.clone(),
-                    cells
-                        .iter()
-                        .map(|p| read_bits(bits, p).map(|v| v as u8))
-                        .collect::<Result<Vec<_>>>()?,
-                );
+                // Oracle interface regions have W = 8 (§7.2): one byte per cell.
+                let bytes = cells
+                    .iter()
+                    .map(|cell| {
+                        if cell.len() != 8 {
+                            return err("§7.2", "oracle interface region cells must be wire[8]");
+                        }
+                        Ok(cell
+                            .iter()
+                            .enumerate()
+                            .fold(0u8, |b, (i, p)| b | (u8::from(bits[*p]) << i)))
+                    })
+                    .collect::<Result<_>>()?;
+                input.regions.insert(n.clone(), bytes);
             }
-            let mut machine = OracleMachine::new(self, &callee.name, &input, budget)?;
-            let before = machine.snapshot();
+            let mut machine = crate::OracleVectorMachine::new(self, &callee.name, &input, budget)?;
+            let entry = machine.snapshot();
             for _ in 0..budget.steps {
                 machine.forward_step()?;
             }
-            let outcome = machine.outcome();
+            let outcome = machine.outcome()?;
             for _ in 0..budget.steps {
                 machine.inverse_step()?;
             }
-            if machine.snapshot() != before {
-                return err("§5.2", "oracle ancillae did not restore");
+            if machine.snapshot() != entry || !machine.frames_clean() {
+                return err("§5.2", "oracle workspace failed prefix reversal");
             }
             for (i, p) in target.iter().enumerate() {
-                if i < 128 {
-                    result[*p] ^= outcome.payload & (1u128 << i) != 0;
-                }
+                result[*p] ^= outcome.payload.bit(i)?;
             }
             for (i, p) in fault.iter().enumerate() {
-                if i < 128 {
-                    result[*p] ^= outcome.code & (1u128 << i) != 0;
-                }
+                result[*p] ^= outcome.code.bit(i)?;
             }
             Ok(result)
         })
@@ -957,13 +893,4 @@ fn bundle_exchange(
         q.controlled_gate("swap", &[*s, *t], None, context)?;
     }
     Ok(())
-}
-fn read_bits(bits: &[bool], positions: &[usize]) -> Result<u128> {
-    if positions.len() > 128 {
-        return err("§3.3", "integer evaluation exceeds 128 bits");
-    }
-    Ok(positions
-        .iter()
-        .enumerate()
-        .fold(0, |n, (i, p)| n | ((bits[*p] as u128) << i)))
 }
