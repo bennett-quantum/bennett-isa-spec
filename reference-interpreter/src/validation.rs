@@ -376,8 +376,12 @@ impl Object {
                             if op == "qstore" {
                                 reads.extend(s.wires(&a[2])?);
                             }
-                            let version =
-                                format!("{op}:{}:{:?}", a.join(" "), s.read_snapshot(&reads)?);
+                            let version = format!(
+                                "{op}:{}:{:?}:{:?}",
+                                a.join(" "),
+                                s.read_snapshot(&reads)?,
+                                s.predicates
+                            );
                             if op == "qexchm" {
                                 s.check_target(&a[2], false)?;
                                 let mut wires = s.wires(&a[2])?;
@@ -389,9 +393,6 @@ impl Object {
                             s.note_reads(&version, &reads)?;
                             s.update_log(&format!("{}[*]", a[0]), &version, false);
                             *s.cell_epochs.entry(format!("{}[*]", a[0])).or_default() += 1;
-                            if op == "qexchm" {
-                                s.change(&a[2], version, false)?;
-                            }
                         }
                     }
                 }
@@ -594,9 +595,10 @@ impl Object {
                             phase_reads.extend(s.wires(p)?);
                         }
                         let key = format!(
-                            "{op}:{}:{:?}",
+                            "{op}:{}:{:?}:{:?}",
                             normalized.join(" "),
-                            s.snapshot(&phase_reads)
+                            s.snapshot(&phase_reads),
+                            s.predicates
                         );
                         if !operands.is_empty() {
                             s.note_reads(&key, &operands)?;
@@ -1542,7 +1544,7 @@ impl Discipline {
     ) -> Result<()> {
         let other = wires.iter().any(|w| self.wire_is_other(w));
         let context = self.read_snapshot(&[])?;
-        let base = format!("{version}:context{context:?}");
+        let base = format!("{version}:context{context:?}:polarity{:?}", self.predicates);
         let prior = wires
             .first()
             .and_then(|w| self.versions.get(w))
@@ -1610,7 +1612,10 @@ impl Discipline {
         // (The context snapshot itself contains earlier ":context" suffixes, so
         // the operation key is taken before formatting, never re-split.)
         let original = version;
-        let version = format!("{original}:context{context:?}");
+        let version = format!(
+            "{original}:context{context:?}:polarity{:?}",
+            self.predicates
+        );
         let reads = self.reads.get(&original).cloned().unwrap_or(context);
         self.reads.insert(version.clone(), reads);
         if self.other_versions.contains(&original) {

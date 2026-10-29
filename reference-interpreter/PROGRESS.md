@@ -6,6 +6,35 @@ under `reference-interpreter/`; commit own paths
 (`git add -A -- reference-interpreter && git commit -- reference-interpreter`),
 never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
+## Council round 2: sol/codex implementation (2026-10-29)
+
+The 15 blockers from the dc46d07 round-2 snapshot are implemented in nine
+coincident groups; `council/response-round-2.md` has one entry per member ID
+and is appendable for muse's pending second pass. No declines or partial
+round-2 blocker resolutions. Deliverables 8–11 remain staged below; this
+round does not claim they are implemented. Bead: b-isa-spec-zq2.
+
+Changes: typed matched-invocation tuples and all-row qjumpr CFG; canonical
+lifted memory suffixes and integer/ptr-only comparisons; expansion-owned
+predicate protection; function-entry qregions in both static checkers;
+qinplace explicit inverse recognition; complete classical environments in
+borrow proofs; joint exchange dependency/provenance and entry-version
+identities; full effective-control polarity in memory/phase/change identities;
+bounded-factor phase rendering for finite rotations with unbounded combined
+angles. SPEC-QUESTIONS 28 resolves cross-arm unconditional lifetimes by taking
+the adjoint of the full qif expansion (else before then); entry 21 and interval
+claim diagnostics now consistently name deliverable 11.
+
+Every cause had a development-time red witness. The final tests were also
+compiled against archived dc46d07 in ignored `.tmp`, observing the independent
+exchange, argument/literal angle, member-specific call, suffix, operand-kind,
+and declaration variants fail there. Extended differential generation includes
+swap/qexch/qexchm plus 80 generated borrow frames with differing classical
+bindings. It found additional unsound exchange/polarity accepts, now pinned by
+named red-green regressions in the response. No Python seed or spec changes.
+
+Final headless gate results and sweep counts are recorded below when complete.
+
 ## CLI commands (xam)
 
 Bead `b-isa-spec-xam` (brief `docs/briefs/2026-10-29-isa-ref-cli-xam.md`):

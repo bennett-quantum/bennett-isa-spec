@@ -131,3 +131,16 @@ fn r2_qinplace_explicit_adjoint_cleans_workspace() {
         assert!(e.to_string().contains("§6.2"), "{e}");
     }
 }
+
+#[test]
+fn r2_qinplace_complementary_arms_do_not_cancel() {
+    let g = "oracle @g (x:wire in) (t:wire) (f:wire[4]) () ()\nregs { one:reg[1], r:reg[1] }\n^entry():\none = lift.const.i1 1\nr = lift.xor x one\nlift.retval r";
+    let a = "action @a (t:wire mut, c:wire mut) () () (tk:token) ()\n^entry():\nd = qalloc any 1\nqif c {\nqinplace @g @g tk d\n} {\nqinplace @g @g tk d\n}\nqfree d";
+    let e = Object::parse(&support::object(
+        &[("g", ORACLE1, g), ("a", ACTION, a)],
+        "{}",
+        "",
+    ))
+    .unwrap_err();
+    assert!(e.to_string().contains("§6.2"), "{e}");
+}

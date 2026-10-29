@@ -331,3 +331,24 @@ fn r2_qif_body_cannot_temporarily_consume_its_implicit_selector() {
 fn r2_exchange_computations_pin_their_entry_versions() {
     reject(&tmp("qregion r 1 1\nd0 = qload r p\nd1 = qcopy p\nqexch d1 m\nccx d1 t d0\nqexch d1 m\nqxor t m\nqexch d1 m\nccx d1 t d0\nqexch d1 m\nquncopy p d1\nqunload r p d0"), "§6.2");
 }
+
+#[test]
+fn r2_memory_exchange_and_target_writes_do_not_cancel_independently() {
+    reject(&action("qregion r 1 1\nd0 = qalloc any 1\nqif t {\nqloop 3 {\nqexchm r p d0\n}\n} {\nqexchm r p d0\n}\nccx t p d0\nqpred p\nx d0\nqunpred p\nqpred p\nx d0\nqunpred p\nqif t {\nqloop 3 {\nqexchm r p d0\n}\n} {\nqexchm r p d0\n}\nccx t p d0\nqfree d0", &[3,3]), "§6.2");
+}
+
+#[test]
+fn r2_memory_operations_pin_predicate_polarity() {
+    reject(
+        &action(
+            "qregion r 1 1\nqif p {\nqstore r p t\n} {\nqstore r p t\n}",
+            &[],
+        ),
+        "§5.1",
+    );
+}
+
+#[test]
+fn r2_complementary_diagonal_phases_do_not_cancel() {
+    reject(&tmp("d0 = qalloc any 1\nd1 = qalloc any 1\nh d0\ncx d0 d1\nqif p {\ncz d1 t\n} {\ncz d1 t\n}\ncx d0 d1\nh d0\nqfree d1\nqfree d0"), "§6.2");
+}

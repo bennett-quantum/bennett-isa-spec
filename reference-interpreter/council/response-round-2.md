@@ -177,3 +177,26 @@ an expansion-owned selector and pushing it back later. Pin:
 `r1_discipline::r2_qif_body_cannot_temporarily_consume_its_implicit_selector`
 (red accepted, now §3.5 rejection). Balanced user-owned predicate pairs remain
 legal. No new specification question.
+
+The next extended sweep exposed missing predicate **polarity** in memory
+operation identities: complementary qif arms had equal address/control version
+snapshots. Memory keys, generic change contexts, joint exchange contexts, and
+outstanding diagonal phase keys now also retain predicate signs. Red-green pins:
+`r1_discipline::r2_memory_exchange_and_target_writes_do_not_cancel_independently`
+(the generated witness), `r2_memory_operations_pin_predicate_polarity`,
+`r2_complementary_diagonal_phases_do_not_cancel`, and
+`r1_qinplace::r2_qinplace_complementary_arms_do_not_cancel`. These extend the
+SOL-R2-B01 / codex R2-B03 effective-control fixes, without a new reading.
+
+### Frozen-snapshot RED audit
+
+In addition to the development-time red runs above, the final regressions were
+compiled against an archived dc46d07 crate in the ignored project-local `.tmp`.
+The audit observed each exchange witness separately (swap, qexch, qexchm), both
+literal and argument large-angle cases, both members' multi-input witnesses,
+qjumpr, qinplace, borrow bindings, and the region loop/forward-reference/zero-loop
+witnesses fail against dc46d07. Token, f64, qreg[1], load.i08, and store.i016
+were also audited separately and all failed their rejection assertions. The
+unchanged integer/ptr comparison positive passed on dc46d07. This archive is
+verification-only, not a checkout or deliverable; no source outside the owned
+crate was changed.
