@@ -4,3 +4,4 @@ target/
 *.so
 .DS_Store
 # Cargo.lock is kept for libraries; .beads/ is NOT ignored
+__pycache__/
