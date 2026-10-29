@@ -34,6 +34,9 @@
 | SQLite E3 | efficiency: compare tree and static call | 4/5/6/7 use construction | — |
 | SQLite E4 | efficiency: memory-copy lproc | 2/4/5/6/7/8 use construction | — |
 | SQLite E5 | efficiency: classical QROM specialisation | 4(c) | — |
+| New defect: SCC group ordering | wording-only | linked recursive programs | — |
+| New defect: empty data spelling | wording-only | no specific rung | — |
+| New defect: explicit fault code zero | gap: make the failure observable | oracle fault contract | V |
 
 **Hash legend.** `—` means no change to any of the four published 0.8 hashes is required by this item's construction or proposed editorial wording. `V` means a semantic 0.9 change requires the full version bump. ISA §9.2 says `"isa=" <full version string, e.g. 0.8>` is envelope part (1); §1 says “drafts are not compatible with each other.” Consequently **all four examples acquire new hashes when republished as 0.9**, even when their bodies are unchanged. The old 0.8 vectors remain valid historical vectors. No proposal below silently rewrites those bytes or supplies uncomputed 0.9 digests. New bodies/references/signatures also change their own hashes; runtime argument values and budgets bind schedules/certificates, not function bytes.
 
@@ -211,7 +214,7 @@ cx q[0] q[7]
 
 A CC caller passes its live qreg[8] to this one action, so no slice exists. Exact map q_7→q_7⊕q_0, all other bits unchanged; one CX. Runtime classical indices can dispatch to the n(n−1) ordered distinct-pair actions; a binary tree uses O(log(n(n−1))) comparisons and O(n²) static leaves, **one** quantum CX at execution. For triples there are n(n−1)(n−2) leaves. Alternatively compute selector bits into wires using classical args, perform a fully enumerated controlled action and uncompute selectors. No O(n) general routing bound is claimed without constructing that routing network: the audit's bare O(n) assertion is not verified here.
 
-The smallest 0.9 action is **no semantic change**: use joint actions. Clarify §3.3: “The slice lo operand may be an unsigned classical i64 value; lo+len is checked without wrap. With literal len the result has qreg[len]. The parent becomes live when the one region call completes, including on its recorded inverse.” This is proposed wording for an underspecified operand kind; conservative 0.8 producers can dispatch literal lo values meanwhile. `qreg.slices` would be optional efficiency work; no new multi-view instruction is proposed in this review. A/C/F tests compare all 56 two-bit choices in an eight-bit parent, reject overlapping controls/targets and a second simultaneous view. No new faults/history beyond existing code-4 handle failure and view frames. Existing hashes unchanged.
+The smallest 0.9 action is **no semantic change**: use joint actions. Clarify §3.3: “The slice lo operand may be an unsigned classical i64 value; lo+len is checked without wrap. With literal len the result has qreg[len]. The parent becomes live when the forward region call completes; reversing that call restores its pre-call view state before the slice frame is undone.” This is proposed wording for an underspecified operand kind; conservative 0.8 producers can dispatch literal lo values meanwhile. `qreg.slices` would be optional efficiency work; no new multi-view instruction is proposed in this review. A/C/F tests compare all 56 two-bit choices in an eight-bit parent, reject overlapping controls/targets and a second simultaneous view. No new faults/history beyond existing code-4 handle failure and view frames. Existing hashes unchanged.
 
 **Verdict: efficiency — the joint-parent action realises multi-wire gates on 0.8; no rung dependency.**
 
@@ -236,6 +239,22 @@ Write an arbitrary joint input as |0⟩|e_0⟩+|1⟩|e_1⟩. Outcome m has proba
 
 Neither construction enables reversal across measurement: §7.4 and §10 still exclude it. No new opcode, frame, fault code, identity change, or normative measurement rule is needed. A/G test outcome 0/1 and consumption; D tests an entangled reference state, with the conditional reference states above as expectations. No particular demo requires retaining a measured qreg.
 
+A stronger variant preserves the original **launch id**, avoiding even the logical handle update above:
+
+```text
+fn cc @measure_same (q:qreg[1]) (m:i1) () () ()
+^entry():
+copy = qreg.new any 1
+action_call @basis_copy (copy) (q) () ()
+m = measure copy
+ret m
+perm_action @basis_copy (t:wire) (q:wire in) () () ()
+^entry():
+cx q t
+```
+
+The copy is a declared mutable interface target, so the action returns with no unclean private workspace. Measuring it applies the same projector P_m to the original q and any reference; q's handle stays live with its original id and all aliases. Cost: four CC instructions, one CX, one temporary clean wire and one measurement. This is the preferred lowering when identity comparisons or stored aliases are observable. It also supports partial observation of larger registers through an action on the whole parent, without measuring a view.
+
 **Verdict: already-realised — destructive measure plus exact re-preparation reproduces the instrument; no rung blocker.**
 
 ## ISA-7: trap causes and explicit classical faults
@@ -248,7 +267,7 @@ NS §0 promises “a named fault outcome … never a silent wrong answer”; §4
 >
 > `fault C` in CC/R takes a literal unsigned 64-bit code and appends that terminal record without other state mutation. It is impure; reversal removes the record and restores the pre-fault control position. In Q its existing F-bit literal rule and row semantics are unchanged. Code 10 names entropy exhaustion in virtualised coherent state as well as in R; remove the parenthetical “R only.”
 
-The unsigned width is derived from the existing `uint64_t bennett_result_fault`, not a new numerical cause assignment. Retain literal `fault 0`'s existing Q semantics rather than inventing a new invalid-code rule here; consumers must distinguish terminal status from code value. For R instrumentation `fault 1`, `fault 2`, `fault 3` now report exactly those causes. A/G tests division by 0→5, −128/−1 at i8→6, null load→7, exhausted allocator→2, trap→4, explicit fault 1→1, each with unchanged pre-fault data. B tests a virtualised exhausted entropy oracle's `fault 10`, target unchanged and fr⊕10, all scratch reversed. F checks literal width/tier schema. Function text containing new classical faults changes its hash; the cause mapping is semantic, so V applies to 0.9 publication. No new fault numbers.
+The unsigned width is derived from the existing `uint64_t bennett_result_fault`, not a new numerical cause assignment. The newly found zero-cause defect is repaired by the effective-cause rule below; consumers must still distinguish terminal status from ordinary results. For R instrumentation `fault 1`, `fault 2`, `fault 3` now report exactly those causes. A/G tests division by 0→5, −128/−1 at i8→6, null load→7, exhausted allocator→2, trap→4, explicit fault 1→1, each with unchanged pre-fault data. B tests a virtualised exhausted entropy oracle's `fault 10`, target unchanged and fr⊕10, all scratch reversed. F checks literal width/tier schema. Function text containing new classical faults changes its hash; the cause mapping is semantic, so V applies to 0.9 publication. No new fault numbers.
 
 **Verdict: gap — exact CC/R fault causes and an explicit classical fault instruction; no fault-free rung depends on it.**
 
@@ -709,7 +728,7 @@ Deferred .4/.14 remain concrete work: publish ref's exact bytes/ordinals and has
 
 ## I8: blocks versus rows in the index space
 
-NS §4.2 promises an arbitrary-CFG step machine and a reference-interpreter budget unit. ISA §3.6 calls I[0..n) “the oracle's blocks in text order, each contiguous,” but §4.2 says “Every row is one budget step; k is its own index.” `inc8` has one block with three rows and needs B≥3; treating that block as one index cannot produce k+1 fallthrough or that result. §3.7 records return index k+1. This is an editorial inconsistency with a uniquely pinned row interpretation.
+NS §4.2 states “The budget unit is steps of the ISA formal-model interpreter” and promises the general predicated machine for arbitrary CFGs. ISA §3.6 calls I[0..n) “the oracle's blocks in text order, each contiguous,” but §4.2 says “Every row is one budget step; k is its own index.” `inc8` has one block with three rows and needs B≥3; treating that block as one index cannot produce k+1 fallthrough or that result. §3.7 records return index k+1. This is an editorial inconsistency with a uniquely pinned row interpretation.
 
 **Exact edits** (§3.6/4.2): “I[0..n) is the oracle's rows in block text order, then the rows of its lproc closure. Each function occupies a contiguous range of row indices; a block label denotes its first row.” In qjumpr's flag definition, replace “indices of the containing function's blocks” by “row indices of the containing function”; label values still come from labels, not arbitrary cross-function control. Keep HALT=n and 2^P>n. No row count, frame width, instruction semantics, fault code or hash changes locally.
 
@@ -839,27 +858,197 @@ C/D compare the QROM tuple and phases to general qload, including superposed add
 
 ## Additional ISA 0.8 defects found during the review
 
-Only these two new issues were created; I8, ISA-10, I7's context/history defects and ISA-7/8 already have issues. Both new issues carry `isa-0.9-candidate`. These are text proposals, not repairs made to accepted 0.8.
+Three new issues were created; I8, ISA-10, I7's context/history defects and ISA-7/8 already have issues. All three new issues carry `isa-0.9-candidate`. These are text proposals, not repairs made to accepted 0.8.
 
-**b-isa-spec-was — SCC ordering (§3.6).** Exact text says “lprocs ordered by closure hash with SCC members in SCC index order.” SHA-256 member digests are not ordered by member index, so sorting every member's closure hash can conflict with keeping its SCC in index order. Proposed exact clarification: “Partition the lproc closure into SCC groups. An acyclic singleton group's order key is its closure hash; a cyclic group's order key is its scc_hash. Sort groups by those keys, then emit each group's members in SCC index order. Within each function concatenate rows in block text order.” §9.2's name ordering determines the SCC member indices. No new frame/fault/width. F fixture: mutual f,g, member-hash order opposite name order; canonical f-before-g within that group and stable lift.label values, independent of load/link order. No existing example has a multi-member SCC; all four 0.8 vectors remain unchanged. NS §4.4's public linking contract and all recursive lifted programs depend on deterministic labels. Verdict: wording-only; no extra rung blocker.
+**b-isa-spec-was — SCC ordering (§3.6).** Exact text says “lprocs ordered by closure hash with SCC members in SCC index order.” SHA-256 member digests are not ordered by member index, so sorting every member's closure hash can conflict with keeping its SCC in index order. Proposed exact clarification: “Partition the lproc closure into SCC groups. An acyclic singleton group's order key is its closure hash; a cyclic group's order key is its closure-envelope scc_hash. Sort groups by those keys, then emit each group's members in SCC index order. Within each function concatenate rows in block text order.” §9.2's name ordering determines the SCC member indices. No new frame/fault/width. F fixture: mutual f,g, member-hash order opposite name order; canonical f-before-g within that group and stable lift.label values, independent of load/link order. No existing example has a multi-member SCC; all four 0.8 vectors remain unchanged. NS §4.4's public linking contract and all recursive lifted programs depend on deterministic labels. Verdict: wording-only; no extra rung blocker.
 
 **b-isa-spec-oim — empty data (§16.1/16.2).** HEX is `([0-9a-f]{2})*`, allowing empty; dataline is `NAME SP HEX NL`; §16.1 forbids trailing spaces. A size-zero image therefore requires and forbids its separator space. Proposed exact sentence: “The mandatory separator space in a data line with empty HEX is the sole exception to the no-trailing-spaces rule.” Keep the existing dataline grammar; do not disallow zero-sized data to escape the inconsistency. F accepts exactly NAME, one space, LF for size0; rejects two spaces and size/image mismatch. The hash includes the mandatory space. No instruction/frame/fault changes or existing example changes. NS §0's unrestricted programs and §4.4 serialisation apply; no rung specifically needs an empty image. Verdict: wording-only.
 
-## Proposed ISA 0.9 change list
+**b-isa-spec-7qu — unflagged explicit fault (§3.3/4.2/5.4).** `fault C` and `lift.faultif p C` require C<2^F, but not C≠0; §5.4 assigns 0 to FAULT_NONE. For this legal 0.8 fragment:
 
-**Order by rung dependency.** There is no proved missing ISA capability blocking the fixed-shape demo ladder. The implementations and proof obligations supporting rungs 1–8 are given above; this does not assert that their plugin, platform or executors are implemented. First address shared correctness/contracts used by early rungs (row indices, acyclic hashing, SCC ordering, call/uncall history and complete certificate contexts). Next prioritise rung-4/7 cost work **outside normative edits**: corrected layout and full mapped budgets, structure recovery (I2), QROM bindings (E5), physical stack/frame accounting (E1/E2), and optional pebbled expansion (I1). Rungs 5/6 require the platform/continuation transform and independent native tests; G-16 is optional efficiency. Runtime-snapshot efficiency (G-12) follows for 7(c). None of E1–E5 warrants inventing a new ISA numerical rule.
+```text
+oracle @zero_cause () (t:wire) (f:wire[4]) () ()
+^entry():
+fault 0
+```
 
-**Fewest council rounds: one combined 0.9 proposal**, after dialect acceptance. Group the dependency-ordered contents in that single dossier:
-
-1. Editorial repairs with unchanged local semantics: I8, ISA-10's direct/cyclic distinction, SCC ordering, empty data, I4, accepted I7 wording and its positive borrow vector; call/ret/branch qreg threading and literal/runtime slice-offset wording. New vectors and their expected values must enter the precheck before grading, per spec/README. Include entropy code10's clarified use.
-2. Small capability contracts, independent of demo feasibility: BLK-1 dynamic handle type/id ledger and concrete schedule binding; BLK-4 R allocation using the same ledger and cleanliness inverse; BLK-2 device minting with immutable per-invocation tuples; BLK-3 parameterised certified inverse pairs plus provenance/cleanup exception. Follow with ISA-7's cause mapping/explicit fault and ISA-8's reversible failed prefixes, using the shared T4 eligibility wording. Their exact sentences and suites are in their item sections. No new numerical fault codes, no LLVM changes, no weakening of any NS clause.
-3. Optional efficiency semantics in the **same** dossier if their expansion fixtures are ready: I5's encoded old_pc reference variant and I1's realisation/resource bindings. They are not prerequisites to sending the mandatory capability/wording proposals. Default remains full history until a checked alternative is bound. Publish ref's actual operation set/hash and run each changed/new vector before acceptance; a prose declaration of its existence does not discharge that work.
-
-Use a full 0.9 version consistently and recompute all four republished example hashes; retain 0.8 vectors unchanged. This note deliberately proposes no callr, copy row, overlay, dynamic-base field, CC borrow ABI, fiber ABI or native-memory mapping until evidence establishes the efficiency case and their full cross-repository contracts. Every associated software capability is retained by a construction, with unverified generalisations marked explicitly. Four deferred round-8 suggestions stay open; they are not deleted or relabelled as implemented.
+At B=1 the row sets faulted=1 and code=0. §5.2 commits no payload and XORs 0 into fr; the final interface is indistinguishable from a successful zero result for every target/fault seed. This violates NS §4.2's “distinct code per cause” and the fault-clear acceptance contract, despite perfect prefix reversal. **Exact proposed semantic edit:** “For an explicit fault or a triggered lift.faultif, the effective cause is FAULT_UB_TRAP when the literal C is zero, and C otherwise. Both forward and inverse fault writes use that effective cause. The same rule applies to CC/R fault.” Syntax remains accepted and no meaningful fault capability is removed. F=4 already represents code4; no new fault number or width condition. B/C check all target/fault seeds: B=0 gives fr⊕1, B=1 gives fr⊕4 and target unchanged; inverse scratch is clean. With an untriggered faultif, no cause is committed. A/G check proposed CC/R fault0 gives terminal record4. The one-row oracle's history still uses the ordinary fault-row inverse. Existing §16.3 bodies contain no zero-cause fault, but the semantic 0.9 version bump changes their republished hashes. Verdict: gap; fault observability, no additional demo blocker.
 
 ## Verification record and remaining evidentiary limits
 
 Read-only baseline: headless `python3 -B reference-interpreter/isa_check.py` passed: two complete published objects parse/hash and execute, both printed envelopes verified. Inline `python3 -B`/hashlib independently checked the direct/wrapped envelope distinction, arithmetic and the constructions listed below. These checks are evidence for this note, not a claim that proposed 0.9 syntax passes the unchanged 0.8 checker. No LLVM command, Rust build, git command, spec edit or interpreter edit was performed by this job.
+
+The following self-contained arithmetic verifier reads the actual printed loop fragments. Run from the repository root with the headless environment and `python3 -B`, extracting this `python verify=isa09` fence. It does not write files or import interpreter code. Its small row evaluator verifies the hand-derived counts; its permutation checks verify full tuples, not only ancilla zero. It is not a replacement ISA implementation.
+
+```python verify=isa09
+from pathlib import Path
+from itertools import product
+from fractions import Fraction as Q
+import hashlib, re
+
+note = Path('docs/notes/2026-10-29-isa-09-evidence.md').read_text()
+spec = Path('spec/Bennett-ISA-Spec.md').read_bytes()
+assert hashlib.sha256(spec).hexdigest() == '90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e'
+
+def fragment(name):
+    for body in re.findall(r'```text\n(.*?)```', note, re.S):
+        if re.search(r'^(oracle|lproc) @' + name + r' ', body):
+            return body
+    raise AssertionError(name)
+
+def rows(text, initial, memory, budget):
+    labels, code, widths = {}, [], {}
+    for n, w in re.findall(r'(\w+):reg\[(\d+)\]', text):
+        widths[n] = int(w)
+    for line in text.splitlines()[1:]:
+        if line.startswith('regs '):
+            continue
+        if line.startswith('^'):
+            labels[line[1:line.index('(')]] = len(code)
+        else:
+            code.append(line)
+    state, mem, displaced = dict(initial), dict(memory), []
+    pc = 0
+    for count in range(1, budget + 1):
+        lhs, rhs = code[pc].split(' = ') if ' = ' in code[pc] else (None, code[pc])
+        op, *args = rhs.split()
+        if op.startswith('lift.const.i'):
+            state[lhs] = int(args[0])
+        elif op == 'lift.add':
+            state[lhs] = (state[args[0]] + state[args[1]]) % (1 << widths[lhs])
+        elif op == 'lift.icmp.ult':
+            state[lhs] = int(state[args[0]] < state[args[1]])
+        elif op == 'qjump':
+            pc = labels[args[0][1:]]
+            continue
+        elif op == 'qbranch':
+            pc = labels[args[1 if state[args[0]] else 2][1:]]
+            continue
+        elif op == 'lift.load.i8':
+            state[lhs] = mem[state[args[0]]]
+        elif op == 'lift.store.i8':
+            address = state[args[0]]
+            displaced.append((address, mem[address]))
+            mem[address] = state[args[1]]
+        elif op in ('lift.ret', 'lift.retval'):
+            return state[args[0]], 0, count, mem, displaced
+        else:
+            raise AssertionError(op)
+        pc += 1
+    return 0, 1, budget, mem, displaced
+
+for k in range(33):
+    expected = 4 * k + 6
+    result = rows(fragment('bounded_counter'), {'K': k}, {}, expected)
+    assert result[:3] == (k, 0, expected)
+    assert rows(fragment('bounded_counter'), {'K': k}, {}, expected - 1)[:2] == (0, 1)
+for size in range(17):
+    memory = {16+i: (i*3+1) % 256 for i in range(size)}
+    memory.update({128+i: 199 for i in range(size)})
+    result = rows(fragment('copy_bytes'), {'d':128, 's':16, 'n':size}, memory, 8*size+6)
+    assert result[:3] == (size, 0, 8*size+6)
+    assert [result[3][128+i] for i in range(size)] == [memory[16+i] for i in range(size)]
+    for address, value in reversed(result[4]):
+        result[3][address] = value
+    assert result[3] == memory
+
+for x, lo, hi, fault in product(range(4), range(4), range(4), range(16)):
+    for budget in (4, 5):
+        payload = (x, x ^ 3, 0) if budget >= 5 else (0, 0, 0)
+        code = 0 if budget >= 5 else 1
+        actual = (lo ^ payload[0] ^ payload[2], hi ^ payload[1], fault ^ code ^ code ^ code)
+        expected = (lo ^ payload[0], hi ^ payload[1], fault ^ code)
+        assert actual == expected
+for x, y, a, control in product(range(4), range(4), range(4), range(2)):
+    out, scratch = x, 0
+    if control:
+        scratch = (x + y + a) % 4
+        out, scratch = scratch, out
+        scratch ^= (out - y - a) % 4
+    assert scratch == 0 and out == ((x+y+a) % 4 if control else x)
+for x, t, b, w in product(range(2), repeat=4):
+    dirty, out = b, t
+    dirty ^= w*x
+    out ^= w*dirty
+    dirty ^= w*x
+    out ^= w*dirty
+    assert (dirty, out) == (b, t ^ (w*x))
+
+def pebble(level, a, b, calls):
+    if level == 0:
+        calls[0] += 1
+        return b ^ ((a+1) % 4)
+    c = pebble(level-1, a, 0, calls)
+    b = pebble(level-1, c, b, calls)
+    c = pebble(level-1, a, c, calls)
+    assert c == 0
+    return b
+for level, a, b in product(range(6), range(4), range(4)):
+    calls = [0]
+    out = pebble(level, a, b, calls)
+    assert out == b ^ ((a + (1 << level)) % 4)
+    assert calls[0] == 3**level
+
+idle_checks = 0
+for halt in range(1, 17):
+    for oldpc, oldvalue in product(range(halt+1), range(4)):
+        pc, value, pcprime, old, disp, successor = oldpc, oldvalue, 0, 0, 0, 0
+        active = int(pc != halt)
+        if active:
+            successor = (pc + oldvalue + 1) % (halt+1)
+            disp ^= (3*value + pc) % 4
+            value, disp = disp, value
+            pcprime ^= successor
+            pc, pcprime = pcprime, pc
+            pcprime, old = old, pcprime
+            old ^= halt
+        active ^= int(old != 0)
+        assert active == 0
+        if oldpc == halt:
+            assert (pc, value, pcprime, old, disp, successor) == (halt, oldvalue, 0, 0, 0, 0)
+        active = int(old != 0)
+        if active:
+            row = old ^ halt
+            old ^= halt
+            pcprime, old = old, pcprime
+            pc, pcprime = pcprime, pc
+            pcprime ^= successor
+            value, disp = disp, value
+            disp ^= (3*value + row) % 4
+            successor ^= (pc + value + 1) % (halt+1)
+        active ^= int(pc != halt)
+        assert (pc, value, pcprime, old, disp, successor, active) == (oldpc, oldvalue, 0, 0, 0, 0, 0)
+        idle_checks += 1
+
+image = [0x12, 0, 0x80, 0x03]
+assert sum(v.bit_count() for v in image) == 5
+for address, target in product(range(4), range(256)):
+    out = target
+    for j, byte in enumerate(image):
+        if address == j:
+            out ^= byte
+    assert out == target ^ image[address]
+for outcome in range(2):
+    state = [1, 2j, 3, -4j]
+    direct = [v if (i & 1) == outcome else 0 for i, v in enumerate(state)]
+    copied = [0j] * 8
+    for i, value in enumerate(state):
+        copied[i + 4*(i & 1)] = value
+    measured = [copied[i + 4*outcome] for i in range(4)]
+    assert measured == direct
+for target, fault in product(range(2), range(16)):
+    for budget in (0, 1):
+        cause = 1 if budget == 0 else 4
+        assert (target, fault ^ cause) != (target, fault)
+assert Q(3,8) - 2*Q(1,8) == Q(1,8) > 0
+assert 1214248 * 128 == 155423744
+assert 740 * 289590 == 214296600
+assert 740 * ((289590*11+9)//10) == 235726260
+assert (1 << 25) - 33492992 == 61440
+assert 1 + (1 << 25) > (1 << 25)
+assert (1 << 25) + (1 << 25) <= (1 << 26)
+print('PASS: wrapper/copy row counts and boundaries; 2048 wide-output tuples; parameterised inverse; controlled dirty borrowing; pebbling recurrence;', idle_checks, 'active/idle round trips; QROM; retained-register measurement instrument; nonzero effective faults; rational witness and resource arithmetic; spec unchanged')
+```
 
 Source fingerprints at reading (SHA-256):
 
@@ -874,3 +1063,16 @@ plan                    faa2fbd2eb4523f240fd549120947d8331dfb196a93a34fae9ead089
 ```
 
 Not reproduced here: SQLite source builds/profiles and complete mapped ISA closure, real target gate counts, the generic static taint/control/ABI completeness proofs, an Ambainis amplification schedule, approximate witness acceptance at arbitrary precision, or the 2013 bibliographic attribution. Each numerical rule used in a proposal is derived in its section. Beads notes carry verdicts, not closure claims about the later spec implementation. See the paired progress file for the final verification commands and issue-note audit.
+
+## Proposed ISA 0.9 change list
+
+**Order by rung dependency.** There is no proved missing ISA capability blocking the fixed-shape demo ladder. The implementations and proof obligations supporting rungs 1–8 are given above; this does not assert that their plugin, platform or executors are implemented. First address shared correctness/contracts used by early rungs (nonzero fault outcomes, row indices, acyclic hashing, SCC ordering, call/uncall history and complete certificate contexts). Next prioritise rung-4/7 cost work **outside normative edits**: corrected layout and full mapped budgets, structure recovery (I2), QROM bindings (E5), physical stack/frame accounting (E1/E2), and optional pebbled expansion (I1). Rungs 5/6 require the platform/continuation transform and independent native tests; G-16 is optional efficiency. Runtime-snapshot efficiency (G-12) follows for 7(c). None of E1–E5 warrants inventing a new ISA numerical rule.
+
+**Fewest council rounds: one combined 0.9 proposal**, after dialect acceptance. Group the dependency-ordered contents in that single dossier:
+
+1. Editorial repairs with unchanged local semantics: I8, ISA-10's direct/cyclic distinction, SCC ordering, empty data, I4, accepted I7 wording and its positive borrow vector; call/ret/branch qreg threading and literal/runtime slice-offset wording. New vectors and their expected values must enter the precheck before grading, per spec/README. Include entropy code10's clarified use and the zero-cause effective-fault repair.
+2. Small capability contracts, independent of demo feasibility: BLK-1 dynamic handle type/id ledger and concrete schedule binding; BLK-4 R allocation using the same ledger and cleanliness inverse; BLK-2 device minting with immutable per-invocation tuples; BLK-3 parameterised certified inverse pairs plus provenance/cleanup exception. Follow with ISA-7's cause mapping/explicit fault and ISA-8's reversible failed prefixes, using the shared T4 eligibility wording. Their exact sentences and suites are in their item sections. No new numerical fault codes, no LLVM changes, no weakening of any NS clause.
+3. Optional efficiency semantics in the **same** dossier if their expansion fixtures are ready: I5's encoded old_pc reference variant and I1's realisation/resource bindings. They are not prerequisites to sending the mandatory capability/wording proposals. Default remains full history until a checked alternative is bound. Publish ref's actual operation set/hash and run each changed/new vector before acceptance; a prose declaration of its existence does not discharge that work.
+
+Use a full 0.9 version consistently and recompute all four republished example hashes; retain 0.8 vectors unchanged. This note deliberately proposes no callr, copy row, overlay, dynamic-base field, CC borrow ABI, fiber ABI or native-memory mapping until evidence establishes the efficiency case and their full cross-repository contracts. Every associated software capability is retained by a construction, with unverified generalisations marked explicitly. Four deferred round-8 suggestions stay open; they are not deleted or relabelled as implemented.
+
