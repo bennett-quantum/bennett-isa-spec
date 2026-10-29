@@ -16,7 +16,7 @@ entangled-residual regressions were witnessed RED, then GREEN, including the
 smallest positive binary64 angle and an amplitude below binary64 range.
 Normal suite: **226 passed, 0 failed, 5 ignored**; initial strict Clippy clean.
 Details and named pins: council/response-round-4.md. No new ambiguity or cap.
-The response remains appendable for SOL-R4-B02/B03 and the pending muse seat.
+The response remains appendable for the pending muse seat.
 
 SOL-R4-B02 resolved after RED on the exact truncated frame and the nested-line
 positive. Canonical point resolution and an opt-in borrow compilation trace
@@ -25,6 +25,17 @@ inherited controls, syntactic side conditions and omitted adjacent touches.
 Three new tests exercise verify_claim and verify_certificate independently of
 borrow_frames admission, including full/nested positives and endpoint, changed-W,
 fake-B and omitted-gate negatives. The full suite remains green; no spec question.
+
+SOL-R4-B03 resolved: claim domains retain ABI group/slot and region cell index,
+so expected programs receive the corresponding inputs under any local renaming.
+Borrowed entries preserve domain order; genuinely omitted inputs stay zero.
+The exact four-element witness and renamed-region analogue were both RED.
+Three new regressions now prove these identities, reversed enumeration,
+crossed local names and multiple same-width slots, while single-X, wrong-slot
+and memory-only mismatches reject. Partial domains remain evidence.
+Normal suite: **232 passed, 0 failed, 5 ignored**. No new ambiguity; reading 21
+is unchanged. All SOL blockers resolved; muse response remains appendable.
+Blocker commits so far: **3ba7154** (SOL-B01), **21da2cc** (SOL-B02).
 
 ## Council round 4, codex first pass (2026-10-29)
 

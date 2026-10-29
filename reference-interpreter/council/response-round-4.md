@@ -1,7 +1,7 @@
 # Editor response: council round 4
 
-Input so far: codex out-codex.json, snapshot 8e11fe7. This response is
-appendable for the pending sol/muse second pass. Owned paths are exclusively
+Inputs: codex out-codex.json and sol out-sol.json, snapshot 8e11fe7. This
+response is appendable for the pending muse pass. Owned paths are exclusively
 reference-interpreter; ISA 0.8, the Python seed and random seeds are unchanged.
 
 ## R4-B01 — resolved
@@ -163,3 +163,35 @@ independently of parse-time factorisation. README documents the complete check.
 
 GREEN: all 3 new structural regressions pass; whole normal suite is green.
 No SPEC-QUESTIONS entry: §§5.6, 9.2 and 12.1 specify the checks directly.
+
+## SOL-R4-B03 — resolved
+
+RED: `r1_certificates::sol_r4_b03_expected_program_uses_signature_positions_for_renamed_bundles`
+failed on element 1 of the exact four-element identity-vs-renamed-identity
+witness (subject closure e153e677…, expected program 44e334e5…). The region
+analogue independently failed on element 1 before the fix.
+
+`claims.rs::Component` now identifies interface bundles by (ABI group, slot)
+and region cells by (ABI group, slot, cell index). `domain` resolves these
+positions once against the subject; `execute_element` binds those same
+positions to either function, independently of local names. Borrowed pool
+components retain their domain order. Deliberately omitted partial-domain
+inputs still initialize to zero, and output tuples retain signature order.
+Both exhaustive and sampled comparisons use this common representation.
+
+Pins: the exact four tuples now return Proof through both verify_claim and
+verify_certificate, as do reversed domain enumeration order and two extra
+borrowed pool components in deliberate z,b order. Omitting p still yields
+Evidence(2). A single-X reference still fails with a §12.1 full-tuple mismatch.
+`sol_r4_b03_expected_program_maps_renamed_region_cells_positionally` proves
+all 16 interface/memory tuples for m→n and checks a partial cell-1 domain
+(Evidence(8)); a reference changing only memory rejects.
+`sol_r4_b03_positions_distinguish_same_width_slots_and_crossed_names` uses
+two mutable bundles and reuses t/u/p in different groups in the reference:
+all eight tuples agree positionally; writing the wrong mutable slot rejects.
+README documents positional input binding and retained partial-domain rules.
+
+GREEN: full normal suite **232 passed, 0 failed, 5 ignored**. No new ambiguity:
+§§5.1, 9.4 and 12.1, consistently with SPEC-QUESTIONS 21, determine the ABI
+and tuple correspondence. All three SOL blockers are resolved; no declines,
+partials, dependencies, Python/random seed changes or spec edits.

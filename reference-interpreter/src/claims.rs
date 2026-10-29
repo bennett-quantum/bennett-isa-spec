@@ -35,13 +35,27 @@ pub struct ClaimReport {
 }
 #[derive(Clone, Debug)]
 enum Component {
-    Bundle(String),
+    Bundle(usize, usize),
     Borrowed(String),
-    Cell(String, usize),
+    Cell(usize, usize, usize),
 }
 struct Domain {
     components: Vec<(Component, usize, BitVector, BitVector)>,
     covers_d: bool,
+}
+/// ABI slot identity, independent of a function's local spelling. The domain
+/// is resolved once against its subject; the same positions bind the reference.
+fn interface_slot(f: &Function, name: &str) -> Result<(usize, usize)> {
+    f.params
+        .iter()
+        .enumerate()
+        .find_map(|(group, params)| {
+            params
+                .iter()
+                .position(|p| p.name == name)
+                .map(|index| (group, index))
+        })
+        .ok_or_else(|| Error(format!("§12.2: unknown interface component {name}")))
 }
 fn json_bits(value: &Json, width: usize) -> Result<BitVector> {
     BitVector::parse_unsigned_exact(width, value.uint_text()?)
@@ -163,7 +177,8 @@ impl Object {
                     if borrowed {
                         Component::Borrowed(name)
                     } else {
-                        Component::Bundle(name)
+                        let (group, index) = interface_slot(f, &name)?;
+                        Component::Bundle(group, index)
                     },
                     width,
                     lo,
@@ -173,6 +188,7 @@ impl Object {
         }
         for r in d.get("regions")?.array()? {
             let name = r.get("name")?.string()?.to_string();
+            let (group, slot) = interface_slot(f, &name)?;
             let (a, w) = f
                 .params
                 .iter()
@@ -190,7 +206,7 @@ impl Object {
                 Json::String(s) if s == "all" => {
                     for i in 0..cells {
                         components.push((
-                            Component::Cell(name.clone(), i),
+                            Component::Cell(group, slot, i),
                             w,
                             BitVector::zero(w)?,
                             ones(w)?,
@@ -204,7 +220,7 @@ impl Object {
                             .map_err(|_| Error("§12.2: cell index".into()))?;
                         let lo = json_bits(c.get("lo")?, w)?;
                         let hi = json_bits(c.get("hi")?, w)?;
-                        components.push((Component::Cell(name.clone(), i), w, lo, hi));
+                        components.push((Component::Cell(group, slot, i), w, lo, hi));
                     }
                 }
             }
@@ -237,19 +253,21 @@ impl Object {
         budget: Option<Budget>,
     ) -> Result<Vec<BitVector>> {
         let value = |name: &str, width: usize| -> Result<BitVector> {
+            let (group, index) = interface_slot(f, name)?;
             Ok(element
                 .iter()
                 .find_map(|(c, v)| match c {
-                    Component::Bundle(n) if n == name => Some(v.clone()),
+                    Component::Bundle(g, j) if (*g, *j) == (group, index) => Some(v.clone()),
                     _ => None,
                 })
                 .unwrap_or(BitVector::zero(width)?))
         };
         let cell = |region: &str, i: usize, width: usize| -> Result<BitVector> {
+            let (group, slot) = interface_slot(f, region)?;
             Ok(element
                 .iter()
                 .find_map(|(c, v)| match c {
-                    Component::Cell(n, j) if n == region && *j == i => Some(v.clone()),
+                    Component::Cell(g, s, j) if (*g, *s, *j) == (group, slot, i) => Some(v.clone()),
                     _ => None,
                 })
                 .unwrap_or(BitVector::zero(width)?))

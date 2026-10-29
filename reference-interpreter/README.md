@@ -289,7 +289,9 @@ reference-interpreter/target/debug/bennett-isa-ref run-program reference-interpr
   sampled claims (`ClaimVerdict::Proof` only for exhaustive claims over D),
   check the complete named translation frame (canonical nested-line points,
   actual borrowed wires, exact reverse V, repeated W and side conditions) and
-  library structural claims, and report interval
+  library structural claims. Expected programs bind bundles and region cells
+  by ABI group and position, independently of local names; borrowed pools retain
+  domain order and omitted partial-domain inputs start at zero. Interval
   claims and `expected: "oracle"` as `Unverified` with the reason.
 - `Xoshiro256` is the §12.1 sampler.
 

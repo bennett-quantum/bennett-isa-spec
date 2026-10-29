@@ -364,3 +364,138 @@ fn sol_r4_b02_translation_frame_rejects_omissions_and_checks_reverse_order() {
         false,
     );
 }
+
+fn sol_positional_object(region: bool, reference: &str) -> String {
+    let mem = if region {
+        r#"[{"A":1,"W":1,"role":"mut"}]"#
+    } else {
+        "[]"
+    };
+    let sig = format!(
+        r#"{{"abi":"0.8","args":[],"bounds":[],"in":[1],"kind":"perm_action","mem":{mem},"mut":[1],"tier":"q"}}"#
+    );
+    let a = format!(
+        "perm_action @a (t:wire mut) (p:wire in) ({}) () ()\n^entry():\nx t\nx t",
+        if region { "m:region[1,1] mut" } else { "" }
+    );
+    let id = format!(
+        "perm_action @id (u:wire mut) (v:wire in) ({}) () ()\n^entry():\n{reference}",
+        if region { "n:region[1,1] mut" } else { "" }
+    );
+    support::rehash(&support::object(&[("a",&sig,&a),("id",&sig,&id)],"{}",if region { "\nsection layout\n{\"A_tab\":0,\"H\":0,\"S_cells\":0,\"globals\":{},\"heap_base\":1,\"heap_limit_max\":0,\"interface_regions\":{},\"null_size\":1,\"ptr_width\":32}\n" } else {""})).text
+}
+fn sol_positional_claim(regions: &str, borrowed: &str, bundles: &str) -> String {
+    format!(
+        r#"{{"kind":"exhaustive","label":"proof","domain":{{"bundles":[{bundles}],"borrowed":[{borrowed}],"regions":[{regions}]}},"expected":{{"program":"ID"}}}}"#
+    )
+}
+const SOL_BUNDLES: &str =
+    r#"{"name":"t","width":1,"lo":0,"hi":1},{"name":"p","width":1,"lo":0,"hi":1}"#;
+fn sol_positional_verdict(text: &str, claim: &str) -> Result<ClaimVerdict, bennett_isa_ref::Error> {
+    let o = Object::parse(&certificate(text, 1, claim, "")).unwrap();
+    let h = o.identity().unwrap().closure_hashes["a"].clone().unwrap();
+    let v = o.verify_claim(&h, 0)?;
+    assert_eq!(o.verify_certificate().unwrap()[0].verdict, v);
+    Ok(v)
+}
+#[test]
+fn sol_r4_b03_expected_program_uses_signature_positions_for_renamed_bundles() {
+    // Independently: both bodies are identity on 00,01,10,11. Local names
+    // t,p versus u,v have no ABI significance (§9.4).
+    let text = sol_positional_object(false, "x u\nx u");
+    let claim = sol_positional_claim("", "", SOL_BUNDLES);
+    assert_eq!(
+        sol_positional_verdict(&text, &claim).unwrap(),
+        ClaimVerdict::Proof
+    );
+    // Permuting domain enumeration order must not permute interface slots.
+    let reverse = sol_positional_claim(
+        "",
+        "",
+        r#"{"name":"p","width":1,"lo":0,"hi":1},{"name":"t","width":1,"lo":0,"hi":1}"#,
+    );
+    assert_eq!(
+        sol_positional_verdict(&text, &reverse).unwrap(),
+        ClaimVerdict::Proof
+    );
+    // Borrowed pool entries follow their domain order, independently of the
+    // expected program's local names. A truly omitted input stays zero.
+    let borrowed = r#"{"name":"z","width":1,"lo":0,"hi":1},{"name":"b","width":2,"lo":0,"hi":3}"#;
+    assert_eq!(
+        sol_positional_verdict(&text, &sol_positional_claim("", borrowed, SOL_BUNDLES)).unwrap(),
+        ClaimVerdict::Proof
+    );
+    let partial = sol_positional_claim("", "", r#"{"name":"t","width":1,"lo":0,"hi":1}"#);
+    assert_eq!(
+        sol_positional_verdict(&text, &partial).unwrap(),
+        ClaimVerdict::Evidence { elements: 2 }
+    );
+    let wrong = sol_positional_object(false, "x u");
+    let e = sol_positional_verdict(&wrong, &claim)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        e.contains("§12.1") && e.contains("differs from the expected program"),
+        "{e}"
+    );
+}
+#[test]
+fn sol_r4_b03_expected_program_maps_renamed_region_cells_positionally() {
+    // 2 interface bits and 2 independent region cells => 16 identical final
+    // tuples. Changing only reference memory must still be detected.
+    let text = sol_positional_object(true, "x u\nx u");
+    let claim = sol_positional_claim(r#"{"name":"m","cells":"all"}"#, "", SOL_BUNDLES);
+    assert_eq!(
+        sol_positional_verdict(&text, &claim).unwrap(),
+        ClaimVerdict::Proof
+    );
+    let partial = sol_positional_claim(
+        r#"{"name":"m","cells":[{"index":1,"lo":0,"hi":1}]}"#,
+        "",
+        SOL_BUNDLES,
+    );
+    assert_eq!(
+        sol_positional_verdict(&text, &partial).unwrap(),
+        ClaimVerdict::Evidence { elements: 8 }
+    );
+    let wrong = sol_positional_object(true, "qstore n v u");
+    assert!(sol_positional_verdict(&wrong, &claim)
+        .unwrap_err()
+        .to_string()
+        .contains("§12.1"));
+}
+
+#[test]
+fn sol_r4_b03_positions_distinguish_same_width_slots_and_crossed_names() {
+    let sig = r#"{"abi":"0.8","args":[],"bounds":[],"in":[1],"kind":"perm_action","mem":[],"mut":[1,1],"tier":"q"}"#;
+    // Rename by crossing existing local names. Both maps are (t,u,p) ->
+    // (t XOR p,u,p); a name-based correspondence would exchange mut and in.
+    let a = "perm_action @a (t:wire mut, u:wire mut) (p:wire in) () () ()\n^entry():\ncx p t";
+    let id = "perm_action @id (p:wire mut, t:wire mut) (u:wire in) () () ()\n^entry():\ncx u p";
+    let text = support::rehash(&support::object(
+        &[("a", sig, a), ("id", sig, id)],
+        "{}",
+        "",
+    ))
+    .text;
+    let claim = sol_positional_claim(
+        "",
+        "",
+        r#"{"name":"u","width":1,"lo":0,"hi":1},{"name":"p","width":1,"lo":0,"hi":1},{"name":"t","width":1,"lo":0,"hi":1}"#,
+    );
+    assert_eq!(
+        sol_positional_verdict(&text, &claim).unwrap(),
+        ClaimVerdict::Proof
+    );
+    // Writing the second mutable slot instead must fail the full-tuple check.
+    let wrong = support::rehash(&support::object(
+        &[("a", sig, a), ("id", sig, &id.replace("cx u p", "cx u t"))],
+        "{}",
+        "",
+    ))
+    .text;
+    assert!(sol_positional_verdict(&wrong, &claim)
+        .unwrap_err()
+        .to_string()
+        .contains("§12.1"));
+}
