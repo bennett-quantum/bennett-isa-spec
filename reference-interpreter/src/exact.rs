@@ -502,3 +502,133 @@ pub fn minus_one() -> Amplitude {
         Dyadic::default(),
     ))
 }
+
+impl BigInt {
+    fn mul_small(&self, m: u32) -> Self {
+        self.mul(&Self::from_i128(m as i128))
+    }
+    /// (quotient, remainder) of a nonnegative value by a small divisor.
+    fn divmod_small(&self, d: u32) -> (Self, u32) {
+        let mut out = vec![0u32; self.limbs.len()];
+        let mut rem = 0u64;
+        for (i, l) in self.limbs.iter().enumerate().rev() {
+            let cur = (rem << 32) | *l as u64;
+            out[i] = (cur / d as u64) as u32;
+            rem = cur % d as u64;
+        }
+        (
+            Self {
+                negative: self.negative,
+                limbs: out,
+            }
+            .normalize(),
+            rem as u32,
+        )
+    }
+    pub fn to_decimal(&self) -> String {
+        if self.is_zero() {
+            return "0".into();
+        }
+        let mut digits = Vec::new();
+        let mut v = Self {
+            negative: false,
+            limbs: self.limbs.clone(),
+        };
+        while !v.is_zero() {
+            let (q, r) = v.divmod_small(10);
+            digits.push(b'0' + r as u8);
+            v = q;
+        }
+        if self.negative {
+            digits.push(b'-');
+        }
+        digits.reverse();
+        String::from_utf8(digits).unwrap_or_default()
+    }
+}
+/// An exact decimal m * 10^e, for §12.3 error composition (no rounding).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Decimal {
+    m: BigInt,
+    e: i64,
+}
+impl Decimal {
+    pub fn zero() -> Self {
+        Self {
+            m: BigInt::zero(),
+            e: 0,
+        }
+    }
+    /// Parses a nonnegative JSON decimal (digits, optional fraction, optional exponent).
+    pub fn parse(s: &str) -> Option<Self> {
+        let (mantissa, exponent) = match s.split_once(['e', 'E']) {
+            Some((m, e)) => (m, e.trim_start_matches('+').parse::<i64>().ok()?),
+            None => (s, 0),
+        };
+        let (int, frac) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+        if int.is_empty()
+            || !int.bytes().all(|b| b.is_ascii_digit())
+            || !frac.bytes().all(|b| b.is_ascii_digit())
+        {
+            return None;
+        }
+        let mut m = BigInt::zero();
+        for d in int.bytes().chain(frac.bytes()) {
+            m = m.mul_small(10).add(&BigInt::from_i128((d - b'0') as i128));
+        }
+        Some(Self {
+            m,
+            e: exponent - frac.len() as i64,
+        })
+    }
+    fn align(&self, e: i64) -> BigInt {
+        let mut m = self.m.clone();
+        for _ in e..self.e {
+            m = m.mul_small(10);
+        }
+        m
+    }
+    pub fn add(&self, o: &Self) -> Self {
+        let e = self.e.min(o.e);
+        Self {
+            m: self.align(e).add(&o.align(e)),
+            e,
+        }
+    }
+    pub fn mul_int(&self, n: u128) -> Self {
+        Self {
+            m: self.m.mul(&BigInt::from_i128(n as i128)),
+            e: self.e,
+        }
+    }
+    /// Plain decimal text without an exponent, trailing zeros removed.
+    pub fn to_text(&self) -> String {
+        let mut m = self.m.clone();
+        let mut e = self.e;
+        while e < 0 && !m.is_zero() {
+            let (q, r) = m.divmod_small(10);
+            if r != 0 {
+                break;
+            }
+            m = q;
+            e += 1;
+        }
+        let digits = m.to_decimal();
+        if m.is_zero() {
+            return "0".into();
+        }
+        if e >= 0 {
+            return format!("{digits}{}", "0".repeat(e as usize));
+        }
+        let point = digits.len() as i64 + e;
+        if point > 0 {
+            format!(
+                "{}.{}",
+                &digits[..point as usize],
+                &digits[point as usize..]
+            )
+        } else {
+            format!("0.{}{digits}", "0".repeat((-point) as usize))
+        }
+    }
+}

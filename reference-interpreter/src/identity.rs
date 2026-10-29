@@ -87,48 +87,81 @@ impl Object {
         }
         // Tarjan emits dependency SCCs before their users.
         let components = components(&graph);
-        let mut hashes = BTreeMap::new();
-        let mut closure = BTreeMap::new();
-        let mut envelopes = BTreeMap::new();
-        let mut scc_members = BTreeMap::new();
-        let mut scc_hashes = BTreeMap::new();
+        // One hashing pass; `imported` gives the hash an import reference takes,
+        // None for an import whose closure is unknown (not pinned).
+        let pass = |imported: BTreeMap<String, Option<String>>| -> Result<HashPass> {
+            let mut hashes: BTreeMap<String, String> = BTreeMap::new();
+            let mut known: BTreeMap<String, bool> = BTreeMap::new();
+            for (n, h) in &imported {
+                if let Some(h) = h {
+                    hashes.insert(n.clone(), h.clone());
+                }
+                known.insert(n.clone(), h.is_some());
+            }
+            let mut out = HashPass::default();
+            for comp in &components {
+                let closed = comp.iter().all(|n| {
+                    graph[n]
+                        .iter()
+                        .all(|r| comp.contains(r) || known.get(r).copied().unwrap_or(false))
+                });
+                let mut envs = Vec::new();
+                for n in comp {
+                    let env = self.envelope(n, symbols[n], comp, &hashes)?;
+                    out.envelopes.insert(n.clone(), env.clone());
+                    envs.push(env);
+                }
+                let recursive = comp.len() > 1 || graph[&comp[0]].contains(&comp[0]);
+                let scc = sha256_hex(envs.concat().as_bytes());
+                for (i, n) in comp.iter().enumerate() {
+                    out.scc_members.insert(n.clone(), comp.clone());
+                    out.scc_hashes.insert(n.clone(), scc.clone());
+                    let hash = if recursive {
+                        sha256_hex(format!("{scc}:{i}").as_bytes())
+                    } else {
+                        sha256_hex(envs[i].as_bytes())
+                    };
+                    known.insert(n.clone(), closed);
+                    out.closed.insert(n.clone(), closed);
+                    hashes.insert(n.clone(), hash.clone());
+                    out.hashes.insert(n.clone(), hash);
+                }
+            }
+            Ok(out)
+        };
+        // Interface hashes: SHA-256(name || 0x00 || JCS signature) for imports.
+        let mut fingerprints = BTreeMap::new();
+        let mut pins = BTreeMap::new();
         for (n, im) in &imports {
             let mut seed = n.as_bytes().to_vec();
             seed.push(0);
             seed.extend_from_slice(im.get("signature")?.canonical().as_bytes());
-            hashes.insert(n.clone(), sha256_hex(&seed));
-            closure.insert(n.clone(), None);
+            fingerprints.insert(n.clone(), Some(sha256_hex(&seed)));
+            // Closure hashes: a pinned import's closure hash is fixed by its pin
+            // (§9.3 requires equality at link time), so closures over pinned
+            // imports are determined before linking.
+            let pin = im
+                .object()?
+                .get("pinned_closure_hash")
+                .map(|p| p.string().map(str::to_string))
+                .transpose()?;
+            pins.insert(n.clone(), pin);
         }
-        for comp in components {
-            let mut envs = Vec::new();
-            let closed = comp.iter().all(|n| {
-                graph[n]
-                    .iter()
-                    .all(|r| comp.contains(r) || closure.get(r).is_some_and(Option::is_some))
-            });
-            for n in &comp {
-                let env = self.envelope(n, symbols[n], &comp, &hashes)?;
-                envelopes.insert(n.clone(), env.clone());
-                envs.push(env);
-            }
-            let recursive = comp.len() > 1 || graph[&comp[0]].contains(&comp[0]);
-            let scc = sha256_hex(envs.concat().as_bytes());
-            for (i, n) in comp.iter().enumerate() {
-                scc_members.insert(n.clone(), comp.clone());
-                scc_hashes.insert(n.clone(), scc.clone());
-                let hash = if recursive {
-                    sha256_hex(format!("{scc}:{i}").as_bytes())
-                } else {
-                    sha256_hex(envs[i].as_bytes())
-                };
-                closure.insert(n.clone(), if closed { Some(hash.clone()) } else { None });
-                hashes.insert(n.clone(), hash);
-            }
-        }
-        for n in imports.keys() {
-            hashes.remove(n);
-            closure.remove(n);
-        }
+        let interface = pass(fingerprints)?;
+        let closures = pass(pins)?;
+        let hashes = interface.hashes;
+        let closure: BTreeMap<String, Option<String>> = closures
+            .hashes
+            .into_iter()
+            .map(|(n, h)| {
+                let closed = closures.closed[&n];
+                (n, closed.then_some(h))
+            })
+            .collect();
+        let envelopes = interface.envelopes;
+        // SCC grouping and ordering keys are those of executable (closure) identity.
+        let scc_members = closures.scc_members;
+        let scc_hashes = closures.scc_hashes;
         let mut canonical = String::new();
         let mut skip = false;
         let mut pending_blank = false;
@@ -309,6 +342,14 @@ impl Object {
         lines.extend(refs);
         Ok(lines.join("\n") + "\n")
     }
+}
+#[derive(Default)]
+struct HashPass {
+    hashes: BTreeMap<String, String>,
+    closed: BTreeMap<String, bool>,
+    envelopes: BTreeMap<String, String>,
+    scc_members: BTreeMap<String, Vec<String>>,
+    scc_hashes: BTreeMap<String, String>,
 }
 pub(crate) fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
