@@ -46,9 +46,13 @@ member and finding; *r8* = a council round-8 suggestion (bead
 `b-isa-spec-zsw.N`); *DL* = the dialect 0.2 outline's §25 list.
 
 **No narrowing.** No entry rejects, faults, declares inert or removes a
-capability that 0.8 permits or the north star promises. Entries that
-add a well-formedness check (E16.9, E17.9, E17.10, E17.12) or a run-time
-check say so and name what keeps every program expressible.
+capability that 0.8 permits or the north star promises. The entries
+that add a well-formedness check (E16.9, E17.9, E17.10, E17.12, the
+block terminators of K5) concern spellings that always have a legal
+equivalent; the run-time checks (E11, K1's width checks, K3's token
+validity, K4's inverse-pair check) concern operations that 0.8 did not
+define or already required (0.8's `qinplace` already demanded its
+certificates).
 
 ### 0.1 Group 1: repairs with unchanged local semantics
 
@@ -728,7 +732,7 @@ permutation actions require ε = 0** for every gate; actions MAY use ε > 0
 | `quncopy` | `quncopy s d` | `cx s[i] d[i]` under the predicate; `qfree d` |
 | `qxor` | `qxor s t` | `cx s[i] t[i]` |
 | `qexch` | `qexch a b` | `swap a[i] b[i]` |
-| `qinplace` | `qinplace @g @ginv tk x (ins..) (mem..) (args..)`; written `qinplace @g @ginv tk x` when all three lists are empty (and only then) | **Well-formed** iff `@g` and `@ginv` are oracles whose `in` slots are x's width n followed by the widths of `ins` in order, whose `tgt` width is n, whose fault widths are equal (F), whose `mem` slots match the `mem` regions (role `in`, §3.3's matching rule) and whose `args` types are those of `args`; x, the `ins` wires and the effective control context are pairwise disjoint. **Sem**: `t = qalloc any n; f = qalloc any F; oracle_call @g tk (x, ins..) t f (mem..) (args..); qexch x t; oracle_call @ginv tk (x, ins..) t f (mem..) (args..); qfree t; qfree f`, so x ← g(x; ins, mem, args). **Inverse-pair obligation**: under the token's tuple and the call's `args` values, on every basis value of x, of the `ins` wires and of the `mem` cells, both oracles are fault-free and g(·; ins, mem, args) and ginv(·; ins, mem, args) are mutually inverse permutations of the n-bit encoding. It is carried by a verified `inverse_pairs` entry (§12.3) whose tuple is componentwise ≤ the token's (success at a tuple implies the same result at every larger one, §5.4) and whose claim's `args` domain contains the call's values. Before any effect of a CC/R region call, every `qinplace` the callee executes (transitively; its token and `args` are resolved from the call's classical arguments) MUST have a covering entry, else CC trap / R fault `FAULT_UB_TRAP`. The private t and f are not values of the region for §6: the certified pair cleans them, the only cleanup that is not a §6.4 realisation. Under control the allocations are unconditional and every gate of both calls and of the exchange is controlled |
+| `qinplace` | `qinplace @g @ginv tk x (ins..) (mem..) (args..)`; written `qinplace @g @ginv tk x` when all three lists are empty (and only then) | **Well-formed** iff `@g` and `@ginv` are oracles whose `in` slots are x's width n followed by the widths of `ins` in order, whose `tgt` width is n, whose fault widths are equal (F), whose `mem` slots match the `mem` regions (role `in`, §3.3's matching rule) and whose `args` types are those of `args`; x, the `ins` wires and the effective control context are pairwise disjoint. **Sem**: `t = qalloc any n; f = qalloc any F; oracle_call @g tk (x, ins..) t f (mem..) (args..); qexch x t; oracle_call @ginv tk (x, ins..) t f (mem..) (args..); qfree t; qfree f`, so x ← g(x; ins, mem, args); these are its generated operations, in this order (§11). **Inverse-pair obligation**: under the token's tuple and the call's `args` values, on every basis value of x, of the `ins` wires and of the `mem` cells, both oracles are fault-free and g(·; ins, mem, args) and ginv(·; ins, mem, args) are mutually inverse permutations of the n-bit encoding. It is carried by a verified `inverse_pairs` entry (§12.3) whose tuple is componentwise ≤ the token's (success at a tuple implies the same result at every larger one, §5.4) and whose claim's `args` domain contains the call's values. Before any effect of a CC/R region call, every `qinplace` the callee executes (transitively; its token and `args` are resolved from the call's classical arguments) MUST have a covering entry, else CC trap / R fault `FAULT_UB_TRAP`. The private t and f are not values of the region for §6: the certified pair cleans them, the only cleanup that is not a §6.4 realisation. Under control the allocations are unconditional and every gate of both calls and of the exchange is controlled |
 
 ### 4.6 Quantum memory, predication, structure
 
@@ -966,8 +970,8 @@ computing a fresh outcome. No automatic propagation: the dialect emits `p
 = lift.icmp.ne fr' zero; lift.faultif p FAULT_CALLEE` (with `zero` a
 `lift.const` location) where the source requires it. To clear `fr'`, the
 producer emits `lift.oracle_uncall @o` with the same token, callee, `ins`
-and `mem` values (no intervening row writes those locations or cells:
-suite F) and the successor versions of `tgt` and `fr'`; the pair shares a
+and `mem` values (no intervening row writes those locations, suite F,
+nor those cells, below) and the successor versions of `tgt` and `fr'`; the pair shares a
 dynamic invocation identity. Alternatively `fr'` is retained until the
 prefix reversal. Matching is **LIFO**: on every path, a
 `lift.oracle_uncall` matches the most recent preceding unmatched
@@ -1206,15 +1210,15 @@ legal iff S is a call of `@f`, S's recorded boundary argument and result
 values equal the operand values, **every frame after S is pure**, and S
 contains, at any nesting depth, **no `measure` frame** and no `qreg.
 free` frame whose cleanliness was not verified (hardware, §17 item 14);
-otherwise it is a CC trap / R fault `FAULT_UB_TRAP` and changes nothing.
-Execution reverses S by the history traversal (nested segments are
+otherwise it is a CC trap / R fault `FAULT_UB_TRAP` and changes nothing
+beyond the fault record (§4.9). Execution reverses S by the history traversal (nested segments are
 undone; nested segments already cancelled by an inner `uncall`, and that
 inner `uncall` frame, are skipped), and pushes an `uncall` frame naming
 S. The instances defined inside S no longer exist; using such a name
 before it is redefined is a CC trap / R fault `FAULT_UB_TRAP`.
 **Whole-run reversal** (§10) is the history traversal over the whole
-history: S's effects on memory, the allocation table, devices and
-handles were undone by the `uncall`, and the frames between S and the
+history: S's effects on memory, the allocation table, devices, the
+register ledger and tokens were undone by the `uncall`, and the frames between S and the
 `uncall` are pure, so at the `uncall` frame every component except the
 retained instances already equals its value before S. T4 is stated over
 these frames. *(non-normative)* S is never re-executed and never redone;
@@ -1810,7 +1814,8 @@ and cells are bit-vectors of their declared widths (no upper bound,
 §3.3), pseudo-locations read-only, predication is
 `if`, each §4.2 row is its classical function (including the inherent
 `inrange` check of loads and stores, the activation records of §3.7, the
-`alloctab` and stack arrays), `fault` records the code and halts, `lift.
+`alloctab` and stack arrays), `fault` and a triggered `lift.faultif`
+record their effective cause (§5.4) and halt, `lift.
 retval` halts with success and `f(x) = result_val`, the step counter
 counts executed rows (on budget exhaustion exactly B rows have
 executed), counters are unbounded integers. It **defines** F_B
@@ -1866,8 +1871,8 @@ Born probabilities, consuming the wires.
 | C | Executor, Producer | T3 over full D at exhaustive widths for oracles, permutation actions, `qinplace` pairs, borrow frames; T6 agreement among VM, specialiser, transformed forms and the reference interpreter; the §16.3 examples as normative test vectors, including the stack-capacity boundary of example 2 and example 3 over its 8 basis and 16 controlled configurations with an entangled reference on the borrowed wire; `qinplace` with `ins` and `args` (example 7) over all x, y, a and both control values, scratch clean, and its adjoint |
 | D | Executor | channel and unitary comparison for ε > 0 realisations; controlled-interference tests; checker-computed bounds; the diamond-norm SDP witness check of §12.1, including d = 2, J(Φ) = 0, Y = I₄/8, mu = bound = 3/8 (accepted: every pivot 1/8) and Y = 0, mu = 0 (rejected: pivot 0) |
 | E | Target author, Executor | JCS parsing; AST evaluation; matching; scheme expansion and correctness; aggregation from event lists; timing model; imports |
-| F | Producer | versioning, disjointness incl. control context; operand schema; row classes and frame sizing; index-space flattening; terminators; name resolution; permutation-only oracles; §6 transfer and windows; adjoint table; translation lemma side conditions with the four negative tests; `in`-wire use; acyclic action graphs; grammar; schemas; envelope and hashes, acyclic (inc8, zero, sum_db) and cyclic (sum, and a mutual SCC); SCC placement in the index space (mutual f, g whose member hashes order opposite to their names); empty data lines (`NAME SP LF` accepted, two spaces rejected); canonical `INT`/`FLOAT` at every literal site; const literal ranges; the region call graph with lifted calls and `qinplace`; `call` operand spelling; param role suffixes; interface-region names; local regions as call operands; `in`-wire uses; LIFO matched uncalls; `qreg[*]` typing, the `measure.iN` form and width checks; `budget.mint` rejected in regions; CC/R block terminators; `qinplace` signature compatibility, its short form exactly when the three lists are empty, and its §6.1 transfer (cleaning a value that depends on x after changing an `ins` wire is rejected); CC/R `fault` literal range; linking; frame-descriptor live ranges |
-| G | Launch | every §10 entry point, state transition, binding rule, ownership rule; HOST_REQUEST/reply (a reply longer than `ptr_width` bits can count is `E_ARG`); reverse eligibility and tree order; `QREG` bound to `qreg[*]`; `FAILED → REVERSED` (example 8) and `E_NOT_REVERSIBLE` after a `measure` or an unverified free; exactly one fault record per `FAILED` run; a device-minted token used after its run is CLOSED is `E_ARG` |
+| F | Producer | versioning, disjointness incl. control context; operand schema; row classes and frame sizing; index-space flattening; terminators; name resolution; permutation-only oracles; §6 transfer and windows; adjoint table; translation lemma side conditions with the four negative tests; `in`-wire use; acyclic action graphs; grammar; schemas; envelope and hashes, acyclic (inc8, zero, sum_db) and cyclic (sum, and a mutual SCC); SCC placement in the index space (mutual f, g whose member hashes order opposite to their names); empty data lines (`NAME SP LF` accepted, two spaces rejected); canonical `INT`/`FLOAT` at every literal site; const literal ranges; the region call graph with lifted calls and `qinplace`; `call` operand spelling; param role suffixes; interface-region names; local regions as call operands; the widened `in`-wire uses of §5.1; LIFO matched uncalls; `qreg[*]` typing, the `measure.iN` form and width checks; `budget.mint` rejected in regions; CC/R block terminators; `qinplace` signature compatibility, its short form exactly when the three lists are empty, and its §6.1 transfer (cleaning a value that depends on x after changing an `ins` wire is rejected); CC/R `fault` literal range; linking; frame-descriptor live ranges |
+| G | Launch | every §10 entry point, state transition, binding rule, ownership rule; HOST_REQUEST/reply (a reply whose length does not fit `ptr_width` bits is `E_ARG`); reverse eligibility and tree order; `QREG` bound to `qreg[*]`; `FAILED → REVERSED` (example 8) and `E_NOT_REVERSIBLE` after a `measure` or an unverified free; exactly one fault record per `FAILED` run; a device-minted token used after its run is CLOSED is `E_ARG` |
 | H | Scheduler | §6 validity; capacity; reproducibility; specificity resolution; verbatim execution; INFEASIBLE/UNSUPPORTED; invocation contexts covering default-only invocations (an action calling one region twice, one call scheduled explicitly: a claim with one witness rejects, two passing witnesses accept); a device-minted tuple binds the schedule (a schedule bound to B = 3 is rejected for an invocation minted with B = 2) |
 
 ## 16. Canonical textual form (normative)
