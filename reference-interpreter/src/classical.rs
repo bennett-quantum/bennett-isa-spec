@@ -961,11 +961,7 @@ impl<'a> ClassicalMachine<'a> {
                     "call" => {
                         let n = a[0].trim_start_matches('@');
                         let callee = &object.functions[n];
-                        let args = if a.len() == 2 && a[1].starts_with('(') {
-                            list(&a[1])?
-                        } else {
-                            a[1..].to_vec()
-                        };
+                        let args = a[1..].to_vec();
                         let values = args
                             .iter()
                             .map(|n| self.read(n))

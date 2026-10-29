@@ -21,14 +21,11 @@ impl Object {
         fn bounds(seq: &[Instruction], out: &mut Vec<u64>) -> Result<()> {
             for i in seq {
                 if i.op == "qloop" {
-                    out.push(
-                        i.operands
-                            .first()
-                            .and_then(|s| s.parse().ok())
-                            .ok_or_else(|| {
-                                Error("§4.8: loop count must be nonnegative literal".into())
-                            })?,
-                    );
+                    let n = i
+                        .operands
+                        .first()
+                        .ok_or_else(|| Error("§4.8: qloop requires a trip count".into()))?;
+                    out.push(crate::object::host_count(n, "qloop trip count")?);
                 }
                 for body in &i.bodies {
                     bounds(body, out)?;
@@ -125,9 +122,7 @@ impl Object {
                     if !i.lhs.is_empty() || !matches!(a.len(), 1 | 3) || i.bodies.len() != 1 {
                         return err("§4.8", "qloop arity/body mismatch");
                     }
-                    let n = a[0].parse::<u64>().map_err(|_| {
-                        Error("§4.8: loop count must be nonnegative literal".into())
-                    })?;
+                    let n = crate::object::host_count(&a[0], "qloop trip count")?;
                     if a.len() == 3 && (a[1] != "while" || s.wires(&a[2])?.len() as u64 != n) {
                         return err("§4.6", "qloop selector width mismatch");
                     }
@@ -699,9 +694,10 @@ impl Object {
                 if let Some(t) = op.strip_prefix("const.") {
                     arity(1, 1)?;
                     let t = Type::parse(t)?;
-                    if !matches!(t, Type::Int(_)) || !integer(&a[0]) {
-                        return err("§4.8", "invalid classical const");
-                    }
+                    let Type::Int(n) = t else {
+                        return err("§4.8", "const requires an iN suffix");
+                    };
+                    crate::object::const_literal(&a[0], n as u64)?;
                     result = Some(t);
                 } else if is_binop(op) || is_div(op) {
                     arity(2, 1)?;
@@ -722,17 +718,24 @@ impl Object {
                     .filter(|(c, _)| ["zext", "sext", "trunc", "ptrtoint", "load"].contains(c))
                 {
                     arity(1, 1)?;
+                    // §4.8: every suffix of these opcodes is iN / iM.
                     let t = Type::parse(suffix)?;
+                    if !matches!(t, Type::Int(_)) {
+                        return err("§4.8", format!("{op}: the result suffix must be iN"));
+                    }
                     let to = t.width(self.ptr_width)?;
                     let from = rd(&a[0])?;
                     if cast == "load" || cast == "ptrtoint" {
                         if from != Type::Ptr {
                             return err("§3.3", "pointer operand required");
                         }
-                        if cast == "load" && to % 8 != 0 {
-                            return err("§3.3", "load width must be byte multiple");
+                        if cast == "load" && !to.is_multiple_of(8) {
+                            return err("§3.3", "load.iN requires N in {8, 16, ..., 128}");
                         }
                     } else {
+                        if !matches!(from, Type::Int(_)) {
+                            return err("§3.3", "zext/sext/trunc require an iN operand");
+                        }
                         let w = from.width(self.ptr_width)?;
                         if if cast == "trunc" { to >= w } else { to <= w } {
                             return err("§3.3", "cast direction mismatch");
@@ -771,7 +774,10 @@ impl Object {
                         _ if op.starts_with("store.") => {
                             arity(2, 0)?;
                             let t = Type::parse(&op[6..])?;
-                            if t.width(self.ptr_width)? % 8 != 0
+                            if !matches!(t, Type::Int(_)) {
+                                return err("§4.8", "store requires an iN suffix");
+                            }
+                            if !t.width(self.ptr_width)?.is_multiple_of(8)
                                 || rd(&a[0])? != Type::Ptr
                                 || rd(&a[1])? != t
                             {
@@ -835,12 +841,18 @@ impl Object {
                             {
                                 return err("§4.8", "classical call tier mismatch");
                             }
+                            // §4.1 prints `results = call @f args` (bare operands) and
+                            // `uncall @f (args) (results)`; one spelling each (SPEC-QUESTIONS 18).
                             let vs = if op == "uncall" {
                                 arity(3, 0)?;
                                 list(&a[1])?
-                            } else if a.len() == 2 && a[1].starts_with('(') {
-                                list(&a[1])?
                             } else {
+                                if a[1..].iter().any(|v| !name(v)) {
+                                    return err(
+                                        "§16.2",
+                                        "call arguments are bare names: results = call @f a b",
+                                    );
+                                }
                                 a[1..].to_vec()
                             };
                             if vs.len() != callee.params[0].len() {
@@ -906,9 +918,11 @@ impl Object {
                             if f.kind != "cc" {
                                 return err("§4.8", "qreg instructions are CC only");
                             }
-                            let n = a[1]
-                                .parse::<u64>()
-                                .map_err(|_| Error("§3.3: qreg literal width".into()))?;
+                            crate::object::literal_name(&a[0])?;
+                            let n = crate::object::host_count(&a[1], "qreg size")?;
+                            if n == 0 {
+                                return err("§3.3", "qreg size must be positive");
+                            }
                             result = Some(Type::Qreg(n));
                         }
                         "qreg.free" => {
@@ -922,12 +936,8 @@ impl Object {
                             let Type::Qreg(n) = rd(&a[0])? else {
                                 return err("§3.3", "slice needs qreg");
                             };
-                            let lo = a[1]
-                                .parse::<u64>()
-                                .map_err(|_| Error("§3.3: slice offset".into()))?;
-                            let len = a[2]
-                                .parse::<u64>()
-                                .map_err(|_| Error("§3.3: slice length".into()))?;
+                            let lo = crate::object::host_count(&a[1], "slice offset")?;
+                            let len = crate::object::host_count(&a[2], "slice length")?;
                             if f.kind != "cc" || lo.checked_add(len).is_none_or(|end| end > n) {
                                 return err("§3.3", "invalid slice");
                             }

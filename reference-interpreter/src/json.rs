@@ -88,10 +88,13 @@ impl Json {
         let value = s
             .parse::<u128>()
             .map_err(|_| crate::Error(format!("§9.1: invalid unsigned integer {s}")))?;
-        if matches!(self, Self::Number(_)) && value > 9_007_199_254_740_991 {
+        // §9.1 "Integers that may exceed 2^53 are decimal strings": a value above
+        // 2^53 - 1 is a string and a smaller one a number (SPEC-QUESTIONS 17).
+        let exact = value <= 9_007_199_254_740_991;
+        if matches!(self, Self::Number(_)) != exact {
             return err(
                 "§9.1",
-                "integers outside the exact JSON range require decimal strings",
+                format!("integer {s} must be a JSON number iff it is at most 2^53 - 1"),
             );
         }
         Ok(value)

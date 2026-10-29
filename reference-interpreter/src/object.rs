@@ -876,10 +876,7 @@ impl Object {
                     if !bs.is_empty() {
                         f.bounds = bs
                             .split(", ")
-                            .map(|s| {
-                                s.parse::<u64>()
-                                    .map_err(|_| Error("§16.2: invalid loop bound".into()))
-                            })
+                            .map(|s| host_count(s, "loop bound"))
                             .collect::<Result<_>>()?;
                     }
                 }

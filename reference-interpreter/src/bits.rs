@@ -112,7 +112,10 @@ impl BitVector {
     }
     pub fn parse_unsigned_exact(width: usize, s: &str) -> Result<Self> {
         if !crate::object::integer(s) || s.starts_with('-') {
-            return err("§3.3", "unsigned canonical integer required");
+            return err(
+                "§16.1",
+                format!("unsigned canonical INT required, found {s}"),
+            );
         }
         let generous = s
             .len()
