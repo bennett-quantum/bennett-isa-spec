@@ -478,3 +478,188 @@ fn reverse_rejects_unknown_symbols_and_bad_prefixes() {
         "--steps is a reverse option",
     );
 }
+
+#[test]
+fn run_action_bell_from_basis_values() {
+    // registers.bisa @bell (mut wire[2] only): h t[0]; cx t[0] t[1] maps
+    // |00> to (|00> + |11>)/sqrt(2) in interface order (t0, t1). This is the
+    // exact shape the dialect checker's state= examples consume: one JSON
+    // `state` object keyed by bit string with [re, im] amplitudes.
+    let v = ok(&["run-action", &fixture("registers"), "bell", "--mut", "0"]);
+    assert_eq!(text(&v, "action"), "bell");
+    assert_eq!(uint(&v, "wires"), 2);
+    let state = field(&v, "state").object().unwrap();
+    assert_eq!(state.len(), 2);
+    for key in ["00", "11"] {
+        let amp = state[key].array().unwrap();
+        let re: f64 = amp[0].canonical().parse().unwrap();
+        let im: f64 = amp[1].canonical().parse().unwrap();
+        assert!(
+            (re - std::f64::consts::FRAC_1_SQRT_2).abs() < 1e-12,
+            "{key}: {re}"
+        );
+        assert_eq!(im, 0.0);
+    }
+    // The mut bundle has no definite basis value, reported as null (never a
+    // guessed outcome).
+    assert_eq!(array(&v, "mut"), [Json::Null]);
+    assert_eq!(array(&v, "in").len(), 0);
+    // registers.bisa @toggle flips its single wire: |0> -> |1> exactly.
+    let v = ok(&["run-action", &fixture("registers"), "toggle", "--mut", "0"]);
+    let state = field(&v, "state").object().unwrap();
+    assert_eq!(state.len(), 1);
+    assert_eq!(state["1"].canonical(), "[1,0]");
+    assert_eq!(array(&v, "mut")[0].uint().unwrap(), 1);
+}
+
+#[test]
+fn run_action_permutation_basis_and_adjoint() {
+    // actions.bisa @flip computes t ^= p (fixture comment). With t = 1 and
+    // p = 2 the result is t = 3, p = 2; in interface order (t0,t1,p0,p1)
+    // that is |1101>. The same run spelled --basis starts from
+    // (t0,t1,p0,p1) = 1001. flip is its own adjoint, so the adjoint run
+    // from t = 3, p = 2 returns t = 1.
+    let v = ok(&[
+        "run-action",
+        &fixture("actions"),
+        "flip",
+        "--mut",
+        "1",
+        "--in",
+        "2",
+    ]);
+    assert_eq!(field(&v, "state").canonical(), "{\"1101\":[1,0]}");
+    assert_eq!(array(&v, "mut")[0].uint().unwrap(), 3);
+    assert_eq!(array(&v, "in")[0].uint().unwrap(), 2);
+    let basis = ok(&["run-action", &fixture("actions"), "flip", "--basis", "1001"]);
+    assert_eq!(field(&basis, "state"), field(&v, "state"));
+    assert_eq!(array(&basis, "mut")[0].uint().unwrap(), 3);
+    let adjoint = ok(&[
+        "run-action",
+        &fixture("actions"),
+        "flip",
+        "--mut",
+        "3",
+        "--in",
+        "2",
+        "--adjoint",
+    ]);
+    assert_eq!(field(&adjoint, "adjoint"), &Json::Bool(true));
+    assert_eq!(array(&adjoint, "mut")[0].uint().unwrap(), 1);
+    assert_eq!(field(&adjoint, "state").canonical(), "{\"1001\":[1,0]}");
+}
+
+#[test]
+fn run_action_state_vector_input() {
+    // The adjoint of Bell preparation maps (|00> + |11>)/sqrt(2) back to
+    // |00>: cx gives (|00> + |10>)/sqrt(2), then h on t0 interferes to
+    // |00>. The specified amplitude is a binary64 whose exact dyadic value
+    // cancels exactly on the other component, so the support is a single
+    // component of amplitude sqrt(2) * 0.7071067811865475 ~ 1.
+    let v = ok(&[
+        "run-action",
+        &fixture("registers"),
+        "bell",
+        "--state",
+        "00=0.7071067811865475,0;11=0.7071067811865475,0",
+        "--adjoint",
+    ]);
+    let state = field(&v, "state").object().unwrap();
+    assert_eq!(state.len(), 1);
+    let amp = state["00"].array().unwrap();
+    let re: f64 = amp[0].canonical().parse().unwrap();
+    assert!((re - 1.0).abs() < 1e-12, "{re}");
+    assert_eq!(array(&v, "mut")[0].uint().unwrap(), 0);
+}
+
+#[test]
+fn run_action_mem_region_and_borrow_pool() {
+    // control_flow.bisa @exchange swaps t with m[a] (fixture comment):
+    // t = 2, a = 1, m = [1, 3] (one byte per 2-bit cell) gives t = 3 and
+    // m = [1, 2]. All seven interface wires (t0,t1,a,m0.0,m0.1,m1.0,m1.1)
+    // are then 1111001.
+    let v = ok(&[
+        "run-action",
+        &fixture("control_flow"),
+        "exchange",
+        "--mut",
+        "2",
+        "--in",
+        "1",
+        "--mem",
+        "m=0103",
+    ]);
+    assert_eq!(array(&v, "mut")[0].uint().unwrap(), 3);
+    assert_eq!(
+        field(field(&v, "mem"), "m")
+            .array()
+            .unwrap()
+            .iter()
+            .map(|c| c.uint().unwrap())
+            .collect::<Vec<_>>(),
+        [1, 2]
+    );
+    assert_eq!(field(&v, "state").canonical(), "{\"1111001\":[1,0]}");
+    // Without --mem the region cells start zero: t swaps with m[1] = 0.
+    let v = ok(&[
+        "run-action",
+        &fixture("control_flow"),
+        "exchange",
+        "--mut",
+        "2",
+        "--in",
+        "1",
+    ]);
+    assert_eq!(array(&v, "mut")[0].uint().unwrap(), 0);
+    assert_eq!(
+        field(field(&v, "mem"), "m")
+            .array()
+            .unwrap()
+            .iter()
+            .map(|c| c.uint().unwrap())
+            .collect::<Vec<_>>(),
+        [0, 2]
+    );
+    // control_flow.bisa @borrowed borrows one pool wire and computes
+    // t ^= x independently of it: --mut 0 --in 1 gives t = 1.
+    let v = ok(&[
+        "run-action",
+        &fixture("control_flow"),
+        "borrowed",
+        "--mut",
+        "0",
+        "--in",
+        "1",
+    ]);
+    assert_eq!(array(&v, "mut")[0].uint().unwrap(), 1);
+    assert_eq!(field(&v, "state").canonical(), "{\"11\":[1,0]}");
+}
+
+#[test]
+fn run_action_rejects_ambiguous_and_malformed_inputs() {
+    let bell = fixture("registers");
+    // Exactly one state mode.
+    fails(
+        &["run-action", &bell, "bell", "--mut", "0", "--basis", "00"],
+        "exactly one of --mut, --basis, --state",
+    );
+    fails(
+        &["run-action", &bell, "bell"],
+        "exactly one of --mut, --basis, --state",
+    );
+    // --in only accompanies --mut.
+    fails(
+        &["run-action", &bell, "bell", "--basis", "00", "--in", "0"],
+        "--in accompanies --mut only",
+    );
+    // Wrong bit-string length (2 interface wires).
+    fails(&["run-action", &bell, "bell", "--basis", "000"], "§14.2");
+    // A zero-amplitude state component is not a component.
+    fails(&["run-action", &bell, "bell", "--state", "00=0,0"], "§14.2");
+    // An oracle is not an action, and unknown names fail loudly.
+    fails(
+        &["run-action", &fixture("inc8"), "inc8", "--mut", "0"],
+        "§5.3",
+    );
+    fails(&["run-action", &bell, "missing", "--mut", "0"], "§5.3");
+}

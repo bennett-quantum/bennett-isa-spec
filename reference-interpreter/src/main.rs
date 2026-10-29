@@ -6,7 +6,7 @@ use bennett_isa_ref::{
 };
 use std::collections::VecDeque;
 
-const USAGE:&str="bennett-isa-ref check <object>\nbennett-isa-ref hash <object>\nbennett-isa-ref run-oracle <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref step-check <object> <oracle> (--exhaustive [--max-bits N] | --suite | --samples N) [--seed a,b,c,d] [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref run-cc <object> <entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex]\nbennett-isa-ref reverse <object> <entry> [run-cc options] [--steps N]\nbennett-isa-ref reverse <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--steps N] [--mem name=hex] [--arg value]\nbennett-isa-ref reverse <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]>] [--adjoint]";
+const USAGE:&str="bennett-isa-ref check <object>\nbennett-isa-ref hash <object>\nbennett-isa-ref run-oracle <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref step-check <object> <oracle> (--exhaustive [--max-bits N] | --suite | --samples N) [--seed a,b,c,d] [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref run-cc <object> <entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex]\nbennett-isa-ref reverse <object> <entry> [run-cc options] [--steps N]\nbennett-isa-ref reverse <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--steps N] [--mem name=hex] [--arg value]\nbennett-isa-ref reverse <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]>] [--adjoint]\nbennett-isa-ref run-action <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]> | --arg value...] [--adjoint]";
 fn fail(message: impl std::fmt::Display) -> Error {
     Error(message.to_string())
 }
@@ -1450,6 +1450,41 @@ fn reverse(program: &Object, name: &str, args: &[String]) -> Result<Json> {
         ))),
     }
 }
+fn run_action(program: &Object, name: &str, options: ActionOptions) -> Result<Json> {
+    let f = program
+        .functions
+        .get(name)
+        .filter(|f| matches!(f.kind.as_str(), "action" | "perm_action"))
+        .ok_or_else(|| fail(format!("§5.3: unknown action @{name}")))?;
+    let mut run = build_action_state(program, f, &options)?;
+    program.execute_action(name, &mut run.state, &run.bindings, options.adjoint, &[])?;
+    let state = action_state_json(&run)?;
+    let mem = object(run.regions.iter().map(|(region, cells)| {
+        (
+            region.clone(),
+            Json::Array(
+                cells
+                    .iter()
+                    .map(|cell| {
+                        bundle_value(&run.state, cell)
+                            .as_ref()
+                            .map(vector_number)
+                            .unwrap_or(Json::Null)
+                    })
+                    .collect(),
+            ),
+        )
+    }));
+    Ok(object([
+        ("action".into(), string(name)),
+        ("adjoint".into(), Json::Bool(options.adjoint)),
+        ("in".into(), bundles_json(&run.state, &run.in_bundles)),
+        ("mem".into(), mem),
+        ("mut".into(), bundles_json(&run.state, &run.mut_bundles)),
+        ("state".into(), state),
+        ("wires".into(), number(run.interface_wires.len() as u128)),
+    ]))
+}
 fn main() {
     if let Err(e) = run() {
         eprintln!("{e}");
@@ -1473,6 +1508,7 @@ fn run() -> Result<()> {
         "step-check",
         "run-cc",
         "reverse",
+        "run-action",
     ]
     .contains(&command)
     {
@@ -1524,6 +1560,16 @@ fn run() -> Result<()> {
             ])
             .canonical()
         );
+        return Ok(());
+    }
+    if command == "run-action" {
+        let name = args
+            .get(2)
+            .ok_or_else(|| fail(USAGE))?
+            .trim_start_matches('@');
+        program.check_hashes()?;
+        let options = parse_action_options(&args, 3)?;
+        println!("{}", run_action(&program, name, options)?.canonical());
         return Ok(());
     }
     if command == "reverse" {
