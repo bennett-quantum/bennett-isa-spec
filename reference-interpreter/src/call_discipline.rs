@@ -2,7 +2,7 @@ use crate::{
     err,
     object::list,
     validation::{gate, gate_operands, normalize_call},
-    Function, Instruction, Object, Result, Type,
+    Error, Function, Instruction, Object, Result, Type,
 };
 use std::collections::{BTreeMap, BTreeSet};
 impl Object {
@@ -133,90 +133,222 @@ impl Object {
         }
         Ok(())
     }
+    /// §5.5 matched cleanup: each `lift.oracle_uncall` pairs with one
+    /// outstanding `lift.oracle_call` of identical operands (callee, token,
+    /// ins, tgt, fr, mem, args) on EVERY incoming path, with no intervening row
+    /// writing its ins, tgt or fr locations (other than XOR delivery of oracle
+    /// calls, which commute) or possibly writing a cell of a supplied region.
+    /// A forward dataflow over the row CFG: the outstanding multiset meets by
+    /// pointwise minimum, address constants (from lift.addr) by agreement.
     pub(crate) fn validate_matched_oracle_calls(&self, f: &Function) -> Result<()> {
+        if !f.instructions().any(|i| i.op == "lift.oracle_uncall") {
+            return Ok(());
+        }
         let mut rows = Vec::new();
         let mut labels = BTreeMap::new();
         for block in &f.blocks {
             labels.insert(block.name.clone(), rows.len());
             rows.extend(&block.instructions);
         }
-        let mut predecessors = vec![Vec::new(); rows.len()];
+        let label = |s: &str| -> Result<usize> {
+            labels
+                .get(s.trim_start_matches('^'))
+                .copied()
+                .ok_or_else(|| Error(format!("§3.6: unknown label {s}")))
+        };
+        let mut successors = Vec::new();
         for (k, row) in rows.iter().enumerate() {
-            let destinations: Vec<usize> = match row.op.as_str() {
-                "qjump" => vec![labels[row.operands[0].trim_start_matches('^')]],
-                "qbranch" => row.operands[1..]
-                    .iter()
-                    .map(|s| labels[s.trim_start_matches('^')])
-                    .collect(),
-                "qjumpr" => (0..rows.len()).collect(),
+            successors.push(match row.op.as_str() {
+                "qjump" => vec![label(&row.operands[0])?],
+                "qbranch" => vec![label(&row.operands[1])?, label(&row.operands[2])?],
+                "qjumpr" => labels.values().copied().collect(),
                 "fault" | "lift.ret" | "lift.retval" => Vec::new(),
-                _ => {
-                    if k + 1 < rows.len() {
-                        vec![k + 1]
-                    } else {
-                        Vec::new()
+                _ => vec![k + 1],
+            });
+        }
+        let regions = self.region_ranges(f)?;
+        let addresses = self.address_constants(f)?;
+        let stores_in_closure = |callee: &str| -> Result<bool> { self.closure_may_store(callee) };
+        #[derive(Clone, PartialEq, Eq)]
+        struct State {
+            outstanding: BTreeMap<String, u64>,
+            constants: BTreeMap<String, u128>,
+        }
+        let meet = |a: &State, b: &State| State {
+            outstanding: a
+                .outstanding
+                .iter()
+                .filter_map(|(k, n)| {
+                    let m = (*n).min(b.outstanding.get(k).copied().unwrap_or(0));
+                    (m > 0).then(|| (k.clone(), m))
+                })
+                .collect(),
+            constants: a
+                .constants
+                .iter()
+                .filter(|(k, v)| b.constants.get(*k) == Some(v))
+                .map(|(k, v)| (k.clone(), *v))
+                .collect(),
+        };
+        let transfer = |row: &Instruction, state: &State| -> Result<State> {
+            let mut next = state.clone();
+            let op = row.op.as_str();
+            let key = row.operands.join(" ");
+            let mut writes: BTreeSet<String> = row.lhs.iter().cloned().collect();
+            if op == "lift.perm_call" {
+                writes.extend(list(&row.operands[1])?);
+            }
+            // Cell writes: None = no cell written, Some(None) = unknown address.
+            let mut cells: Vec<Option<(u128, u128)>> = Vec::new();
+            if let Some(w) = op.strip_prefix("lift.store.i") {
+                let n = crate::object::host_count(w, "store width")? as u128 / 8;
+                cells.push(state.constants.get(&row.operands[0]).map(|c| (*c, n)));
+            }
+            if op == "lift.call" && stores_in_closure(row.operands[0].trim_start_matches('@'))? {
+                cells.push(None);
+            }
+            let mut mut_regions = BTreeSet::new();
+            if op == "lift.perm_call" {
+                let callee = self.declaration(row.operands[0].trim_start_matches('@'))?;
+                for (p, n) in callee.params[2].iter().zip(list(&row.operands[3])?) {
+                    if p.role.as_deref() == Some("mut") {
+                        mut_regions.insert(n);
                     }
                 }
-            };
-            for destination in destinations {
-                predecessors[destination].push(k);
+            }
+            next.outstanding.retain(|k, _| {
+                let o: Vec<&str> = k.split(' ').collect();
+                let ins = list(o[2]).unwrap_or_default();
+                let mem = list(o[5]).unwrap_or_default();
+                let touches = ins
+                    .iter()
+                    .chain([&o[3].to_string(), &o[4].to_string()])
+                    .any(|w| writes.contains(w));
+                let clobbers = mem.iter().any(|r| {
+                    mut_regions.contains(r)
+                        || cells.iter().any(|c| match (c, regions.get(r)) {
+                            (None, _) | (_, None) => true,
+                            (Some((p, n)), Some((base, size))) => {
+                                // [p, p+n) meets [base, base+size), computed without wrap.
+                                *p < base.saturating_add(*size) && *base < p.saturating_add(*n)
+                            }
+                        })
+                });
+                !(touches || clobbers)
+            });
+            for w in &writes {
+                next.constants.remove(w);
+            }
+            match op {
+                "lift.oracle_call" => *next.outstanding.entry(key).or_default() += 1,
+                "lift.oracle_uncall" => {
+                    if let Some(n) = next.outstanding.get_mut(&key) {
+                        *n -= 1;
+                        if *n == 0 {
+                            next.outstanding.remove(&key);
+                        }
+                    }
+                }
+                "lift.addr" => {
+                    if let Some(base) = addresses.get(row.operands[0].trim_start_matches('@')) {
+                        next.constants.insert(row.lhs[0].clone(), *base);
+                    }
+                }
+                _ => {}
+            }
+            Ok(next)
+        };
+        let mut entry: Vec<Option<State>> = vec![None; rows.len()];
+        entry[0] = Some(State {
+            outstanding: BTreeMap::new(),
+            constants: BTreeMap::new(),
+        });
+        let mut work = vec![0usize];
+        while let Some(k) = work.pop() {
+            let state = entry[k].clone().expect("queued rows have a state");
+            let out = transfer(rows[k], &state)?;
+            for &s in &successors[k] {
+                let merged = match &entry[s] {
+                    None => out.clone(),
+                    Some(prior) => meet(prior, &out),
+                };
+                if entry[s].as_ref() != Some(&merged) {
+                    entry[s] = Some(merged);
+                    work.push(s);
+                }
             }
         }
-        for (k, uncall) in rows
-            .iter()
-            .enumerate()
-            .filter(|(_, r)| r.op == "lift.oracle_uncall")
-        {
-            let ins = list(&uncall.operands[2])?;
-            let memory = list(&uncall.operands[5])?;
-            let mut work = predecessors[k].clone();
-            let mut seen = BTreeSet::new();
-            let mut found = false;
-            while let Some(point) = work.pop() {
-                if !seen.insert(point) {
-                    continue;
-                }
-                let row = rows[point];
-                if row.op == "lift.oracle_call" && row.operands == uncall.operands {
-                    found = true;
-                    continue;
-                }
-                if row.op == "lift.oracle_uncall" && row.operands == uncall.operands {
-                    return err(
-                        "§5.5",
-                        "oracle_uncall has already consumed its matching invocation",
-                    );
-                }
-                let mut writes = row.lhs.clone();
-                if matches!(row.op.as_str(), "lift.oracle_call" | "lift.oracle_uncall") {
-                    writes.extend([row.operands[3].clone(), row.operands[4].clone()]);
-                }
-                if row.op == "lift.perm_call" {
-                    writes.extend(list(&row.operands[1])?);
-                }
-                if writes.iter().any(|w| ins.contains(w)) {
-                    return err(
-                        "§5.5",
-                        "oracle_uncall input was written after the computing call",
-                    );
-                }
-                if !memory.is_empty()
-                    && (row.op.starts_with("lift.store.") || row.op == "lift.call")
-                {
-                    return err("§5.5", "oracle_uncall memory version may have advanced");
-                }
-                if point == 0 || predecessors[point].is_empty() {
-                    return err(
-                        "§5.5",
-                        "oracle_uncall lacks a matching invocation on an incoming path",
-                    );
-                }
-                work.extend(&predecessors[point]);
+        for (k, row) in rows.iter().enumerate() {
+            if row.op != "lift.oracle_uncall" {
+                continue;
             }
-            if !found {
-                return err("§5.5", "oracle_uncall lacks a matching invocation");
+            let Some(state) = &entry[k] else { continue };
+            if !state.outstanding.contains_key(&row.operands.join(" ")) {
+                return err(
+                    "§5.5",
+                    format!(
+                        "lift.oracle_uncall at line {} has no outstanding matching lift.oracle_call on every path with unchanged ins, tgt, fr and supplied cells",
+                        row.line
+                    ),
+                );
             }
         }
         Ok(())
+    }
+    /// Base and size of each mapped interface region of an oracle (§7.2).
+    fn region_ranges(&self, f: &Function) -> Result<BTreeMap<String, (u128, u128)>> {
+        let mut out = BTreeMap::new();
+        if f.kind != "oracle" || f.params[3].is_empty() {
+            return Ok(out);
+        }
+        let Some(layout) = self.section("layout") else {
+            return Ok(out);
+        };
+        let mapping = layout.get("interface_regions")?.get(&f.name)?;
+        for p in &f.params[3] {
+            let Type::Region(a, _) = p.ty else {
+                return err("§5.1", "mem slot requires region type");
+            };
+            let base = mapping.get(&p.name)?.get("base")?.uint()?;
+            let size = crate::oracle::power_of_two(a as u128).unwrap_or(u128::MAX);
+            out.insert(p.name.clone(), (base, size));
+        }
+        Ok(out)
+    }
+    /// lift.addr results known from the layout: globals and this oracle's regions.
+    fn address_constants(&self, f: &Function) -> Result<BTreeMap<String, u128>> {
+        let mut out: BTreeMap<String, u128> = self
+            .region_ranges(f)?
+            .into_iter()
+            .map(|(n, (base, _))| (n, base))
+            .collect();
+        if let Some(layout) = self.section("layout") {
+            for (n, g) in layout.get("globals")?.object()? {
+                out.insert(n.clone(), g.get("base")?.uint()?);
+            }
+        }
+        Ok(out)
+    }
+    /// Whether an lproc's transitive closure contains a lift.store.
+    fn closure_may_store(&self, root: &str) -> Result<bool> {
+        let mut pending = vec![root.to_string()];
+        let mut seen = BTreeSet::new();
+        while let Some(n) = pending.pop() {
+            if !seen.insert(n.clone()) {
+                continue;
+            }
+            let Some(f) = self.functions.get(&n) else {
+                return Ok(true); // unresolved import: may store
+            };
+            for i in f.instructions() {
+                if i.op.starts_with("lift.store.") {
+                    return Ok(true);
+                }
+                if i.op == "lift.call" {
+                    pending.push(i.operands[0].trim_start_matches('@').into());
+                }
+            }
+        }
+        Ok(false)
     }
 }

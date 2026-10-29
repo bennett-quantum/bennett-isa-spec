@@ -939,12 +939,15 @@ impl Object {
     }
     fn validate(&self) -> Result<()> {
         self.validate_symbols()?;
+        // Schemas and the region call graph first: later passes read callee
+        // bodies and must never index malformed operands (suite F).
+        self.validate_local_schemas()?;
+        self.validate_call_graph()?;
         for f in self.functions.values() {
             self.validate_function(f)?;
         }
         self.validate_layout()?;
         self.validate_metadata()?;
-        self.validate_call_graph()?;
         Ok(())
     }
     fn validate_symbols(&self) -> Result<()> {

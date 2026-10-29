@@ -53,3 +53,58 @@ pub fn rehash(text: &str) -> Object {
     lines[i] = Json::Object(symbols).canonical();
     Object::parse(&(lines.join("\n") + "\n")).unwrap()
 }
+/// An object with functions, data symbols (name, hex) and trailing sections
+/// (layout and later, each starting with "\nsection ..."). Hashes are zero;
+/// pass the text through `rehash` to obtain canonical identities.
+pub fn object_with_data(
+    functions: &[(&str, &str, &str)],
+    data: &[(&str, &str)],
+    tail: &str,
+) -> String {
+    let mut symbols = BTreeMap::new();
+    for (i, (name, signature, _)) in functions.iter().enumerate() {
+        let sig = json(signature);
+        symbols.insert(
+            i.to_string(),
+            Json::Object(BTreeMap::from([
+                ("name".into(), Json::String((*name).into())),
+                ("kind".into(), sig.get("kind").unwrap().clone()),
+                ("signature".into(), sig),
+                ("interface_hash".into(), Json::String("0".repeat(64))),
+            ])),
+        );
+    }
+    for (j, (name, hex)) in data.iter().enumerate() {
+        let sig = json(&format!(
+            r#"{{"abi":"0.8","kind":"data","size":{},"tier":"-"}}"#,
+            hex.len() / 2
+        ));
+        symbols.insert(
+            (functions.len() + j).to_string(),
+            Json::Object(BTreeMap::from([
+                ("name".into(), Json::String((*name).into())),
+                ("kind".into(), Json::String("data".into())),
+                ("signature".into(), sig),
+                ("interface_hash".into(), Json::String("0".repeat(64))),
+            ])),
+        );
+    }
+    let mut text = format!(
+        "bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=32\n\nsection symbols\n{}\n\nsection functions\n",
+        Json::Object(symbols).canonical()
+    );
+    for (_, _, body) in functions {
+        text.push_str(body.trim_end_matches('\n'));
+        text.push('\n');
+    }
+    if !data.is_empty() {
+        text.push_str("\nsection data\n");
+        for (name, hex) in data {
+            text.push_str(&format!("{name} {hex}\n"));
+        }
+    }
+    text.push_str(tail);
+    text
+}
+pub const ACTION_1_1: &str =
+    r#"{"abi":"0.8","args":[],"bounds":[],"in":[1],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;

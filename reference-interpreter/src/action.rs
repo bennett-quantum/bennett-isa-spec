@@ -255,12 +255,8 @@ impl Object {
                 .args
                 .get(&p.name)
                 .ok_or_else(|| Error("§5.1: missing action classical argument".into()))?;
-            match (&p.ty, arg) {
-                (Type::Token, Argument::Token(b)) => self.validate_budget(*b)?,
-                (Type::Int(w), Argument::Bits(n)) if *w == 128 || *n < 1u128 << w => {}
-                (Type::F64, Argument::Float(a)) if a.is_finite() => {}
-                _ => return err("§3.3", "action argument type mismatch"),
-            }
+            // §3.3 classical types, ptr included (ptr_width bits).
+            crate::oracle::check_argument(self, &p.ty, arg)?;
         }
         let mut env = Environment {
             bindings: bindings.clone(),

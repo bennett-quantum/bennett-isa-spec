@@ -399,6 +399,19 @@ impl<'a> ClassicalMachine<'a> {
         for n in (0..self.history.len()).rev() {
             self.undo_frame(n)?;
         }
+        // History traversal undoes each frame's effects; reversed frames and
+        // uncall markers are skipped (§7.4). Control is administrative, not an
+        // effect: whole-run reversal ends at the run's entry point, i.e. the
+        // control recorded before the first frame, even when that frame opened
+        // a segment cancelled by a later uncall (codex B09).
+        if let Some(first) = self.history.first() {
+            let entry = first.undo.clone();
+            self.state.control = entry.control;
+            self.state.next_id = entry.next_id;
+            self.state.fault = entry.fault;
+            self.state.finished = entry.finished;
+            self.state.pending = entry.pending;
+        }
         self.history.clear();
         self.segments.clear();
         if self.state != self.initial {

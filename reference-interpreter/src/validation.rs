@@ -7,6 +7,7 @@ use crate::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
+const UNDEFINED: &str = "§3.3: undefined classical operand";
 impl Object {
     pub(crate) fn validate_structured(
         &self,
@@ -656,380 +657,412 @@ impl Object {
                 }
             }
         }
-        for b in &f.blocks {
-            for (ordinal, i) in b.instructions.iter().enumerate() {
-                let op = i.op.as_str();
-                let a = &i.operands;
-                let arity = |n: usize, lhs: usize| -> Result<()> {
-                    if a.len() != n || i.lhs.len() != lhs {
-                        err("§4.8", format!("{op}: wrong arity"))
-                    } else {
-                        Ok(())
-                    }
-                };
-                let rd = |n: &str| -> Result<Type> {
-                    types
-                        .get(n)
-                        .cloned()
-                        .ok_or_else(|| Error(format!("§3.3: undefined classical operand {n}")))
-                };
-                let same = |x: &str, y: &str| -> Result<Type> {
-                    let t = rd(x)?;
-                    if t != rd(y)? {
-                        return err("§3.3", "classical operand types differ");
-                    }
-                    Ok(t)
-                };
-                if !i.bodies.is_empty() {
-                    return err(
-                        "§4.8",
-                        "classical instruction cannot have Q structured body",
-                    );
-                }
-                let term = matches!(op, "br" | "ret" | "trap");
-                if term != (ordinal + 1 == b.instructions.len()) {
-                    return err("§3.4", "classical block requires final br/ret/trap");
-                }
-                let mut result = None;
-                if let Some(t) = op.strip_prefix("const.") {
-                    arity(1, 1)?;
-                    let t = Type::parse(t)?;
-                    let Type::Int(n) = t else {
-                        return err("§4.8", "const requires an iN suffix");
-                    };
-                    crate::object::const_literal(&a[0], n as u64)?;
-                    result = Some(t);
-                } else if is_binop(op) || is_div(op) {
-                    arity(2, 1)?;
-                    let t = same(&a[0], &a[1])?;
-                    if !matches!(t, Type::Int(_)) {
-                        return err("§3.3", "binop requires integers");
-                    }
-                    result = Some(t);
-                } else if let Some(pred) = op.strip_prefix("icmp.") {
-                    arity(2, 1)?;
-                    if !["eq", "ne", "ult", "ule", "slt", "sle"].contains(&pred) {
-                        return err("§4.8", "unknown comparison");
-                    }
-                    same(&a[0], &a[1])?;
-                    result = Some(Type::Int(1));
-                } else if let Some((cast, suffix)) = op
-                    .split_once('.')
-                    .filter(|(c, _)| ["zext", "sext", "trunc", "ptrtoint", "load"].contains(c))
-                {
-                    arity(1, 1)?;
-                    // §4.8: every suffix of these opcodes is iN / iM.
-                    let t = Type::parse(suffix)?;
-                    if !matches!(t, Type::Int(_)) {
-                        return err("§4.8", format!("{op}: the result suffix must be iN"));
-                    }
-                    let to = t.width(self.ptr_width)?;
-                    let from = rd(&a[0])?;
-                    if cast == "load" || cast == "ptrtoint" {
-                        if from != Type::Ptr {
-                            return err("§3.3", "pointer operand required");
-                        }
-                        if cast == "load" && !to.is_multiple_of(8) {
-                            return err("§3.3", "load.iN requires N in {8, 16, ..., 128}");
-                        }
-                    } else {
-                        if !matches!(from, Type::Int(_)) {
-                            return err("§3.3", "zext/sext/trunc require an iN operand");
-                        }
-                        let w = from.width(self.ptr_width)?;
-                        if if cast == "trunc" { to >= w } else { to <= w } {
-                            return err("§3.3", "cast direction mismatch");
+        // Definitions are typed independently of block text order (codex B11):
+        // iterate until every instruction's operand types are known.
+        let mut pending: Vec<(usize, usize)> = f
+            .blocks
+            .iter()
+            .enumerate()
+            .flat_map(|(b, block)| (0..block.instructions.len()).map(move |i| (b, i)))
+            .collect();
+        loop {
+            let mut retry = Vec::new();
+            let mut first_error = None;
+            let before = pending.len();
+            for (b, ordinal) in pending {
+                let block = &f.blocks[b];
+                match self.classical_instruction(f, block, ordinal, types, labels) {
+                    Ok(defs) => {
+                        for (n, ty) in defs {
+                            if types.insert(n, ty).is_some() {
+                                return err("§3.3", "SSA definition reused");
+                            }
                         }
                     }
-                    result = Some(t);
-                } else {
-                    match op {
-                        "select" => {
-                            arity(3, 1)?;
-                            if rd(&a[0])? != Type::Int(1) {
-                                return err("§3.3", "select requires i1 condition");
-                            }
-                            result = Some(same(&a[1], &a[2])?);
-                        }
-                        "inttoptr" => {
-                            arity(1, 1)?;
-                            if !matches!(rd(&a[0])?, Type::Int(_)) {
-                                return err("§3.3", "inttoptr requires integer");
-                            }
-                            result = Some(Type::Ptr);
-                        }
-                        "alloc" => {
-                            arity(1, 1)?;
-                            if !matches!(rd(&a[0])?, Type::Int(_)) {
-                                return err("§3.3", "alloc requires integer length");
-                            }
-                            result = Some(Type::Ptr);
-                        }
-                        "free" => {
-                            arity(1, 0)?;
-                            if rd(&a[0])? != Type::Ptr {
-                                return err("§3.3", "free requires pointer");
-                            }
-                        }
-                        _ if op.starts_with("store.") => {
-                            arity(2, 0)?;
-                            let t = Type::parse(&op[6..])?;
-                            if !matches!(t, Type::Int(_)) {
-                                return err("§4.8", "store requires an iN suffix");
-                            }
-                            if !t.width(self.ptr_width)?.is_multiple_of(8)
-                                || rd(&a[0])? != Type::Ptr
-                                || rd(&a[1])? != t
-                            {
-                                return err("§3.3", "store operand type mismatch");
-                            }
-                        }
-                        "br" => {
-                            if !i.lhs.is_empty() || !matches!(a.len(), 1 | 3) {
-                                return err("§4.8", "br operand count");
-                            }
-                            if a.len() == 3 && rd(&a[0])? != Type::Int(1) {
-                                return err("§3.3", "br predicate must be i1");
-                            }
-                            for branch in if a.len() == 1 { &a[..] } else { &a[1..] } {
-                                let label = branch
-                                    .strip_prefix('^')
-                                    .ok_or_else(|| Error("§4.8: br target must be label".into()))?;
-                                let (label, args) = label.split_once('(').ok_or_else(|| {
-                                    Error("§4.8: br target needs argument list".into())
-                                })?;
-                                if !labels.iter().any(|l| l.as_str() == label) {
-                                    return err("§3.4", "unknown branch label");
-                                }
-                                let vs = list(&format!("({args}"))?;
-                                let block = f
-                                    .blocks
-                                    .iter()
-                                    .find(|b| b.name == label)
-                                    .expect("label checked");
-                                if vs.len() != block.params.len() {
-                                    return err("§3.3", "branch argument count mismatch");
-                                }
-                                for (v, p) in vs.iter().zip(&block.params) {
-                                    if rd(v)? != p.ty {
-                                        return err("§3.3", "branch parameter type mismatch");
-                                    }
-                                }
-                            }
-                        }
-                        "ret" => {
-                            if !i.lhs.is_empty() || a.len() != f.params[1].len() {
-                                return err("§4.8", "return arity mismatch");
-                            }
-                            for (v, p) in a.iter().zip(&f.params[1]) {
-                                if rd(v)? != p.ty {
-                                    return err("§3.3", "return type mismatch");
-                                }
-                            }
-                        }
-                        "trap" => arity(0, 0)?,
-                        "call" | "uncall" => {
-                            if a.is_empty() {
-                                return err("§4.8", "missing callee");
-                            }
-                            let callee = self
-                                .declaration(a[0].strip_prefix('@').ok_or_else(|| {
-                                    Error("§4.8: call requires @symbol".into())
-                                })?)?;
-                            if !matches!(callee.kind.as_str(), "cc" | "r")
-                                || op == "uncall" && callee.kind != "r"
-                            {
-                                return err("§4.8", "classical call tier mismatch");
-                            }
-                            // §4.1 prints `results = call @f args` (bare operands) and
-                            // `uncall @f (args) (results)`; one spelling each (SPEC-QUESTIONS 18).
-                            let vs = if op == "uncall" {
-                                arity(3, 0)?;
-                                list(&a[1])?
-                            } else {
-                                if a[1..].iter().any(|v| !name(v)) {
-                                    return err(
-                                        "§16.2",
-                                        "call arguments are bare names: results = call @f a b",
-                                    );
-                                }
-                                a[1..].to_vec()
-                            };
-                            if vs.len() != callee.params[0].len() {
-                                return err("§3.3", "call argument count");
-                            }
-                            for (v, p) in vs.iter().zip(&callee.params[0]) {
-                                if rd(v)? != p.ty {
-                                    return err("§3.3", "call argument type");
-                                }
-                            }
-                            if op == "call" {
-                                if i.lhs.len() != callee.params[1].len() {
-                                    return err("§3.3", "call result count");
-                                }
-                                for (n, p) in i.lhs.iter().zip(&callee.params[1]) {
-                                    if types.insert(n.clone(), p.ty.clone()).is_some() {
-                                        return err("§3.3", "SSA name defined twice");
-                                    }
-                                }
-                            } else {
-                                let rs = list(&a[2])?;
-                                if rs.len() != callee.params[1].len() {
-                                    return err("§3.3", "uncall result count");
-                                }
-                                for (v, p) in rs.iter().zip(&callee.params[1]) {
-                                    if rd(v)? != p.ty {
-                                        return err("§3.3", "uncall result type");
-                                    }
-                                }
-                            }
-                        }
-                        "effect" => {
-                            if f.kind != "r" {
-                                return err("§4.8", "effect is R only");
-                            }
-                            if !i.lhs.is_empty() || a.is_empty() {
-                                return err("§4.8", "effect schema");
-                            }
-                            for n in &a[1..] {
-                                rd(n)?;
-                            }
-                        }
-                        "hostcall" => {
-                            arity(3, 1)?;
-                            if f.kind != "cc"
-                                || rd(&a[1])? != Type::Ptr
-                                || !matches!(rd(&a[2])?, Type::Int(_))
-                            {
-                                return err("§4.8", "hostcall tier/type mismatch");
-                            }
-                            let service = self
-                                .section("devices")
-                                .and_then(|d| d.get("services").ok())
-                                .and_then(|s| s.object().ok());
-                            let service_name = crate::object::literal_name(&a[0])?;
-                            if service.is_none_or(|s| !s.contains_key(&service_name)) {
-                                return err("§10", "hostcall service undeclared");
-                            }
-                            result = Some(Type::Int(self.ptr_width));
-                        }
-                        "qreg.new" => {
-                            arity(2, 1)?;
-                            if f.kind != "cc" {
-                                return err("§4.8", "qreg instructions are CC only");
-                            }
-                            crate::object::literal_name(&a[0])?;
-                            let n = crate::object::host_count(&a[1], "qreg size")?;
-                            if n == 0 {
-                                return err("§3.3", "qreg size must be positive");
-                            }
-                            result = Some(Type::Qreg(n));
-                        }
-                        "qreg.free" => {
-                            arity(1, 0)?;
-                            if f.kind != "cc" || !matches!(rd(&a[0])?, Type::Qreg(_)) {
-                                return err("§3.3", "qreg.free operand/tier");
-                            }
-                        }
-                        "qreg.slice" => {
-                            arity(3, 1)?;
-                            let Type::Qreg(n) = rd(&a[0])? else {
-                                return err("§3.3", "slice needs qreg");
-                            };
-                            let lo = crate::object::host_count(&a[1], "slice offset")?;
-                            let len = crate::object::host_count(&a[2], "slice length")?;
-                            if f.kind != "cc" || lo.checked_add(len).is_none_or(|end| end > n) {
-                                return err("§3.3", "invalid slice");
-                            }
-                            result = Some(Type::Qreg(len));
-                        }
-                        "qreg.concat" => {
-                            arity(2, 1)?;
-                            let (Type::Qreg(n), Type::Qreg(m)) = (rd(&a[0])?, rd(&a[1])?) else {
-                                return err("§3.3", "concat needs qregs");
-                            };
-                            if f.kind != "cc" || a[0] == a[1] {
-                                return err("§3.3", "concat tier/alias");
-                            }
-                            result = Some(Type::Qreg(
-                                n.checked_add(m)
-                                    .ok_or_else(|| Error("§3.3: qreg size overflow".into()))?,
-                            ));
-                        }
-                        "measure" => {
-                            arity(1, 1)?;
-                            let Type::Qreg(n) = rd(&a[0])? else {
-                                return err("§3.3", "measure needs qreg");
-                            };
-                            if f.kind != "cc" || n == 0 || n > 128 {
-                                return err("§3.3", "measure tier/width");
-                            }
-                            result = Some(Type::Int(n as u16));
-                        }
-                        "oracle_call" | "action_call" | "adj" | "ctl" => {
-                            let call = normalize_call(i)?;
-                            self.validate_region_call(f, &call.instruction, types)?;
-                        }
-                        _ => return err("§4.8", format!("unknown classical opcode {op}")),
+                    Err(e) if e.0.starts_with(UNDEFINED) => {
+                        first_error.get_or_insert(e);
+                        retry.push((b, ordinal));
                     }
-                }
-                if let Some(ty) = result {
-                    if types.insert(i.lhs[0].clone(), ty).is_some() {
-                        return err("§3.3", "SSA definition reused");
-                    }
+                    Err(e) => return Err(e),
                 }
             }
+            if retry.is_empty() {
+                break;
+            }
+            if retry.len() == before {
+                return Err(first_error.expect("retry records its error"));
+            }
+            pending = retry;
         }
         self.validate_handle_views(f, types)
     }
-    pub(crate) fn validate_call_graph(&self) -> Result<()> {
-        fn calls<'a>(i: &'a Instruction, output: &mut Vec<&'a str>) {
-            if let Ok(c) = normalize_call(i) {
-                if matches!(c.instruction.op.as_str(), "action_call" | "oracle_call") {
-                    if let Some(n) = i.operands.iter().find_map(|s| s.strip_prefix('@')) {
-                        output.push(n);
+    /// The §4.1/§4.8 schema of one classical instruction; returns its definitions.
+    fn classical_instruction(
+        &self,
+        f: &Function,
+        b: &crate::Block,
+        ordinal: usize,
+        types: &BTreeMap<String, Type>,
+        labels: &BTreeSet<&String>,
+    ) -> Result<Vec<(String, Type)>> {
+        let i = &b.instructions[ordinal];
+        let mut defs = Vec::new();
+        let op = i.op.as_str();
+        let a = &i.operands;
+        let arity = |n: usize, lhs: usize| -> Result<()> {
+            if a.len() != n || i.lhs.len() != lhs {
+                err("§4.8", format!("{op}: wrong arity"))
+            } else {
+                Ok(())
+            }
+        };
+        let rd = |n: &str| -> Result<Type> {
+            types
+                .get(n)
+                .cloned()
+                .ok_or_else(|| Error(format!("§3.3: undefined classical operand {n}")))
+        };
+        let same = |x: &str, y: &str| -> Result<Type> {
+            let t = rd(x)?;
+            if t != rd(y)? {
+                return err("§3.3", "classical operand types differ");
+            }
+            Ok(t)
+        };
+        if !i.bodies.is_empty() {
+            return err(
+                "§4.8",
+                "classical instruction cannot have Q structured body",
+            );
+        }
+        let term = matches!(op, "br" | "ret" | "trap");
+        if term != (ordinal + 1 == b.instructions.len()) {
+            return err("§3.4", "classical block requires final br/ret/trap");
+        }
+        let mut result = None;
+        if let Some(t) = op.strip_prefix("const.") {
+            arity(1, 1)?;
+            let t = Type::parse(t)?;
+            let Type::Int(n) = t else {
+                return err("§4.8", "const requires an iN suffix");
+            };
+            crate::object::const_literal(&a[0], n as u64)?;
+            result = Some(t);
+        } else if is_binop(op) || is_div(op) {
+            arity(2, 1)?;
+            let t = same(&a[0], &a[1])?;
+            if !matches!(t, Type::Int(_)) {
+                return err("§3.3", "binop requires integers");
+            }
+            result = Some(t);
+        } else if let Some(pred) = op.strip_prefix("icmp.") {
+            arity(2, 1)?;
+            if !["eq", "ne", "ult", "ule", "slt", "sle"].contains(&pred) {
+                return err("§4.8", "unknown comparison");
+            }
+            same(&a[0], &a[1])?;
+            result = Some(Type::Int(1));
+        } else if let Some((cast, suffix)) = op
+            .split_once('.')
+            .filter(|(c, _)| ["zext", "sext", "trunc", "ptrtoint", "load"].contains(c))
+        {
+            arity(1, 1)?;
+            // §4.8: every suffix of these opcodes is iN / iM.
+            let t = Type::parse(suffix)?;
+            if !matches!(t, Type::Int(_)) {
+                return err("§4.8", format!("{op}: the result suffix must be iN"));
+            }
+            let to = t.width(self.ptr_width)?;
+            let from = rd(&a[0])?;
+            if cast == "load" || cast == "ptrtoint" {
+                if from != Type::Ptr {
+                    return err("§3.3", "pointer operand required");
+                }
+                if cast == "load" && !to.is_multiple_of(8) {
+                    return err("§3.3", "load.iN requires N in {8, 16, ..., 128}");
+                }
+            } else {
+                if !matches!(from, Type::Int(_)) {
+                    return err("§3.3", "zext/sext/trunc require an iN operand");
+                }
+                let w = from.width(self.ptr_width)?;
+                if if cast == "trunc" { to >= w } else { to <= w } {
+                    return err("§3.3", "cast direction mismatch");
+                }
+            }
+            result = Some(t);
+        } else {
+            match op {
+                "select" => {
+                    arity(3, 1)?;
+                    if rd(&a[0])? != Type::Int(1) {
+                        return err("§3.3", "select requires i1 condition");
+                    }
+                    result = Some(same(&a[1], &a[2])?);
+                }
+                "inttoptr" => {
+                    arity(1, 1)?;
+                    if !matches!(rd(&a[0])?, Type::Int(_)) {
+                        return err("§3.3", "inttoptr requires integer");
+                    }
+                    result = Some(Type::Ptr);
+                }
+                "alloc" => {
+                    arity(1, 1)?;
+                    if !matches!(rd(&a[0])?, Type::Int(_)) {
+                        return err("§3.3", "alloc requires integer length");
+                    }
+                    result = Some(Type::Ptr);
+                }
+                "free" => {
+                    arity(1, 0)?;
+                    if rd(&a[0])? != Type::Ptr {
+                        return err("§3.3", "free requires pointer");
                     }
                 }
-            }
-            for body in &i.bodies {
-                for child in body {
-                    calls(child, output);
+                _ if op.starts_with("store.") => {
+                    arity(2, 0)?;
+                    let t = Type::parse(&op[6..])?;
+                    if !matches!(t, Type::Int(_)) {
+                        return err("§4.8", "store requires an iN suffix");
+                    }
+                    if !t.width(self.ptr_width)?.is_multiple_of(8)
+                        || rd(&a[0])? != Type::Ptr
+                        || rd(&a[1])? != t
+                    {
+                        return err("§3.3", "store operand type mismatch");
+                    }
                 }
+                "br" => {
+                    if !i.lhs.is_empty() || !matches!(a.len(), 1 | 3) {
+                        return err("§4.8", "br operand count");
+                    }
+                    if a.len() == 3 && rd(&a[0])? != Type::Int(1) {
+                        return err("§3.3", "br predicate must be i1");
+                    }
+                    for branch in if a.len() == 1 { &a[..] } else { &a[1..] } {
+                        let label = branch
+                            .strip_prefix('^')
+                            .ok_or_else(|| Error("§4.8: br target must be label".into()))?;
+                        let (label, args) = label
+                            .split_once('(')
+                            .ok_or_else(|| Error("§4.8: br target needs argument list".into()))?;
+                        if !labels.iter().any(|l| l.as_str() == label) {
+                            return err("§3.4", "unknown branch label");
+                        }
+                        let vs = list(&format!("({args}"))?;
+                        let block = f
+                            .blocks
+                            .iter()
+                            .find(|b| b.name == label)
+                            .expect("label checked");
+                        if vs.len() != block.params.len() {
+                            return err("§3.3", "branch argument count mismatch");
+                        }
+                        for (v, p) in vs.iter().zip(&block.params) {
+                            if rd(v)? != p.ty {
+                                return err("§3.3", "branch parameter type mismatch");
+                            }
+                        }
+                    }
+                }
+                "ret" => {
+                    if !i.lhs.is_empty() || a.len() != f.params[1].len() {
+                        return err("§4.8", "return arity mismatch");
+                    }
+                    for (v, p) in a.iter().zip(&f.params[1]) {
+                        if rd(v)? != p.ty {
+                            return err("§3.3", "return type mismatch");
+                        }
+                    }
+                }
+                "trap" => arity(0, 0)?,
+                "call" | "uncall" => {
+                    if a.is_empty() {
+                        return err("§4.8", "missing callee");
+                    }
+                    let callee = self.declaration(
+                        a[0].strip_prefix('@')
+                            .ok_or_else(|| Error("§4.8: call requires @symbol".into()))?,
+                    )?;
+                    // §3.1: CC calls CC or R functions, R calls R functions
+                    // (SPEC-QUESTIONS 19); uncall follows the same graph.
+                    if !matches!(callee.kind.as_str(), "cc" | "r") {
+                        return err("§4.8", "call/uncall requires a CC or R function");
+                    }
+                    if f.kind == "r" && callee.kind != "r" {
+                        return err("§3.1", "an R function calls only R functions and Q regions");
+                    }
+                    // §4.1 prints `results = call @f args` (bare operands) and
+                    // `uncall @f (args) (results)`; one spelling each (SPEC-QUESTIONS 18).
+                    let vs = if op == "uncall" {
+                        arity(3, 0)?;
+                        list(&a[1])?
+                    } else {
+                        if a[1..].iter().any(|v| !name(v)) {
+                            return err(
+                                "§16.2",
+                                "call arguments are bare names: results = call @f a b",
+                            );
+                        }
+                        a[1..].to_vec()
+                    };
+                    if vs.len() != callee.params[0].len() {
+                        return err("§3.3", "call argument count");
+                    }
+                    for (v, p) in vs.iter().zip(&callee.params[0]) {
+                        if rd(v)? != p.ty {
+                            return err("§3.3", "call argument type");
+                        }
+                    }
+                    if op == "call" {
+                        if i.lhs.len() != callee.params[1].len() {
+                            return err("§3.3", "call result count");
+                        }
+                        for (n, p) in i.lhs.iter().zip(&callee.params[1]) {
+                            defs.push((n.clone(), p.ty.clone()));
+                        }
+                    } else {
+                        let rs = list(&a[2])?;
+                        if rs.len() != callee.params[1].len() {
+                            return err("§3.3", "uncall result count");
+                        }
+                        for (v, p) in rs.iter().zip(&callee.params[1]) {
+                            if rd(v)? != p.ty {
+                                return err("§3.3", "uncall result type");
+                            }
+                        }
+                    }
+                }
+                "effect" => {
+                    if f.kind != "r" {
+                        return err("§4.8", "effect is R only");
+                    }
+                    if !i.lhs.is_empty() || a.is_empty() {
+                        return err("§4.8", "effect schema");
+                    }
+                    let operands = a[1..].iter().map(|n| rd(n)).collect::<Result<Vec<_>>>()?;
+                    self.validate_effect(&a[0], &operands)?;
+                }
+                "hostcall" => {
+                    arity(3, 1)?;
+                    if f.kind != "cc"
+                        || rd(&a[1])? != Type::Ptr
+                        || !matches!(rd(&a[2])?, Type::Int(_))
+                    {
+                        return err("§4.8", "hostcall tier/type mismatch");
+                    }
+                    let service = self
+                        .section("devices")
+                        .and_then(|d| d.get("services").ok())
+                        .and_then(|s| s.object().ok());
+                    let service_name = crate::object::literal_name(&a[0])?;
+                    if service.is_none_or(|s| !s.contains_key(&service_name)) {
+                        return err("§10", "hostcall service undeclared");
+                    }
+                    result = Some(Type::Int(self.ptr_width));
+                }
+                "qreg.new" => {
+                    arity(2, 1)?;
+                    if f.kind != "cc" {
+                        return err("§4.8", "qreg instructions are CC only");
+                    }
+                    crate::object::literal_name(&a[0])?;
+                    let n = crate::object::host_count(&a[1], "qreg size")?;
+                    if n == 0 {
+                        return err("§3.3", "qreg size must be positive");
+                    }
+                    result = Some(Type::Qreg(n));
+                }
+                "qreg.free" => {
+                    arity(1, 0)?;
+                    if f.kind != "cc" || !matches!(rd(&a[0])?, Type::Qreg(_)) {
+                        return err("§3.3", "qreg.free operand/tier");
+                    }
+                }
+                "qreg.slice" => {
+                    arity(3, 1)?;
+                    let Type::Qreg(n) = rd(&a[0])? else {
+                        return err("§3.3", "slice needs qreg");
+                    };
+                    let lo = crate::object::host_count(&a[1], "slice offset")?;
+                    let len = crate::object::host_count(&a[2], "slice length")?;
+                    if f.kind != "cc" || lo.checked_add(len).is_none_or(|end| end > n) {
+                        return err("§3.3", "invalid slice");
+                    }
+                    result = Some(Type::Qreg(len));
+                }
+                "qreg.concat" => {
+                    arity(2, 1)?;
+                    let (Type::Qreg(n), Type::Qreg(m)) = (rd(&a[0])?, rd(&a[1])?) else {
+                        return err("§3.3", "concat needs qregs");
+                    };
+                    if f.kind != "cc" || a[0] == a[1] {
+                        return err("§3.3", "concat tier/alias");
+                    }
+                    result = Some(Type::Qreg(
+                        n.checked_add(m)
+                            .ok_or_else(|| Error("§3.3: qreg size overflow".into()))?,
+                    ));
+                }
+                "measure" => {
+                    arity(1, 1)?;
+                    let Type::Qreg(n) = rd(&a[0])? else {
+                        return err("§3.3", "measure needs qreg");
+                    };
+                    if f.kind != "cc" || n == 0 || n > 128 {
+                        return err("§3.3", "measure tier/width");
+                    }
+                    result = Some(Type::Int(n as u16));
+                }
+                "oracle_call" | "action_call" | "adj" | "ctl" => {
+                    let call = normalize_call(i)?;
+                    self.validate_region_call(f, &call.instruction, types)?;
+                }
+                _ => return err("§4.8", format!("unknown classical opcode {op}")),
             }
         }
-        fn visit(
-            obj: &Object,
-            n: &str,
-            active: &mut BTreeSet<String>,
-            done: &mut BTreeSet<String>,
-        ) -> Result<()> {
-            if done.contains(n) {
-                return Ok(());
-            }
-            if !active.insert(n.into()) {
-                return err("§5.1", "recursive region call graph");
-            }
-            let f = &obj.functions[n];
-            let mut children = Vec::new();
-            for i in f.instructions() {
-                calls(i, &mut children);
-            }
-            for child in children {
-                if obj.functions.contains_key(child) {
-                    visit(obj, child, active, done)?;
-                }
-            }
-            active.remove(n);
-            done.insert(n.into());
-            Ok(())
+        if let Some(ty) = result {
+            defs.push((i.lhs[0].clone(), ty));
         }
-        let mut done = BTreeSet::new();
-        for f in self
-            .functions
-            .values()
-            .filter(|f| matches!(f.kind.as_str(), "action" | "perm_action" | "oracle"))
-        {
-            visit(self, &f.name, &mut BTreeSet::new(), &mut done)?;
+        Ok(defs)
+    }
+    /// §7.3 device operation table; an unmodelled device is legal text whose
+    /// execution faults FAULT_EFFECT_UNMODELLED (§17 item 3).
+    fn validate_effect(&self, operation: &str, operands: &[Type]) -> Result<()> {
+        let (device, op) = operation
+            .split_once('.')
+            .ok_or_else(|| Error("§7.3: effect names dev.op".into()))?;
+        let int = |t: &Type| matches!(t, Type::Int(_));
+        let ptr = |t: &Type| *t == Type::Ptr;
+        let shape: &[fn(&Type) -> bool] = match (device, op) {
+            ("console", "write") | ("entropy", "read") => &[ptr, int],
+            ("clock", "read") => &[ptr],
+            ("block", "read" | "write") => &[int, ptr],
+            ("console" | "clock" | "entropy" | "block", _) => {
+                return err("§7.3", format!("device {device} has no operation {op}"))
+            }
+            _ => return Ok(()),
+        };
+        if operands.len() != shape.len() || !shape.iter().zip(operands).all(|(ok, t)| ok(t)) {
+            return err(
+                "§7.3",
+                format!(
+                    "{device}.{op} takes {} ptr/len operands of the §7.3 table",
+                    shape.len()
+                ),
+            );
+        }
+        let declared = self
+            .section("devices")
+            .and_then(|d| d.get("models").ok())
+            .and_then(|m| m.object().ok())
+            .is_some_and(|m| m.contains_key(device));
+        if !declared {
+            return err(
+                "§7.3",
+                format!("device model {device} is used but not declared"),
+            );
         }
         Ok(())
     }

@@ -15,6 +15,7 @@ mod object;
 mod oracle;
 mod quantum;
 mod registers;
+mod schema;
 mod sha256;
 mod validation;
 pub use bits::BitVector;

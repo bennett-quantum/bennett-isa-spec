@@ -158,27 +158,7 @@ fn mutual_scc_hashing_and_canonical_lproc_member_order() {
 
 #[test]
 fn every_committed_fixture_has_valid_identity() {
-    for name in [
-        "inc8",
-        "sum_db",
-        "arithmetic",
-        "heap",
-        "nested",
-        "classical",
-        "actions",
-        "mutual",
-        "registers",
-        "tiny_memory",
-        "control_flow",
-        "wide",
-    ] {
-        let path = format!("{}/tests/fixtures/{name}.bisa", env!("CARGO_MANIFEST_DIR"));
-        let text = std::fs::read_to_string(path).unwrap();
-        Object::parse(&text)
-            .unwrap()
-            .check_hashes()
-            .unwrap_or_else(|e| panic!("{name}: {e}"));
-    }
+    // The complete fixture audit is tests/r1_fixtures.rs (directory enumeration).
     // Independently hand-assembled device/layout envelope, checked by Python hashlib.
     let o = Object::parse(include_str!("fixtures/classical.bisa")).unwrap();
     assert_eq!(
