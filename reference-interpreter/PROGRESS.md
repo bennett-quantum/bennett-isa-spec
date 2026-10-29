@@ -32,7 +32,46 @@ completion and control/read-only-input overlap remains legal. Both main
 witnesses were RED; replaying the five library pins against pre-fix source
 found oracle aliases had silently completed as well. GREEN: 11 register +
 29 CLI tests; full normal suite **223 passed, 0 failed, 5 ignored**.
-Final exhaustive/conformance gates follow.
+Blocker commits: **40ef8ce** (B01), **09fe805** (B02).
+
+### Final round-4 first-pass verification
+
+All cargo commands used the absolute manifest path
+`/home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/Cargo.toml`.
+All verification ran with DISPLAY, WAYLAND_DISPLAY, DBUS_SESSION_BUS_ADDRESS,
+and BROWSER unset and
+TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/.tmp.
+Logs are retained in ignored `.tmp/r4-{tests,ignored,clippy,conformance}.log`.
+
+After rebuilding the binary offline, ran the exact standalone harness command
+from conformance/PROGRESS.md, with absolute conformance manifest and `--bin`
+paths. `CARGO_TARGET_DIR` kept build artifacts under the interpreter's ignored
+`.tmp/conformance-target`; conformance/include sources remained read-only.
+Result: **445 pass, 0 fail, 45 unavailable / 490**, exit **2** for existing
+staged capabilities, unchanged from the reviewed baseline.
+
+Then `cargo test --offline` passed **223 tests, 0 failed, 5 ignored**
+(222 integration + 1 unit; 0 doctests; 2.53 s summed runner time).
+`cargo clippy --offline --all-targets -- -D warnings` and
+`cargo fmt -- --check` pass. Unchanged Python seed check passes and its diff
+against 8e11fe7 is empty. README documents lifetime boundaries and dynamic
+alias fault reporting. No dependencies added; no pushes.
+
+`cargo test --offline -- --ignored --nocapture`: **5 passed, 0 failed**.
+All original random seeds are unchanged; the loop-lifetime family is separate.
+
+| Ignored sweep | Cases | Runner time |
+|---|---|---|
+| u8 division/remainder | 65,536 operand pairs × 4 operations = 262,144 oracle executions | 2.22 s |
+| 17-wire borrow execution | 2^17 basis entries | 15.45 s |
+| checked borrow-frame certificate | 2^18 claim elements, both programs | 64.53 s |
+| extended §6 differential | 200,000 programs: **64,717 accepted, all clean**, 135,283 rejected | 200.70 s |
+| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 10.29 s |
+
+Both received codex blockers are resolved with individual commits. The editor
+response stays appendable for the pending sol/muse second pass. Only
+reference-interpreter paths were committed, with bd comments for tracking.
+
 No new ambiguity, decline, spec edit or narrowed capability. Bead b-isa-spec-zq2.
 
 ## Council round 3, codex second pass (2026-10-29)

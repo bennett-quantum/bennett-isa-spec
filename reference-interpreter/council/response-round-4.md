@@ -74,4 +74,26 @@ passed, 0 failed, 5 ignored**. No SPEC-QUESTIONS entry: §§3.3, 4.7 and 7.4
 explicitly prescribe physical disjointness, the trap and prefix reversal.
 
 Both received blockers are resolved; no declines or partials. This response
-remains appendable for sol/muse. Final exhaustive/conformance gates follow.
+remains appendable for sol/muse.
+
+## Final verification of this received pass
+
+Blocker commits: **40ef8ce** (R4-B01), **09fe805** (R4-B02). Rebuilt offline,
+then ran the exact standalone conformance harness from conformance/PROGRESS.md
+against the absolute reference binary: **445 pass, 0 fail, 45 unavailable /
+490**, exit **2** for the previously disclosed deliverables 8–11. Conformance
+and headers were read-only; build artifacts went into the interpreter's `.tmp`.
+
+Final normal suite: **223 passed, 0 failed, 5 ignored**. All ignored tests:
+**5 passed, 0 failed** (u8 division/remainder, 2^17 borrow basis entries,
+2^18 certificate elements, 200,000 generated discipline programs, all prefixes
+for 256 recursive inputs). The discipline sweep reports **64,717 accepted,
+all exactly clean / 135,283 rejected**; the new 32-case lifetime family runs
+separately in the normal suite. PROGRESS.md records runner timings.
+
+Strict all-target Clippy, formatting check, unchanged Python seed check and
+diff check pass. Every verification command used absolute manifest paths,
+DISPLAY/WAYLAND_DISPLAY/DBUS_SESSION_BUS_ADDRESS/BROWSER unset, and
+TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/.tmp.
+No dependencies, spec edits, seed changes, declines or pushes. README retains
+the failed-result promise and documents lifetime and dynamic-alias semantics.

@@ -115,7 +115,9 @@ for `run-program`), `results`, `fault`, `faults`, `tape`,
 their previous and new current values, null when absent) and `memory` (each
 `{"address","pre","post"}`, every changed byte). A hostcall record includes
 its reply's deltas. A fault or trap is a `FAILED` result with no values,
-not a diagnostic.
+not a diagnostic. This includes runtime region-interface and control/target
+aliases created through dynamic SSA: the call records fault 4 before changing
+quantum state or consuming a handle. Controls may share read-only inputs.
 
 `reverse <object> <symbol> [options]` runs forward, then reverses, and
 reports whether the complete entry state is restored byte for byte:
@@ -307,7 +309,11 @@ its adjoint reverses the complete expansion, including unconditional lifetimes
 retain token and effective-control versions. Exchanges retain the dependency
 union and other provenance on all outputs, and their inverse histories cancel
 jointly. Borrow proofs distinguish the complete classical argument and token
-bindings through inlined calls. Matched lifted oracle calls preserve all tuple
+bindings through inlined calls. Borrow/return lifetime boundaries survive loop
+composition and adjoints: each return proves restoration and independence before
+repetitions compose. A borrow spanning a loop may be restored by the whole loop;
+a later borrowing cannot restore an earlier completed lifetime.
+Matched lifted oracle calls preserve all tuple
 boundaries and account for every possible numeric `qjumpr` destination.
 
 Integer comparisons require integer or pointer operands; lifted memory width
