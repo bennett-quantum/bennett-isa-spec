@@ -366,3 +366,41 @@ The bead's "polylog time" is not adopted. Decision: §17 item 18, default full h
   7 (all x, y, a, both controls, adjoint, B = 2 failure), 8 (byte trace and reversal) and 9 (B = 0..5): PASS.
 - Cross-reference check: every § reference resolves except DL §17.6 / §25 (dialect sections, labelled DL);
   §17 items 1–18 exist and every "§17 item n" reference resolves.
+
+## Hostile review (independent reviewer agent, read-only, rubric-isa) and fixes
+
+The reviewer re-derived every stated result of examples 1, 3–9, the suite D vector, the E8 margin algebra, the
+idle-step variant, the counter widths and the lift.free match: all correct. It found 9 S0 and 13 S1 issues; each
+was checked against the text and all were accepted:
+
+- S0-1 qjumpr into a block's interior vs the kept "any other index faults" → E17.16 (range check only; interior
+  rows reachable; re-indexing preserves reachable rows).
+- S0-2 "ill-formed where suite F decides it" was circular → E11 now states the exact static rule.
+- S0-3 inverse-pair coverage only by exhaustive claims was a narrowing (NS §3.1 promises library certificates;
+  Int64 `x += a` would need ~2^128 runs) → K4 admits `inverse_pair_library` claims (no args domain = all values),
+  sampled never covers.
+- S0-4 monotonicity ignored nested lift.oracle_call (a nested outcome can change with its own budget) → entries
+  carry exact `arg_tokens` tuples; the note now says nested rows use their own tokens.
+- S0-5 orientation: adjoint `qinplace @ginv @g` would not match an entry {g, ginv} → an entry covers both.
+- S0-6 minted tuples vs the single schedule line → invocations whose bindings match run the schedule, others the
+  §11 defaults; tokens encoded in params_hash as their tuples (this also closes the same gap for host tokens).
+- S0-7 effect memory operand out of range had no code → 7.
+- S0-8 T4's quantum-state clause false for ε > 0 adjoints → exactness hypothesis stated; ledger claim restricted to
+  registers the run created or touched; qreg.new reversal releases without a test (residual within bounds).
+- S0-9 lifted-call args from locations would be superposed "classical" values → E17.14 (classical args only);
+  consequence filed as bd 7u6 (lprocs have no token/args source), open question Q14.
+- S1s: from_id ownership not undone, host calls on owned registers E_INVALID_STATE; measure.iN on qreg[n] with
+  N = n; literal qreg.new 0 ill-formed (literal n ≥ 1); slice out of range traps even when literal; executor class
+  includes inverse-pair checking; "verifying executor" defined (E17.17) and used for qreg.free and host calls;
+  item 16 faults before mutation; @o's role stated; ids executor-chosen; effect undo removes its tape entry;
+  §0 Group 1 retitled, E11 → S, no-narrowing list completed; G-15 now realised directly (E17.1, E17.15); lifted
+  suffix widths unbounded (E17.15); unmatched or path-dependent uncalls ill-formed; nits (suite letters, §3.2 wire
+  store, example 4/5/8 wording).
+
+Not changed: T1's "halts within B + 1 rows" (0.8 text, counts the halting check; no conflict with "exactly B rows
+executed"); `fn` result names (0.8 convention); `bennett_qreg_new`'s `uint32_t n` (host-side allocation; device
+widths are unbounded through `qreg.new`).
+
+Q14 (new). Lprocs cannot obtain tokens or classical args for lifted calls (0.8 limitation made explicit by E17.14;
+bd 7u6). Recommend raising it as a blocker candidate for the dialect council: either lprocs read the enclosing
+oracle's classical arguments as pseudo-locations, or lprocs take token/classical params.
