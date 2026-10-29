@@ -1,0 +1,90 @@
+bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=16
+
+section symbols
+{"0":{"interface_hash":"0000000000000000000000000000000000000000000000000000000000000000","kind":"r","name":"sum","signature":{"abi":"0.8","kind":"r","params":["i8"],"results":["i8"],"tier":"r"}},"1":{"interface_hash":"0000000000000000000000000000000000000000000000000000000000000000","kind":"r","name":"g","signature":{"abi":"0.8","kind":"r","params":["ptr"],"results":[],"tier":"r"}},"2":{"interface_hash":"0000000000000000000000000000000000000000000000000000000000000000","kind":"r","name":"f","signature":{"abi":"0.8","kind":"r","params":["ptr"],"results":[],"tier":"r"}},"3":{"interface_hash":"0000000000000000000000000000000000000000000000000000000000000000","kind":"r","name":"nested","signature":{"abi":"0.8","kind":"r","params":[],"results":["i64"],"tier":"r"}},"4":{"interface_hash":"0000000000000000000000000000000000000000000000000000000000000000","kind":"r","name":"effects","signature":{"abi":"0.8","kind":"r","params":[],"results":["i64"],"tier":"r"}},"5":{"interface_hash":"0000000000000000000000000000000000000000000000000000000000000000","kind":"r","name":"impure","signature":{"abi":"0.8","kind":"r","params":[],"results":[],"tier":"r"}},"6":{"interface_hash":"0000000000000000000000000000000000000000000000000000000000000000","kind":"r","name":"entropy_short","signature":{"abi":"0.8","kind":"r","params":[],"results":[],"tier":"r"}},"7":{"interface_hash":"0000000000000000000000000000000000000000000000000000000000000000","kind":"r","name":"unknown_effect","signature":{"abi":"0.8","kind":"r","params":[],"results":[],"tier":"r"}},"8":{"interface_hash":"0000000000000000000000000000000000000000000000000000000000000000","kind":"r","name":"memfault","signature":{"abi":"0.8","kind":"r","params":[],"results":["i8"],"tier":"r"}},"9":{"interface_hash":"0000000000000000000000000000000000000000000000000000000000000000","kind":"r","name":"divzero","signature":{"abi":"0.8","kind":"r","params":[],"results":["i8"],"tier":"r"}}}
+
+section functions
+fn r @sum (n:i8) (answer:i8) () () ()
+^entry():
+zero = const.i8 0
+one = const.i8 1
+br ^loop(n, zero)
+^loop(i:i8, acc:i8):
+p = icmp.eq i zero
+br p ^done(acc) ^more(i, acc)
+^more(ii:i8, aa:i8):
+next = sub ii one
+s = add aa ii
+br ^loop(next, s)
+^done(answer:i8):
+ret answer
+fn r @g (p:ptr) () () () ()
+^entry():
+effect clock.read p
+ret
+fn r @f (p:ptr) () () () ()
+^entry():
+call @g p
+uncall @g (p) ()
+ret
+fn r @nested () (r:i64) () () ()
+^entry():
+n = const.i16 1024
+p = alloc n
+call @f p
+r = load.i64 p
+uncall @f (p) ()
+ret r
+fn r @effects () (r:i64) () () ()
+^entry():
+n = const.i16 1024
+p = alloc n
+len = const.i16 3
+effect entropy.read p len
+effect console.write p len
+effect clock.read p
+sector = const.i64 7
+effect block.write sector p
+effect block.read sector p
+r = load.i64 p
+ret r
+fn r @impure () () () () ()
+^entry():
+n = const.i16 1024
+p = alloc n
+call @g p
+v = const.i64 0
+store.i64 p v
+uncall @g (p) ()
+ret
+fn r @entropy_short () () () () ()
+^entry():
+n = const.i16 1024
+p = alloc n
+len = const.i16 3
+effect entropy.read p len
+ret
+fn r @unknown_effect () () () () ()
+^entry():
+n = const.i16 1024
+p = alloc n
+effect missing.op p
+ret
+fn r @memfault () (r:i8) () () ()
+^entry():
+z = const.i16 0
+p = inttoptr z
+r = load.i8 p
+ret r
+fn r @divzero () (r:i8) () () ()
+^entry():
+a = const.i8 3
+b = const.i8 0
+r = udiv a b
+ret r
+
+section devices
+{"models":{"block":{"version":"0.8"},"clock":{"version":"0.8"},"console":{"version":"0.8"},"entropy":{"version":"0.8"}},"services":{}}
+
+section layout
+{"A_tab":4,"H":12,"S_cells":0,"globals":{},"heap_base":16,"heap_limit_max":1024,"interface_regions":{},"null_size":1,"ptr_width":16}

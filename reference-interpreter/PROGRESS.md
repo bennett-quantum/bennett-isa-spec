@@ -17,7 +17,7 @@ The existing crate contains only a version function and a skeleton test.
 | 2. SHA-256, envelopes, SCC identity | Core implemented: four published hashes and both envelopes exact; broader SCC/import/link tests still needed | 4 integration tests green |
 | 3. Sequential reference interpreter, every lifted row | Partial: all arithmetic/control/memory/procedure rows and nested oracle calls execute; lift.perm_call awaits Q engine | 5 oracle tests green; full division sweep added |
 | 4. Literal reversible step machine and exhaustive comparisons | Partial: slot/exchange machine, C1–C5/R1–R5 and their inverses, ordinary rows and nested oracle engine implemented | 4 tests green, recursive sweep added |
-| 5. CC/R interpreter, tapes, history, uncall | Pending | Pending |
+| 5. CC/R interpreter, tapes, history, uncall | Partial: classical rows, dynamic SSA, memory, four device models, tapes, segment/whole reversal | 3 tests green; hostcall/qreg/Q integration pending |
 | 6. Q simulator and static cleanup discipline | Pending | Pending |
 | 7. CLI and documentation | Pending | Pending |
 
@@ -103,6 +103,33 @@ Next: run ignored recursive-prefix sweep; correct mutual-SCC closure ordering;
 add linking and matched-nested-call validation; implement Q/action engine and
 lift.perm_call, CC/R engine, CLI/docs. Parser/schema/provenance checks still
 need adversarial expansion before any deliverable can be called complete.
+
+### Milestone: CC/R history and device models
+
+Ignored recursive sweep PASSED: `cargo test --manifest-path
+reference-interpreter/Cargo.toml --offline --test step_machine -- --ignored`,
+all 8-bit n and every prefix through completion/first memory fault, 12.58 sec.
+
+Red: `cargo test --manifest-path reference-interpreter/Cargo.toml --offline
+--test classical` failed with missing execution APIs. Green: 3 tests now pass
+for dynamic SSA loops, pure copies surviving uncall, nested cancelled segments,
+memory/allocator reversal, all four device models including absent-block
+presence restoration, terminal fault reversal and entropy atomicity.
+
+src/classical.rs records per-instruction deltas and activation controls,
+not complete memory snapshots. New classical.bisa fixture has hand-derived
+comments. Its symbol hashes remain placeholders (the seed cannot hash CC/R
+closures correctly); regenerate/check independently when the identity/link
+milestone is finished. No test currently claims its placeholder hashes pass.
+
+Hand check: nested f calls g (clock 0->1), uncalls g (clock 1->0), then returns;
+uncall f skips g's reversed frames and marker, keeping clock 0. effects emits
+five tape entries (entropy, console, clock, block write, block read), returns
+the clock's initial zero, and reverses to an absent sector map and empty tape.
+
+Next: Q basis/state-vector kernels and action execution, then CC hostcall and
+qreg/measurement integration; complete suite F, SCC/linking, CLI/docs. All
+seven statuses remain partial/pending until exhaustive obligations are met.
 
 Open specification readings are recorded in SPEC-QUESTIONS.md. No decision from
 the maintainer is currently required. In particular the printed 0.8 HALT idle

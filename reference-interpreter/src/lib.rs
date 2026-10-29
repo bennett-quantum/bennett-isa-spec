@@ -1,16 +1,21 @@
 //! Executable reference semantics for the Bennett ISA, version 0.8.
-pub mod json;
-mod object;
-mod sha256;
+mod action;
+mod classical;
 mod identity;
-mod validation;
-mod oracle;
+pub mod json;
 mod machine;
-pub use object::*;
-pub use sha256::{sha256,sha256_hex};
+mod object;
+mod oracle;
+mod quantum;
+mod sha256;
+mod validation;
+pub use classical::{ClassicalMachine, ClassicalOutcome, ClassicalSnapshot, ClassicalValue};
 pub use identity::Identity;
-pub use oracle::{Argument,Budget,OracleInput,OracleOutcome};
-pub use machine::{BasisConfiguration,OracleMachine};
+pub use machine::{BasisConfiguration, OracleMachine};
+pub use object::*;
+pub use oracle::{Argument, Budget, OracleInput, OracleOutcome};
+pub use quantum::{Complex, MeasurementBranch, QuantumBindings, QuantumRegion, QuantumState};
+pub use sha256::{sha256, sha256_hex};
 
 /// A diagnostic always names the normative rule that was violated.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -25,4 +30,6 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub(crate) fn err<T>(rule: &str, message: impl std::fmt::Display) -> Result<T> {
     Err(Error(format!("{rule}: {message}")))
 }
-pub fn version() -> &'static str { "0.8" }
+pub fn version() -> &'static str {
+    "0.8"
+}
