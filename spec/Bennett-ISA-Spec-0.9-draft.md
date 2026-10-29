@@ -96,6 +96,19 @@ check say so and name what keeps every program expressible.
 | D1 | §17 item 15, §8.2 | Target topology deferred with a default (all-to-all, no topology field) | zsw.16 | E | – |
 | D2 | – | Deferred r8 suggestions: zsw.4 (the controlled-action target/schedule/certificate fixture waits for `ref`, §17 item 7), zsw.5 (citation unverified), zsw.14 (`ref` artefact, §17 item 7) | zsw.4, .5, .14 | – | – |
 
+### 0.2 Group 2: capability contracts
+
+| # | § | Change | Closes | Kind | Hash |
+|---|---|---|---|---|---|
+| K1 | §3.2, §3.3, §4.1, §4.8, §7.4, §9.1, §10, §16.2 | **Run-time-width registers and handle lookup**: type `qreg[*]`; `qreg.new` with an `i64` count; `qreg.width`, `qreg.id`, `qreg.from_id`; a register ledger (ids never reassigned); width checks at every `qreg[*]` → fixed-width transfer; `measure.iN`; run-time slice `len`; `QREG` binds `qreg[*]` | EN BLK-1; DL BLK-1; bd dw7 | S | +bytes |
+| K2 | §3.3, §4.1, §4.8, §7.4 | **Quantum allocation in R**: `qreg.*` execute in CC and R; ledger frames and their reversal (`qreg.new` ↔ release, clean by construction; `qreg.free` ↔ re-creation with the same id); `measure` stays CC-only | EN BLK-4; DL BLK-4 | S | +bytes |
+| K3 | §3.2, §4.1, §4.8, §5.1, §5.4, §7.4, §10 | **Device-minted budgets**: `budget.mint @o s h st d` in CC and R with `bennett_budget`'s checks; token validity (run-scoped, revoked by reversal); a token may be supplied to any region call of the program; a minted tuple binds schedule and certificate | EN BLK-2; DL BLK-2; bd 4qy; bd 8wn (binding, found while drafting) | S | +bytes |
+| K4 | §4.5, §5.3, §5.4, §6.1, §12.1–§12.3 | **Parametrised in-place**: `qinplace @g @ginv tk x (ins..) (mem..) (args..)`; signature compatibility; inverse-pair obligation carried by an `inverse_pairs` entry with a minimum tuple and an `args` domain (claim `expected: "inverse_pair"`), checked before any effect of the CC/R region call; monotonicity in the tuple; §6.1 transfer with `ins`, `mem` cells and `other` preserved; adjoint swaps the pair and keeps the lists | EN BLK-3; DL BLK-3; bd gv7; RC codex B07, muse s4 | S | +bytes |
+| K5 | §3.4, §4.1, §4.9, §5.4, §7.4, §10, §17 item 16 | **Classical fault contract**: CC trap = R fault record = one terminal record; a cause → code table; `fault C` in CC and R (literal < 2^64, effective cause); CC/R blocks end in `br`, `ret`, `trap` or `fault`; a `FAILED` run has exactly one record (0.8: "at least one") | EN ISA-7; DL ISA-7; bd 221; RC fable C5, s4 | S | +bytes |
+| K6 | §7.4, §10, §14.3 | **Reversible failed runs**: R faults are terminal; `FAILED → REVERSED` under the shared eligibility (no `measure`, no unverified free, ownership); reversal undoes the record, then the rest including open activations; T4 covers `FAILED` runs, the register ledger and token validity | EN ISA-8; DL ISA-8 (terminal reading, DL §17.6); bd 0b9 | S | – |
+| K7 | §3.3, §17 item 14 | 0.8's §17 item 14 default (a `FAILED` record for a condition hardware cannot test) contradicted §7.4's unverified frees: hardware releases proceed unverified and exclude `uncall` and reversal; a simulator records `FAULT_UB_TRAP` | found while drafting; bd exc | S | – |
+| K8 | §16.3, §15 | Examples 4–9 (one per new family, hand-derived results) and the suite rows for every new instruction and fault | brief | E | new |
+
 ## 1. Scope and conformance
 
 ### 1.1 What the ISA is
@@ -181,7 +194,8 @@ host requests (§4.1), which an R history cannot reverse.
 
 | Component | Tier | Contents |
 |---|---|---|
-| classical environment | CC, R | dynamic SSA instances (§7.4), block parameters, activation stack, **quantum-register handles** (`qreg[n]`, §3.3) |
+| classical environment | CC, R | dynamic SSA instances (§7.4), block parameters, activation stack, **quantum-register handles** (`qreg[n]`, `qreg[*]`, §3.3), tokens (§5.4) |
+| register and token ledgers | CC, R | every register's id, class, width and state (§3.3); every device-minted token's tuple and validity (§5.4) |
 | classical memory | CC, R | byte-addressed, little-endian, sparse; allocation table (§7.1) |
 | effect tape, entropy tape | R | §7.3 |
 | run history | CC, R | one frame per executed instruction (§7.4) |
@@ -195,14 +209,15 @@ host requests (§4.1), which an R history cannot reverse.
 ### 3.3 Types, ownership, operand schema
 
 ```
-  iN (1 ≤ N ≤ 128)   ptr (width ptr_width)   f64   token   qreg[n]   region[A,W]
+  iN (1 ≤ N ≤ 128)   ptr (width ptr_width)   f64   token   qreg[n]   qreg[*]   region[A,W]
   wire   wire[N]      linear values in structured code and interfaces
   reg[N]              a location (oracle bodies, lprocs); not linear
 ```
 
 **Widths.** The bound 1 ≤ N ≤ 128 applies to `iN` only. `wire[N]`,
 `reg[N]` and `qreg[n]` have N, n ≥ 1 and `region[A,W]` has A ≥ 0, W ≥ 1,
-with no upper bound; a value of these types is a bit-vector of its
+with no upper bound (a `qreg[*]` register's width is a run-time value n
+≥ 0, §3.3 below); a value of these types is a bit-vector of its
 width in every semantics (§14.1), including interface bundles,
 pseudo-locations, locations, cells, stack cells and frame slots.
 
@@ -229,7 +244,8 @@ determined by the operands are written as a suffix** (`r = const.i32 5`,
 a`). Width rules: `binop`/`icmp` operands equal width; `select` arms equal
 width; `zext`/`sext` strictly widen, `trunc` strictly narrows; `load.iN`
 and `lift.load.iN` require N ∈ {8, 16, …, 128}; `measure` of `qreg[n]`
-with n ≤ 128 yields `in`; signed division truncates toward zero. The
+with n ≤ 128 yields `in`, and `measure.iN` (1 ≤ N ≤ 128) of a `qreg[*]`
+yields `iN`; signed division truncates toward zero. The
 literal c of `const.iN c` and `lift.const.iN c` satisfies −2^(N−1) ≤ c <
 2^N and denotes c mod 2^N (both the signed and the unsigned spelling of
 every value are accepted); any other literal is ill-formed (suite F).
@@ -257,32 +273,63 @@ for `binop`, `icmp`, `select`, `zext`, `sext`, `trunc` apply verbatim to
 their `lift.*` counterparts; the destinations of one `lift.parmov` are
 pairwise distinct.
 
-**Quantum registers in CC.** `qreg[n]` names n device-resident wires. A
-handle is in exactly one state: **live**, **viewed** (one slice of it is
-live) or **consumed**; an instruction whose precondition fails is a CC
-trap. **Handle transitions:**
+**Quantum registers in CC and R.** A **register** is n device-resident
+wires of one class with a nonzero 64-bit **id**, recorded in the
+program's **register ledger** with its class, width and state:
+**live**, **viewed** (one slice of it is live) or **consumed**.
+`qreg[n]` is the type of a register whose width n is fixed statically;
+`qreg[*]` the type of a register whose width is known only at run time
+(an unsigned 64-bit n ≥ 0). A `qreg[n]` value may be used wherever a
+`qreg[*]` is expected; a `qreg[*]` value bound to a `qreg[n]` parameter
+or block parameter (`call`, `br`, `ret`, launch) or to a slot of width n
+(region call, §4.7) is checked at that transfer: its width MUST equal
+the required one. The `qreg.*` instructions execute in CC and R;
+`measure` only in CC. An instruction whose precondition fails is a CC
+trap / R fault (§4.9) with code `FAULT_UB_TRAP` unless the table says
+otherwise, and has no effect. An id is never reassigned to another
+register while the program is loaded. **Handle transitions:**
 
 | Instruction | Precondition | Effect |
 |---|---|---|
-| `q = qreg.new cls n` | – | q live, clean |
-| `qreg.free q` | q live, not a view, clean on every basis configuration (a simulator checks and reports `E_QREG_NOT_CLEAN`; hardware records a program error in the run) | q consumed |
-| `q2 = qreg.slice q lo len` | q live, not a view; `lo` a literal or an `i64` value, `len` a literal, both unsigned; lo + len ≤ n, computed without wrap | q2 live (wires [lo, lo+len) of q), q viewed; q2 MUST be the operand of exactly one region call and of nothing else; after that call q2 is consumed and q is live again; any use of q while viewed is ill-formed (suite F). Reversing that region call (§7.4) restores q viewed and q2 live; reversing the slice frame then restores q live |
-| `q = qreg.concat q1 q2` | q1, q2 live, not views | q1, q2 consumed; q live over the wires of q1 then q2 |
-| region call (§4.7) with q as operand | q live (a view included) | q unchanged |
-| `r = measure q` | q live, not a view | q consumed, its wires released |
-| reversal of a `qreg.*` frame (§7.4, §10) | – | the handle states before that frame. A `measure` frame is **never reversed**: a segment containing one cannot be uncalled (§7.4) and a run containing one is not reversible (§10) |
+| `q = qreg.new cls n` | `n` a literal (q: `qreg[n]`) or an `i64` value read unsigned (q: `qreg[*]`); the device can provide n wires of class `cls`, else code `FAULT_BUDGET_HEAP` | q live, clean, with a fresh id |
+| `qreg.free q` | q live, not a view, clean on every basis configuration (a simulator checks it; on failure q stays live and unchanged; hardware: §17 item 14) | q consumed |
+| `q2 = qreg.slice q lo len` | q live, not a view; `lo` and `len` each a literal or an `i64` value, both unsigned; lo + len ≤ n, computed without wrap | q2 a view of wires [lo, lo+len) of q, of type `qreg[len]` for a literal len and `qreg[*]` otherwise; q viewed; q2 MUST be the operand of exactly one region call and of nothing else; after that call q2 is consumed and q is live again; a use of q (through any alias) while it is viewed is ill-formed where suite F decides it, and a trap otherwise. Reversing that region call (§7.4) restores q viewed and q2 live; reversing the slice frame then restores q live |
+| `q = qreg.concat q1 q2` | q1, q2 live, not views, distinct registers | q1, q2 consumed; q live, with a fresh id, over the wires of q1 then q2; `qreg[n1+n2]` if both operands are static, else `qreg[*]` |
+| `w = qreg.width q` | q live, not a view | w: `i64`, the width; no state change |
+| `id = qreg.id q` | q live, not a view | id: `i64`, the bits of q's id; no state change |
+| `q = qreg.from_id id` | `id` is the id of a register of the program that is live, not a view, and not owned by another run that is not CLOSED (§10) | q: `qreg[*]`, an alias of that register; no state change (the run now owns it, §10) |
+| region call (§4.7) with q as operand | q live (a view included); its width equals the slot's (§3.3 binding) | q unchanged |
+| `r = measure q` / `r = measure.iN q` | q live, not a view; the form `measure.iN` (1 ≤ N ≤ 128) for a `qreg[*]`, whose width MUST be N (checked before measuring), the form `measure` for a `qreg[n]` | q consumed, its wires released; r: `in` / `iN` |
+| reversal of a `qreg.*` frame (§7.4, §10) | – | the ledger state before that frame (below). A `measure` frame is **never reversed**: a segment containing one cannot be uncalled (§7.4) and a run containing one is not reversible (§10) |
 
-**Binding**: a `qreg[n]` argument fills a `wire[n]` slot bit for bit (bit
-0 ↔ wire 0); it fills a `region[A,W]` slot iff n = 2^A·W with cell i =
-bits [iW, (i+1)W). Host-supplied register ids are `qreg` values of the
-same type.
+**Ledger frames and their reversal** (§7.4). A `qreg.new` frame records
+the id, class and width; its reversal releases that register, which is
+clean then because every later frame touching it has been undone first
+(LIFO) and the run owns it exclusively (§10); a simulator verifies it.
+A `qreg.free` frame records the id, class, width and whether its
+cleanliness was verified; its reversal re-creates the register clean and
+live with the same id, class and width (every alias sees it live
+again). A `qreg.slice` frame records the parent id, lo and len, a
+`qreg.concat` frame the two operand ids and the new id; their reversal
+restores the exact prior states and wire order without moving, copying
+or measuring a wire. `qreg.width`, `qreg.id` and `qreg.from_id` change
+no ledger state and their frames are pure (§7.4); if an `uncall` later
+removes the register an alias refers to, every use of the alias traps.
+
+**Binding**: a register of width n (`qreg[n]`, or `qreg[*]` of run-time
+width n) fills a `wire[n]` slot bit for bit (bit 0 ↔ wire 0); it fills a
+`region[A,W]` slot iff n = 2^A·W with cell i = bits [iW, (i+1)W); for a
+`qreg[*]` the width is checked at the call, before any effect.
+Host-supplied register ids are `qreg` values of the parameter's type.
 
 **Registers, handles and aliases.** A `qreg` value is a reference to a
 register of the device; the state live / viewed / consumed belongs to
 the register, not to a name. `qreg` values pass unchanged as `call`
 arguments, `ret` values and `br` block arguments (each transfer binds
-another name to the same register, of the same type, and changes no
-state). Two names bound to one register are **aliases**: a transition
+another name to the same register and changes no state; a `qreg[*]`
+reaching a `qreg[n]` parameter is width-checked, above). Two names bound
+to one register (by such transfers or by `qreg.from_id`) are
+**aliases**: a transition
 made through either is observed through both. The wire operands of one
 region call, with its effective control context, MUST denote pairwise
 disjoint wires (§3.3 disjointness); aliases violate it, and where suite
@@ -301,7 +348,9 @@ instruction of that function, and all its definitions give it one type
 (suite F). The text order of blocks is irrelevant: a definition need not
 precede its uses textually. Executing a use of a name that has no
 current instance (none was created on the executed path, or an `uncall`
-removed it, §7.4) is a CC trap / R fault `FAULT_UB_TRAP`.
+removed it, §7.4) is a CC trap / R fault `FAULT_UB_TRAP`. Every CC or R
+block ends in `br`, `ret`, `trap` or `fault` (suite F); `trap` and `fault`
+end the run (§4.9).
 
 ### 3.5 Predication
 
@@ -536,7 +585,7 @@ pre-step tuple is restored and every frame field is clean.
 |---|---|---|
 | `const` | `r = const.iN c` | |
 | `add sub mul and or xor shl lshr ashr` | `r = op a b` | wrap; shift ≥ N → 0 |
-| `udiv urem sdiv srem` | `r = op a b` | divisor 0 or signed MIN/−1: CC trap; R fault record |
+| `udiv urem sdiv srem` | `r = op a b` | divisor 0 or signed MIN/−1: CC trap; R fault record (`FAULT_UB_DIV0` / `FAULT_UB_SDIV_OVERFLOW`, §4.9) |
 | `icmp` | `r = icmp.{eq,ne,ult,ule,slt,sle} a b` | |
 | `select` | `r = select p a b` | |
 | `zext sext trunc` | `r = op.iM a` | |
@@ -546,9 +595,11 @@ pre-step tuple is restored and every frame field is clean.
 | `br` | `br ^b(args)` / `br p ^b1(args) ^b2(args)` | parallel block-parameter assignment |
 | `call` / `ret` | `results = call @f args` / `ret vals` | arguments and values are bare operands (`r = call @f a b`, `(r1, r2) = call @f a`, `call @f`, `ret v`, `ret`); results bind in order; a parenthesised argument list is ill-formed for `call`; callee tiers per §3.1 |
 | `uncall` | `uncall @f (args) (results)` | **segment uncall**, legal exactly under §7.4: the most recent completed call segment of the history is a call of `@f` whose recorded boundary argument and result values equal the current operand values, every frame after it is pure, and it contains, at any nesting depth, no `measure` frame and no `qreg.free` frame whose cleanliness was not verified; otherwise CC trap / R fault `FAULT_UB_TRAP` with no state change beyond the fault record. The segment is reversed by the cancellation-aware history traversal of §7.4 (LIFO, nested segments included; frames already reversed and `uncall` markers skipped) and its frames are marked reversed; the `uncall` itself pushes a frame naming the segment |
-| `trap` | `trap` | CC trap; R fault record |
-| `qreg.new/free/slice/concat` | §3.3 | CC only |
-| `measure` | `r = measure q` | CC only; Born rule (§14.2); consumes q |
+| `trap` | `trap` | CC trap; R fault record (`FAULT_UB_TRAP`, §4.9) |
+| `fault` | `fault C` | CC trap; R fault record with the effective cause of the literal C, 0 ≤ C < 2^64 (§4.9, §5.4); in an oracle body or lproc, the §4.2 row |
+| `qreg.new qreg.free qreg.slice qreg.concat qreg.width qreg.id qreg.from_id` | §3.3 | CC and R (§3.3) |
+| `measure` | `r = measure q` / `r = measure.iN q` | CC only; Born rule (§14.2); consumes q; `.iN` for a `qreg[*]` (§3.3) |
+| `budget.mint` | `tk = budget.mint @o s h st d` | CC and R; a token for the tuple (s, h, st, d) validated for oracle `@o` (§5.4) |
 | `effect` | `effect dev.op args` | R only (§7.3); results are written to memory operands |
 | `hostcall` | `rlen = hostcall service ptr len` | CC only (§10) |
 
@@ -648,7 +699,7 @@ permutation actions require ε = 0** for every gate; actions MAY use ε > 0
 | `quncopy` | `quncopy s d` | `cx s[i] d[i]` under the predicate; `qfree d` |
 | `qxor` | `qxor s t` | `cx s[i] t[i]` |
 | `qexch` | `qexch a b` | `swap a[i] b[i]` |
-| `qinplace` | `qinplace @g @ginv tk x` | `@g`, `@ginv` total permutation oracles on the n-bit encoding with certificates that under `tk` the fault code is `FAULT_NONE` on every input and `g∘ginv = ginv∘g = id`. Sem: `t = qalloc any n; f = qalloc any F; oracle_call @g tk (x) t f; qexch x t; oracle_call @ginv tk (x) t f; qfree t; qfree f` |
+| `qinplace` | `qinplace @g @ginv tk x (ins..) (mem..) (args..)`; written `qinplace @g @ginv tk x` when all three lists are empty (and only then) | **Well-formed** iff `@g` and `@ginv` are oracles whose `in` slots are x's width n followed by the widths of `ins` in order, whose `tgt` width is n, whose fault widths are equal (F), whose `mem` slots match the `mem` regions (role `in`, §3.3's matching rule) and whose `args` types are those of `args`; x, the `ins` wires and the effective control context are pairwise disjoint. **Sem**: `t = qalloc any n; f = qalloc any F; oracle_call @g tk (x, ins..) t f (mem..) (args..); qexch x t; oracle_call @ginv tk (x, ins..) t f (mem..) (args..); qfree t; qfree f`, so x ← g(x; ins, mem, args). **Inverse-pair obligation**: under the token's tuple and the call's `args` values, on every basis value of x, of the `ins` wires and of the `mem` cells, both oracles are fault-free and g(·; ins, mem, args) and ginv(·; ins, mem, args) are mutually inverse permutations of the n-bit encoding. It is carried by a verified `inverse_pairs` entry (§12.3) whose tuple is componentwise ≤ the token's (success at a tuple implies the same result at every larger one, §5.4) and whose claim's `args` domain contains the call's values. Before any effect of a CC/R region call, every `qinplace` the callee executes (transitively; its token and `args` are resolved from the call's classical arguments) MUST have a covering entry, else CC trap / R fault `FAULT_UB_TRAP`. The private t and f are not values of the region for §6: the certified pair cleans them, the only cleanup that is not a §6.4 realisation. Under control the allocations are unconditional and every gate of both calls and of the exchange is controlled |
 
 ### 4.6 Quantum memory, predication, structure
 
@@ -693,13 +744,43 @@ and a `token` argument is usable only as the `tk` operand of
 | `ptrtoint.iM`, `inttoptr` | CC R | ptr / integer | iM / ptr |
 | `load.iN store.iN` | CC R | ptr [, value] | iN / – |
 | `alloc free` | CC R | iN / ptr | ptr / – |
-| `br call ret uncall trap` | CC R | per §4.1 | – |
-| `qreg.new qreg.free qreg.slice qreg.concat measure` | CC | per §3.3 | qreg / – / qreg / qreg / iN |
+| `br call ret uncall trap fault` | CC R (`fault` also Q(lift)) | per §3.1, §4.1, §4.9 | – |
+| `qreg.new qreg.free qreg.slice qreg.concat qreg.width qreg.id qreg.from_id` | CC R | per §3.3 | qreg / – / qreg / qreg / i64 / i64 / qreg[*] |
+| `measure`, `measure.iN` | CC | qreg[n] / qreg[*] | in / iN |
+| `budget.mint` | CC R | oracle reference, four i64 values | token |
 | `effect` | R | device op, ptr/len operands | – |
 | `hostcall` | CC | service literal, ptr, len | iN (rlen, width ptr_width) |
 | `lift.*`, `qjump qbranch qjumpr fault` | Q (oracle bodies, lprocs) | locations, pseudo-locations, labels, literals | locations |
 | gates, `qalloc qborrow qfree qreturn qcopy quncopy qxor qexch qinplace qregion qload qunload qstore qexchm qpred qunpred qif qloop` | Q (actions) | wires, bundles, regions, literals | wires / – |
 | `oracle_call action_call adj ctl` | Q, CC, R | per §4.7 | – |
+
+### 4.9 Classical faults (CC, R)
+
+A **CC trap** and an **R fault record** are one event. The failing
+instruction is validated before any mutation and has no effect except
+appending one **terminal fault record** (its cause code and program
+point, §7.4); the run ends `FAILED` (§10) with no further instruction
+executed, so the CC caller of a faulting R call executes no successor
+instruction and receives no results, and a `FAILED` run has exactly
+one fault record. Its code is fixed by the cause:
+
+| Cause | Code |
+|---|---|
+| `udiv urem sdiv srem` with divisor 0 | 5 `FAULT_UB_DIV0` |
+| `sdiv srem` of the signed minimum by −1 | 6 `FAULT_UB_SDIV_OVERFLOW` |
+| `load`/`store` outside every live allocation; `free` with no live unpinned entry at its address (§7.1); a `hostcall` range not in one live allocation (§10) | 7 `FAULT_UB_MEMFAULT` |
+| `alloc` with the heap or the allocation table exhausted (§7.1); a `qreg.new` the device cannot satisfy (§3.3) | 2 `FAULT_BUDGET_HEAP` |
+| `effect` on a device outside §7.3 (§17 item 3) | 8 `FAULT_EFFECT_UNMODELLED` |
+| `entropy.read` past the end of the tape (§7.3) | 10 `FAULT_ENTROPY_EXHAUSTED` |
+| `trap`; an illegal `uncall` (§7.4); a use without a current instance (§3.4); a failed `qreg` precondition, width check or overlap check (§3.3), including an unclean `qreg.free` a simulator detects; an invalid token or a failed `budget.mint` validation (§5.4); a `qinplace` without a covering inverse-pair entry (§4.5) | 4 `FAULT_UB_TRAP` |
+| `fault C` | C′, the effective cause of C (§5.4) |
+| exhaustion of the executor's own classical resources | §17 item 16 |
+
+`fault C` takes a literal 0 ≤ C < 2^64 (a launch fault code is a
+`uint64_t`, §10); codes above 10 are program-defined. Its frame is the
+fault record. `bennett_result_fault` returns the record's code
+unchanged. A Q region never produces a fault record: an oracle's fault
+is an outcome in its fault register (§5.2).
 
 ## 5. Regions
 
@@ -713,7 +794,7 @@ text form (§16.2) a wire param's role suffix is optional and, when
 present, MUST equal its group's role (`in` in an oracle's or action's
 `in` group, `mut` in an action's `mut` group); a region param always
 carries its role (`in` or `mut`); no other param carries a suffix. A region
-MUST NOT contain `measure effect br call uncall trap hostcall qreg.*` or
+MUST NOT contain `measure effect br call uncall trap hostcall qreg.* budget.mint` or
 classical memory instructions, nor lifted rows outside oracle bodies.
 Predicate stack empty at entry and exit. Every `qalloc` matched by a
 `qfree` of a clean bundle, every `qborrow` by a `qreturn` after its
@@ -787,7 +868,8 @@ renumbered):
 ```
   rx/ry/rz(θ) ↦ (−θ)   s ↔ sdg   t ↔ tdg   x cx ccx mcx swap h cz: self-adjoint
   qalloc ↔ qfree   qborrow ↔ qreturn   qregion creation ↔ release   qcopy ↔ quncopy   qload ↔ qunload
-  qxor qexch qstore qexchm: self-adjoint   qinplace @g @ginv ↦ qinplace @ginv @g   oracle_call ↦ oracle_call
+  qxor qexch qstore qexchm: self-adjoint   qinplace @g @ginv tk x (ins) (mem) (args) ↦ qinplace @ginv @g tk x (ins) (mem) (args)
+  oracle_call ↦ oracle_call
   action_call @b ↦ adj action_call @b   qpred/qunpred pairs reversed as a whole
   qif w {A}{B} ↦ qif w {adj A}{adj B}   qloop n {A} ↦ qloop n {adj A}
   qloop n while cond {A} ↦ flags computed forward as §4.6; adj A for i = n..1 under c_i; flags uncomputed
@@ -804,6 +886,30 @@ budget` validates: `heap_limit ≤ layout.heap_limit_max`, `stack_limit ≤
 2^S_cells`, `depth_limit < 2^Dc − 1`; for a memoryless object (§7.2)
 `heap_limit = stack_limit = depth_limit = 0`. B is enforced by running
 exactly B steps; heap, stack and depth are wire counters.
+*(non-normative, used by §4.5)* If the reference interpreter succeeds
+on x under a tuple β₀, it succeeds with the same result under every
+tuple β ≥ β₀ componentwise: its only limit-dependent decisions are the
+flags of `lift.alloc` and `lift.call`, false on that trajectory and
+still false with larger limits, and the step bound, not reached.
+
+**Tokens.** A token denotes a validated tuple (B, heap_limit,
+stack_limit, depth_limit) and the oracle it was validated for; a region
+call uses the tuple of the token it is given, and a token MAY be
+supplied to any region call of the program (the checks above depend
+only on the object's layout). Tokens come from `bennett_budget` (§10;
+valid until the program is unloaded) or from **`tk = budget.mint @o s h
+st d`** (CC and R): `@o` names an oracle of the program (a symbol
+reference, §9.2); s, h, st, d are `i64` values read as unsigned 64-bit;
+the instruction applies exactly `bennett_budget`'s checks to (s, h, st,
+d) before any mutation; failure is a fault record `FAULT_UB_TRAP` (§4.9)
+and no token; success produces a fresh token for that tuple, valid
+until its frame is reversed or its run is CLOSED, and never
+constructible from an integer. A region call given a token that is not
+valid is a CC trap / R fault `FAULT_UB_TRAP` before any effect (a launch
+argument: `E_ARG`). A minted tuple binds its invocation exactly as a
+host-minted one does (§11, §12): a consumer MUST NOT substitute another
+tuple. A budget is classical and fixed before region entry (§3.1), so
+`budget.mint` is not a region instruction (§5.1).
 
 ```
   0 FAULT_NONE            4 FAULT_UB_TRAP            8 FAULT_EFFECT_UNMODELLED
@@ -816,8 +922,9 @@ F ≥ 4. Code 10 is recorded by the R `entropy` device (§7.3) and is also
 the code a lifted oracle that virtualises entropy uses (`fault 10`) when
 its entropy input is exhausted.
 
-**Effective cause.** The literal C of `fault C` and of `lift.faultif p
-C` records the cause C′ = C if C ≠ 0 and C′ = `FAULT_UB_TRAP` (4) if C = 0;
+**Effective cause.** The literal C of `fault C` (in every tier, §4.2,
+§4.9) and of `lift.faultif p C` records the cause C′ = C if C ≠ 0 and C′ =
+`FAULT_UB_TRAP` (4) if C = 0;
 every other row's code is a fixed nonzero constant. So no fault is ever
 recorded as `FAULT_NONE`: a faulted outcome F_B(x) = (0, code) has code ≠
 0, and the fault register distinguishes it from every success (F ≥ 4
@@ -906,7 +1013,7 @@ every write. Π is the effective control context at the instruction.
 | `oracle_call @o (ins) tgt fr (mem)` | tgt, fr: perm with S = ins ∪ {tgt, fr} ∪ cells(every region passed) ∪ Π; `in` regions unchanged |
 | `lift.perm_call` / permutation `action_call` | each mut: perm with S = mut ∪ ins ∪ cells(regions passed) ∪ Π; `mut`-region cells advance with the same S |
 | non-permutation `action_call` | every mut and every `mut`-region cell: other |
-| `qinplace @g @ginv x` | x: perm with S_x ∪ Π |
+| `qinplace @g @ginv tk x (ins) (mem) (args)` | x: perm with S_x ∪ ins ∪ cells(every region in `mem`) ∪ Π if x was perm, else other; the `ins` wires and `mem` cells are unchanged |
 | lifted rows | each written location/cell: perm with the union of its read operands' sets ∪ Π; written cells' versions advance |
 
 ### 6.2 Window and obligations
@@ -1025,9 +1132,10 @@ until reversal; a name denotes its most recent instance. Frames:
 | `uncall` | the reversed segment's id (skipped by whole-run reversal, below) |
 | `effect` | tape index plus the device-specific record of §7.3 |
 | `hostcall` | payload bytes and reply bytes |
-| `qreg.*`, `measure` | handle created/freed/consumed and the measured bits |
-| `oracle_call` / `action_call` | (region hash, variant, inherited control count, classical args, register ids): reversed by re-application / adjoint, exactly once, by this frame |
-| fault record | cause code (§5.4) and location; terminal faulted state, reversed like any prefix |
+| `qreg.*`, `measure` | the ledger record of §3.3 (ids, class, widths, prior states, whether a free's cleanliness was verified) and the measured bits |
+| `budget.mint` | the token and its tuple; reversal revokes the token |
+| `oracle_call` / `action_call` | (region hash, variant, inherited control count, classical args with every token's tuple, register ids): reversed by re-application / adjoint, exactly once, by this frame |
+| fault record (a failing instruction, `trap`, `fault`) | cause code (§4.9) and program point; terminal. Reversal (§10) removes the record; the failing instruction had no other effect, so the state is then the state before it |
 
 **Logical history.** Frames and dynamic instances specify the
 *logical* history. An executor MAY store it by checkpoints, deltas or
@@ -1044,10 +1152,11 @@ active environment although its audit record is retained.
 
 **Pure frames.** A frame is **pure** iff it belongs to `br` or to a
 defining instruction among `const`, the binops, `udiv..srem`, `icmp`,
-`select`, `zext sext trunc`, `ptrtoint inttoptr`, `load`: it changes
-only the set of instances. Every other frame (`store alloc free call ret
-uncall trap effect hostcall qreg.* measure`, region calls, fault
-records) is impure.
+`select`, `zext sext trunc`, `ptrtoint inttoptr`, `load`, `qreg.width
+qreg.id qreg.from_id`: it changes only the set of instances. Every other
+frame (`store alloc free call ret uncall trap fault effect hostcall
+qreg.new qreg.free qreg.slice qreg.concat measure budget.mint`, region
+calls, fault records) is impure.
 
 **History traversal** (the one reversal procedure, used by segment
 `uncall` and by whole-run reversal). A range of frames is **reversed**
@@ -1331,9 +1440,11 @@ results, fault codes and declared measurements; host services are
 reached by `hostcall`. **Positional binding**: argument i of `bennett_
 run` binds to parameter i of the entry's signature: `INT(width, bytes)`
 to `iN` with width = N (else `E_ARG`), `F64` to `f64`, `QREG` to `qreg[n]`
-with the register's n, `TOKEN` to `token`. Arguments and the entropy tape
+with the register's n or to `qreg[*]` with any width, `TOKEN` to `token`
+(a valid token, §5.4). Arguments and the entropy tape
 are **copied** at `bennett_run`; the caller may free its buffers
-afterwards. Tokens are scoped to the program and destroyed at unload.
+afterwards. Host-minted tokens are scoped to the program and destroyed
+at unload; device-minted tokens to their run (§5.4).
 Accessor-returned pointers are valid until the owning object is freed.
 `bennett_unload` with a run not CLOSED: `E_INVALID_STATE`.
 
@@ -1341,16 +1452,26 @@ Accessor-returned pointers are valid until the owning object is freed.
 calls); an R call's subtree is owned by its R history; `bennett_reverse`
 reverses post-order: CC segments by their run history, R calls by LIFO
 reversal of their history (§7.4, reversed segments and `uncall` frames
-skipped), top-level Q calls by re-application / adjoint.
+skipped), top-level Q calls by re-application / adjoint. A fault record
+is terminal (§4.9): the run is `FAILED`, and every activation open at
+the fault keeps its frames, which reversal undoes like those of a call
+that returned.
 
 **States.** `CREATED → RUNNING → (SUSPENDED ⇄ RUNNING) → (HOST_REQUEST ⇄
-RUNNING) → COMPLETED | FAILED`; `COMPLETED → REVERSED`; any of
+RUNNING) → COMPLETED | FAILED`; `COMPLETED → REVERSED`; `FAILED →
+REVERSED`; any of
 `COMPLETED/FAILED/REVERSED → CLOSED` (`bennett_run_close` releases the
 record; register ids created by the run remain valid unless measured or
 freed). A run owns the registers and memory it touches exclusively while
-not CLOSED. **Reverse eligibility**: `COMPLETED`; no `measure`; no
-register it touched has been prepared, freed, sliced or used by another
-run since; else `E_NOT_REVERSIBLE`. `bennett_qreg_prepare` and `bennett_
+not CLOSED; a register reached by `qreg.from_id` is touched from then
+on. **Reverse eligibility**: `COMPLETED` or `FAILED`; no `measure`
+frame; no `qreg.free` frame whose cleanliness was not verified (§17
+item 14); no register it touched has been prepared, freed, sliced or
+used by another run since; else `E_NOT_REVERSIBLE`. Reversing a `FAILED`
+run first undoes its terminal fault record, then traverses the rest of
+its history exactly as for a completed run, including the frames of
+activations that never returned; the run is then `REVERSED` with every
+component T4 names at its entry value. `bennett_qreg_prepare` and `bennett_
 qreg_free` require a clean register (`E_QREG_NOT_CLEAN` otherwise); there
 is no reset and no trace-out: a register in unknown state is released by
 a `measure` inside a run, which consumes its handle (§3.3).
@@ -1361,8 +1482,8 @@ a `measure` inside a run, which consumes its handle (§3.3).
 `TOKEN` as the 8-byte little-endian id, `*width` = 64. A `cap` smaller
 than that byte count is `E_ARG` and nothing is written. Fault records
 are read by `bennett_result_nfaults` / `bennett_result_fault` (codes of
-§5.4, in order of occurrence; a `COMPLETED` run has none, a `FAILED` run
-has at least one and exposes no values).
+§4.9; a `COMPLETED` run has none, a `FAILED` run has exactly one, its
+terminal record, and exposes no values).
 
 **Waiting.** `bennett_wait` blocks until the run leaves `RUNNING` and
 returns `OK` with exactly one outcome: `HOST_REQUEST` (`*request_out`
@@ -1529,7 +1650,7 @@ INFEASIBLE`).
 
 | kind | payload | checker obligation |
 |---|---|---|
-| `exhaustive` | `domain` (§12.2); `expected`: `"oracle"` \| `{ "table": [...] }` \| `{ "program": closure_hash }` | re-execute every domain element on the reference interpreter / expected program; compare full tuples |
+| `exhaustive` | `domain` (§12.2); `expected`: `"oracle"` \| `{ "table": [...] }` \| `{ "program": closure_hash }` \| `"inverse_pair"` | re-execute every domain element on the reference interpreter / expected program; compare full tuples. For `"inverse_pair"` (the claim of an `inverse_pairs` entry, §12.3): for every element (x, ins, mem cells, args) run g and ginv at the entry's tuple and require both fault-free, ginv(g(x)) = x and g(ginv(x)) = x; the bundles and regions components MUST be the full domain of g's `in` and `mem` slots (the `args` component lists the covered classical values) |
 | `sampled` | `domain`; `sampler`: `{ "algorithm": "xoshiro256**", "seed": [4 decimal strings, not all zero], "count": n }` | replay; **evidence** |
 | `structural` | `{ "rule": "translation_lemma" \| "inverse_pair_library" \| "adjoint_table", "subclaims": [indices], "witness": … }`; for `translation_lemma`: `{ "V": [points], "W": [points], "X": [wires], "B": [wires], "frame": [first point, last point] }`; for `inverse_pair_library`: `{ "library_closure_hash", "claim_index" }`; for `adjoint_table`: `{}` | check the rule's side conditions syntactically against the object and the subclaims' results |
 | `numerical` | `{ "subject": { "closure_hash", "variant", "inherited_controls", "schedule_hash" }, "metric": "operator_norm", "precision_bits": n, "bound": decimal }` | **checker-computed, for every invocation context of the subject** (below): build the realised unitary U of that invocation (the region's realisation under the root schedule at that path, with its resolved classical arguments, budget, epsilon shares and cleanup choices, and `inherited_controls` control wires prepended) and the reference unitary V (the region's §5.3 semantics with the same arguments, controlled on the same wires) at the subject's signature widths in interval arithmetic at `precision_bits` (basis order = allocation order, controls first), form interval enclosures of `V†U − I` entrywise, derive the operator-norm bound as the Frobenius-norm upper bound in interval arithmetic, and verify it is ≤ `bound`; the claim holds iff it holds for every context |
@@ -1601,8 +1722,11 @@ if ≥ R, add `lo`; components are consumed in enumeration order.
 
 ### 12.2 Domains
 
-`"domain": { "bundles": [ { "name", "width", "lo", "hi" } ], "borrowed": [ same ], "regions": [ { "name", "cells": "all" | [ { "index", "lo", "hi" } ] } ] }`,
+`"domain": { "bundles": [ { "name", "width", "lo", "hi" } ], "borrowed": [ same ], "regions": [ { "name", "cells": "all" | [ { "index", "lo", "hi" } ] } ], "args"?: [ same as bundles ] }`,
 bounds inclusive, enumeration order as listed, last component fastest.
+`args` (inverse-pair claims only) ranges over classical arguments other
+than tokens, each read as an unsigned integer of its width (`ptr`:
+ptr_width; `f64`: 64, its bits).
 A `proof` label requires the domain to equal D; otherwise the claim is
 `evidence` with the covered fraction.
 
@@ -1612,7 +1736,7 @@ A `proof` label requires the domain to equal D; otherwise the claim is
   versions; bindings { object_hash, interface_hash, closure_hash (required), reference_program_hash, dialect_mapping_version, target_hash, schedule_hash? }
   producer { name, version, materialisation { llvm_version, pipeline, normaliser_version } }
   regions { <closure_hash>: { kind, signature, bounds, frame (§9.4), resources { name: decimal }, gates_used { gate: { count, scheme?, epsilon? } },
-            claims: [ <claim> … ], verification: { oracle: i, borrow_frames: [i], inverse_pairs: [ { g, ginv, claim: i } ], unitary: [i], channel: [i],
+            claims: [ <claim> … ], verification: { oracle: i, borrow_frames: [i], inverse_pairs: [ { g, ginv, claim: i, budget: [B,heap,stack,depth] } ], unitary: [i], channel: [i],
                                                    fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
             cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },
             error:   { "<variant>:<inherited_controls>": { local: { "operator_norm"?: v, "diamond"?: v }, inclusive: { "operator_norm"?: v, "diamond"?: v } } },
@@ -1683,12 +1807,15 @@ Born probabilities, consuming the wires.
   span(D) is a permutation matrix and the final basis tuple equals P(x)
   for every x ∈ D, then V|span(D) = P.
 - **T4 (round trip).** For every finite CC/R trace with retained run
-  history and tapes that is eligible for reversal under §10 (in
-  particular it contains no `measure` frame and no `qreg.free` frame
-  whose cleanliness was not verified), the history traversal of §7.4
-  restores the active environment, memory, allocation table,
-  device-model state and active history (§7.4) to their entry values;
-  audit records may remain; observed external events are not retracted.
+  history and tapes that is eligible for reversal under §10 — a
+  `COMPLETED` or `FAILED` run containing no `measure` frame and no
+  `qreg.free` frame whose cleanliness was not verified — the history
+  traversal of §7.4 restores the active environment, memory, allocation
+  table, device-model state, register ledger (with the quantum state of
+  every register the run touched, its region calls being undone by
+  re-application or adjoint), token validity and active history (§7.4)
+  to their entry values; audit records may remain; observed external
+  events are not retracted.
 - **T5.** As §6.3.
 - **T6 (executor agreement).** Two executors conforming to §3–§7 on one
   target with the same schedule produce on every x ∈ D the same final
@@ -1702,14 +1829,14 @@ Born probabilities, consuming the wires.
 
 | Suite | Class | Tests |
 |---|---|---|
-| A | Executor | classical ISA; run history and LIFO reversal with loops, recursion, effects, segment `uncall` (impure suffix traps; nested `uncall` inside an uncalled segment; `uncall` over a `measure` traps; a segment that begins at the run's first instruction, uncalled, then whole-run reversal), `hostcall`, `qreg.*`, fault records (T4); the §3.1 call-tier table (R → CC rejected; CC `uncall` of a CC segment); a use reached before any definition traps 4 whatever the block text order |
+| A | Executor | classical ISA; run history and LIFO reversal with loops, recursion, effects, segment `uncall` (impure suffix traps; nested `uncall` inside an uncalled segment; `uncall` over a `measure` traps; a segment that begins at the run's first instruction, uncalled, then whole-run reversal), `hostcall`, `qreg.*`, fault records (T4); the §3.1 call-tier table (R → CC rejected; CC `uncall` of a CC segment); a use reached before any definition traps 4 whatever the block text order; `qreg[*]` (examples 4, 5): run-time widths 0, 2, 3, an id stored and reloaded, `qreg.from_id` of a stale, consumed or viewed id or of a register owned by another open run traps 4, a width-3 register bound to `wire[2]` or `qreg[2]` traps 4 with no effect, aliases consumed together, ids restored and never reused by reversal, run-time slice `lo` and `len`; `qreg.*` in R with whole-run reversal and segment `uncall` (a hardware-unverified free makes the segment non-uncallable); `budget.mint` valid and invalid and its reversal (example 6); the §4.9 causes — `udiv` by 0 → 5, i8 −128 `sdiv` −1 → 6, `load` at address 0 → 7, `alloc` beyond the heap → 2, `trap` → 4, `fault 1` → 1, `fault 0` → 4 — each with the pre-fault state unchanged and exactly one record; terminal R faults and FAILED-run reversal (example 8) |
 | B | Executor | oracle totality and prefix reversal: every fault code; B = 0; boundary halts; `lift.call`/`lift.ret` recursion with argument capture; one forward `lift.call` and one forward `lift.ret` step of a recursive call each followed by its inverse (§3.7); stack exhaustion (`sp + R_f > stack_limit`); matched `lift.oracle_uncall`, including two calls followed by two uncalls; interface regions restored; pre-entries; `lift.free` on pinned entries, and of a heap entry whose base equals a size-0 global's (the global stays live); inherent load/store checks; row indices of multi-row blocks and their `lift.label` values; `fault 0` and a triggered `lift.faultif p 0` commit `FAULT_UB_TRAP`; counters at the §3.7 minimum widths and interface widths above 128 bits |
-| C | Executor, Producer | T3 over full D at exhaustive widths for oracles, permutation actions, `qinplace` pairs, borrow frames; T6 agreement among VM, specialiser, transformed forms and the reference interpreter; the §16.3 examples as normative test vectors, including the stack-capacity boundary of example 2 and example 3 over its 8 basis and 16 controlled configurations with an entangled reference on the borrowed wire |
+| C | Executor, Producer | T3 over full D at exhaustive widths for oracles, permutation actions, `qinplace` pairs, borrow frames; T6 agreement among VM, specialiser, transformed forms and the reference interpreter; the §16.3 examples as normative test vectors, including the stack-capacity boundary of example 2 and example 3 over its 8 basis and 16 controlled configurations with an entangled reference on the borrowed wire; `qinplace` with `ins` and `args` (example 7) over all x, y, a and both control values, scratch clean, and its adjoint |
 | D | Executor | channel and unitary comparison for ε > 0 realisations; controlled-interference tests; checker-computed bounds; the diamond-norm SDP witness check of §12.1, including d = 2, J(Φ) = 0, Y = I₄/8, mu = bound = 3/8 (accepted: every pivot 1/8) and Y = 0, mu = 0 (rejected: pivot 0) |
 | E | Target author, Executor | JCS parsing; AST evaluation; matching; scheme expansion and correctness; aggregation from event lists; timing model; imports |
-| F | Producer | versioning, disjointness incl. control context; operand schema; row classes and frame sizing; index-space flattening; terminators; name resolution; permutation-only oracles; §6 transfer and windows; adjoint table; translation lemma side conditions with the four negative tests; `in`-wire use; acyclic action graphs; grammar; schemas; envelope and hashes, acyclic (inc8, zero, sum_db) and cyclic (sum, and a mutual SCC); SCC placement in the index space (mutual f, g whose member hashes order opposite to their names); empty data lines (`NAME SP LF` accepted, two spaces rejected); canonical `INT`/`FLOAT` at every literal site; const literal ranges; the region call graph with lifted calls and `qinplace`; `call` operand spelling; param role suffixes; interface-region names; local regions as call operands; `in`-wire uses; LIFO matched uncalls; linking; frame-descriptor live ranges |
-| G | Launch | every §10 entry point, state transition, binding rule, ownership rule; HOST_REQUEST/reply; reverse eligibility and tree order |
-| H | Scheduler | §6 validity; capacity; reproducibility; specificity resolution; verbatim execution; INFEASIBLE/UNSUPPORTED; invocation contexts covering default-only invocations (an action calling one region twice, one call scheduled explicitly: a claim with one witness rejects, two passing witnesses accept) |
+| F | Producer | versioning, disjointness incl. control context; operand schema; row classes and frame sizing; index-space flattening; terminators; name resolution; permutation-only oracles; §6 transfer and windows; adjoint table; translation lemma side conditions with the four negative tests; `in`-wire use; acyclic action graphs; grammar; schemas; envelope and hashes, acyclic (inc8, zero, sum_db) and cyclic (sum, and a mutual SCC); SCC placement in the index space (mutual f, g whose member hashes order opposite to their names); empty data lines (`NAME SP LF` accepted, two spaces rejected); canonical `INT`/`FLOAT` at every literal site; const literal ranges; the region call graph with lifted calls and `qinplace`; `call` operand spelling; param role suffixes; interface-region names; local regions as call operands; `in`-wire uses; LIFO matched uncalls; `qreg[*]` typing, the `measure.iN` form and width checks; `budget.mint` rejected in regions; CC/R block terminators; `qinplace` signature compatibility, its short form exactly when the three lists are empty, and its §6.1 transfer (cleaning a value that depends on x after changing an `ins` wire is rejected); CC/R `fault` literal range; linking; frame-descriptor live ranges |
+| G | Launch | every §10 entry point, state transition, binding rule, ownership rule; HOST_REQUEST/reply (a reply longer than `ptr_width` bits can count is `E_ARG`); reverse eligibility and tree order; `QREG` bound to `qreg[*]`; `FAILED → REVERSED` (example 8) and `E_NOT_REVERSIBLE` after a `measure` or an unverified free; exactly one fault record per `FAILED` run; a device-minted token used after its run is CLOSED is `E_ARG` |
+| H | Scheduler | §6 validity; capacity; reproducibility; specificity resolution; verbatim execution; INFEASIBLE/UNSUPPORTED; invocation contexts covering default-only invocations (an action calling one region twice, one call scheduled explicitly: a claim with one witness rejects, two passing witnesses accept); a device-minted tuple binds the schedule (a schedule bound to B = 3 is rejected for an invocation minted with B = 2) |
 
 ## 16. Canonical textual form (normative)
 
@@ -1748,7 +1875,7 @@ syntax; annotations travel outside the object.
                -- oracle: (in..) (tgt) (fault) (mem..) (args..) ; action: (mut..) (in..) (mem..) (args..) () ; lproc: (params..) (result) () () () ; fn: (params..) (results..) () () ()
   plist     := (param ("," SP param)*)?
   param     := NAME ":" type (SP ("in"|"mut"))?
-  type      := "i" INT | "ptr" | "f64" | "token" | "wire" | "wire[" INT "]" | "reg[" INT "]" | "region[" INT "," INT "]" | "qreg[" INT "]"
+  type      := "i" INT | "ptr" | "f64" | "token" | "wire" | "wire[" INT "]" | "reg[" INT "]" | "region[" INT "," INT "]" | "qreg[" (INT | "*") "]"
   regs      := "regs" SP "{" SP (NAME ":" type ("," SP NAME ":" type)*)? SP "}" (SP "bounds" SP "{" INT ("," SP INT)* "}")? NL
   block     := "^" NAME "(" plist "):" NL instr+
   instr     := (lhs SP "=" SP)? OPCODE (SP operand)* (SP "{" NL instr+ "}" (SP "{" NL instr+ "}")?)? NL
@@ -1947,6 +2074,266 @@ sequence `cx b[0] t; cx x b[0]; cx b[0] t; cx x b[0]`) realises the same
 permutation; the adjoint's frame is not of the lemma's shape and is
 covered by the `adjoint_table` rule (§12.1).
 
+**Example 4** (`ones`, BLK-1): a register of run-time width, its id
+stored to memory and reloaded, wires addressed by run-time slices.
+
+```
+bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"<to be computed by the 0.9 precheck>","kind":"cc","name":"ones","signature":{"abi":"0.9","kind":"cc","params":["i64"],"results":["i3"],"tier":"cc"}},"1":{"interface_hash":"<to be computed by the 0.9 precheck>","kind":"perm_action","name":"flip","signature":{"abi":"0.9","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}}}
+
+section functions
+fn cc @ones (n:i64) (m:i3) () () ()
+^entry():
+q = qreg.new any n
+w = qreg.width q
+id = qreg.id q
+k = const.i32 8
+p = alloc k
+store.i64 p id
+id2 = load.i64 p
+q2 = qreg.from_id id2
+zero = const.i64 0
+one = const.i64 1
+br ^test(zero)
+^test(i:i64):
+c = icmp.ult i w
+br c ^body(i) ^done()
+^body(j:i64):
+s = qreg.slice q2 j 1
+action_call @flip (s) () () ()
+j2 = add j one
+br ^test(j2)
+^done():
+m = measure.i3 q2
+ret m
+perm_action @flip (a:wire) () () () ()
+^entry():
+x a
+
+section layout
+{"A_tab":4,"H":12,"S_cells":0,"globals":{},"heap_base":16,"heap_limit_max":4080,"interface_regions":{},"null_size":16,"ptr_width":32}
+```
+
+Ranges: null [0, 16), heap [16, 4096) = [0, 2^12), no globals. For n = 3:
+`q` is a fresh register R (width 3, |000⟩); `p` = 16 (the bump pointer
+starts at `heap_base`); `q2` is an alias of R; iterations i = 0, 1, 2
+each slice [i, 1) (a `qreg[1]` view) and flip that wire; at i = 3 the
+loop exits; `measure.i3` finds width 3 and outcome 0b111 = 7 with
+probability 1. The run is `COMPLETED` with one `INT` result of width 3
+(the byte `07`) and one measurement record (R, bits 1, 1, 1); it is not
+reversible (a `measure` frame). For n = 2 the loop flips two wires and
+`measure.i3` traps before measuring (width 2 ≠ 3): `FAILED`, one record
+`FAULT_UB_TRAP`, no measurement, R live in |11⟩; that run *is*
+reverse-eligible and reversal returns R to |00⟩ and releases it. For n =
+0 the loop does not run and `measure.i3` traps likewise.
+
+**Example 5** (`scratch`, BLK-4): quantum allocation inside an R
+function, used and released, then reversed.
+
+```
+bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"<to be computed by the 0.9 precheck>","kind":"cc","name":"main","signature":{"abi":"0.9","kind":"cc","params":["i64"],"results":[],"tier":"cc"}},"1":{"interface_hash":"<to be computed by the 0.9 precheck>","kind":"r","name":"scratch","signature":{"abi":"0.9","kind":"r","params":["i64"],"results":[],"tier":"r"}},"2":{"interface_hash":"<to be computed by the 0.9 precheck>","kind":"perm_action","name":"flip","signature":{"abi":"0.9","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}}}
+
+section functions
+fn cc @main (n:i64) () () () ()
+^entry():
+call @scratch n
+ret
+fn r @scratch (n:i64) () () () ()
+^entry():
+q = qreg.new any n
+zero = const.i64 0
+one = const.i64 1
+br ^test(zero)
+^test(i:i64):
+c = icmp.ult i n
+br c ^body(i) ^done()
+^body(j:i64):
+s = qreg.slice q j 1
+action_call @flip (s) () () ()
+t = qreg.slice q j 1
+action_call @flip (t) () () ()
+j2 = add j one
+br ^test(j2)
+^done():
+qreg.free q
+ret
+perm_action @flip (a:wire) () () () ()
+^entry():
+x a
+```
+
+The object is memoryless. Forward, for every n: R creates register Q
+(width n, |0…0⟩); iteration j flips wire j to |1⟩ and back to |0⟩; the
+`qreg.free` finds Q clean (a simulator verifies it); the run is
+`COMPLETED` with no values. Whole-run reversal re-creates Q clean with
+its id, undoes iteration n − 1 (the second flip's adjoint makes wire n −
+1 |1⟩, its slice frame restores Q live, the first flip's adjoint makes
+it |0⟩), then every earlier iteration, and finally the `qreg.new` (Q is
+clean: released); the run is `REVERSED` with the register ledger as at
+entry, Q's id not reused. On hardware the free is unverified (§17 item
+14) and `bennett_reverse` returns `E_NOT_REVERSIBLE`. Under 0.8 `@scratch`
+is ill-formed (`qreg.*` was CC only).
+
+**Example 6** (`adaptive`, BLK-2): a budget minted on the device from a
+run-time value.
+
+```
+bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"<to be computed by the 0.9 precheck>","kind":"cc","name":"adaptive","signature":{"abi":"0.9","kind":"cc","params":["i1","qreg[8]","qreg[8]","qreg[4]"],"results":[],"tier":"cc"}},"1":{"interface_hash":"<to be computed by the 0.9 precheck>","kind":"cc","name":"overdraw","signature":{"abi":"0.9","kind":"cc","params":[],"results":[],"tier":"cc"}},"2":{"interface_hash":"<to be computed by the 0.9 precheck>","kind":"oracle","name":"inc8","signature":{"abi":"0.9","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}}}
+
+section functions
+fn cc @adaptive (b:i1, x:qreg[8], t:qreg[8], f:qreg[4]) () () () ()
+^entry():
+two = const.i64 2
+three = const.i64 3
+zero = const.i64 0
+s = select b three two
+tk = budget.mint @inc8 s zero zero zero
+oracle_call @inc8 tk (x) t f () ()
+ret
+fn cc @overdraw () () () () ()
+^entry():
+three = const.i64 3
+one = const.i64 1
+zero = const.i64 0
+tk = budget.mint @inc8 three one zero zero
+ret
+oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
+regs { one:reg[8], r:reg[8] }
+^entry():
+one = lift.const.i8 1
+r = lift.add x one
+lift.retval r
+```
+
+`@inc8` is example 1's oracle. With b = 1 the token's tuple is (3, 0, 0,
+0) and, on basis inputs, t ⊕= (x + 1) mod 256 with f unchanged; with b = 0
+it is (2, 0, 0, 0): t unchanged, f ⊕= `FAULT_BUDGET_STEPS` (example 1's
+results). Both runs are `COMPLETED`. Reversal re-applies `@inc8` with the
+recorded tuple (an involution), restoring t and f, then revokes the
+token. `@overdraw` asks for heap_limit 1 in a memoryless object: the mint
+fails `bennett_budget`'s check, the run is `FAILED` with one record
+`FAULT_UB_TRAP`, and no token exists.
+
+**Example 7** (`addya`, BLK-3): a parametrised in-place update x ← (x
++ y + a) mod 4 from a declared inverse pair.
+
+```
+bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"<to be computed by the 0.9 precheck>","kind":"oracle","name":"g","signature":{"abi":"0.9","args":["i2"],"fault":4,"in":[2,2],"kind":"oracle","mem":[],"tgt":2,"tier":"q"}},"1":{"interface_hash":"<to be computed by the 0.9 precheck>","kind":"oracle","name":"ginv","signature":{"abi":"0.9","args":["i2"],"fault":4,"in":[2,2],"kind":"oracle","mem":[],"tgt":2,"tier":"q"}},"2":{"interface_hash":"<to be computed by the 0.9 precheck>","kind":"perm_action","name":"addya","signature":{"abi":"0.9","args":["token","i2"],"bounds":[],"in":[2],"kind":"perm_action","mem":[],"mut":[2],"tier":"q"}},"3":{"interface_hash":"<to be computed by the 0.9 precheck>","kind":"cc","name":"run","signature":{"abi":"0.9","kind":"cc","params":["qreg[2]","qreg[2]","token","i2"],"results":[],"tier":"cc"}}}
+
+section functions
+oracle @g (x:wire[2] in, y:wire[2] in) (t:wire[2]) (f:wire[4]) () (a:i2)
+regs { s:reg[2], r:reg[2] }
+^entry():
+s = lift.add x y
+r = lift.add s a
+lift.retval r
+oracle @ginv (x:wire[2] in, y:wire[2] in) (t:wire[2]) (f:wire[4]) () (a:i2)
+regs { s:reg[2], r:reg[2] }
+^entry():
+s = lift.sub x y
+r = lift.sub s a
+lift.retval r
+perm_action @addya (x:wire[2]) (y:wire[2] in) () (tk:token, a:i2) ()
+^entry():
+qinplace @g @ginv tk x (y) () (a)
+fn cc @run (x:qreg[2], y:qreg[2], tk:token, a:i2) () () () ()
+^entry():
+action_call @addya (x) (y) () (tk, a)
+ret
+```
+
+Each oracle has three rows, so F_B = ((x + y + a) mod 4, 0), resp. ((x − y
+− a) mod 4, 0), for B ≥ 3 and (0, `FAULT_BUDGET_STEPS`) for B ≤ 2; for each
+(y, a) the two maps are mutually inverse bijections of [0, 4). The object
+is completed for execution by a certificate (generated with the 0.9
+precheck, which first computes `object_hash`) whose `@addya` region
+record carries `verification.inverse_pairs` = `[{"budget":[3,0,0,0],"claim":0,"g":"<closure hash of g>","ginv":"<closure hash of ginv>"}]`
+and claim 0 = `{"domain":{"args":[{"hi":3,"lo":0,"name":"a","width":2}],"borrowed":[],"bundles":[{"hi":3,"lo":0,"name":"x","width":2},{"hi":3,"lo":0,"name":"y","width":2}],"regions":[]},"expected":"inverse_pair","kind":"exhaustive"}`
+(64 elements). With it and a token whose tuple is ≥ (3, 0, 0, 0), `@run`
+maps every basis (x, y) and a ∈ [0, 4) to x′ = (x + y + a) mod 4, y
+unchanged, scratch clean: for x = 3, y = 2, a = 1, `@g` gives t = 2, the
+exchange gives x = 2, t = 3, and `@ginv`(2; 2, 1) = 3 clears t. The adjoint
+maps x to (x − y − a) mod 4; under a control 0 nothing changes. Without the
+certificate, or with a token of tuple (2, 0, 0, 0), `@run` traps
+`FAULT_UB_TRAP` before any effect.
+
+**Example 8** (`fails`, ISA-7/ISA-8): an R fault after effects, and the
+reversal of the failed run.
+
+```
+bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"<to be computed by the 0.9 precheck>","kind":"cc","name":"main","signature":{"abi":"0.9","kind":"cc","params":[],"results":[],"tier":"cc"}},"1":{"interface_hash":"<to be computed by the 0.9 precheck>","kind":"r","name":"work","signature":{"abi":"0.9","kind":"r","params":["ptr"],"results":[],"tier":"r"}}}
+
+section functions
+fn cc @main () () () () ()
+^entry():
+n = const.i32 8
+p = alloc n
+call @work p
+ret
+fn r @work (p:ptr) () () () ()
+^entry():
+v = const.i64 7
+store.i64 p v
+effect clock.read p
+fault 21
+
+section devices
+{"models":{"clock":{"version":"0.9"}},"services":{}}
+
+section layout
+{"A_tab":4,"H":12,"S_cells":0,"globals":{},"heap_base":16,"heap_limit_max":4080,"interface_regions":{},"null_size":16,"ptr_width":32}
+```
+
+`p` = 16; the store writes `07 00 00 00 00 00 00 00` at [16, 24); the clock
+read writes c = 0 there (`00` × 8) and sets c = 1; `fault 21` ends the run:
+`FAILED`, `bennett_result_nfaults` = 1, `bennett_result_fault` = 21, no
+values, `@main`'s `ret` not executed, [16, 24) = `00` × 8, c = 1, tape
+length 1. `bennett_reverse` (0.8: `E_NOT_REVERSIBLE`) removes the fault
+record, undoes the clock read ([16, 24) = `07 00` × 7, c = 0, tape empty),
+the store ([16, 24) = `00` × 8), the open activation of `@work` and the
+call, and the allocation: the run is `REVERSED` with memory, allocation
+table, clock and tape at their entry values.
+
+**Example 9** (`zero_cause`, effective cause): a literal fault code 0.
+
+```
+bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"<to be computed by the 0.9 precheck>","kind":"oracle","name":"zero_cause","signature":{"abi":"0.9","args":[],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}},"1":{"interface_hash":"<to be computed by the 0.9 precheck>","kind":"cc","name":"zero_cc","signature":{"abi":"0.9","kind":"cc","params":[],"results":[],"tier":"cc"}}}
+
+section functions
+oracle @zero_cause (x:wire in) (t:wire) (f:wire[4]) () ()
+^entry():
+lift.faultif x 0
+lift.retval x
+fn cc @zero_cc () () () () ()
+^entry():
+fault 0
+```
+
+Rows: `lift.faultif` (index 0), `lift.retval` (1); `HALT` = 2, P = 2. With
+B = 0 every x yields (0, `FAULT_BUDGET_STEPS`). With B = 1, x = 0 yields (0,
+`FAULT_BUDGET_STEPS`) (not halted) and x = 1 yields (0, `FAULT_UB_TRAP`).
+With B ≥ 2, x = 0 yields (0, 0) (success, payload 0) and x = 1 yields (0,
+`FAULT_UB_TRAP`); under 0.8, x = 1 yielded (0, 0) for every B ≥ 1,
+indistinguishable from success. A run of `@zero_cc` is `FAILED` with one
+record `FAULT_UB_TRAP`.
+
 ## 17. Decisions deferred to implementation, with defaults
 
 Each item is one an implementer must decide to build; any decision is
@@ -1991,12 +2378,23 @@ the item is revised. Items 1–5 are asserted non-semantic.
 13. **Suite sizes** (§15): the exhaustive widths of suite C and the
     sample counts of `sampled` claims. Default: exhaustive for ≤ 16
     interface bits; 2^16 samples above.
-14. **Hardware handling of an unclean `qreg.free`** (§3.3). Default: the
-    run is marked `FAILED` with a fault record `FAULT_UB_TRAP` at the
-    instruction, since cleanliness of an arbitrary state is not
-    testable nondestructively.
+14. **Hardware handling of `qreg.free`** (§3.3). Cleanliness of an
+    arbitrary state is not testable nondestructively. Default: on
+    hardware the release proceeds without a test and its frame is
+    marked unverified, so a segment containing it cannot be uncalled
+    (§7.4) and a run containing it is not reverse-eligible (§10);
+    releasing a register that was not clean is a program error the
+    hardware does not detect *(non-normative: its wires are then
+    discarded as by an unrecorded measurement)*. A simulator verifies
+    and records `FAULT_UB_TRAP` on failure (§4.9).
 15. **Target topology** (§8.2, §8.3). target 0.9 has no topology field
     (an unknown field is a load error). Default: all-to-all over
     logical wires, overlap limited only by `max_parallel`; a routing
     cost a target wishes to charge is a declared resource (`resources`,
     `imports`, §8.2–§8.3).
+16. **Exhaustion of an executor's own classical resources in CC/R**
+    (activation stack, history storage; §4.9). CC and R carry no budget
+    (§5.4 budgets are Q-tier), so where a finite executor runs out is
+    its own limit. Default: a terminal fault record `FAULT_BUDGET_HEAP`
+    at the instruction that cannot proceed; the point is
+    executor-defined and the suites do not test it.

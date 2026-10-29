@@ -60,7 +60,7 @@ item recorded in §0 as considered and deferred with its 0.8 construction.
 
 ## Status
 
-- [x] group 1 (commit below)   - [ ] group 2   - [ ] group 3   - [ ] hostile reread and fixes   - [ ] final diff + commit
+- [x] group 1   - [x] group 2   - [ ] group 3   - [ ] hostile reread and fixes   - [ ] final diff + commit
 
 ## Decisions (with reasons) — appended as taken
 
@@ -163,3 +163,104 @@ for unchanged bodies, and it has no 0.9 instructions. The crate was not edited. 
 ## Open questions for the maintainer
 
 (see below)
+
+### Group 2 decisions
+
+- G2-a (K1). `qreg[n]` may be used where `qreg[*]` is expected; `qreg[*]` → `qreg[n]` (parameter, block parameter,
+  `ret`, region slot, launch) is checked at the transfer (width = n, else trap 4, no effect). `measure` keeps the
+  0.8 form for `qreg[n]`; `qreg[*]` needs `measure.iN` (width checked before measuring). Run-time width 0 is legal
+  (an empty `Vec<Qubit>`); such a register can be freed, passed, concatenated, never measured (N ≥ 1) or bound to a
+  slot (slot widths ≥ 1). Ids are never reassigned while the program is loaded (simplest sufficient rule for
+  "reversal restores the same ids"). `qreg.slice` `len` may also be run-time (result `qreg[*]`).
+- G2-b (K1). DEPARTURE from the evidence note and DL: `qreg.from_id` frames are **pure** (it changes only the
+  instance set; ownership acquisition is launch bookkeeping released at CLOSED). Reason: purity lets the
+  compute–copy–`uncall` idiom (§7.4) look a handle up after the call; impure would forbid it. Soundness: if the
+  uncalled segment created the register, the retained alias is dangling and every use traps 4 (deterministic).
+- G2-c (K2). Reversal of `qreg.new` releases without a test: the register is clean because every later frame
+  touching it is undone first (LIFO) and the run owns it exclusively; simulators verify. Reversal of `qreg.free`
+  re-creates it clean with the same id/class/width.
+- G2-d (K3). DEPARTURE: `budget.mint` is CC **and R** (evidence note and DL: CC). Reason: the BLK-4 analogue —
+  an R routine computing a budget from R data mid-run cannot hoist it to CC; R is classical, so §3.1's invariant
+  holds. Mint frames are impure (they change the token ledger).
+- G2-e (K3, new closure found while drafting). 0.8 never says whether a token validated for region @p may be given
+  to `oracle_call @o`. The §5.4 checks depend only on the object's layout, and the evidence note's own fixtures pass
+  one token to several calls. Draft: a token MAY be supplied to any region call of the program. Bead filed.
+- G2-f (K4). The inverse-pair obligation is carried by a certificate claim with a budget tuple and an args domain,
+  checked at the CC/R region call before any effect (trap 4 otherwise). DEPARTURE from the evidence note ("a failing
+  certificate is ill-formed"): tokens and args are run-time values, so the claim's applicability can only be checked
+  at the call; a run-time trap is the more permissive outcome. Monotonicity lemma D14 makes one claim cover every
+  larger tuple. The short form `qinplace @g @ginv tk x` is the spelling when all three lists are empty.
+- G2-g (K4). §6.1: x stays `other` if it was `other` (0.8's row gave "perm with S_x ∪ Π", undefined for other x).
+- G2-h (K5). "CC trap" and "R fault record" are one event: a terminal fault record; a FAILED run has exactly one
+  (0.8: "at least one"; no second can arise once the first is terminal). Every CC/R block ends in `br`, `ret`,
+  `trap` or `fault` (0.8 had no CC/R terminator rule). Unclean `qreg.free` on a simulator: record 4.
+- G2-i (K6). R faults are terminal (EN; DL §17.6). DL's B-BLK row for ISA-8 says "an R call returns a fault status
+  to its CC caller"; that contradicts DL §17.6 and is not adopted (open question Q3).
+- G2-j (K8). §17 item 14's 0.8 default ("FAILED with FAULT_UB_TRAP", for a condition hardware cannot test)
+  contradicts §7.4's "qreg.free frame whose cleanliness was not verified (hardware, §17 item 14)". Reconciled: the
+  hardware release proceeds unverified, its frame is marked so (no uncall, no reversal), and releasing an unclean
+  register discards (traces out) its wires.
+
+### Group 2 derivations
+
+D10 (example 4, `ones`, n = 3). qreg.new any 3 → register R, width 3, state |000⟩, fresh id r. w = 3; id = r.
+p = alloc 8 → 16 (bump starts at heap_base = 16; entry (16, 8, live, unpinned); bump 24). store.i64 16 r;
+load.i64 16 → r; from_id r → q2, alias of R (live, not a view, owned by this run). Loop i = 0, 1, 2: slice [i, 1)
+of R (lo run-time, len literal 1 → `qreg[1]` view), R viewed; action_call @flip flips wire i (X); view consumed,
+R live. i = 3: icmp.ult 3 3 = 0 → ^done. measure.i3 q2: width 3 = N; state |111⟩ (wire i = bit i), so outcome
+0b111 = 7 with probability 1; R consumed. ret m = 7: COMPLETED, one INT result of width 3 (⌈3/8⌉ = 1 byte 0x07),
+one measurement record (R, bits 1 1 1). Reverse: E_NOT_REVERSIBLE (a measure frame).
+n = 2: the loop flips wires 0 and 1; measure.i3 sees width 2 ≠ 3 → trap 4 before measuring: FAILED, one record 4,
+no measurement, R live in |11⟩. That run is reverse-eligible (no measure frame, no free): reversal undoes the record,
+then i = 1's call by adjoint (X) and slice, i = 0's likewise, from_id, load, store, alloc, the consts, width, id
+and finally qreg.new (R is |00⟩ again: release). n = 0: no iteration; measure.i3 sees width 0 → FAILED, record 4.
+
+D11 (example 5, `scratch`, R allocation). For n: R creates register Q (width n, |0…0⟩). Iteration j < n: slice
+[j,1) → view, flip (wire j: 0 → 1), view consumed; slice again, flip (1 → 0). After the loop Q is |0…0⟩;
+qreg.free Q: clean (simulator verifies) → consumed. ret; main ret: COMPLETED, no values. Whole-run reversal (LIFO):
+main's ret; call frame boundary; @scratch's ret; qreg.free undone → Q re-created clean, same id; iteration n−1
+undone: br, add, second flip's adjoint (wire n−1: 0 → 1), its slice (view gone, Q live), first flip's adjoint (1 →
+0), its slice; … iteration 0 likewise; consts; qreg.new undone → Q released clean. REVERSED; ledger as at entry (Q's
+id is not reused). Midway, just after the first undone flip, wire n−1 is |1⟩, which checks the order. On hardware
+the free is unverified → E_NOT_REVERSIBLE. Under 0.8 the R function is ill-formed (qreg.* CC only).
+
+D12 (example 6, `adaptive`). b = 1: select → 3; mint (3, 0, 0, 0) for @inc8: memoryless object, heap = stack =
+depth = 0 required: passes. inc8 at B = 3 (D1): t ⊕= (x + 1) mod 256, f unchanged. b = 0: B = 2: (0,
+FAULT_BUDGET_STEPS) → t unchanged, f ⊕= 1. Both runs COMPLETED (an oracle fault is a fault-register outcome, not a
+run fault). Reverse: the region-call frame re-applies inc8 with its recorded tuple (the oracle is an involution):
+t, f restored; the mint frame is undone (token revoked); select and consts removed. `@overdraw`: mint (3, 1, 0, 0)
+fails heap_limit = 0 for a memoryless object → FAILED, record 4, no token.
+
+D13 (example 7, `addya`). g: rows s = x + y, r = s + a, retval r: 3 rows, F_B = ((x+y+a) mod 4, 0) for B ≥ 3, (0, 1)
+for B ≤ 2. ginv: s = x − y, r = s − a: ((x−y−a) mod 4, 0) for B ≥ 3. For fixed (y, a) both are bijections of
+Z/4 and mutually inverse: (x+y+a) − y − a = x. Macro (token B ≥ 3): t = 0, f = 0; g: t = (x+y+a) mod 4, f = 0; qexch:
+x' = (x+y+a) mod 4, t = x; ginv on x': t = x ⊕ ((x'−y−a) mod 4) = x ⊕ x = 0, f = 0; free t, f clean. E.g. x = 3, y =
+2, a = 1: x' = 6 mod 4 = 2; ginv(2; 2, 1) = −1 mod 4 = 3; t = 3 ⊕ 3 = 0. Adjoint (pair swapped): x ← (x − y − a) mod 4.
+Under an external control 0 no gate acts and scratch stays 0. Exhaustive claim: 4 · 4 · 4 = 64 elements (x, y, a),
+both oracles at (3, 0, 0, 0). A token (2, 0, 0, 0) is not ≥ (3, 0, 0, 0): trap 4. Without a certificate: trap 4.
+
+D14 (monotonicity, used by K4). Reference interpreter at tuple β₀ = (B₀, h₀, s₀, d₀) reaching `lift.retval` at
+step T ≤ B₀ without a fault: the only limit-dependent decisions are the flags heap_used + max(n,1) > heap_limit,
+depth + 1 > depth_limit, sp + R_f > stack_limit (all false on this trajectory) and the step bound (not reached).
+For β ≥ β₀ componentwise each flag is still false (its right-hand side only grew), so the trajectory is identical
+and halts at T ≤ B₀ ≤ B with the same result_val: F_β(x) = F_β₀(x) = (f(x), 0). (A faulting or exhausted run at β₀
+gives no such implication, which is why claims state a minimum tuple.) Nested `lift.oracle_call`s use tokens from
+classical arguments, which the claim's args domain fixes.
+
+D15 (example 8, failed prefix). Initial: bump 16, no table entries, clock c = 0, tape empty. main: n = 8; alloc 8 →
+p = 16, entry (16, 8, live, unpinned), [16, 24) zero, bump 24; call @work 16; v = 7; store.i64 16 7 → [16, 24) =
+07 00 00 00 00 00 00 00 (frame keeps 00 × 8); clock.read 16 → writes c = 0 LE: 00 × 8 (frame keeps 07 00 × 7), c = 1,
+tape (clock, read, 16); fault 21 → C′ = 21: terminal record, FAILED. Observable: nfaults = 1, fault 0 = 21,
+nvalues = 0, [16, 24) = 00 × 8, c = 1, tape length 1; main's ret never executes. Reverse: record removed; clock.read
+undone ([16, 24) = 07 00 × 7, c = 0, tape empty); store undone ([16, 24) = 00 × 8); v; the open activation of @work
+and main's call frame; alloc undone (bump 16, entry removed); n. REVERSED; memory, table, clock and tape at entry.
+0.8: FAILED → E_NOT_REVERSIBLE.
+
+D16 (example 9, zero cause). `@zero_cause`: rows faultif (index 0), retval (1); n = 2, HALT = 2, P = 2 (2^2 > 2). B =
+0: every x → (0, 1). B = 1: x = 0: flag 0, pc = 1, not halted → (0, 1); x = 1: flag 1, code ^= C′ = 4, faulted,
+HALT → (0, 4). B ≥ 2: x = 0 → retval 0: success, result 0 → (0, 0) (t unchanged, f unchanged); x = 1 → (0, 4). In
+0.8 the x = 1 outcome at B ≥ 1 was (0, 0), identical to x = 0's success. `@zero_cc`: `fault 0` → record C′ = 4,
+FAILED.
+
+Beads filed by this job: b-isa-spec-8wn (token-region binding), b-isa-spec-exc (§17 item 14 vs §7.4),
+b-isa-spec-04w (measuring registers wider than 128 bits; efficiency, construction recorded).
