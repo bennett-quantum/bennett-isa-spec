@@ -60,7 +60,7 @@ item recorded in §0 as considered and deferred with its 0.8 construction.
 
 ## Status
 
-- [x] group 1   - [x] group 2   - [ ] group 3   - [ ] hostile reread and fixes   - [ ] final diff + commit
+- [x] group 1   - [x] group 2   - [x] group 3   - [ ] hostile reread and fixes   - [ ] final diff + commit
 
 ## Decisions (with reasons) — appended as taken
 
@@ -264,3 +264,21 @@ FAILED.
 
 Beads filed by this job: b-isa-spec-8wn (token-region binding), b-isa-spec-exc (§17 item 14 vs §7.4),
 b-isa-spec-04w (measuring registers wider than 128 bits; efficiency, construction recorded).
+
+### Group 3 derivations and decisions
+
+D17 (I5, identity-idle variant, verified by hand before citing EN's 608-case check). Forward: a = (pc ≠ HALT);
+at_k for k < n from pc (all 0 when idle); rows; successor XORs for k < n and both exchanges under a (no HALT
+successor); then old_pc ^= HALT under a. Active from k: after the exchanges pc = succ, pc' = 0, old_pc = k; then
+old_pc = k ⊕ HALT ≠ 0 since k ≠ HALT. Clean dispatch: at_k ^= (old_pc ⊕ HALT == k) ∧ a. Clear a: a ^= (old_pc ≠ 0) =
+1 → 0. Idle: a = 0, no write, old_pc = 0, a ^= (0 ≠ 0) = 0. Inverse: a = (old_pc ≠ 0); at_k from old_pc ⊕ HALT under a;
+old_pc ^= HALT under a (→ k); inverse exchanges under a (pc = k, pc' = succ, old_pc = 0); successor XOR undone (pc' =
+0); rows undone as printed; at_k uncomputed from pc under a; a ^= (pc ≠ HALT) = (k ≠ HALT) = 1 → 0; idle: all zero.
+A step ending in HALT (retval, fault) still leaves old_pc = k ⊕ HALT ≠ 0, so it is never confused with idle. Same
+frame width (P bits), same F_B. Decision: §17 item 17 with the printed step as default (brief: no expansion fixture
+with hand-derived gate-level values exists, ref unpublished).
+
+D18 (I1). P_{j+1}(a, b) = P_j(a, c); P_j(c, b); P_j(a, c) with c clean: T(j+1) = 3T(j), T(0) = 1 → 3^k base
+evaluations for k = ⌈log₂ B⌉ (after padding F to 2^k stuttering steps); one temporary configuration per level live
+during the inner calls → at most k temporaries of S bits. EN's verifier checked the recurrence to level 5 on Z/4.
+The bead's "polylog time" is not adopted. Decision: §17 item 18, default full history, hook in §9.4/§11.

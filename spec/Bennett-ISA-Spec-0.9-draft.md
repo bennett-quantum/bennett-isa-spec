@@ -109,6 +109,35 @@ check say so and name what keeps every program expressible.
 | K7 | §3.3, §17 item 14 | 0.8's §17 item 14 default (a `FAILED` record for a condition hardware cannot test) contradicted §7.4's unverified frees: hardware releases proceed unverified and exclude `uncall` and reversal; a simulator records `FAULT_UB_TRAP` | found while drafting; bd exc | S | – |
 | K8 | §16.3, §15 | Examples 4–9 (one per new family, hand-derived results) and the suite rows for every new instruction and fault | brief | E | new |
 
+### 0.3 Group 3: optional efficiency semantics (deferred)
+
+| # | § | Change | Closes | Kind | Hash |
+|---|---|---|---|---|---|
+| P1 | §17 item 17, §3.6 | Identity-idle step (old index encoded as k ⊕ HALT, idle frames zero), deferred with the printed step as default and its normative hook | EN I5; bd roy | E | – |
+| P2 | §17 item 18, §5.7, §9.4 | Checkpointed and pebbled oracle realisations, deferred with full history as default and the expansion-library hook | EN I1; bd 9c3 | E | – |
+
+**Considered and deferred** (efficiency in the evidence note; no 0.9
+text; the capability is kept by the stated construction, so no rung and
+no north-star promise depends on the deferred primitive):
+
+| Item | Construction that keeps the capability |
+|---|---|
+| ISA-2 (R-tier budget) | an R step counter threaded through the code; exhaustion is now `fault 1` (K5) |
+| ISA-5 (two simultaneous slices) | one action on the parent register (e.g. `cx q[0] q[7]`); run-time indices by dispatch or by run-time slice `lo` (E12) |
+| ISA-6 (non-consuming measurement) | CNOT copy of the wires into a fresh register, then `measure` of the copy; the original keeps its id |
+| ISA-9 (borrowing driven from CC) | a clean allocation, or a Q region with its own borrow frame |
+| ISA-11 (host memory at native addresses) | promotion of the pointer-sharing callers to CC (`alloc`, `hostcall` for genuine host effects) |
+| G-12 (run-time snapshot at native addresses) | replay every allocation in bump order (dead and zero-size ones included) and copy the bytes |
+| G-13 (interface base chosen at call time) | static arenas and explicit logical-to-physical address translation rows |
+| G-14 (step machine inside actions) | bounded, padded structured expansion with immutable selectors |
+| G-15 (payloads wider than 128 bits) | one oracle variant per slice sharing the caller's fault register (k calls, k + 1 when k is even) |
+| G-16 (fibers, interrupts) | explicit continuation records in memory and polling at defined points |
+| I2 (bounded-loop recovery) | §5.7 structure recovery with immutable selectors or retained history |
+| I3 (budget provenance) | host tuple or bounded wrapper; dialect documentation |
+| I6 (step-granular oracle interface) | whole-oracle budget ladders of region calls |
+| SQLite E1–E5 | logical stack and frames as specified; compare tree plus static `lift.call`; a copy lproc; classical-data specialisation under §5.7 |
+| measuring registers wider than 128 bits (bd 04w) | copy 128-bit slices to fresh registers, measure the copies, reset the source wire by wire with run-time slices |
+
 ## 1. Scope and conformance
 
 ### 1.1 What the ISA is
@@ -987,7 +1016,8 @@ are one frame verified by their own T3 claim over D.
 
 Inlining, structure recovery, dispatch re-indexing and simplification
 MUST produce on every x ∈ D the same final interface tuple as §5.2's
-construction on the reference body (T6).
+construction on the reference body (T6). Checkpointed and pebbled
+realisations: §17 item 18.
 
 ## 6. Uncomputation validity (static discipline)
 
@@ -1421,7 +1451,9 @@ rebinding to closure hashes.
 - **Frame descriptor** (certificate): interface slots (role, width,
   class), scratch by class and cleanliness **as a function of the
   inherited control count c** (an expression in `c` of §8.1's language),
-  retained history (oracles: B × frame width), borrow requirement, scheme
+  retained history (oracles: B × frame width under the full-history
+  reference expansion, otherwise the realised history of the bound
+  expansion library, §17 item 18), borrow requirement, scheme
   ancillae. Shared frames only with disjoint live ranges (suite F);
   callees `qborrow` only from the caller's designated idle set.
   Encoded (JCS) as `{ "interface": [ { "role", "width", "class" } ],
@@ -2398,3 +2430,36 @@ the item is revised. Items 1–5 are asserted non-semantic.
     its own limit. Default: a terminal fault record `FAULT_BUDGET_HEAP`
     at the instruction that cannot proceed; the point is
     executor-defined and the suites do not test it.
+17. **Identity-idle step** (§3.6). A variant of the step in which an
+    idle step leaves its frame at zero: forward, a = (pc ≠ HALT) into
+    clean scratch; dispatch k < n only; rows as printed; the successor
+    XORs for k < n and both commit exchanges under a, with no HALT
+    successor; then `old_pc ^= HALT` under a (an active frame holds old
+    index ⊕ HALT, never 0, since the old index is < n = HALT);
+    dispatch uncomputed from old_pc ⊕ HALT under a; a cleared from
+    (old_pc ≠ 0). Inverse: a = (old_pc ≠ 0); dispatch from old_pc ⊕
+    HALT under a; `old_pc ^= HALT` under a; the two inverse exchanges
+    under a; successors and rows undone as printed; dispatch uncomputed
+    from pc under a; a cleared from (pc ≠ HALT). Same frame width, same
+    F_B and the same postcondition as T2; on pc = HALT with a fresh zero
+    frame a forward step is the identity (candidate theorem T7).
+    Default: the printed step, whose idle frames record HALT. Hook: an
+    expansion library (§11) MAY name this variant as its realisation of
+    §3.6, and a schedule binding that library executes and charges it;
+    making it the reference changes §3.6 and adds T7.
+18. **Checkpointed or pebbled oracle realisations** (§5.2, §5.7, §9.4,
+    §11). Default: the full-history reference expansion (B frames, the
+    library `ref`). Hook: an expansion library MAY realise §5.2 by
+    checkpoints and replay or by pebbling; it MUST list every generated
+    allocation, copy, forward evaluation, inverse evaluation and release,
+    every repeated evaluation included, with distinct ordinals and
+    scratch identities, and carry a full-domain argument that the final
+    interface tuple of §5.2 is produced with private scratch clean and
+    borrowed correlations restored; a schedule binds its name, version
+    and hash; every replay is executed and charged (§8.2); the frame
+    descriptor reports the realised history (§9.4); the reference body,
+    F_B and the budget unit are unchanged, and T2 remains stated for the
+    reference expansion. *(non-normative)* Binary pebbling P_{j+1}(a, b) =
+    P_j(a, c); P_j(c, b); P_j(a, c) uses 3^⌈log₂ B⌉ base evaluations and at
+    most ⌈log₂ B⌉ intermediate configurations; no polylogarithmic-time
+    bound is claimed.
