@@ -355,3 +355,14 @@ D18 (I1). P_{j+1}(a, b) = P_j(a, c); P_j(c, b); P_j(a, c) with c clean: T(j+1) =
 evaluations for k = ⌈log₂ B⌉ (after padding F to 2^k stuttering steps); one temporary configuration per level live
 during the inner calls → at most k temporaries of S bits. EN's verifier checked the recurrence to level 5 on Z/4.
 The bead's "polylog time" is not adopted. Decision: §17 item 18, default full history, hook in §9.4/§11.
+
+## Verification record
+
+- Hand derivations D1–D18 above, written before the numbers entered the draft.
+- Independent hashlib check of 0.8 hashing (D1b); the printed 0.9 inc8 envelope hashes to the seed's 0.9 inc8
+  value (consistency of the republished envelope).
+- A small independent Python model (job scratchpad, not the interpreter) re-checked the stated results of
+  examples 3 (all t, x, b, w), 4 (n = 0, 2, 3), 6 (all x, 6 target values, all f, both b, with reversal),
+  7 (all x, y, a, both controls, adjoint, B = 2 failure), 8 (byte trace and reversal) and 9 (B = 0..5): PASS.
+- Cross-reference check: every § reference resolves except DL §17.6 / §25 (dialect sections, labelled DL);
+  §17 items 1–18 exist and every "§17 item n" reference resolves.
