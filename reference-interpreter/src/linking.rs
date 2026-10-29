@@ -117,7 +117,7 @@ impl Object {
             for symbol in symbols.values_mut() {
                 let n = symbol.get("name")?.string()?.to_string();
                 let Json::Object(fields) = symbol else {
-                    unreachable!("validated symbol")
+                    return err("§9.1", "symbol entries are objects");
                 };
                 fields.insert(
                     "interface_hash".into(),
@@ -132,12 +132,10 @@ impl Object {
             }
             for (name, hash) in old.closure_hashes {
                 if let Some(hash) = hash {
-                    replacements.insert(
-                        hash,
-                        identity.closure_hashes[&name]
-                            .clone()
-                            .expect("fully resolved closure"),
-                    );
+                    let next = identity.closure_hashes[&name].clone().ok_or_else(|| {
+                        Error(format!("§9.3: @{name} is still unresolved after linking"))
+                    })?;
+                    replacements.insert(hash, next);
                 }
             }
         }

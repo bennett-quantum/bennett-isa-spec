@@ -348,7 +348,10 @@ impl<'a> ClassicalMachine<'a> {
             ClassicalValue::Int(self.object.ptr_width, payload.len() as u128),
             &mut undo,
         )?;
-        let frame = self.history.last_mut().expect("retained host frame");
+        let frame = self
+            .history
+            .last_mut()
+            .ok_or_else(|| Error("§10: missing retained host frame".into()))?;
         frame.undo = undo;
         frame
             .host
@@ -509,7 +512,7 @@ impl<'a> ClassicalMachine<'a> {
             let id = self.qreg(&n)?;
             let wires = self.state.quantum.bundle(id)?;
             let Type::Region(a, w) = p.ty else {
-                unreachable!("validated region")
+                return err("§5.1", "mem slot requires region type");
             };
             if crate::oracle::power_of_two(a as u128).and_then(|cells| cells.checked_mul(w as u128))
                 != Some(wires.len() as u128)
@@ -785,7 +788,12 @@ impl<'a> ClassicalMachine<'a> {
                 let bytes = (0..512).map(|n| self.state.memory.byte(p + n)).collect();
                 self.state.devices.blocks.insert(sector, bytes);
             }
-            _ => unreachable!("device operation validated"),
+            _ => {
+                return err(
+                    "§7.3",
+                    format!("unknown device operation {dev}.{operation}"),
+                )
+            }
         }
         self.state
             .devices
@@ -825,7 +833,11 @@ impl<'a> ClassicalMachine<'a> {
             registers: Vec::new(),
             region: None,
         };
-        self.state.control.last_mut().expect("activation").ip += 1;
+        self.state
+            .control
+            .last_mut()
+            .ok_or_else(|| Error("§3.4: no active function".into()))?
+            .ip += 1;
         let mut fault = None;
         let mut output = None;
         let mut marker = false;
@@ -968,11 +980,15 @@ impl<'a> ClassicalMachine<'a> {
                             .blocks
                             .iter()
                             .position(|b| b.name == n)
-                            .expect("validated branch target");
+                            .ok_or_else(|| Error(format!("§3.4: unknown branch target {n}")))?;
                         for (p, v) in f.blocks[block].params.iter().zip(values) {
                             self.define(&p.name, v, &mut undo)?;
                         }
-                        let active = self.state.control.last_mut().expect("activation");
+                        let active = self
+                            .state
+                            .control
+                            .last_mut()
+                            .ok_or_else(|| Error("§3.4: no active function".into()))?;
                         active.block = block;
                         active.ip = 0;
                     }
@@ -1008,7 +1024,11 @@ impl<'a> ClassicalMachine<'a> {
                     }
                     "ret" => {
                         let values = a.iter().map(|n| self.read(n)).collect::<Result<Vec<_>>>()?;
-                        let active = self.state.control.pop().expect("return activation");
+                        let active = self
+                            .state
+                            .control
+                            .pop()
+                            .ok_or_else(|| Error("§3.4: ret without an activation".into()))?;
                         if let Some(segment) = active.segment {
                             self.segments[segment].end = Some(self.history.len());
                             self.segments[segment].results = values.clone();
@@ -1038,7 +1058,9 @@ impl<'a> ClassicalMachine<'a> {
                             .max_by_key(|s| s.end)
                             .cloned();
                         if let Some(s) = segment {
-                            let end = s.end.expect("completed segment");
+                            let end = s
+                                .end
+                                .ok_or_else(|| Error("§7.4: segment is not complete".into()))?;
                             if s.callee != name
                                 || s.args != args
                                 || s.results != results

@@ -96,7 +96,7 @@ impl Object {
         }
         for p in &f.params[2] {
             let Type::Region(a, w) = p.ty else {
-                unreachable!("region")
+                return err("§5.1", "mem slot requires region type");
             };
             let bytes = regions
                 .get(&p.name)
@@ -230,7 +230,7 @@ impl Object {
         }
         for p in &f.params[2] {
             let Type::Region(a, w) = p.ty else {
-                unreachable!("validated region")
+                return err("§5.1", "mem slot requires region type");
             };
             let r = bindings
                 .regions

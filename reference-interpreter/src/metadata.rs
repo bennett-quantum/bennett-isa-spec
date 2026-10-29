@@ -86,26 +86,29 @@ impl Object {
             ordinal: u128,
             cursor: &mut u128,
             loops: &mut Vec<u64>,
-        ) -> Option<(&'a Instruction, Vec<u64>)> {
+        ) -> Result<Option<(&'a Instruction, Vec<u64>)>> {
             for i in seq {
                 let current = *cursor;
                 *cursor += 1;
                 if current == ordinal {
-                    return Some((i, loops.clone()));
+                    return Ok(Some((i, loops.clone())));
                 }
                 if i.op == "qloop" {
-                    loops.push(i.operands[0].parse().expect("validated bound"));
+                    loops.push(crate::object::host_count(
+                        &i.operands[0],
+                        "qloop trip count",
+                    )?);
                 }
                 for body in &i.bodies {
-                    if let Some(p) = find(body, ordinal, cursor, loops) {
-                        return Some(p);
+                    if let Some(p) = find(body, ordinal, cursor, loops)? {
+                        return Ok(Some(p));
                     }
                 }
                 if i.op == "qloop" {
                     loops.pop();
                 }
             }
-            None
+            Ok(None)
         }
         let mut found = None;
         for candidate in candidates {
@@ -113,7 +116,7 @@ impl Object {
             if let Some(f) = self.functions.get(name) {
                 if let Some(b) = f.blocks.iter().find(|b| b.name == block) {
                     if let Some((instruction, loops)) =
-                        find(&b.instructions, ordinal, &mut 0, &mut Vec::new())
+                        find(&b.instructions, ordinal, &mut 0, &mut Vec::new())?
                     {
                         if found.is_some() {
                             return err("§9.2", "ambiguous program-point symbol hash");
@@ -338,7 +341,7 @@ fn specificity(e: &Json) -> Result<(usize, usize, bool, bool, bool)> {
     Ok((
         path.len(),
         path.iter()
-            .filter(|p| !wildcard(p.get("iteration").expect("validated path")))
+            .filter(|p| p.get("iteration").is_ok_and(|i| !wildcard(i)))
             .count(),
         !wildcard(e.get("step")?),
         !wildcard(e.get("phase")?),
@@ -380,10 +383,11 @@ impl Object {
             {
                 continue;
             }
-            if result.is_none_or(|prior| {
-                specificity(entry).expect("validated entry")
-                    > specificity(prior).expect("validated entry")
-            }) {
+            let better = match result {
+                None => true,
+                Some(prior) => specificity(entry)? > specificity(prior)?,
+            };
+            if better {
                 result = Some(entry);
             }
         }
