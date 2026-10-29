@@ -128,3 +128,62 @@ pub fn reject_cli(text: &str, rule: &str, tag: &str) {
         assert!(String::from_utf8_lossy(&out.stderr).contains(rule));
     }
 }
+
+/// Memoryless round-4 borrow fixtures, with exactly the advertised loop bounds.
+pub fn borrow_lifetime_object(body: &str, bounds: &[u64]) -> String {
+    let sig = format!(
+        r#"{{"abi":"0.8","args":[],"bounds":{bounds:?},"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}}"#
+    );
+    let regs = if bounds.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "regs {{  }} bounds {{{}}}\n",
+            bounds
+                .iter()
+                .map(u64::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    };
+    object(
+        &[(
+            "a",
+            &sig,
+            &format!("perm_action @a (t:wire mut) () () () ()\n{regs}^entry():\n{body}"),
+        )],
+        "{}",
+        "",
+    )
+}
+
+/// Identity on all t,b basis entries, a superposition, and b entangled with an
+/// untouched reference proves the controls do not merely hide a pool mutation.
+pub fn borrow_identity(o: &Object) {
+    use bennett_isa_ref::{QuantumBindings, QuantumState};
+    for input in 0..6u32 {
+        let mut q = QuantumState::new();
+        let w = q.allocate(3).unwrap();
+        if input == 5 {
+            q.gate("h", &[w[1]], None, &[]).unwrap();
+            q.gate("cx", &[w[1], w[2]], None, &[]).unwrap();
+            q.gate("h", &[w[0]], None, &[]).unwrap();
+        } else {
+            for (bit, wire) in w[..2].iter().enumerate() {
+                if input == 4 {
+                    q.gate("h", &[*wire], None, &[]).unwrap();
+                } else if input >> bit & 1 == 1 {
+                    q.gate("x", &[*wire], None, &[]).unwrap();
+                }
+            }
+        }
+        let entry = q.clone();
+        let mut b = QuantumBindings::default();
+        b.bundles.insert("t".into(), vec![w[0]]);
+        b.borrowed.push(vec![w[1]]);
+        for adjoint in [false, true] {
+            o.execute_action("a", &mut q, &b, adjoint, &[]).unwrap();
+            assert_eq!(q, entry, "input={input}, adjoint={adjoint}");
+        }
+    }
+}

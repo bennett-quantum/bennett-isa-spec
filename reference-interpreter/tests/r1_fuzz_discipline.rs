@@ -489,3 +489,52 @@ fn generated_changing_input_opaque_loops_match_independent_parity() {
         }
     }
 }
+
+#[test]
+fn generated_loop_local_borrow_returns_match_alpha_renamed_unrollings() {
+    // Independent expectation: each lifetime's X parity must be even, not
+    // merely the product of trip count and parity. No existing RNG is changed.
+    let mut counts = (0, 0);
+    for trips in 1..=4u64 {
+        for flips in 1..=2usize {
+            for nested in [false, true] {
+                for unrolled in [false, true] {
+                    let lifetime = |name: &str| {
+                        format!(
+                            "{name} = qborrow any 1\n{}qreturn {name}\n",
+                            format!("x {name}\n").repeat(flips)
+                        )
+                    };
+                    let (mut body, mut bounds) = if unrolled {
+                        (
+                            (0..trips)
+                                .map(|j| lifetime(&format!("b{j}")))
+                                .collect::<String>(),
+                            vec![],
+                        )
+                    } else {
+                        (
+                            format!("qloop {trips} {{\n{}}}", lifetime("b")),
+                            vec![trips],
+                        )
+                    };
+                    if nested {
+                        body = format!("qloop 2 {{\n{}\n}}", body.trim_end());
+                        bounds.insert(0, 2);
+                    }
+                    let text = support::borrow_lifetime_object(&body, &bounds);
+                    if flips == 1 {
+                        let e = Object::parse(&text).expect_err("one-X lifetime accepted");
+                        assert!(e.to_string().contains("§5.6"), "{e}");
+                        counts.1 += 1;
+                    } else {
+                        let o = Object::parse(&text).unwrap();
+                        support::borrow_identity(&o);
+                        counts.0 += 1;
+                    }
+                }
+            }
+        }
+    }
+    assert_eq!(counts, (16, 16));
+}

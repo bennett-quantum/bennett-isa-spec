@@ -6,6 +6,21 @@ under `reference-interpreter/`; commit own paths
 (`git add -A -- reference-interpreter && git commit -- reference-interpreter`),
 never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
+## Council round 4, codex first pass (2026-10-29)
+
+R4-B01 resolved after RED on the exact loop-local borrow witness. Borrow/Return
+nodes preserve lifetime boundaries through loops and adjoints; every return
+proves identity and output independence before repetition can compose it.
+Spanning lifetimes retain whole-loop restoration. Exact, unrolled, nested and
+output-dependency negatives reject at parser/hash/check; positive controls
+preserve all t,b bases, superposition and an entangled reference forward/adjoint.
+The new deterministic 32-case family checks trip counts 1..4 against per-return
+parity: 16 accepted / 16 rejected. Existing RNG/Python seeds unchanged.
+Normal suite after B01: **217 passed, 0 failed, 5 ignored**. 11 active borrow
+and 5 active generator tests pass. Response: council/response-round-4.md;
+appendable for sol/muse. B02 and final exhaustive/conformance gates follow.
+No new ambiguity, decline, spec edit or narrowed capability. Bead b-isa-spec-zq2.
+
 ## Council round 3, codex second pass (2026-10-29)
 
 R3-B01 is resolved-by c2d97f8 (SOL-R3-B01): the exact six-row codex witness

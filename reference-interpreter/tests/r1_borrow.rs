@@ -395,3 +395,66 @@ fn codex_r3_b03_adjoint_child_zero_trip_region_declaration() {
     // creates the region at function entry. The loaded image is restored.
     check_local_region_lifetime("z = qalloc any 1\nv = qload r z\nqunload r z v\nqfree z\nqloop 0 {\nqregion r 1 4 @image\n}", &[0], true);
 }
+
+#[test]
+fn r4_loop_local_returns_cannot_be_restored_by_later_borrowings() {
+    // At EACH return b_out = beta XOR 1. A second borrowing cannot complete
+    // the first frame, even if the executor happens to reuse the same pool bit.
+    for (tag, body, bounds) in [
+        (
+            "loop",
+            "qloop 2 {\nb = qborrow any 1\nx b\nqreturn b\n}",
+            vec![2],
+        ),
+        (
+            "unrolled",
+            "b = qborrow any 1\nx b\nqreturn b\nb = qborrow any 1\nx b\nqreturn b",
+            vec![],
+        ),
+        (
+            "nested",
+            "qloop 2 {\nqloop 2 {\nb = qborrow any 1\nx b\nqreturn b\n}\n}",
+            vec![2, 2],
+        ),
+        ("single", "b = qborrow any 1\nx b\nqreturn b", vec![]),
+        // b is restored but the output depends on beta at each return.
+        (
+            "dependent",
+            "qloop 2 {\nb = qborrow any 1\ncx b t\nqreturn b\n}",
+            vec![2],
+        ),
+    ] {
+        support::reject_cli(
+            &support::borrow_lifetime_object(body, &bounds),
+            "§5.6",
+            &format!("r4-borrow-{tag}"),
+        );
+    }
+}
+
+#[test]
+fn r4_borrow_lifetimes_inside_and_across_loops_preserve_full_state() {
+    for (body, bounds) in [
+        (
+            "d = qalloc any 1\nb = qborrow any 1\nx b\nx b\nqfree d\nqreturn b",
+            vec![],
+        ),
+        ("b = qborrow any 1\nqloop 2 {\nx b\n}\nqreturn b", vec![2]),
+        (
+            "qloop 2 {\nb = qborrow any 1\nx b\nx b\nqreturn b\n}",
+            vec![2],
+        ),
+        (
+            "qloop 2 {\nqloop 2 {\nb = qborrow any 1\nx b\nx b\nqreturn b\n}\n}",
+            vec![2, 2],
+        ),
+        (
+            "qloop 2 {\nb = qborrow any 1\nqloop 2 {\nx b\n}\nqreturn b\n}",
+            vec![2, 2],
+        ),
+    ] {
+        let o = support::rehash(&support::borrow_lifetime_object(body, &bounds));
+        o.check_hashes().unwrap();
+        support::borrow_identity(&o);
+    }
+}

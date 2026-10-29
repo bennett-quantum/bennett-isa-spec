@@ -124,6 +124,9 @@ enum Node {
     /// Allocate clean wires; image preparation is represented by explicit flips.
     Alloc(Vec<String>),
     Free(Vec<String>),
+    /// Unconditional lifetime boundaries, retained inside Repeat and adjoints.
+    Borrow(Vec<String>),
+    Return(Vec<String>),
 }
 impl Node {
     fn wires(&self, out: &mut BTreeSet<String>) {
@@ -148,7 +151,9 @@ impl Node {
                 out.extend(inputs.iter().cloned());
                 out.extend(outputs.iter().cloned());
             }
-            Self::Other(w) | Self::Alloc(w) | Self::Free(w) => out.extend(w.iter().cloned()),
+            Self::Other(w) | Self::Alloc(w) | Self::Free(w) | Self::Borrow(w) | Self::Return(w) => {
+                out.extend(w.iter().cloned());
+            }
         }
     }
     fn permutation(&self) -> bool {
@@ -174,6 +179,8 @@ impl Node {
             },
             Self::Alloc(w) => Self::Free(w.clone()),
             Self::Free(w) => Self::Alloc(w.clone()),
+            Self::Borrow(w) => Self::Return(w.clone()),
+            Self::Return(w) => Self::Borrow(w.clone()),
             other => other.clone(),
         }
     }
@@ -313,13 +320,14 @@ impl Compiler<'_> {
                     let n = crate::object::host_count(&a[1], "allocation width")? as usize;
                     let wires = self.produce(&i.lhs[0], n);
                     if op == "qborrow" {
-                        self.borrowed.extend(wires);
+                        self.borrowed.extend(wires.iter().cloned());
+                        out.push(Node::Borrow(wires));
                     } else {
                         out.push(Node::Alloc(wires.clone()));
                     }
                 }
                 "qfree" => out.push(Node::Free(self.bundle(&a[0])?)),
-                "qreturn" => {}
+                "qreturn" => out.push(Node::Return(self.bundle(&a[0])?)),
                 "qpred" => predicate.push((self.scalar(&a[0])?, true)),
                 "qunpred" => {
                     predicate
@@ -645,6 +653,37 @@ impl Evaluation<'_> {
                 self.state.insert(a.clone(), x.xor(&d));
                 self.state.insert(b.clone(), y.xor(&d));
             }
+            Node::Borrow(wires) => {
+                // Every borrowing starts an independent unknown system. A loop
+                // summary may reuse its symbolic name only AFTER its return has
+                // proved identity and independence on the full entry domain.
+                for w in wires {
+                    let p = Poly::var(self.vars[w]);
+                    self.state.insert(w.clone(), p);
+                }
+            }
+            Node::Return(wires) => {
+                let returned: BTreeSet<_> = wires.iter().map(|w| self.vars[w]).collect();
+                for w in wires {
+                    if self.var(w) != Poly::var(self.vars[w]) {
+                        return err(
+                            "§5.6",
+                            format!("qreturn does not restore borrowed wire {w}"),
+                        );
+                    }
+                }
+                for (w, p) in &self.state {
+                    if !wires.contains(w) && p.mentions(&returned) {
+                        return err(
+                            "§5.6",
+                            format!("qreturn output {w} depends on borrowed entry values"),
+                        );
+                    }
+                }
+                for w in wires {
+                    self.state.remove(w);
+                }
+            }
             Node::Alloc(wires) => {
                 for w in wires {
                     self.state.insert(w.clone(), Poly::zero());
@@ -692,6 +731,13 @@ impl Evaluation<'_> {
                 }
             }
             Node::Repeat(n, body) => {
+                if *n == 0 {
+                    return Ok(());
+                }
+                // Prove all internal return boundaries on the generic body
+                // BEFORE squaring its surviving-wire map. Borrowed systems
+                // whose lifetimes span the loop remain in that map and may be
+                // restored by its full power, rather than by each iteration.
                 // The body as a map from its wires' entry values; M^n by squaring.
                 let mut wires = BTreeSet::new();
                 for b in body {
@@ -926,7 +972,10 @@ impl Object {
             if let (Some(first), Some(last)) = (first, last) {
                 let frame = &nodes[first..=last];
                 if !translation_lemma(frame, borrowed) {
-                    factorises(frame, borrowed)?;
+                    // Keep surrounding allocation/cleanup when evaluating
+                    // lifetime boundaries; the cropped gate frame alone may
+                    // omit a clean allocation consumed before a qreturn.
+                    factorises(&nodes[start..end], borrowed)?;
                 }
             }
             start = end;
