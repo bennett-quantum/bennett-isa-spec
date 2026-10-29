@@ -60,7 +60,7 @@ item recorded in §0 as considered and deferred with its 0.8 construction.
 
 ## Status
 
-- [x] group 1   - [x] group 2   - [x] group 3   - [ ] hostile reread and fixes   - [ ] final diff + commit
+- [x] group 1   - [x] group 2   - [x] group 3   - [x] hostile reread and fixes (own + independent reviewer)   - [x] final diff + commit
 
 ## Decisions (with reasons) — appended as taken
 
