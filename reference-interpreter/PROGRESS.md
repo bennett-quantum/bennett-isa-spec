@@ -24,7 +24,38 @@ inference execution/reversal positives pass. B05 resolved: non-permutation
 call touch sets include effective controls and passed cells. Direct/ctl/qpred
 borrowed-H negatives reject; paired borrowed-controlled X calls preserve all
 basis inputs and a superposition. All five received blockers resolved, no
-declines or partials; final whole-suite verification follows. Bead b-isa-spec-zq2.
+declines or partials. Bead b-isa-spec-zq2.
+
+### Final round-3 verification
+
+Every command used the absolute manifest path and ran headlessly with
+DISPLAY, WAYLAND_DISPLAY, DBUS_SESSION_BUS_ADDRESS and BROWSER unset;
+TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/.tmp.
+Logs are retained in ignored `.tmp/r3-{tests,ignored,conformance}.log`.
+
+| Command | Result |
+|---|---|
+| `cargo test --offline` | **210 passed**, 0 failed, 5 ignored (209 integration + 1 unit; 0 doctests; summed runner time 2.25 s) |
+| `cargo test --offline -- --ignored --nocapture` | **5 passed**, 0 failed |
+| `cargo clippy --offline --all-targets -- -D warnings` | clean |
+| `cargo fmt -- --check` | clean |
+| unchanged `python3 isa_check.py` | passes; seed diff from 2e61144 is empty |
+| conformance standalone harness with absolute `--bin` | **445 pass, 0 fail, 45 unavailable / 490**; exit **2** for staged capabilities, identical to baseline |
+
+| Ignored sweep | Cases | Runner time |
+|---|---|---|
+| u8 division/remainder | 262,144 pairs × 4 operations | 2.96 s |
+| 17-wire borrow execution | 2^17 entries | 16.06 s |
+| checked borrow-frame certificate | 2^18 claim elements, both programs | 72.61 s |
+| extended §6 differential | 200,000 programs: **64,717 accepted, all clean**, 135,283 rejected | 209.69 s |
+| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 11.19 s |
+
+The dedicated generated families additionally exercise 12 direct/call-wrapped
+Bell-cleanup variants and 32 opaque-loop/nested-loop variants, against independent
+parity formulas. Accepted programs run on their full small basis domains plus a
+superposed interface and restore exactly under adjoint. Each blocker has a
+witnessed development-time RED and a named GREEN regression in the appendable
+`council/response-round-3.md`. No capabilities or new ambiguities were declined.
 
 ## Council round 2: sol/codex implementation (2026-10-29)
 
@@ -229,8 +260,9 @@ that needs them already reports so explicitly (`ClaimVerdict::Unverified`).
 ### Resume here: outstanding work, in priority order
 
 1. Deliverables 8–11 above, in that order.
-2. Extend the §6 differential fuzzer to region calls (child actions with mut
-   regions, oracle calls) and borrowed systems; extend the borrow-frame
+2. Broaden randomized §6 call/mutable-region/borrow generation beyond round 3
+   dedicated child-call Bell/parity and changing-input opaque-loop families;
+   extend the borrow-frame
    symbolic decision to black-box calls whose inputs depend on borrowed wires
    (currently the claim route).
 3. Claims on regions with classical arguments (the claim domain carries none;

@@ -90,3 +90,20 @@ No SPEC-QUESTIONS entry: §§4.7, 5.6 and 14.2 explicitly include controls.
 All five received blocker IDs are resolved; no declines or partials. Pending
 astra/codex and muse reviews are a subsequent pass. Deliverables 8–11 remain
 staged as documented in PROGRESS.md, outside this round's received blockers.
+
+## Final verification of this pass
+
+All commands used absolute manifest paths, project-local TMPDIR and the four
+display/browser variables unset. Normal tests: **210 passed, 0 failed, 5 ignored**.
+Ignored tests (`--ignored --nocapture`): **5 passed, 0 failed**. Strict all-target
+Clippy, formatting check and unchanged Python seed check pass. No dependencies
+added. The five ignored sweeps and timings are recorded in PROGRESS.md; the
+200,000-program sweep reported **64,717 accepted, all exactly clean**, 135,283
+rejected. Dedicated call-wrapping and changing-input loop families run in the
+normal suite in addition to the unchanged random sweep.
+
+Conformance command: `cargo run --offline --manifest-path
+/home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/Cargo.toml --
+--bin /home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/target/debug/bennett-isa-ref`.
+Result: **445 pass, 0 fail, 45 unavailable, 490 total**, exit **2** for explicit
+staging (same as baseline). No conformance/include/spec/docs edits or pushes.

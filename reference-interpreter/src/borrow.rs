@@ -6,8 +6,8 @@
 //! AND-monomials over the frame's input wires), which is canonical: two ANFs
 //! denote the same function iff they are equal. P_F = P' ⊗ I_B iff every
 //! borrowed output equals its input variable and no other output mentions a
-//! borrowed variable. This is a total, exact decision over the frame's full
-//! domain (T3), with no wire-count limit; loops are composed by repeated
+//! borrowed variable. For Boolean-gate circuits this is a total, exact decision
+//! over the frame's full domain (T3), with no wire-count limit; loops use repeated
 //! squaring, never unrolled bound times. Opaque applications retain their full
 //! input expressions: composition substitutes recursively into those inputs and
 //! interns the resulting application, rather than freezing an ANF variable.
