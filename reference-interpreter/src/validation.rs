@@ -106,18 +106,17 @@ impl Object {
                     if i.bodies.len() != 2 {
                         return err("§4.8", "qif needs two arms");
                     }
-                    s.predicates.push(a[0].clone());
+                    let outer = s.predicates.clone();
                     for (arm, body) in i.bodies.iter().enumerate() {
-                        *s.predicates.last_mut().expect("qif predicate") = if arm == 0 {
-                            a[0].clone()
-                        } else {
-                            format!("!{}", a[0])
-                        };
+                        let mut expected = outer.clone();
+                        expected.push(if arm == 0 { a[0].clone() } else { format!("!{}", a[0]) });
+                        s.predicates = expected.clone();
                         self.validate_action_sequence(f, body, s)?;
+                        if s.predicates != expected {
+                            return err("§3.5", "qif body altered predicate stack");
+                        }
                     }
-                    if s.predicates.pop().as_deref() != Some(&format!("!{}", a[0])) {
-                        return err("§3.5", "qif body altered predicate stack");
-                    }
+                    s.predicates = outer;
                 }
                 "qloop" => {
                     if !i.lhs.is_empty() || !matches!(a.len(), 1 | 3) || i.bodies.len() != 1 {
@@ -814,7 +813,9 @@ impl Object {
             if !["eq", "ne", "ult", "ule", "slt", "sle"].contains(&pred) {
                 return err("§4.8", "unknown comparison");
             }
-            same(&a[0], &a[1])?;
+            if !matches!(same(&a[0], &a[1])?, Type::Int(_) | Type::Ptr) {
+                return err("§3.3", "icmp requires integer or pointer bit-vectors");
+            }
             result = Some(Type::Int(1));
         } else if let Some((cast, suffix)) = op
             .split_once('.')

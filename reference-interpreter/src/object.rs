@@ -1412,12 +1412,7 @@ impl Object {
                 _ if op.starts_with("lift.load.i") || op.starts_with("lift.store.i") => {
                     let load = op.starts_with("lift.load");
                     arity(if load { 1 } else { 2 }, if load { 1 } else { 0 })?;
-                    let n = op
-                        .rsplit_once(".i")
-                        .expect("suffix")
-                        .1
-                        .parse::<u64>()
-                        .map_err(|_| Error("§4.8: malformed memory width".into()))?;
+                    let n = host_count(op.rsplit_once(".i").expect("suffix").1, "memory width")?;
                     if n == 0 || n > 128 || n % 8 != 0 {
                         return err("§3.3", "load/store width must be a byte multiple up to 128");
                     }
