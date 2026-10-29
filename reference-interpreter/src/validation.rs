@@ -2,7 +2,7 @@
 //! by executors; accepting a text object does not waive those obligations.
 use crate::{
     err,
-    object::{integer, is_binop, is_div, list, name},
+    object::{is_binop, is_div, list, name},
     Error, Function, Instruction, Object, Result, Type,
 };
 use std::collections::{BTreeMap, BTreeSet};
