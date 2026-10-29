@@ -193,9 +193,13 @@ struct Compiler<'a> {
     bundles: BTreeMap<String, Vec<String>>,
     regions: BTreeMap<String, (u64, Vec<Vec<String>>)>,
     borrowed: BTreeSet<String>,
+    classical: BTreeMap<String, String>,
     generation: usize,
 }
 impl Compiler<'_> {
+    fn classical(&self, name: &str) -> Result<String> {
+        self.classical.get(name).cloned().ok_or_else(|| Error(format!("§3.3: unknown classical binding {name}")))
+    }
     fn bundle(&self, name: &str) -> Result<Vec<String>> {
         if let Some((base, index)) = name.split_once('[') {
             let index = crate::object::host_count(index.trim_end_matches(']'), "wire index")?;
@@ -422,7 +426,8 @@ impl Compiler<'_> {
                             memory.extend(cells.into_iter().flatten());
                         }
                         out.push(Node::Opaque {
-                            key: format!("oracle:{}:{}", callee.name, ca[1]),
+                            key: format!("oracle:{:?}", (&callee.name, self.classical(&ca[1])?,
+                                list(&ca[6])?.iter().map(|n| self.classical(n)).collect::<Result<Vec<_>>>()?)),
                             controls: c,
                             inputs: [inputs, memory].concat(),
                             outputs,
@@ -438,6 +443,7 @@ impl Compiler<'_> {
                             bundles: BTreeMap::new(),
                             regions: BTreeMap::new(),
                             borrowed: BTreeSet::new(),
+                            classical: BTreeMap::new(),
                             generation: self.generation,
                         };
                         for (group, actuals) in [(0, list(&ca[1])?), (1, list(&ca[2])?)] {
@@ -451,6 +457,9 @@ impl Compiler<'_> {
                                     Error("§4.7: region operand is not live".into())
                                 })?;
                             child.regions.insert(p.name.clone(), r);
+                        }
+                        for (p, n) in f.params[3].iter().zip(list(&ca[4])?) {
+                            child.classical.insert(p.name.clone(), self.classical(&n)?);
                         }
                         let mut body = Vec::new();
                         child.declare_regions(f, &mut body)?;
@@ -476,7 +485,7 @@ impl Compiler<'_> {
                 "qinplace" => {
                     let x = self.bundle(&a[3])?;
                     out.push(Node::Opaque {
-                        key: format!("qinplace:{}:{}:{}", a[0], a[1], a[2]),
+                        key: format!("qinplace:{:?}", (&a[0], &a[1], self.classical(&a[2])?)),
                         controls: predicate.clone(),
                         inputs: x.clone(),
                         outputs: x,
@@ -782,6 +791,9 @@ impl Object {
             bundles: BTreeMap::new(),
             regions: BTreeMap::new(),
             borrowed: BTreeSet::new(),
+            classical: f.params.iter().flatten()
+                .filter(|p| !matches!(p.ty, Type::Wire(_) | Type::Region(_, _)))
+                .map(|p| (p.name.clone(), format!("{}:{}", f.name, p.name))).collect(),
             generation: 0,
         };
         for p in f.params.iter().flatten() {

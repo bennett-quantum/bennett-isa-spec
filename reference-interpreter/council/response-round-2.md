@@ -92,3 +92,14 @@ Pin: `r1_qinplace::r2_qinplace_explicit_adjoint_cleans_workspace`: identity and
 NOT/NOT (B=1/3), distinct callee names to verify the exchange, both workspace
 basis values via copying t, forward/adjoint; changed predicate rejects §6.2.
 RED: the identity-pair explicit cleanup rejected at load. No new question.
+
+## SOL-R2-B04 — resolved
+
+`borrow.rs::Compiler` now carries immutable classical bindings. Oracle opaque
+identities contain the callee, resolved token and complete resolved classical
+argument tuple; inlined permutation calls substitute the caller's bindings
+for child formals. qinplace token identities use the same environment. Pin:
+`r1_borrow::r2_opaque_borrow_calls_bind_classical_args_and_tokens_through_inlining`
+rejects x/y in both direct and inlined witnesses (§5.6), accepts x/x and checks
+all x,f,d basis states forward/adjoint. RED: direct x/y parsed successfully.
+No new specification question.
