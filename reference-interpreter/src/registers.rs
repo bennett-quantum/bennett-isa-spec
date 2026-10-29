@@ -83,6 +83,7 @@ impl QuantumRegisters {
         }
         Ok(h)
     }
+    pub(crate) fn idle_bundle(&self,id:u64)->Result<&[Wire]>{Ok(&self.ordinary(id)?.wires)}
     fn record(&self, ids: &[u64]) -> RegisterUndo {
         RegisterUndo {
             handles: ids

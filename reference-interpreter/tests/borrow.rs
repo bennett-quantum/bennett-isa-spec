@@ -30,3 +30,22 @@ fn translation_pattern_returns_an_entangled_borrowed_system(){
     // The output is t=1 tensor the original Bell pair on borrowed b/reference.
     q.gate("x",&t,None,&[]).unwrap();q.gate("cx",&[b[0],reference[0]],None,&[]).unwrap();q.gate("h",&b,None,&[]).unwrap();q.release(&b).unwrap();q.release(&reference).unwrap();
 }
+
+#[test]
+fn classical_region_calls_supply_only_designated_idle_registers(){
+    use bennett_isa_ref::{ClassicalMachine,ClassicalValue,QuantumRegisters};
+    let action=support::rehash(&borrowed("cx x b\ncx b t\ncx x b\ncx b t"));let sig=r#"{"abi":"0.8","kind":"cc","params":["qreg[1]","qreg[1]","qreg[1]","qreg[1]"],"results":[],"tier":"cc"}"#;
+    let imports=format!("{{\"a\":{{\"signature\":{}}}}}",action.symbols().unwrap()["0"].get("signature").unwrap().canonical());
+    let caller=support::rehash(&object(&[("invoke",sig,"fn cc @invoke (t:qreg[1], y:qreg[1], z:qreg[1], x:qreg[1]) () () () ()\n^entry():\naction_call @a (t, y, z) (x) () ()\nret")],&imports,""));let program=Object::link(&[caller,action]).unwrap();
+    let mut registers=QuantumRegisters::new();let mut ids=Vec::new();for _ in 0..5{ids.push(registers.allocate(1).unwrap());}registers.prepare(ids[3],&[true]).unwrap();registers.prepare(ids[4],&[true]).unwrap();let args=ids[..4].iter().map(|id|ClassicalValue::Qreg(*id)).collect::<Vec<_>>();
+    let mut m=ClassicalMachine::with_quantum_registers(&program,"invoke",&args,&[],registers).unwrap();m.designate_idle_registers(&[ids[4]]).unwrap();let before=m.snapshot();assert_eq!(m.run(100).unwrap().fault,None);let r=m.quantum_registers();for id in [ids[0],ids[4]]{assert_eq!(r.quantum_state().read_basis(r.bundle(id).unwrap()).unwrap(),1);}m.reverse().unwrap();assert_eq!(m.snapshot(),before);
+}
+
+#[test]
+fn lifted_permutation_actions_can_borrow_workspace_and_reverse(){
+    use bennett_isa_ref::{Budget,OracleInput,OracleMachine};
+    let action=support::rehash(&borrowed("cx x b\ncx b t\ncx x b\ncx b t"));let signature=r#"{"abi":"0.8","args":[],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#;
+    let imports=format!("{{\"a\":{{\"signature\":{}}}}}",action.symbols().unwrap()["0"].get("signature").unwrap().canonical());
+    let caller=support::rehash(&object(&[("lifted",signature,"oracle @lifted (input:wire in) (target:wire) (fault:wire[4]) () ()\nregs { t:reg[1], y:reg[1], z:reg[1], x:reg[1] }\n^entry():\nx = lift.mov input\nt = lift.const.i1 0\ny = lift.const.i1 0\nz = lift.const.i1 0\nlift.perm_call @a (t, y, z) (x) () ()\nlift.retval t")],&imports,""));let o=Object::link(&[caller,action]).unwrap();
+    for x in 0..2{for steps in 0..8{let input=OracleInput::bits(&[x]);let budget=Budget::steps(steps);let result=o.run_oracle("lifted",&input,budget).unwrap();assert_eq!((result.payload,result.code),if steps>=6{(x,0)}else{(0,1)});let mut m=OracleMachine::new(&o,"lifted",&input,budget).unwrap();let before=m.snapshot();for _ in 0..steps{m.forward_step().unwrap();}assert_eq!(m.outcome(),result);for _ in 0..steps{m.inverse_step().unwrap();}assert_eq!(m.snapshot(),before);}}
+}

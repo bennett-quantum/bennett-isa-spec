@@ -121,3 +121,11 @@ fn lifted_permutation_calls_use_the_action_and_its_adjoint() {
         assert_eq!(m.snapshot(), before);
     }
 }
+
+#[test]
+fn wide_structured_bundles_are_not_limited_to_integer_widths(){
+    let signature=r#"{"abi":"0.8","args":[],"bounds":[],"in":[256],"kind":"perm_action","mem":[],"mut":[256],"tier":"q"}"#;
+    let text=format!("bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=32\n\nsection symbols\n{{\"0\":{{\"interface_hash\":\"{}\",\"kind\":\"perm_action\",\"name\":\"wide\",\"signature\":{signature}}}}}\n\nsection functions\nperm_action @wide (t:wire[256] mut) (p:wire[256] in) () () ()\n^entry():\nd = qcopy p\nqxor d t\nquncopy p d\n","0".repeat(64));
+    let object=Object::parse(&text).unwrap();let mut q=QuantumState::new();let t=q.allocate(256).unwrap();let p=q.allocate(256).unwrap();q.gate("x",&[p[255]],None,&[]).unwrap();let mut b=QuantumBindings::default();b.bundles.insert("t".into(),t.clone());b.bundles.insert("p".into(),p);
+    object.execute_action("wide",&mut q,&b,false,&[]).unwrap();assert_eq!(q.read_basis(&[t[0],t[128],t[255]]).unwrap(),4);assert_eq!(q.wire_count(),512);object.execute_action("wide",&mut q,&b,true,&[]).unwrap();assert_eq!(q.read_basis(&[t[255]]).unwrap(),0);
+}

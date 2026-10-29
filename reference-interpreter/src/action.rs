@@ -12,7 +12,7 @@ struct Environment {
     bindings: QuantumBindings,
     widths: BTreeMap<String, usize>,
     predicates: Vec<Wire>,
-    borrowed: BTreeMap<String, usize>,
+    borrowed: BTreeMap<String, Vec<usize>>,
     borrow_used: BTreeSet<usize>,
 }
 impl Environment {
@@ -123,11 +123,18 @@ impl Object {
         for (p, v) in f.params[3].iter().zip(args) {
             b.args.insert(p.name.clone(), v.clone());
         }
+        let capacity=self.borrow_capacity(name)?;
+        let idle=q.allocate(capacity)?;if !idle.is_empty(){b.borrowed.push(idle.clone());}
         self.execute_action(name, &mut q, &b, adjoint, &[])?;
+        q.release(&idle)?;
         f.params[0]
             .iter()
             .map(|p| q.read_basis(&b.bundles[&p.name]))
             .collect()
+    }
+    fn borrow_capacity(&self,root:&str)->Result<usize>{
+        fn scan(seq:&[Instruction],count:&mut usize,children:&mut Vec<String>)->Result<()>{for i in seq{if i.op=="qborrow"{*count=count.checked_add(i.operands[1].parse::<usize>().map_err(|_|Error("§5.6: borrow count exceeds host storage".into()))?).ok_or_else(||Error("§5.6: borrow capacity overflow".into()))?;}if let Ok(call)=normalize_call(i){if call.instruction.op=="action_call"{children.push(call.instruction.operands[0].trim_start_matches('@').into());}}for body in &i.bodies{scan(body,count,children)?;}}Ok(())}
+        let mut count=0;let mut pending=vec![root.to_string()];let mut visited=BTreeSet::new();while let Some(name)=pending.pop(){if !visited.insert(name.clone()){continue;}let function=self.functions.get(&name).ok_or_else(||Error(format!("§9.3: unresolved action @{name}")))?;for block in &function.blocks{scan(&block.instructions,&mut count,&mut pending)?;}}Ok(count)
     }
     pub fn execute_action(
         &self,
@@ -438,27 +445,16 @@ impl Object {
                     let name = if op == "qborrow" { &i.lhs[0] } else { &a[0] };
                     if borrow {
                         let n = e.widths[name];
-                        let index = e
-                            .bindings
-                            .borrowed
-                            .iter()
-                            .enumerate()
-                            .position(|(i, b)| !e.borrow_used.contains(&i) && b.len() == n)
-                            .ok_or_else(|| {
-                                Error(
-                                    "§5.6: designated idle set lacks requested borrowed bundle"
-                                        .into(),
-                                )
-                            })?;
-                        e.borrow_used.insert(index);
-                        e.borrowed.insert(name.into(), index);
-                        e.produce(name, e.bindings.borrowed[index].clone())?;
+                        let pool=e.bindings.borrowed.iter().flatten().copied().collect::<Vec<_>>();
+                        let indices=(0..pool.len()).filter(|i|!e.borrow_used.contains(i)).take(n).collect::<Vec<_>>();
+                        if indices.len()!=n{return err("§5.6","designated idle set lacks requested borrowed wires");}
+                        let wires=indices.iter().map(|i|pool[*i]).collect();e.borrow_used.extend(&indices);e.borrowed.insert(name.into(),indices);e.produce(name,wires)?;
                     } else {
-                        let index = e
+                        let indices = e
                             .borrowed
                             .remove(name)
                             .ok_or_else(|| Error("§5.6: unmatched return".into()))?;
-                        e.borrow_used.remove(&index);
+                        for index in indices{e.borrow_used.remove(&index);}
                         e.bindings.bundles.remove(name);
                     }
                 }
@@ -569,7 +565,7 @@ impl Object {
                         )?;
                     } else {
                         let mut binding = QuantumBindings {
-                            borrowed: e.bindings.borrowed.clone(),
+                            borrowed: vec![e.bindings.borrowed.iter().flatten().enumerate().filter_map(|(i,w)|(!e.borrow_used.contains(&i)).then_some(*w)).collect()],
                             ..QuantumBindings::default()
                         };
                         for group in 0..2 {

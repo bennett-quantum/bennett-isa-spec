@@ -38,6 +38,7 @@ impl Type {
             }
             Ok(n)
         };
+        let bundle_width=|s:&str|->Result<u16>{if !integer(s)||s.starts_with('-'){return err("§3.3","bundle width requires canonical positive INT");}let n=s.parse::<u16>().map_err(|_|Error("§3.3: bundle width exceeds host descriptor range".into()))?;if n==0{return err("§3.3","bundle width must be positive");}Ok(n)};
         Ok(match s {
             "ptr" => Self::Ptr,
             "f64" => Self::F64,
@@ -45,7 +46,7 @@ impl Type {
             "wire" => Self::Wire(1),
             _ if s.starts_with("i") => Self::Int(width(&s[1..])?),
             _ if s.starts_with("wire[") && s.ends_with(']') => {
-                Self::Wire(width(&s[5..s.len() - 1])?)
+                Self::Wire(bundle_width(&s[5..s.len() - 1])?)
             }
             _ if s.starts_with("reg[") && s.ends_with(']') => Self::Reg(width(&s[4..s.len() - 1])?),
             _ if s.starts_with("qreg[") && s.ends_with(']') => Self::Qreg(
@@ -63,7 +64,7 @@ impl Type {
                 if a > 127 {
                     return err("§3.3", "region address width exceeds 127");
                 }
-                Self::Region(a, width(w)?)
+                Self::Region(a, bundle_width(w)?)
             }
             _ => return err("§3.3", format!("unknown type {s}")),
         })
@@ -962,6 +963,15 @@ impl Object {
         }
         Ok(maximum)
     }
+    fn fault_width(&self,containing:&Function)->Result<u16>{
+        if containing.kind=="oracle"{return containing.params[2][0].ty.width(self.ptr_width);}
+        let mut width=128;
+        for oracle in self.functions.values().filter(|f|f.kind=="oracle"){
+            let mut pending=vec![oracle.name.clone()];let mut seen=BTreeSet::new();
+            while let Some(name)=pending.pop(){if !seen.insert(name.clone()){continue;}let f=self.declaration(&name)?;for call in f.instructions().filter(|i|i.op=="lift.call"){let target=call.operands.first().and_then(|s|s.strip_prefix('@')).ok_or_else(||Error("§4.8: malformed lift.call".into()))?;pending.push(target.into());}}
+            if seen.contains(&containing.name){width=width.min(oracle.params[2][0].ty.width(self.ptr_width)?);}
+        }Ok(width)
+    }
     fn validate_row(
         &self,
         f: &Function,
@@ -1045,11 +1055,7 @@ impl Object {
             let n = s
                 .parse::<u128>()
                 .map_err(|_| Error("§3.3: fault code requires nonnegative literal".into()))?;
-            let fw = if f.kind == "oracle" {
-                f.params[2][0].ty.width(self.ptr_width)?
-            } else {
-                4
-            };
+            let fw = self.fault_width(f)?;
             if fw < 128 && n >= 1u128 << fw {
                 return err("§3.3", "fault code does not fit fault register");
             }
@@ -1428,8 +1434,10 @@ fn validate_header(f: &Function) -> Result<()> {
             Ok(())
         }
     };
+    let classical=|t:&Type|matches!(t,Type::Int(_)|Type::Ptr|Type::F64|Type::Token);
     match f.kind.as_str() {
         "oracle" => {
+            all(&f.params[4],classical)?;
             if f.params[1].len() != 1 || f.params[2].len() != 1 {
                 return err("§5.1", "oracle needs one target and one fault slot");
             }
@@ -1457,13 +1465,15 @@ fn validate_header(f: &Function) -> Result<()> {
             all(&f.params[1], |t| matches!(t, Type::Reg(_)))?;
         }
         "action" | "perm_action" => {
+            all(&f.params[3],classical)?;
             empty(&[4])?;
             for j in 0..2 {
                 all(&f.params[j], |t| matches!(t, Type::Wire(_)))?;
             }
             all(&f.params[2], |t| matches!(t, Type::Region(..)))?;
+            if f.params[2].iter().any(|p|!matches!(p.role.as_deref(),Some("in"|"mut"))){return err("§5.1","action regions need in or mut roles");}
         }
-        _ => empty(&[2, 3, 4])?,
+        _ => {empty(&[2,3,4])?;for group in 0..2{all(&f.params[group],|t|matches!(t,Type::Int(_)|Type::Ptr|Type::F64|Type::Token|Type::Qreg(_)))?;}if !f.regs.is_empty()||!f.bounds.is_empty(){return err("§3.3","classical functions use SSA definitions, not a mutable regs file");}}
     }
     if matches!(f.kind.as_str(), "oracle" | "lproc") {
         all(&f.regs, |t| matches!(t, Type::Reg(_)))?;

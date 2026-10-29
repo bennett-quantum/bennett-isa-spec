@@ -77,3 +77,20 @@ fn release_cannot_consume_its_effective_control() {
         "§3.3",
     );
 }
+
+#[test]
+fn angles_and_function_interfaces_require_classical_argument_types(){
+    reject(&action("rx p t"),"§3.3");
+    let signature=r#"{"abi":"0.8","kind":"cc","params":["wire[8]"],"results":[],"tier":"cc"}"#;
+    reject(&object(&[("bad",signature,"fn cc @bad (x:wire[8]) () () () ()\n^entry():\nret")],"{}",""),"§3.3");
+}
+#[test]
+fn lproc_fault_literals_use_the_enclosing_oracles_fault_width(){
+    use bennett_isa_ref::{Budget,OracleInput};
+    let oracle=r#"{"abi":"0.8","args":[],"fault":5,"in":[],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#;
+    let proc=r#"{"abi":"0.8","kind":"lproc","params":[],"result":1,"tier":"q"}"#;
+    let layout="\nsection layout\n{\"A_tab\":0,\"H\":8,\"S_cells\":4,\"globals\":{},\"heap_base\":16,\"heap_limit_max\":0,\"interface_regions\":{},\"null_size\":1,\"ptr_width\":32}\n";
+    let text=object(&[("main",oracle,"oracle @main () (t:wire) (f:wire[5]) () ()\nregs { r:reg[1] }\n^entry():\nr = lift.call @p ()\nlift.retval r"),("p",proc,"lproc @p () (r:reg[1]) () () ()\n^entry():\nfault 31")],"{}",layout);
+    let o=Object::parse(&text).unwrap();let r=o.run_oracle("main",&OracleInput::bits(&[]),Budget{steps:2,heap:0,stack:16,depth:8}).unwrap();assert_eq!((r.payload,r.code),(0,31));
+    reject(&text.replace("fault 31","fault 32"),"§3.3");
+}
