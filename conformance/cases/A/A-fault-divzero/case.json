@@ -1,0 +1,26 @@
+{
+ "id": "A-fault-divzero",
+ "suite": "A",
+ "spec": "§15 suite A (fault records); §4.1: udiv by zero is an R fault record; §5.4 code 5",
+ "derivation": "3 udiv 0: FAILED with FAULT_UB_DIV0.",
+ "object": "../../objects/classical.bisa",
+ "command": [
+  "run-cc",
+  "{object}",
+  "divzero"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "FAILED",
+   "results": [],
+   "fault": 5,
+   "faults": [
+    {
+     "code": 5,
+     "name": "FAULT_UB_DIV0"
+    }
+   ]
+  }
+ }
+}

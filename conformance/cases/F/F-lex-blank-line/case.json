@@ -1,0 +1,18 @@
+{
+ "id": "F-lex-blank-line",
+ "suite": "F",
+ "spec": "§15 suite F (grammar); §16.1: exactly one blank line before each section line and none elsewhere",
+ "derivation": "inc8 with a blank line inside the functions section: §16.1 diagnostic.",
+ "object": "../../objects/f_lex_blank_line.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§16.1"
+  ]
+ }
+}

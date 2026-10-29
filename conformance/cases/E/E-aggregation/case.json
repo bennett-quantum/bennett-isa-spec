@@ -1,0 +1,10 @@
+{
+ "id": "E-aggregation",
+ "suite": "E",
+ "spec": "§15 suite E (aggregation from event lists; timing model); §8.2: count sums per-event costs each leaf exactly once; time is the makespan; peak is the maximum concurrently live wires per class; a class absent from rate has rate 1 (§17 item 11)",
+ "derivation": "event list in events.json: two sequential cx leaves of duration 1 on disjoint wire pairs, then one classical step (classical_step_time 1). count(time-cost) = 3, makespan 3, peak_qubits in the only class = 2 (one cx at a time), qubit_second occupancy = 2 wires * 2 seconds * rate 1 = 4.",
+ "unavailable": {
+  "deliverable": 9,
+  "reason": "target descriptions (§8) are staged deliverable 9"
+ }
+}

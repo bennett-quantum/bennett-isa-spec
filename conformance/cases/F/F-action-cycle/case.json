@@ -1,0 +1,18 @@
+{
+ "id": "F-action-cycle",
+ "suite": "F",
+ "spec": "§15 suite F (acyclic action graphs); §5.1: action call graphs are acyclic; recursion exists only through lift.call",
+ "derivation": "An action whose body is one action_call of itself: §5.1 diagnostic.",
+ "object": "../../objects/f_action_cycle.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§5.1"
+  ]
+ }
+}

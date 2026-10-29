@@ -1,0 +1,18 @@
+{
+ "id": "F-disjoint-pred",
+ "suite": "F",
+ "spec": "§15 suite F (disjointness incl. control context); §3.3: every wire of the effective control context is distinct from every target; `qpred p; x p` is ill-formed",
+ "derivation": "An action pushing t[0] as predicate and targeting t[0] with x under it: §3.3 diagnostic.",
+ "object": "../../objects/f_disjoint_pred.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§3.3"
+  ]
+ }
+}

@@ -1,0 +1,24 @@
+{
+ "id": "B-fault-code-10",
+ "suite": "B",
+ "spec": "§15 suite B (every fault code); §5.4 fault table: 10 FAULT_ENTROPY_EXHAUSTED; §4.2 fault row: code ^= C, faulted ^= 1, succ HALT; §5.2: a faulted run commits (0, code)",
+ "derivation": "The body is the single row `fault 10`: one step, no payload. literal fault 10 in an oracle body is still just the fault row (the R-only note in §5.4 names its origin, not a restriction on the row): F_B=(0,10).",
+ "object": "../../objects/arithmetic.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "fault10",
+  "--input",
+  "0,0",
+  "--budget",
+  "5"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 10,
+   "payload": 0,
+   "steps": 1
+  }
+ }
+}

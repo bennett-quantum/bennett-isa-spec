@@ -1,0 +1,10 @@
+{
+ "id": "E-scheme-expansion",
+ "suite": "E",
+ "spec": "§15 suite E (scheme expansion and correctness); §8.3: repeat binds i over [from, to); every template gate must itself match a gates entry; schemes do not nest; §8.2: a scheme contributes only its expanded template to aggregation",
+ "derivation": "scheme.json's template replays its single cx leaf for i in [0, k): matched at k=3 it expands to exactly 3 leaf cx events and no cost of its own; each leaf must match the cx gates entry (charged time 1 each, total count cost 3).",
+ "unavailable": {
+  "deliverable": 9,
+  "reason": "target descriptions (§8) are staged deliverable 9"
+ }
+}

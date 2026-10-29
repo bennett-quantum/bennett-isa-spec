@@ -1,0 +1,10 @@
+{
+ "id": "E-ast-log2inv",
+ "suite": "E",
+ "spec": "§15 suite E (AST evaluation); §8.1: log2inv_eps = the exact integer min{{ j >= 0 : eps * 2^j >= 1 }} for 0 < eps <= 1",
+ "derivation": "For eps = 0.001: 0.001 * 2^9 = 0.512 < 1 and 0.001 * 2^10 = 1.024 >= 1, so log2inv_eps evaluates to exactly 10 as a rational integer.",
+ "unavailable": {
+  "deliverable": 9,
+  "reason": "target descriptions (§8) are staged deliverable 9"
+ }
+}

@@ -1,0 +1,11 @@
+{
+ "id": "H-unknown-expansion-library",
+ "suite": "H",
+ "spec": "§15 suite H (verbatim execution); §11: a consumer that does not implement the bound expansion library rejects the schedule (E_SCHEDULE_INFEASIBLE)",
+ "derivation": "A schedule bound to expansion {name: no-such-library} must be rejected with E_SCHEDULE_INFEASIBLE even if every path resolves, because generated-operation ordinals are library-defined.",
+ "object": "../../objects/sched_inc8.bisa",
+ "unavailable": {
+  "deliverable": 10,
+  "reason": "the §11 schedule consumer is staged deliverable 10; no reference-CLI command consumes or validates a schedule for execution"
+ }
+}

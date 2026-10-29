@@ -1,0 +1,18 @@
+{
+ "id": "F-unknown-section",
+ "suite": "F",
+ "spec": "§15 suite F (schemas); §9.1: order fixed, each section at most once, unknown sections or fields are errors",
+ "derivation": "inc8 plus a trailing `section bogus`: §9.1 diagnostic.",
+ "object": "../../objects/f_unknown_section.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§9.1"
+  ]
+ }
+}

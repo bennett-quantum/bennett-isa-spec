@@ -1,0 +1,24 @@
+{
+ "id": "C-arith-ashr-negative",
+ "suite": "C",
+ "spec": "§15 suite C (T3 vectors for the §4.2 rows); §4.2 lift.binop (arithmetic shift right sign-extends)",
+ "derivation": "128 is -128 signed; -128 >> 1 arithmetic = -64 = 192 unsigned; F_B = (192, 0) in 2 steps.",
+ "object": "../../objects/arithmetic.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "ashr",
+  "--input",
+  "128,1",
+  "--budget",
+  "20"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 192,
+   "steps": 2
+  }
+ }
+}

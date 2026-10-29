@@ -1,0 +1,1 @@
+{"kind":"channel","subject":{"region":"toggle","variant":"forward","inherited_controls":0},"metric":"diamond","precision_bits":64,"bound":"1","dual":[{"mu":"0.1875","Y":"(1/16) I4 as [re_lo,re_hi,im_lo,im_hi] entries, row-major"}]}

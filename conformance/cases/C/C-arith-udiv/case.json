@@ -1,0 +1,24 @@
+{
+ "id": "C-arith-udiv",
+ "suite": "C",
+ "spec": "§15 suite C (T3 vectors for the §4.2 rows); §4.2 lift.div unsigned",
+ "derivation": "7 / 2 = 3 remainder 1; F_B = (3, 0) in 2 steps.",
+ "object": "../../objects/arithmetic.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "udiv",
+  "--input",
+  "7,2",
+  "--budget",
+  "20"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 3,
+   "steps": 2
+  }
+ }
+}

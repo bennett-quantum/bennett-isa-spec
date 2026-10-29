@@ -1,0 +1,11 @@
+{
+ "id": "H-path-not-in-object",
+ "suite": "H",
+ "spec": "§15 suite H (verbatim execution; INFEASIBLE/UNSUPPORTED); §11: a consumer validates every path against the object and executes verbatim or rejects (E_SCHEDULE_INFEASIBLE)",
+ "derivation": "An entry whose path names program point entry:3 of inc8 (rows are 0,1,2: const, add, retval) resolves nowhere: E_SCHEDULE_INFEASIBLE, not a silently ignored entry.",
+ "object": "../../objects/sched_inc8.bisa",
+ "unavailable": {
+  "deliverable": 10,
+  "reason": "the §11 schedule consumer is staged deliverable 10; no reference-CLI command consumes or validates a schedule for execution"
+ }
+}

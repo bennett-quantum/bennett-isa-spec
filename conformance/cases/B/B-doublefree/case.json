@@ -1,0 +1,24 @@
+{
+ "id": "B-doublefree",
+ "suite": "B",
+ "spec": "§15 suite B; §4.2 lift.free flag as in B-free-pinned (the entry is no longer live)",
+ "derivation": "const, alloc, const, free (succeeds), free again: no live unpinned match remains: (0,7) in 5 steps.",
+ "object": "../../objects/heap.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "doublefree",
+  "--input",
+  "",
+  "--budget",
+  "20,32,0,0"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 7,
+   "payload": 0,
+   "steps": 5
+  }
+ }
+}

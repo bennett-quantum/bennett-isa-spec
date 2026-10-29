@@ -1,0 +1,25 @@
+{
+ "id": "B-step-check-tiny",
+ "suite": "B",
+ "spec": "§15 suite B (totality and prefix reversal over the domain, interface regions restored, pre-entries); §5.2 domain D; §17 item 13: exhaustive at <= 16 interface bits",
+ "derivation": "tiny's free domain is the 1-bit input plus the one unfixed 8-bit db cell = 9 bits, 512 cases, exhaustive by the §17 item 13 default; on every case the §14.1 interpreter and the literal §3.6 machine agree and the B=9 prefix reversal restores the whole tuple (region cell, pre-entry, frames). Status ok is the CLI encoding of that agreement (README Commands, step-check).",
+ "object": "../../objects/tiny_memory.bisa",
+ "command": [
+  "step-check",
+  "{object}",
+  "tiny",
+  "--suite",
+  "--budget",
+  "9,0,0,0"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "cases": 512,
+   "input_and_memory_bits": 9,
+   "mode": "exhaustive",
+   "fixed_regions": [],
+   "status": "ok"
+  }
+ }
+}

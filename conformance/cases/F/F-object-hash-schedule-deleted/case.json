@@ -1,0 +1,23 @@
+{
+ "id": "F-object-hash-schedule-deleted",
+ "suite": "F",
+ "spec": "§15 suite F (envelope and hashes); §9.2: object_hash is taken over the canonical text with the schedule, certificate and coverage sections deleted together with the preceding blank line",
+ "derivation": "sched_inc8.bisa is inc8.bisa plus one schedule section; deleting it (with its preceding blank line) reproduces the inc8 bytes, so its object_hash equals C-163-inc8-check's 8093da48... and the symbol hashes are unchanged.",
+ "object": "../../objects/sched_inc8.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "ok",
+   "object_hash": "8093da48bad04d6564325faf01ea1304a84b5ac5a120e685eee9951f5daec5d9",
+   "symbols": {
+    "inc8": {
+     "interface_hash": "8ce5e64f15830d8e596ba9b4861def6565dd567b5804300f427d8b9566d5be93"
+    }
+   }
+  }
+ }
+}

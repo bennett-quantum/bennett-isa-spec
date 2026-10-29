@@ -1,0 +1,24 @@
+{
+ "id": "C-arith-icmp-eq",
+ "suite": "C",
+ "spec": "§15 suite C (T3 vectors for the §4.2 rows); §4.2 lift.icmp -> reg[1], then lift.zext",
+ "derivation": "4 == 4 is 1; rows icmp, zext, retval; F_B = (1, 0) in 3 steps.",
+ "object": "../../objects/arithmetic.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "eq",
+  "--input",
+  "4,4",
+  "--budget",
+  "20"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 1,
+   "steps": 3
+  }
+ }
+}

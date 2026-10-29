@@ -1,0 +1,26 @@
+{
+ "id": "B-oracle-call-no-propagation",
+ "suite": "B",
+ "spec": "§15 suite B; §5.5: a callee fault left in fr' does not propagate by itself",
+ "derivation": "ignore calls inc8 with token steps 2 (inner (0,1) into r, fr) and returns r without testing fr: payload 0 with code 0 in 2 rows.",
+ "object": "../../objects/nested.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "ignore",
+  "--input",
+  "8",
+  "--arg",
+  "token:2,0,0,0",
+  "--budget",
+  "20"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 0,
+   "steps": 2
+  }
+ }
+}

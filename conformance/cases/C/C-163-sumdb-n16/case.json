@@ -1,0 +1,26 @@
+{
+ "id": "C-163-sumdb-n16",
+ "suite": "C",
+ "spec": "§15 suite C; §16.3 example 2 sum formula; n = 16 needs 272 stack cells, hence S_cells = 9",
+ "derivation": "Sum 1..16 = 136, no wrap. Rows: oracle 4 + 16 recursive levels of 14 + base 6 = 234. Stack 512 >= 272 here.",
+ "object": "../../objects/sum_db.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "sum_db",
+  "--input",
+  "16",
+  "--mem",
+  "db=0102030405060708090a0b0c0d0e0f10",
+  "--budget",
+  "1000,4080,512,64"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 136,
+   "steps": 234
+  }
+ }
+}

@@ -1,0 +1,26 @@
+{
+ "id": "C-163-sumdb-n0",
+ "suite": "C",
+ "spec": "§15 suite C; §16.3 example 2: F_B(n) = (sum of db[i] for i<n mod 256, 0) for n <= 16",
+ "derivation": "n=0: the first sum activation takes the z branch to done and returns acc=0. Rows: oracle 4 (addr, const, call, retval) + sum 6 (addr, boundscheck, load, icmp, qbranch, ret) = 10.",
+ "object": "../../objects/sum_db.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "sum_db",
+  "--input",
+  "0",
+  "--mem",
+  "db=0102030405060708090a0b0c0d0e0f10",
+  "--budget",
+  "1000,4080,512,64"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 0,
+   "steps": 10
+  }
+ }
+}

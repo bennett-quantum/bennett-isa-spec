@@ -1,0 +1,33 @@
+{
+ "id": "C-qinplace-wrap",
+ "suite": "C",
+ "spec": "§15 suite C (qinplace pairs); §4.5 as in C-qinplace-inc",
+ "derivation": "3 + 1 mod 4 = 0 (key 00).",
+ "object": "../../objects/qinplace.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "inc_inplace",
+  "--mut",
+  "3",
+  "--arg",
+  "token:10,0,0,0"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "mut": [
+    0
+   ],
+   "state": {
+    "00": [
+     1,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state"
+  ]
+ }
+}

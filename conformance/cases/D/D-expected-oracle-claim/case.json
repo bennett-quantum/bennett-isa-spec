@@ -1,0 +1,11 @@
+{
+ "id": "D-expected-oracle-claim",
+ "suite": "D",
+ "spec": "§15 suite D; §12.1 exhaustive claim with expected \"oracle\" re-executes every domain element on the reference interpreter; §12.3: executable claims bind to schedule_hash through their subject",
+ "derivation": "An exhaustive claim over D for inc8 (256 inputs) with expected \"oracle\" holds by definition of F_B (§5.2) when re-executed at the claim's budget B=3: every tuple is (x, 0^(x+1 mod 256), 0) on (ins, tgt, fr) from clean tgt/fr. Expected verdict: proof. No CLI command verifies certificates today.",
+ "object": "../../objects/inc8.bisa",
+ "unavailable": {
+  "deliverable": 11,
+  "reason": "certificate claim checking has no reference-CLI command; the rigorous checker of §12.1 is staged deliverable 11"
+ }
+}

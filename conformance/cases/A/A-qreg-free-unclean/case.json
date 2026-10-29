@@ -1,0 +1,20 @@
+{
+ "id": "A-qreg-free-unclean",
+ "suite": "A",
+ "spec": "§15 suite A (qreg.*); §3.3: qreg.free requires the handle clean on every basis configuration, a failed precondition is a CC trap",
+ "derivation": "unclean flips its one wire to |1> and frees: not clean, so the free traps (fault 4 FAULT_UB_TRAP) and the run FAILED.",
+ "object": "../../objects/registers.bisa",
+ "command": [
+  "run-cc",
+  "{object}",
+  "unclean"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "FAILED",
+   "results": [],
+   "fault": 4
+  }
+ }
+}

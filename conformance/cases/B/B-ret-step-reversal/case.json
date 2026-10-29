@@ -1,0 +1,47 @@
+{
+ "id": "B-ret-step-reversal",
+ "suite": "B",
+ "spec": "§15 suite B; §3.7 suite-B sentence for one forward lift.ret step followed by its inverse (see B-call-step-reversal)",
+ "derivation": "Continuing the row count of B-call-step-reversal: the inner sum (n=0) runs addr,boundscheck,load,icmp,qbranch (rows 17-21) into done, so row 22 is its lift.ret. 22 forward and 22 inverse steps restore the entry tuple with clean frames; the prefix is not halted: payload 0, code 1.",
+ "object": "../../objects/sum_db.bisa",
+ "command": [
+  "reverse",
+  "{object}",
+  "sum_db",
+  "--input",
+  "1",
+  "--mem",
+  "db=0102030405060708090a0b0c0d0e0f10",
+  "--budget",
+  "100,4080,512,64",
+  "--steps",
+  "22"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "REVERSED",
+   "equals_entry": true,
+   "frames_clean": true,
+   "forward_steps": 22,
+   "reverse_steps": 22,
+   "payload": 0,
+   "code": 1,
+   "steps": 22,
+   "state_after_reversal": {
+    "pc": 0,
+    "faulted": false,
+    "counters": [
+     0,
+     2,
+     0,
+     0,
+     0
+    ],
+    "locations": {
+     "sum_db.n": 1
+    }
+   }
+  }
+ }
+}

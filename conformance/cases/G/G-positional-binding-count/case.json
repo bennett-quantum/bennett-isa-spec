@@ -1,0 +1,22 @@
+{
+ "id": "G-positional-binding-count",
+ "suite": "G",
+ "spec": "§15 suite G (binding rule); §10 positional binding: argument i binds to parameter i; a count or kind mismatch is E_ARG",
+ "derivation": "measurement takes 0 parameters; passing one argument is an E_ARG diagnostic before any execution.",
+ "object": "../../objects/registers.bisa",
+ "command": [
+  "run-cc",
+  "{object}",
+  "measurement",
+  "--args",
+  "1"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "E_ARG",
+   "§10"
+  ]
+ }
+}

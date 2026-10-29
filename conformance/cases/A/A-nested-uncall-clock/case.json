@@ -1,0 +1,28 @@
+{
+ "id": "A-nested-uncall-clock",
+ "suite": "A",
+ "spec": "§15 suite A; §7.4 suite-A sentence: f calls g, uncalls g, returns; g performs one clock.read; call f; uncall f leaves the clock at its entry value",
+ "derivation": "g's clock.read writes the initial clock 0 and increments it to 1; the inner uncall reverses that frame (clock back to 0, tape entry popped); load then reads 0; uncall f skips the already-reversed frames. Result 0, clock 0, empty tape. Steps: nested 6 own instructions + f's call,effect,ret,uncall,ret = 11.",
+ "object": "../../objects/classical.bisa",
+ "command": [
+  "run-cc",
+  "{object}",
+  "nested"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "COMPLETED",
+   "steps": 11,
+   "results": [
+    {
+     "type": "i64",
+     "value": "0"
+    }
+   ],
+   "clock": 0,
+   "effect_tape_length": 0,
+   "tape": []
+  }
+ }
+}

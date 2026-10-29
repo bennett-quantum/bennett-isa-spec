@@ -1,0 +1,27 @@
+{
+ "id": "C-qregion-image",
+ "suite": "C",
+ "spec": "§15 suite C; §4.6 qregion with @image: cell i = bits [iW,(i+1)W) of the little-endian image; qload/qxor/qunload",
+ "derivation": "Data `bytes` is hex dead: byte 0 = 0xde is cell 0 and byte 1 = 0xad is cell 1. image XORs the loaded cell into t and unloads, restoring the region. t = 0x35: with p=0, 0x35 xor 0xde = 0xeb = 235.",
+ "object": "../../objects/control_flow.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "image",
+  "--mut",
+  "53",
+  "--in",
+  "0"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "mut": [
+    235
+   ],
+   "in": [
+    0
+   ]
+  }
+ }
+}

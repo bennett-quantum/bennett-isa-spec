@@ -1,0 +1,17 @@
+{
+ "id": "F-bounds-positive-check",
+ "suite": "F",
+ "spec": "§15 suite F; §5.3 bounds list equals the body's loops (actions.bisa loop declares bounds [3] for its one qloop 3)",
+ "derivation": "All declared bounds match their bodies, so check reports ok; the negative direction is F-bounds-mismatch.",
+ "object": "../../objects/actions.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "ok"
+  }
+ }
+}

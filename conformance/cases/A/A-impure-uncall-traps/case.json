@@ -1,0 +1,27 @@
+{
+ "id": "A-impure-uncall-traps",
+ "suite": "A",
+ "spec": "§15 suite A (segment uncall, impure suffix traps); §7.4: every frame after the segment must be pure, else FAULT_UB_TRAP with no state change; store is impure",
+ "derivation": "impure calls g, then stores (impure), then uncalls g: the suffix is impure so the uncall is an R fault 4 and the run FAILED with no results; g's clock.read already happened (clock 1).",
+ "object": "../../objects/classical.bisa",
+ "command": [
+  "run-cc",
+  "{object}",
+  "impure"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "FAILED",
+   "results": [],
+   "fault": 4,
+   "faults": [
+    {
+     "code": 4,
+     "name": "FAULT_UB_TRAP"
+    }
+   ],
+   "clock": 1
+  }
+ }
+}

@@ -1,0 +1,32 @@
+{
+ "id": "A-measure-draw-low",
+ "suite": "A",
+ "spec": "§15 suite A (qreg.*, fault records T4); §14.2: measure is the projective measurement with Born probabilities",
+ "derivation": "bell makes (|00>+|11>)/sqrt(2): probabilities 1/2 and 1/2; a draw of 0.1 falls in the first half, selecting 00 = value 0.",
+ "object": "../../objects/registers.bisa",
+ "command": [
+  "run-cc",
+  "{object}",
+  "measurement",
+  "--draws",
+  "0.1"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "COMPLETED",
+   "results": [
+    {
+     "type": "i2",
+     "value": "0"
+    }
+   ],
+   "measurements": [
+    {
+     "bits": "00",
+     "value": 0
+    }
+   ]
+  }
+ }
+}

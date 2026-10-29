@@ -1,0 +1,18 @@
+{
+ "id": "F-borrow-neg-control-in-b",
+ "suite": "F",
+ "spec": "§15 suite F; §5.6 negative test 2: V = cx b2 b1, W = cx b1 t with b2 in B, violating X cap B = empty",
+ "derivation": "Both borrowed wires are used with b[1] as V's control: net t ^= b[1], depending on a borrowed value: §5.6 diagnostic.",
+ "object": "../../objects/f_borrow_neg2.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§5.6"
+  ]
+ }
+}

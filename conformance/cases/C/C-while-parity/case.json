@@ -1,0 +1,36 @@
+{
+ "id": "C-while-parity",
+ "suite": "C",
+ "spec": "§15 suite C; §4.6 qloop ... while: flag c_i is the conjunction of cond[0..i], iteration i runs under c_i",
+ "derivation": "while3 flips t once per true flag. p=3 is wires (1,1,0): flags 1,1,0 give two flips, t stays 0 (key mut (0) + in (1,1,0) = 0110). p=5 is (1,0,1): flags 1,0,0 give one flip, t=1 (key 1101, asserted in C-while-parity-one).",
+ "object": "../../objects/control_flow.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "while3",
+  "--mut",
+  "0",
+  "--in",
+  "3"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "mut": [
+    0
+   ],
+   "in": [
+    3
+   ],
+   "state": {
+    "0110": [
+     1,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state"
+  ]
+ }
+}

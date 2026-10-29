@@ -1,0 +1,40 @@
+{
+ "id": "D-qif-then-interference",
+ "suite": "D",
+ "spec": "§15 suite D (controlled-interference tests); §4.6 qif expansion runs the then arm under the selector and the else arm under its negation",
+ "derivation": "conditional with p=1 applies h to t=0: components (t,p) = (0,1) and (1,1), keys 01 and 11, amplitudes 1/sqrt(2); mut indefinite, in definite 1. The else arm (x t) does not fire.",
+ "object": "../../objects/control_flow.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "conditional",
+  "--mut",
+  "0",
+  "--in",
+  "1"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "mut": [
+    null
+   ],
+   "in": [
+    1
+   ],
+   "state": {
+    "01": [
+     0.7071067811865476,
+     0
+    ],
+    "11": [
+     0.7071067811865476,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state"
+  ]
+ }
+}

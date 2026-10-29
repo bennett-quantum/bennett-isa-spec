@@ -1,0 +1,12 @@
+bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"0000000000000000000000000000000000000000000000000000000000000000","kind":"oracle","name":"badw","signature":{"abi":"0.8","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}}}
+
+section functions
+oracle @badw (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
+regs { a:reg[8], b:reg[16], r:reg[8] }
+^entry():
+a = lift.mov x
+r = lift.add a b
+lift.retval r

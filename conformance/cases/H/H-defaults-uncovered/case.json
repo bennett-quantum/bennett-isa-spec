@@ -1,0 +1,11 @@
+{
+ "id": "H-defaults-uncovered",
+ "suite": "H",
+ "spec": "§15 suite H; §11 defaults: cleanup reverse; gate native if it matches a gates entry else the first matching scheme; class the first in JCS order with capacity; sequential timing; §17 item 9 default epsilon_share",
+ "derivation": "With entries empty, every generated operation takes its default: an uncovered rz in a region of epsilon 1/100 with 4 epsilon>0 operations gets share 1/400, native realisation, first JCS class with capacity, timed after its predecessor.",
+ "object": "../../objects/sched_inc8.bisa",
+ "unavailable": {
+  "deliverable": 10,
+  "reason": "the §11 schedule consumer is staged deliverable 10; no reference-CLI command consumes or validates a schedule for execution"
+ }
+}

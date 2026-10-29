@@ -1,0 +1,25 @@
+{
+ "id": "G-budget-token-validation",
+ "suite": "G",
+ "spec": "§15 suite G; §5.4: bennett_budget validates its limits - for a memoryless object heap_limit = stack_limit = depth_limit = 0 (§7.2)",
+ "derivation": "nested lives in a memoryless object; a token:3,1,0,0 argument asks for heap 1, which bennett_budget must refuse: a §5.4 diagnostic, no run output.",
+ "object": "../../objects/nested.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "nested",
+  "--input",
+  "8",
+  "--arg",
+  "token:3,1,0,0",
+  "--budget",
+  "20"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§5.4"
+  ]
+ }
+}

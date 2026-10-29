@@ -1,0 +1,22 @@
+{
+ "id": "G-launch-noncc-oracle-entry",
+ "suite": "G",
+ "spec": "§15 suite G (every §10 binding rule); §10: a run executes a device CC entry; other kinds are E_ARG",
+ "derivation": "inc8 is an oracle, not a CC entry: run-program refuses with a §10 E_ARG diagnostic and prints no run JSON.",
+ "object": "../../objects/inc8.bisa",
+ "command": [
+  "run-program",
+  "{object}",
+  "inc8",
+  "--args",
+  ""
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "E_ARG",
+   "§10"
+  ]
+ }
+}

@@ -1,0 +1,18 @@
+{
+ "id": "F-in-wire-target",
+ "suite": "F",
+ "spec": "§15 suite F (`in`-wire use); §5.1: in wires in actions appear only as controls, as targets of diagonal gates, as qcopy/qxor sources, or as in arguments of calls",
+ "derivation": "x p[0] makes the in bundle a permutation-gate target, none of the four allowed uses: §5.1 diagnostic.",
+ "object": "../../objects/f_in_wire_target.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§5.1"
+  ]
+ }
+}

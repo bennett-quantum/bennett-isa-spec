@@ -1,0 +1,18 @@
+{
+ "id": "F-width-mismatch",
+ "suite": "F",
+ "spec": "§15 suite F (operand schema, lifted width rules); §3.3: binop operands have equal width, applied verbatim to lift.* counterparts; a mismatch is ill-formed, never a truncation",
+ "derivation": "lift.add of a reg[8] with a reg[16]: ill-formed with a §3.3 diagnostic. The stored hash is deliberately zero: validation precedes stored-hash verification (reference README, check).",
+ "object": "../../objects/f_width_mismatch.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§3.3"
+  ]
+ }
+}

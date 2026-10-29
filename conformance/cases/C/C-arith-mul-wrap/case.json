@@ -1,0 +1,24 @@
+{
+ "id": "C-arith-mul-wrap",
+ "suite": "C",
+ "spec": "§15 suite C (T3 vectors for the §4.2 rows); §4.2 lift.binop (wrap)",
+ "derivation": "128 * 3 = 384 = 128 mod 256; F_B = (128, 0) in 2 steps.",
+ "object": "../../objects/arithmetic.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "mul",
+  "--input",
+  "128,3",
+  "--budget",
+  "20"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 128,
+   "steps": 2
+  }
+ }
+}

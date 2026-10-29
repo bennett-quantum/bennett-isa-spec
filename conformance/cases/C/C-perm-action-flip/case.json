@@ -1,0 +1,39 @@
+{
+ "id": "C-perm-action-flip",
+ "suite": "C",
+ "spec": "§15 suite C (T3 for permutation actions); §5.3: a permutation action's realised unitary is the permutation matrix, checked extensionally per §14.3 T3; §4.5 qcopy/qxor/quncopy",
+ "derivation": "flip copies p to clean d, XORs d into t, uncopies d: t becomes t xor p with no garbage. mut 1 xor in 2 = 3. State key order is mut wires then in wires, wire 0 first (README run-action): mut (1,1) then in (0,1) = 1101.",
+ "object": "../../objects/actions.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "flip",
+  "--mut",
+  "1",
+  "--in",
+  "2"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "action": "flip",
+   "adjoint": false,
+   "wires": 4,
+   "mut": [
+    3
+   ],
+   "in": [
+    2
+   ],
+   "state": {
+    "1101": [
+     1,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state"
+  ]
+ }
+}

@@ -1,0 +1,36 @@
+{
+ "id": "C-borrow-frame-xor",
+ "suite": "C",
+ "spec": "§15 suite C (T3 for borrow frames); §5.6: the frame factorises as P' x I_B, independent of the borrowed value",
+ "derivation": "borrowed runs CX x,b; CX b,t; CX x,b; CX b,t (V;W;V^-1;W): t ^= (b^x) then t ^= b, net t ^= x with b restored. (t,x) = (0,1) -> t=1 (key mut then in: 11). The CLI starts borrowed wires in |0> (README run-action); independence from b itself is the §5.6 factorisation the spec's rule requires, partially observed here through the single available b entry value.",
+ "object": "../../objects/control_flow.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "borrowed",
+  "--mut",
+  "0",
+  "--in",
+  "1"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "mut": [
+    1
+   ],
+   "in": [
+    1
+   ],
+   "state": {
+    "11": [
+     1,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state"
+  ]
+ }
+}

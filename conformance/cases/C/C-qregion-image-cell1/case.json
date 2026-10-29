@@ -1,0 +1,27 @@
+{
+ "id": "C-qregion-image-cell1",
+ "suite": "C",
+ "spec": "§15 suite C; §4.6 qregion image addressing as in C-qregion-image",
+ "derivation": "With p=1: 0x35 xor 0xad = 0x98 = 152.",
+ "object": "../../objects/control_flow.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "image",
+  "--mut",
+  "53",
+  "--in",
+  "1"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "mut": [
+    152
+   ],
+   "in": [
+    1
+   ]
+  }
+ }
+}

@@ -1,0 +1,36 @@
+{
+ "id": "D-qif-else-branch",
+ "suite": "D",
+ "spec": "§15 suite D (controlled interference); §4.6 qif else arm under the flipped selector",
+ "derivation": "With p=0 the then arm is disabled and x t fires: t becomes 1 exactly, key 10, amplitude 1.",
+ "object": "../../objects/control_flow.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "conditional",
+  "--mut",
+  "0",
+  "--in",
+  "0"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "mut": [
+    1
+   ],
+   "in": [
+    0
+   ],
+   "state": {
+    "10": [
+     1,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state"
+  ]
+ }
+}

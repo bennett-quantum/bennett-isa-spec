@@ -1,0 +1,35 @@
+{
+ "id": "C-qmem-exchange",
+ "suite": "C",
+ "spec": "§15 suite C; §4.6 qexchm exchanges v with the selected cell only",
+ "derivation": "exchange with a=1 swaps t with cell 1: cells start [2,3] (mem hex one little-endian byte per 2-bit cell per the CLI encoding), t=1: t becomes 3, cells [2,1]; cell 0 untouched.",
+ "object": "../../objects/control_flow.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "exchange",
+  "--mut",
+  "1",
+  "--in",
+  "1",
+  "--mem",
+  "m=0203"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "mut": [
+    3
+   ],
+   "in": [
+    1
+   ],
+   "mem": {
+    "m": [
+     2,
+     1
+    ]
+   }
+  }
+ }
+}

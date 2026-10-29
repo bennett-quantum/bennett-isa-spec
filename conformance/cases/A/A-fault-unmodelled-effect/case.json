@@ -1,0 +1,26 @@
+{
+ "id": "A-fault-unmodelled-effect",
+ "suite": "A",
+ "spec": "§15 suite A; §17 item 3 default: an effect on a device beyond the four of §7.3 is FAULT_EFFECT_UNMODELLED (code 8)",
+ "derivation": "unknown_effect issues effect missing.op: FAILED with code 8.",
+ "object": "../../objects/classical.bisa",
+ "command": [
+  "run-cc",
+  "{object}",
+  "unknown_effect"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "FAILED",
+   "results": [],
+   "fault": 8,
+   "faults": [
+    {
+     "code": 8,
+     "name": "FAULT_EFFECT_UNMODELLED"
+    }
+   ]
+  }
+ }
+}

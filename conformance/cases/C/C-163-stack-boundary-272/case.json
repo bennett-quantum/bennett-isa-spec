@@ -1,0 +1,26 @@
+{
+ "id": "C-163-stack-boundary-272",
+ "suite": "C",
+ "spec": "§15 suite C (the stack-capacity boundary of example 2); §16.3: input n occupies 16(n+1) stack cells; stack_limit >= 272 suffices for n=16",
+ "derivation": "Same computation as C-163-sumdb-n16 with stack_limit exactly 272 = 16*17: every call has sp + 16 <= 272 (the test is strict >, §3.7), so it succeeds: (136,0), 234 steps.",
+ "object": "../../objects/sum_db.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "sum_db",
+  "--input",
+  "16",
+  "--mem",
+  "db=0102030405060708090a0b0c0d0e0f10",
+  "--budget",
+  "1000,4080,272,64"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 136,
+   "steps": 234
+  }
+ }
+}

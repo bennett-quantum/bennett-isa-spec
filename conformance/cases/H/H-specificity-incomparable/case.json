@@ -1,0 +1,11 @@
+{
+ "id": "H-specificity-incomparable",
+ "suite": "H",
+ "spec": "§15 suite H (specificity resolution); §11 matching: among matching entries the unique maximal one applies; two incomparable maximal entries make the schedule invalid (document order is never significant)",
+ "derivation": "schedule.json has two cleanup entries matching the same operation with specificity (1,1,0,0,0) and (1,0,1,0,0): neither is >= the other, so the schedule is invalid even though each entry is individually well-formed.",
+ "object": "../../objects/sched_inc8.bisa",
+ "unavailable": {
+  "deliverable": 10,
+  "reason": "the §11 schedule consumer is staged deliverable 10; no reference-CLI command consumes or validates a schedule for execution"
+ }
+}

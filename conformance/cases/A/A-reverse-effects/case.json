@@ -1,0 +1,37 @@
+{
+ "id": "A-reverse-effects",
+ "suite": "A",
+ "spec": "§15 suite A; §7.3 frame records: console pops, clock decrements, entropy position rewinds, an absent block sector is removed again on reversal; §7.4 traversal",
+ "derivation": "Forward: A-effects-tape's run (result 0). Whole reversal pops the console (console_hex empty), clock returns to 0, the effect tape empties, the formerly absent sector 7 is absent again, and the whole entry state is restored.",
+ "object": "../../objects/classical.bisa",
+ "command": [
+  "reverse",
+  "{object}",
+  "effects",
+  "--entropy",
+  "0b1621"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "REVERSED",
+   "equals_entry": true,
+   "memory_equals_entry": true,
+   "clock": 0,
+   "console_hex": "",
+   "effect_tape_length": 0,
+   "results": [
+    {
+     "type": "i64",
+     "value": "0"
+    }
+   ]
+  },
+  "stdout_json_equal_fields": [
+   [
+    "memory_digest",
+    "entry_memory_digest"
+   ]
+  ]
+ }
+}

@@ -1,0 +1,23 @@
+{
+ "id": "G-reverse-eligible-completed",
+ "suite": "G",
+ "spec": "§15 suite G (reverse eligibility); §10 states: COMPLETED -> REVERSED when no measure occurred and the touched registers are untouched since",
+ "derivation": "allocation runs cleanly with no measurement, so bennett_reverse applies: status REVERSED, reversed true, entry state restored (equals_entry), then CLOSED.",
+ "object": "../../objects/registers.bisa",
+ "command": [
+  "run-program",
+  "{object}",
+  "allocation",
+  "--reverse"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "REVERSED",
+   "run_state": "CLOSED",
+   "reversed": true,
+   "equals_entry": true,
+   "memory_equals_entry": true
+  }
+ }
+}

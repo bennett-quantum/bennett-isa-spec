@@ -1,0 +1,11 @@
+bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"0000000000000000000000000000000000000000000000000000000000000000","kind":"perm_action","name":"badpred","signature":{"abi":"0.8","args":[],"bounds":[],"in":[2],"kind":"perm_action","mem":[],"mut":[2],"tier":"q"}}}
+
+section functions
+perm_action @badpred (t:wire[2] mut) (p:wire[2] in) () () ()
+^entry():
+qpred t[0]
+x t[0]
+qunpred t[0]

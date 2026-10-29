@@ -1,0 +1,24 @@
+{
+ "id": "B-load-after-free",
+ "suite": "B",
+ "spec": "§15 suite B (inherent load/store checks); §4.2: lift.load carries its own inrange flag",
+ "derivation": "Allocate 2 bytes, free them (entry dead), then load: inrange fails at row 5 (const, alloc, const, free, load): (0,7).",
+ "object": "../../objects/heap.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "afterfree",
+  "--input",
+  "",
+  "--budget",
+  "20,32,0,0"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 7,
+   "payload": 0,
+   "steps": 5
+  }
+ }
+}

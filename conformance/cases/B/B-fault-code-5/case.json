@@ -1,0 +1,24 @@
+{
+ "id": "B-fault-code-5",
+ "suite": "B",
+ "spec": "§15 suite B (every fault code); §5.4 fault table: 5 FAULT_UB_DIV0; §4.2 fault row: code ^= C, faulted ^= 1, succ HALT; §5.2: a faulted run commits (0, code)",
+ "derivation": "The body is the single row `fault 5`: one step, no payload. literal fault 5: F_B=(0,5).",
+ "object": "../../objects/arithmetic.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "fault5",
+  "--input",
+  "0,0",
+  "--budget",
+  "5"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 5,
+   "payload": 0,
+   "steps": 1
+  }
+ }
+}

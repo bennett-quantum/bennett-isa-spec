@@ -1,0 +1,24 @@
+{
+ "id": "B-boundary-halt-exact",
+ "suite": "B",
+ "spec": "§15 suite B (boundary halts); §16.3 example 1: with B >= 3 every x yields (x + 1 mod 256, 0)",
+ "derivation": "x=8: one=1, r=9, retval XORs 9 into result_val at step 3 and reaches HALT: (9,0), steps 3.",
+ "object": "../../objects/inc8.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "inc8",
+  "--input",
+  "8",
+  "--budget",
+  "3"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 9,
+   "steps": 3
+  }
+ }
+}

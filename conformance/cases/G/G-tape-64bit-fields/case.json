@@ -1,0 +1,11 @@
+{
+ "id": "G-tape-64bit-fields",
+ "suite": "G",
+ "spec": "§15 suite G; §10 tape: bennett_tape_next yields each effect in tape order with args as unsigned 64-bit little-endian fields, so *alen = 8 x arity",
+ "derivation": "The five effects of A-effects-tape iterate as entropy.read (alen 16), console.write (16), clock.read (8), block.write (16), block.read (16), in that order, pointers zero-extended from ptr_width 16.",
+ "object": "../../objects/registers.bisa",
+ "unavailable": {
+  "deliverable": 8,
+  "reason": "the full §10 launch library (stateful bennett_* API over runs) is staged deliverable 8; the CLI exposes only the one-shot run-program launch"
+ }
+}

@@ -1,0 +1,23 @@
+{
+ "id": "G-reverse-measured-run",
+ "suite": "G",
+ "spec": "§15 suite G (reverse eligibility); §10: a run that measured is E_NOT_REVERSIBLE",
+ "derivation": "measurement COMPLETED but consumed its handle by measuring: --reverse is E_NOT_REVERSIBLE, distinct from the FAILED case.",
+ "object": "../../objects/registers.bisa",
+ "command": [
+  "run-program",
+  "{object}",
+  "measurement",
+  "--draws",
+  "0.9",
+  "--reverse"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "E_NOT_REVERSIBLE",
+   "§10"
+  ]
+ }
+}

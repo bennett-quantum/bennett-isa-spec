@@ -1,0 +1,25 @@
+{
+ "id": "C-step-check-inc8",
+ "suite": "C",
+ "spec": "§15 suite C (T3 over full D at exhaustive widths; T6 agreement); §14.3 T3/T6; §17 item 13 exhaustive <= 16 bits",
+ "derivation": "inc8's domain has 8 free input bits: 256 cases, each checked extensionally (interpreter vs literal machine agree on F_B - T6 between the two forms - and the prefix reversal restores the tuple). mode exhaustive by the §17 item 13 default.",
+ "object": "../../objects/inc8.bisa",
+ "command": [
+  "step-check",
+  "{object}",
+  "inc8",
+  "--suite",
+  "--budget",
+  "4"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "cases": 256,
+   "input_and_memory_bits": 8,
+   "mode": "exhaustive",
+   "fixed_regions": [],
+   "status": "ok"
+  }
+ }
+}

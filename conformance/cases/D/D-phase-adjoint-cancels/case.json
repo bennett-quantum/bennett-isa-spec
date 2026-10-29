@@ -1,0 +1,33 @@
+{
+ "id": "D-phase-adjoint-cancels",
+ "suite": "D",
+ "spec": "§15 suite D (unitary comparison); §5.3 adjoint table: rz(theta) adjoints to rz(-theta), phase included",
+ "derivation": "phase applies rz(6.283185307179586) to t=1 and the action-level reversal applies its adjoint; the composition is the identity including phase, so the post-reversal state is exactly {1: [1,0]} regardless of the forward phase value.",
+ "object": "../../objects/control_flow.bisa",
+ "command": [
+  "reverse",
+  "{object}",
+  "phase",
+  "--mut",
+  "1"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "REVERSED",
+   "equals_entry": true,
+   "mut": [
+    1
+   ],
+   "state": {
+    "1": [
+     1,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state"
+  ]
+ }
+}

@@ -1,0 +1,1 @@
+{"context":"gates cost, k=1","expr":{"op":"/","args":[1,{"op":"-","args":[{"var":"k"},{"var":"k"}]}]}}

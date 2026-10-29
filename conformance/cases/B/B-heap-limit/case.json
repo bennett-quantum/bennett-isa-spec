@@ -1,0 +1,24 @@
+{
+ "id": "B-heap-limit",
+ "suite": "B",
+ "spec": "§15 suite B; §4.2 lift.alloc: flag = heap_used + max(n,1) > heap_limit, C = FAULT_BUDGET_HEAP",
+ "derivation": "heap wants 2 bytes with heap_limit 1: the alloc at row 2 has 0 + 2 > 1: (0,2) in 2 steps.",
+ "object": "../../objects/heap.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "heap",
+  "--input",
+  "",
+  "--budget",
+  "20,1,0,0"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 2,
+   "payload": 0,
+   "steps": 2
+  }
+ }
+}

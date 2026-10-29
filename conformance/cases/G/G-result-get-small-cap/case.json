@@ -1,0 +1,11 @@
+{
+ "id": "G-result-get-small-cap",
+ "suite": "G",
+ "spec": "§15 suite G; §10 results: INT writes ceil(N/8) little-endian bytes and sets width N; a cap smaller than that byte count is E_ARG and nothing is written",
+ "derivation": "measurement's i2 result needs 1 byte: bennett_result_get with cap 0 is E_ARG with the output buffer untouched; cap 1 writes the byte 0x03 and width 2.",
+ "object": "../../objects/registers.bisa",
+ "unavailable": {
+  "deliverable": 8,
+  "reason": "the full §10 launch library (stateful bennett_* API over runs) is staged deliverable 8; the CLI exposes only the one-shot run-program launch"
+ }
+}

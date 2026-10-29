@@ -1,0 +1,33 @@
+{
+ "id": "C-qinplace-inc",
+ "suite": "C",
+ "spec": "§15 suite C (T3 for qinplace pairs); §4.5 qinplace semantics: oracle_call g into clean t, exchange, oracle_call ginv cancels t",
+ "derivation": "Object cases/objects/qinplace.bisa (hashes filled with the reference `hash` command, which only computes identities; the outcome is derived here): inc2 is x+1 mod 4 and dec2 its inverse, both total in 3 rows, so under token steps 10 the in-place value goes 1 -> 2 (key: wire0 first, 01).",
+ "object": "../../objects/qinplace.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "inc_inplace",
+  "--mut",
+  "1",
+  "--arg",
+  "token:10,0,0,0"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "mut": [
+    2
+   ],
+   "state": {
+    "01": [
+     1,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state"
+  ]
+ }
+}

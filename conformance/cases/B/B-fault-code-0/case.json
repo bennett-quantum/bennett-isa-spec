@@ -1,0 +1,24 @@
+{
+ "id": "B-fault-code-0",
+ "suite": "B",
+ "spec": "§15 suite B (every fault code); §5.4 fault table: 0 FAULT_NONE; §4.2 fault row: code ^= C, faulted ^= 1, succ HALT; §5.2: a faulted run commits (0, code)",
+ "derivation": "The body is the single row `fault 0`: one step, no payload. fault row with C=0 sets faulted and XORs 0 into code, so F_B=(0,0): a flagged failure indistinguishable at this interface from a successful 0 (bead b-isa-spec-7qu).",
+ "object": "../../objects/arithmetic.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "fault0",
+  "--input",
+  "0,0",
+  "--budget",
+  "5"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 0,
+   "steps": 1
+  }
+ }
+}

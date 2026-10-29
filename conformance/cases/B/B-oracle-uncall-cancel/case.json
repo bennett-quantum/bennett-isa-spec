@@ -1,0 +1,26 @@
+{
+ "id": "B-oracle-uncall-cancel",
+ "suite": "B",
+ "spec": "§15 suite B (matched lift.oracle_uncall); §4.2: the uncall is the identical permutation, oracle contract is an involution (§5.2); §5.5 matched cleanup",
+ "derivation": "cancel calls inc8 with a faulting token (steps 2: r^=0, fr^=1) then uncalls with the same token, ins and mem: r^=0, fr^=1 again, restoring both to 0 even though the callee faulted. retval r: (0,0) in 3 rows.",
+ "object": "../../objects/nested.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "cancel",
+  "--input",
+  "8",
+  "--arg",
+  "token:2,0,0,0",
+  "--budget",
+  "20"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 0,
+   "steps": 3
+  }
+ }
+}

@@ -1,0 +1,36 @@
+{
+ "id": "A-reverse-whole-run",
+ "suite": "A",
+ "spec": "§15 suite A (run history and LIFO reversal); §7.4 whole-run reversal is the history traversal over the whole history; §14.3 T4 round trip",
+ "derivation": "sum(3)=6 forward (21 steps); LIFO reversal restores the complete entry state, so equals_entry and the memory digest match the entry digest.",
+ "object": "../../objects/classical.bisa",
+ "command": [
+  "reverse",
+  "{object}",
+  "sum",
+  "--args",
+  "3"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "REVERSED",
+   "equals_entry": true,
+   "memory_equals_entry": true,
+   "first_difference": null,
+   "results": [
+    {
+     "type": "i8",
+     "value": "6"
+    }
+   ],
+   "steps": 21
+  },
+  "stdout_json_equal_fields": [
+   [
+    "memory_digest",
+    "entry_memory_digest"
+   ]
+  ]
+ }
+}

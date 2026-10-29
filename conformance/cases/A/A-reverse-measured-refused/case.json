@@ -1,0 +1,22 @@
+{
+ "id": "A-reverse-measured-refused",
+ "suite": "A",
+ "spec": "§15 suite A; §10 reverse eligibility: a run containing a measure is not reversible (E_NOT_REVERSIBLE); §3.3: a measure frame is never reversed",
+ "derivation": "measurement measures, so whole-run reversal is refused as a diagnostic naming E_NOT_REVERSIBLE, with no JSON on stdout.",
+ "object": "../../objects/registers.bisa",
+ "command": [
+  "reverse",
+  "{object}",
+  "measurement",
+  "--draws",
+  "0.9"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "E_NOT_REVERSIBLE",
+   "§10"
+  ]
+ }
+}

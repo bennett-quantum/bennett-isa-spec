@@ -1,0 +1,24 @@
+{
+ "id": "B-boundary-halt-under",
+ "suite": "B",
+ "spec": "§15 suite B (boundary halts); §16.3 example 1: with B = 2 every x yields (0, FAULT_BUDGET_STEPS)",
+ "derivation": "inc8 needs 3 rows (const, add, retval); after 2 steps pc is at retval, not HALT, so the commit reports the step budget: (0,1), steps 2.",
+ "object": "../../objects/inc8.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "inc8",
+  "--input",
+  "8",
+  "--budget",
+  "2"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 1,
+   "payload": 0,
+   "steps": 2
+  }
+ }
+}

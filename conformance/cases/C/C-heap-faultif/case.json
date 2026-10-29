@@ -1,0 +1,24 @@
+{
+ "id": "C-heap-faultif",
+ "suite": "C",
+ "spec": "§15 suite C; §4.2 lift.faultif: flag = p, C = the literal code",
+ "derivation": "c is the constant 1, so faultif 9 fires at row 2: (0,9).",
+ "object": "../../objects/heap.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "faultif",
+  "--input",
+  "",
+  "--budget",
+  "20,32,0,0"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 9,
+   "payload": 0,
+   "steps": 2
+  }
+ }
+}

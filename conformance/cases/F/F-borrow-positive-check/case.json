@@ -1,0 +1,17 @@
+{
+ "id": "F-borrow-positive-check",
+ "suite": "F",
+ "spec": "§15 suite F (translation lemma, positive side); §5.6 side conditions (i)-(iv) for the borrowed action in control_flow.bisa",
+ "derivation": "Frame CX x,b; CX b,t; CX x,b; CX b,t: V's target b is in B with the single control x outside B; W's target t is outside X={x}, outside B and outside W's controls, with exactly one control in B; V^-1 is V (cx is self-inverse) and no swap appears. So the object is well-formed and check reports ok (only the status is asserted; the stored hashes are the fixture's own).",
+ "object": "../../objects/control_flow.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "ok"
+  }
+ }
+}

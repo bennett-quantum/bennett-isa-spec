@@ -1,0 +1,10 @@
+{
+ "id": "E-ast-eps-out-of-range",
+ "suite": "E",
+ "spec": "§15 suite E (AST evaluation); §8.1: eps outside (0, 1] is a load-time error",
+ "derivation": "An operation evaluated with eps = 2 makes any expression referencing eps or log2inv_eps a load-time error, not a numeric result.",
+ "unavailable": {
+  "deliverable": 9,
+  "reason": "target descriptions (§8) are staged deliverable 9"
+ }
+}

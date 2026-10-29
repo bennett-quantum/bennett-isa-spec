@@ -1,0 +1,25 @@
+{
+ "id": "C-163-inc8-check",
+ "suite": "C",
+ "spec": "§15 suite C (the §16.3 examples as normative test vectors); §16.3 example 1 envelope and hash; §9.2 identity and object_hash",
+ "derivation": "The §16.3 envelope bytes (3 prefix lines + the 6 canonical function lines, each LF-terminated) hash to 8ce5e64f... under SHA-256 (verified with an independent SHA-256 over the printed envelope, not the interpreter). With no other symbols the closure hash equals the interface hash. The object has no schedule/certificate/coverage section, so object_hash is the SHA-256 of the whole canonical text, 8093da48... (same independent computation).",
+ "object": "../../objects/inc8.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "ok",
+   "object_hash": "8093da48bad04d6564325faf01ea1304a84b5ac5a120e685eee9951f5daec5d9",
+   "unresolved_imports": [],
+   "symbols": {
+    "inc8": {
+     "interface_hash": "8ce5e64f15830d8e596ba9b4861def6565dd567b5804300f427d8b9566d5be93",
+     "closure_hash": "8ce5e64f15830d8e596ba9b4861def6565dd567b5804300f427d8b9566d5be93"
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,25 @@
+{
+ "id": "C-step-check-wide-fault",
+ "suite": "C",
+ "spec": "§15 suite C (T3 full D for oracles, wide widths); §14.1 bit-vectors of any width",
+ "derivation": "fault_small257 has a 1-bit input and a 257-bit fault bundle: 2 cases, both (0, 2^200+3); target and fault widths do not shrink the checked domain.",
+ "object": "../../objects/wide.bisa",
+ "command": [
+  "step-check",
+  "{object}",
+  "fault_small257",
+  "--suite",
+  "--budget",
+  "3"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "cases": 2,
+   "input_and_memory_bits": 1,
+   "mode": "exhaustive",
+   "fixed_regions": [],
+   "status": "ok"
+  }
+ }
+}

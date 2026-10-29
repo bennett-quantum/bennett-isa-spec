@@ -1,0 +1,24 @@
+{
+ "id": "B-badjump",
+ "suite": "B",
+ "spec": "§15 suite B; §4.2 qjumpr: flag = (a < first_f) or (a >= first_f + n_f), C = FAULT_UB_TRAP",
+ "derivation": "idx = 2^32-1 is outside the function's own two indices: const then qjumpr faults: (0,4) in 2 steps.",
+ "object": "../../objects/arithmetic.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "badjump",
+  "--input",
+  "0,0",
+  "--budget",
+  "5"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 4,
+   "payload": 0,
+   "steps": 2
+  }
+ }
+}

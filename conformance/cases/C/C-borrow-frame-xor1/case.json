@@ -1,0 +1,36 @@
+{
+ "id": "C-borrow-frame-xor1",
+ "suite": "C",
+ "spec": "§15 suite C (borrow frames); §5.6 as in C-borrow-frame-xor",
+ "derivation": "(t,x) = (1,1) -> t = 1 xor 1 = 0 (key 01).",
+ "object": "../../objects/control_flow.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "borrowed",
+  "--mut",
+  "1",
+  "--in",
+  "1"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "mut": [
+    0
+   ],
+   "in": [
+    1
+   ],
+   "state": {
+    "01": [
+     1,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state"
+  ]
+ }
+}

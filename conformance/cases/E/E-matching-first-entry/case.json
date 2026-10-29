@@ -1,0 +1,10 @@
+{
+ "id": "E-matching-first-entry",
+ "suite": "E",
+ "spec": "§15 suite E (matching); §8.3 matching: the first gates entry in array order whose op, class pattern and inclusive controls range cover the gate and whose epsilon <= eps; else the first covering scheme; else load-time error",
+ "derivation": "In target.json the single cx entry (classes [fast], controls [1,1], epsilon 0) matches a cx executed on class-fast wires with total control count c = 1 (its own control, no effective context) at any eps, charging time 1. A cx executed under one inherited control has c = 2, which no entry or scheme covers: load-time error.",
+ "unavailable": {
+  "deliverable": 9,
+  "reason": "target descriptions (§8) are staged deliverable 9"
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "id": "E-ast-division-by-zero",
+ "suite": "E",
+ "spec": "§15 suite E; §8.1: division by zero and a table index outside the array are load-time errors; costs must be nonnegative and finite",
+ "derivation": "The expression 1/(k-k) with k=1 divides by exact-rational zero at load: a load-time error. It must not produce an infinite or clamped cost.",
+ "unavailable": {
+  "deliverable": 9,
+  "reason": "target descriptions (§8) are staged deliverable 9"
+ }
+}

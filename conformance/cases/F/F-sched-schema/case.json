@@ -1,0 +1,18 @@
+{
+ "id": "F-sched-schema",
+ "suite": "F",
+ "spec": "§15 suite F (schemas); §9.1 with the §11 schedule document shape",
+ "derivation": "inc8 plus a schedule section {\"unknown\":0}: no bindings/entries in the §11 shape, a §9.1 diagnostic.",
+ "object": "../../objects/f_sched_unknown_field.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§9.1"
+  ]
+ }
+}

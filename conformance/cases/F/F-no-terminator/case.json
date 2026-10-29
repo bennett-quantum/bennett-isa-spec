@@ -1,0 +1,18 @@
+{
+ "id": "F-no-terminator",
+ "suite": "F",
+ "spec": "§15 suite F (terminators); §3.6: every block ends in exactly one of qjump qbranch qjumpr lift.ret lift.retval fault",
+ "derivation": "An oracle block ending in lift.add: no terminator, §3.6 diagnostic.",
+ "object": "../../objects/f_no_terminator.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§3.6"
+  ]
+ }
+}

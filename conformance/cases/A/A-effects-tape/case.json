@@ -1,0 +1,74 @@
+{
+ "id": "A-effects-tape",
+ "suite": "A",
+ "spec": "§15 suite A (effects); §7.3 device models: entropy read copies tape bytes, console write appends, clock read writes c then c+=1, block write/read move a 512-byte sector; each effect appends (dev, op, args) to the effect tape",
+ "derivation": "Entropy bytes 0b 16 21 land at the allocation (heap_base=16 in the layout, alloc returns the bump, §7.1); console echoes them (console_hex 0b1621); clock.read overwrites with its initial 0 and becomes 1; sector 7 is written then read back, so the loaded i64 is 0. Five tape entries in program order; 11 instructions in total.",
+ "object": "../../objects/classical.bisa",
+ "command": [
+  "run-cc",
+  "{object}",
+  "effects",
+  "--entropy",
+  "0b1621"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "COMPLETED",
+   "steps": 11,
+   "results": [
+    {
+     "type": "i64",
+     "value": "0"
+    }
+   ],
+   "clock": 1,
+   "console_hex": "0b1621",
+   "effect_tape_length": 5,
+   "tape": [
+    {
+     "args": [
+      16,
+      3
+     ],
+     "bytes": "0b1621",
+     "dev": "entropy",
+     "op": "read"
+    },
+    {
+     "args": [
+      16,
+      3
+     ],
+     "bytes": "0b1621",
+     "dev": "console",
+     "op": "write"
+    },
+    {
+     "args": [
+      16
+     ],
+     "bytes": "0000000000000000",
+     "dev": "clock",
+     "op": "read"
+    },
+    {
+     "args": [
+      7,
+      16
+     ],
+     "dev": "block",
+     "op": "write"
+    },
+    {
+     "args": [
+      7,
+      16
+     ],
+     "dev": "block",
+     "op": "read"
+    }
+   ]
+  }
+ }
+}

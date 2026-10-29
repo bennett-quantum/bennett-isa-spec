@@ -1,0 +1,45 @@
+{
+ "id": "C-action-reverse-adjoint",
+ "suite": "C",
+ "spec": "§15 suite C; §10: a top-level Q call is reversed by adjoint re-application; §5.3 adjoint table",
+ "derivation": "flip forward on (mut 1, in 2) gives mut 3 (forward_state key 1101); the adjoint then restores mut 1 exactly (key 1001), so the action-level reversal reports REVERSED with equals_entry.",
+ "object": "../../objects/actions.bisa",
+ "command": [
+  "reverse",
+  "{object}",
+  "flip",
+  "--mut",
+  "1",
+  "--in",
+  "2"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "REVERSED",
+   "equals_entry": true,
+   "mut": [
+    1
+   ],
+   "in": [
+    2
+   ],
+   "forward_state": {
+    "1101": [
+     1,
+     0
+    ]
+   },
+   "state": {
+    "1001": [
+     1,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state",
+   "forward_state"
+  ]
+ }
+}

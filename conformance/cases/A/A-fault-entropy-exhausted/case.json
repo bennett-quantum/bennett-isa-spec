@@ -1,0 +1,24 @@
+{
+ "id": "A-fault-entropy-exhausted",
+ "suite": "A",
+ "spec": "§15 suite A; §7.3 entropy: p+len beyond the tape faults FAULT_ENTROPY_EXHAUSTED, and each effect is atomic (validated before any change)",
+ "derivation": "entropy_short reads 3 bytes from an empty entropy tape: fault 10, and atomically no tape entry is appended (effect_tape_length 0).",
+ "object": "../../objects/classical.bisa",
+ "command": [
+  "run-cc",
+  "{object}",
+  "entropy_short",
+  "--entropy",
+  ""
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "FAILED",
+   "results": [],
+   "fault": 10,
+   "effect_tape_length": 0,
+   "tape": []
+  }
+ }
+}

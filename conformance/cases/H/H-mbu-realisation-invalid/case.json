@@ -1,0 +1,11 @@
+{
+ "id": "H-mbu-realisation-invalid",
+ "suite": "H",
+ "spec": "§15 suite H (§6 validity); §6.4: every cleanup in this version is unitary; a schedule naming any other realisation is invalid (§11 cleanup entry realisation is reverse | recompute)",
+ "derivation": "A cleanup entry with realisation \"measure\" is invalid outright in sched 0.8, whatever its path: measurement-based cleanup is not admitted (§17 item 6 default is unitary).",
+ "object": "../../objects/sched_inc8.bisa",
+ "unavailable": {
+  "deliverable": 10,
+  "reason": "the §11 schedule consumer is staged deliverable 10; no reference-CLI command consumes or validates a schedule for execution"
+ }
+}

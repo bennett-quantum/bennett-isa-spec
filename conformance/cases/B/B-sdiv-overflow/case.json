@@ -1,0 +1,24 @@
+{
+ "id": "B-sdiv-overflow",
+ "suite": "B",
+ "spec": "§15 suite B; §4.2 lift.div: signed MIN / -1 sets C = FAULT_UB_SDIV_OVERFLOW",
+ "derivation": "At width 8, MIN=-128 is 128 unsigned and -1 is 255: (0,6) in 1 step.",
+ "object": "../../objects/arithmetic.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "sdiv",
+  "--input",
+  "128,255",
+  "--budget",
+  "5"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 6,
+   "payload": 0,
+   "steps": 1
+  }
+ }
+}

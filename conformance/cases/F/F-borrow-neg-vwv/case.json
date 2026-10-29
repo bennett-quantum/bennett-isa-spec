@@ -1,0 +1,18 @@
+{
+ "id": "F-borrow-neg-vwv",
+ "suite": "F",
+ "spec": "§15 suite F (translation lemma side conditions with the four negative tests); §5.6 negative test 1: `cx b y; cx y z; cx b y` (V;W;V^-1)",
+ "derivation": "b is borrowed, y and z are the two mut wires: the frame leaves z ^= y ^ b, which depends on the borrowed entry value, so it cannot factor as P' x I_B: §5.6 diagnostic. (The frame also lacks the closing W of the lemma's V;W;V^-1;W shape.)",
+ "object": "../../objects/f_borrow_neg1.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§5.6"
+  ]
+ }
+}

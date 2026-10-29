@@ -1,0 +1,16 @@
+bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"0000000000000000000000000000000000000000000000000000000000000000","kind":"perm_action","name":"badborrow3","signature":{"abi":"0.8","args":[],"bounds":[],"in":[1],"kind":"perm_action","mem":[],"mut":[2],"tier":"q"}}}
+
+section functions
+perm_action @badborrow3 (t:wire[2] mut) (x:wire in) () () ()
+^entry():
+b = qborrow any 1
+d = qalloc any 1
+cx b d
+cx d t[0]
+cx b d
+cx d t[0]
+qfree d
+qreturn b

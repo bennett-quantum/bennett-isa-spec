@@ -1,0 +1,24 @@
+{
+ "id": "C-arith-srem-trunc",
+ "suite": "C",
+ "spec": "§15 suite C (T3 vectors for the §4.2 rows); §3.3 truncation toward zero (remainder takes the dividend's sign)",
+ "derivation": "-7 rem 2 = -1 = 255; F_B = (255, 0) in 2 steps.",
+ "object": "../../objects/arithmetic.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "srem",
+  "--input",
+  "249,2",
+  "--budget",
+  "20"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 255,
+   "steps": 2
+  }
+ }
+}

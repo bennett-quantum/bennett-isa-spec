@@ -1,0 +1,26 @@
+{
+ "id": "C-163-sumdb-n3",
+ "suite": "C",
+ "spec": "§15 suite C; §16.3 example 2 sum formula as in C-163-sumdb-n0",
+ "derivation": "db = 1..16, n=3: sum adds db[2]+db[1]+db[0] = 3+2+1 = 6. Rows: oracle 4 + three recursive levels of 14 (13 up to and including the call, plus the ret after it) + base level 6 = 52.",
+ "object": "../../objects/sum_db.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "sum_db",
+  "--input",
+  "3",
+  "--mem",
+  "db=0102030405060708090a0b0c0d0e0f10",
+  "--budget",
+  "1000,4080,512,64"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 6,
+   "steps": 52
+  }
+ }
+}

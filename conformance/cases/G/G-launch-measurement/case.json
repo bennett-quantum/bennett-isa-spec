@@ -1,0 +1,37 @@
+{
+ "id": "G-launch-measurement",
+ "suite": "G",
+ "spec": "§15 suite G; §10: a run executes a device CC entry and ends COMPLETED, then bennett_run_close releases the record (CLOSED); results and measurements are reported",
+ "derivation": "measurement is the A-measure-draw-high run as a one-shot launch: COMPLETED, result i2 = 3 with measurement bits 11, run_state CLOSED after close, reversed false.",
+ "object": "../../objects/registers.bisa",
+ "command": [
+  "run-program",
+  "{object}",
+  "measurement",
+  "--args",
+  "",
+  "--draws",
+  "0.9"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "COMPLETED",
+   "run_state": "CLOSED",
+   "reversed": false,
+   "results": [
+    {
+     "type": "i2",
+     "value": "3"
+    }
+   ],
+   "measurements": [
+    {
+     "bits": "11",
+     "value": 3
+    }
+   ],
+   "fault": null
+  }
+ }
+}

@@ -1,0 +1,24 @@
+{
+ "id": "C-mutual-label-index",
+ "suite": "C",
+ "spec": "§15 suite C; §3.6 index space: lprocs ordered by closure hash with SCC members in SCC index order (members ordered by name bytewise, §9.2)",
+ "derivation": "Indices: main has 2 rows (0-1); the SCC {f,g} in name order gives f 2 rows (2-3) and g starting at 4. g returns lift.label ^entry = 4. Executed rows: main call, g const, qbranch, label, ret, main retval = 6.",
+ "object": "../../objects/mutual.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "main",
+  "--input",
+  "",
+  "--budget",
+  "20,0,32,4"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 4,
+   "steps": 6
+  }
+ }
+}

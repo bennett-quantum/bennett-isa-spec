@@ -1,0 +1,1 @@
+{"leaves":[{"kind":"gate","op":"cx","wires":[0,1],"start":0,"duration":1},{"kind":"gate","op":"cx","wires":[2,3],"start":1,"duration":1},{"kind":"classical","start":2,"duration":1}]}

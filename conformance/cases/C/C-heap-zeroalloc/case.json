@@ -1,0 +1,24 @@
+{
+ "id": "C-heap-zeroalloc",
+ "suite": "C",
+ "spec": "§15 suite C; §4.2 lift.alloc: heap_used advances by max(n,1)",
+ "derivation": "Two allocs of size 0 still consume one byte each, so the second pointer minus the first is 1. Rows: alloc, alloc, sub, retval = 4.",
+ "object": "../../objects/heap.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "zeroalloc",
+  "--input",
+  "",
+  "--budget",
+  "20,32,0,0"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 1,
+   "steps": 4
+  }
+ }
+}

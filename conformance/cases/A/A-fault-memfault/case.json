@@ -1,0 +1,26 @@
+{
+ "id": "A-fault-memfault",
+ "suite": "A",
+ "spec": "§15 suite A (fault records, T4); §4.1 load outside every live allocation is an R fault record; §5.4 code 7",
+ "derivation": "memfault loads through address 0, inside the never-allocated null region: FAILED with FAULT_UB_MEMFAULT and no result values.",
+ "object": "../../objects/classical.bisa",
+ "command": [
+  "run-cc",
+  "{object}",
+  "memfault"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "FAILED",
+   "results": [],
+   "fault": 7,
+   "faults": [
+    {
+     "code": 7,
+     "name": "FAULT_UB_MEMFAULT"
+    }
+   ]
+  }
+ }
+}

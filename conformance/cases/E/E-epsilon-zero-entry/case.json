@@ -1,0 +1,10 @@
+{
+ "id": "E-epsilon-zero-entry",
+ "suite": "E",
+ "spec": "§15 suite E; §8.1: an entry with epsilon 0 MUST NOT reference eps or log2inv_eps, and matches every eps",
+ "derivation": "A gates entry with epsilon 0 whose cost references eps is a load-time error (the MUST NOT). Conversely, the clean epsilon-0 cx entry in target.json is exact and matches an operation at any epsilon_share.",
+ "unavailable": {
+  "deliverable": 9,
+  "reason": "target descriptions (§8) are staged deliverable 9"
+ }
+}

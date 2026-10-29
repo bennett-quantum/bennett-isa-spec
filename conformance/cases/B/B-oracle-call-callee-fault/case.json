@@ -1,0 +1,26 @@
+{
+ "id": "B-oracle-call-callee-fault",
+ "suite": "B",
+ "spec": "§15 suite B; §5.5: no automatic propagation; the dialect's icmp.ne + lift.faultif FAULT_CALLEE pattern raises code 9 explicitly",
+ "derivation": "Token steps 2 makes the inner inc8 commit (0,1): r=0, fr=1; icmp.ne fr 0 is true, so faultif 9 fires at row 4: (0,9), steps 4.",
+ "object": "../../objects/nested.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "nested",
+  "--input",
+  "8",
+  "--arg",
+  "token:2,0,0,0",
+  "--budget",
+  "20"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 9,
+   "payload": 0,
+   "steps": 4
+  }
+ }
+}

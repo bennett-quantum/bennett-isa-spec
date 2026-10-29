@@ -1,0 +1,18 @@
+{
+ "id": "F-borrow-neg-swap",
+ "suite": "F",
+ "spec": "§15 suite F; §5.6 negative test 4: W = swap y z; cx b y (swap excluded from any lemma frame, side condition (iv))",
+ "derivation": "Even with a well-shaped V = cx x b around it, the swap makes the net map depend on b (the second cx b t[0] hits the other wire of the swapped pair): §5.6 diagnostic.",
+ "object": "../../objects/f_borrow_neg4.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§5.6"
+  ]
+ }
+}

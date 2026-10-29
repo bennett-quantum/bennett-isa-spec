@@ -1,0 +1,38 @@
+{
+ "id": "C-perm-action-flip-adjoint",
+ "suite": "C",
+ "spec": "§15 suite C; §5.3 adjoint table (qcopy <-> quncopy, qxor self-adjoint): flip's adjoint computes the same XOR",
+ "derivation": "adjoint on mut 3, in 3: 3 xor 3 = 0; key mut (0,0) then in (1,1) = 0011.",
+ "object": "../../objects/actions.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "flip",
+  "--mut",
+  "3",
+  "--in",
+  "3",
+  "--adjoint"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "adjoint": true,
+   "mut": [
+    0
+   ],
+   "in": [
+    3
+   ],
+   "state": {
+    "0011": [
+     1,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state"
+  ]
+ }
+}

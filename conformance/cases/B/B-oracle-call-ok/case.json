@@ -1,0 +1,26 @@
+{
+ "id": "B-oracle-call-ok",
+ "suite": "B",
+ "spec": "§15 suite B; §4.2 lift.oracle_call: tgt ^= payload, fr ^= code under the callee contract (§5.2)",
+ "derivation": "With token steps 3 the inner inc8(8) succeeds with payload 9 code 0: r becomes 0^9, fr stays 0, the faultif test passes, retval 9. Rows: oracle_call, const, icmp, faultif, retval = 5.",
+ "object": "../../objects/nested.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "nested",
+  "--input",
+  "8",
+  "--arg",
+  "token:3,0,0,0",
+  "--budget",
+  "20"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 9,
+   "steps": 5
+  }
+ }
+}

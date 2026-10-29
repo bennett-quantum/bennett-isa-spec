@@ -1,0 +1,11 @@
+{
+ "id": "H-capacity-peak",
+ "suite": "H",
+ "spec": "§15 suite H (capacity); §8.4 space budget: peak live qubits per class; §11 obligations: satisfy §6 and respect capacity, else BENNETT_SCHED_INFEASIBLE",
+ "derivation": "A request capping the only class at peak 1 qubit for bell (2 concurrent wires minimum) cannot be satisfied: the scheduler must answer INFEASIBLE, and a consumer given a schedule claiming it must reject it.",
+ "object": "../../objects/sched_inc8.bisa",
+ "unavailable": {
+  "deliverable": 10,
+  "reason": "the §11 schedule consumer is staged deliverable 10; no reference-CLI command consumes or validates a schedule for execution"
+ }
+}

@@ -1,0 +1,11 @@
+{
+ "id": "D-channel-diamond-witness",
+ "suite": "D",
+ "spec": "§15 suite D (the diamond-norm SDP witness check of §12.1); §12.1: accept iff Y - J(Phi), Y + J(Phi) and mu I - Tr_out(Y) are proved positive definite by interval Cholesky with strictly positive pivot lower bounds, and mu <= bound",
+ "derivation": "claim.json: subject is the 1-wire toggle permutation action (d=2) realised exactly, so the channel difference Phi = 0 and J(Phi) = 0. Take delta = 1/16 and Y = delta I4 (intervals [delta,delta] on the diagonal): Y +/- J = delta I is positive definite with pivots delta > 0; Tr_out(delta I4) = 2*delta I2; mu = delta*(d+1) = 3/16 gives mu I - Tr_out(Y) = delta I, also strictly positive; 3/16 <= bound 1. Expected verdict: accept with ||Phi||_diamond <= 3/16 (in fact 0; the witness bound is 3/16 by the §12.1 strict-feasibility recipe).",
+ "object": "../../objects/registers.bisa",
+ "unavailable": {
+  "deliverable": 11,
+  "reason": "the rigorous interval certificate checker (§12.1, interval Cholesky) is staged deliverable 11; no reference-CLI command checks channel claims"
+ }
+}

@@ -1,0 +1,20 @@
+{
+ "id": "A-qreg-allocation",
+ "suite": "A",
+ "spec": "§15 suite A (qreg.*); §3.3 handle transitions: qreg.new makes a live clean handle; qreg.concat consumes both; qreg.free of a clean live handle succeeds",
+ "derivation": "Two fresh one-wire handles are clean |0>; concat gives a clean two-wire handle; free consumes it; ret. COMPLETED in 5 instructions.",
+ "object": "../../objects/registers.bisa",
+ "command": [
+  "run-cc",
+  "{object}",
+  "allocation"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "COMPLETED",
+   "steps": 5,
+   "results": []
+  }
+ }
+}

@@ -1,0 +1,11 @@
+{
+ "id": "G-qreg-prepare-unclean",
+ "suite": "G",
+ "spec": "§15 suite G; §10: bennett_qreg_prepare and bennett_qreg_free require a clean register (E_QREG_NOT_CLEAN otherwise); there is no reset and no trace-out",
+ "derivation": "A register left in |1> by toggle cannot be re-prepared to different bits: prepare and free both answer E_QREG_NOT_CLEAN until a run reverses or measures it.",
+ "object": "../../objects/registers.bisa",
+ "unavailable": {
+  "deliverable": 8,
+  "reason": "the full §10 launch library (stateful bennett_* API over runs) is staged deliverable 8; the CLI exposes only the one-shot run-program launch"
+ }
+}

@@ -1,0 +1,25 @@
+{
+ "id": "F-import-unlinked",
+ "suite": "F",
+ "spec": "§15 suite F (linking); §9.3: imports resolve by name + signature; §9.2: the interface hash uses SHA-256(name || 0x00 || JCS signature) for unresolved imports, and the closure hash needs the resolved closure",
+ "derivation": "caller lift.oracle_calls the imported @ext_inc, which this object does not define: check succeeds as a parse, reports status unlinked with unresolved_imports [ext_inc] and a null closure_hash for caller (its closure contains the unpinned import). The stored caller interface hash was filled with the reference `hash` command (identity computation only); the asserted outcome fields are the linking status, not that hash.",
+ "object": "../../objects/f_import_unlinked.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "unlinked",
+   "unresolved_imports": [
+    "ext_inc"
+   ],
+   "symbols": {
+    "caller": {
+     "closure_hash": null
+    }
+   }
+  }
+ }
+}

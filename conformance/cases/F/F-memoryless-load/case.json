@@ -1,0 +1,18 @@
+{
+ "id": "F-memoryless-load",
+ "suite": "F",
+ "spec": "§15 suite F; §7.2 memoryless objects: without a layout section there must be no lift.load (nor the other listed rows)",
+ "derivation": "An oracle using lift.load in an object with no layout section: §7.2 diagnostic.",
+ "object": "../../objects/f_memoryless_load.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§7.2"
+  ]
+ }
+}

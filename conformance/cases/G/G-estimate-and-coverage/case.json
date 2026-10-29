@@ -1,0 +1,11 @@
+{
+ "id": "G-estimate-and-coverage",
+ "suite": "G",
+ "spec": "§15 suite G (every §10 entry point); §10 bennett_estimate_run / bennett_coverage_get report the surface's resources and the coverage document",
+ "derivation": "An estimate over inc8 with budget (3,0,0,0) must return one value per target resource (needs a target: deliverable 9) and coverage returns the object's coverage JCS; neither entry point has any CLI analogue.",
+ "object": "../../objects/registers.bisa",
+ "unavailable": {
+  "deliverable": 8,
+  "reason": "the full §10 launch library (stateful bennett_* API over runs) is staged deliverable 8; the CLI exposes only the one-shot run-program launch"
+ }
+}

@@ -1,0 +1,33 @@
+{
+ "id": "C-163-sumdb-check",
+ "suite": "C",
+ "spec": "§15 suite C (normative vectors); §16.3 example 2 hash list; §9.2 SCC member hash = SHA-256 of ASCII <scc_hash hex>:<index>",
+ "derivation": "The printed @sum envelope (with @$0 for the self-reference and @+the zero hash) gives scc_hash by SHA-256 and member hash SHA-256('<scc>:0') = 74f110bb... (independent computation over the printed bytes); zero = 7002ed5e..., sum_db = 68225d21..., as printed at the end of §16.3. object_hash is the SHA-256 of the canonical text (no deleted sections), ce1a10eb... by the same independent computation.",
+ "object": "../../objects/sum_db.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "ok",
+   "object_hash": "ce1a10eb007786b5a1675892154ec4ac30663a051eeeeee41057596b1db26240",
+   "unresolved_imports": [],
+   "symbols": {
+    "sum_db": {
+     "interface_hash": "68225d213c44812fe844cd295d8821127c3cf31682be4eb19303cb53f9b147f7",
+     "closure_hash": "68225d213c44812fe844cd295d8821127c3cf31682be4eb19303cb53f9b147f7"
+    },
+    "sum": {
+     "interface_hash": "74f110bbafde68a4785025e7e571ef871ddd83a09465ab9c1604f653a0cfcd92",
+     "closure_hash": "74f110bbafde68a4785025e7e571ef871ddd83a09465ab9c1604f653a0cfcd92"
+    },
+    "zero": {
+     "interface_hash": "7002ed5ea010907a0ae99065663f22fb7d18ca1d6cb171fed57e2594bd9367e6",
+     "closure_hash": "7002ed5ea010907a0ae99065663f22fb7d18ca1d6cb171fed57e2594bd9367e6"
+    }
+   }
+  }
+ }
+}

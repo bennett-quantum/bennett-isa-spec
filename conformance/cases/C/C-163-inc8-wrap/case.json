@@ -1,0 +1,24 @@
+{
+ "id": "C-163-inc8-wrap",
+ "suite": "C",
+ "spec": "§15 suite C; §16.3 example 1: result_val = 0 xor r with r = x + 1 mod 256",
+ "derivation": "x=255: r = 256 mod 256 = 0 in 3 rows: (0,0).",
+ "object": "../../objects/inc8.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "inc8",
+  "--input",
+  "255",
+  "--budget",
+  "3"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 0,
+   "steps": 3
+  }
+ }
+}

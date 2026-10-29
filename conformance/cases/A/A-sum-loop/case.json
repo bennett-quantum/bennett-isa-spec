@@ -1,0 +1,32 @@
+{
+ "id": "A-sum-loop",
+ "suite": "A",
+ "spec": "§15 suite A (classical ISA, loops); §4.1 br/call/ret and binops; §3.4 sequential CC/R execution",
+ "derivation": "sum(3) accumulates 3+2+1=6. Steps: entry const,const,br=3; the loop block runs 4 times (icmp,br)=8; the more block 3 times (sub,add,br)=9; done ret=1; total 21.",
+ "object": "../../objects/classical.bisa",
+ "command": [
+  "run-cc",
+  "{object}",
+  "sum",
+  "--args",
+  "3"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "entry": "sum",
+   "status": "COMPLETED",
+   "steps": 21,
+   "results": [
+    {
+     "type": "i8",
+     "value": "6"
+    }
+   ],
+   "fault": null,
+   "faults": [],
+   "tape": [],
+   "clock": 0
+  }
+ }
+}

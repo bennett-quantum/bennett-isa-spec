@@ -1,0 +1,21 @@
+{
+ "id": "A-hostcall-invalid-range",
+ "suite": "A",
+ "spec": "§15 suite A (hostcall); §10: [ptr, ptr+len) must lie in one live allocation, else CC trap and no request is made",
+ "derivation": "host_invalid forms a null pointer; address 0 is in the never-allocated null region (null_size=1), so the hostcall traps as FAULT_UB_MEMFAULT (7) and host_requests stays empty.",
+ "object": "../../objects/classical.bisa",
+ "command": [
+  "run-cc",
+  "{object}",
+  "host_invalid"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "FAILED",
+   "results": [],
+   "fault": 7,
+   "host_requests": []
+  }
+ }
+}

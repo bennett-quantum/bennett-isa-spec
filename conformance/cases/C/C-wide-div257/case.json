@@ -1,0 +1,24 @@
+{
+ "id": "C-wide-div257",
+ "suite": "C",
+ "spec": "§15 suite C; §14.1: locations are bit-vectors of any width; §9.1: integers above 2^53-1 are decimal strings",
+ "derivation": "x = 2^200+3, y = 2^100+5. (2^100-5)(2^100+5) = 2^200-25, so x = (2^100-5)*y + 28 with 28 < y: the unsigned quotient is 2^100-5 = 1267650600228229401496703205371, printed as a decimal string; 2 rows (udiv, retval).",
+ "object": "../../objects/wide.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "div257",
+  "--input",
+  "1606938044258990275541962092341162602522202993782792835301379,1267650600228229401496703205381",
+  "--budget",
+  "5"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": "1267650600228229401496703205371",
+   "steps": 2
+  }
+ }
+}

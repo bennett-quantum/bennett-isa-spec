@@ -1,0 +1,24 @@
+{
+ "id": "B-budget-zero",
+ "suite": "B",
+ "spec": "§15 suite B (B = 0); §3.6: B = 0 is legal, the oracle commits FAULT_BUDGET_STEPS on every input",
+ "derivation": "Zero forward steps run, pc never reaches HALT, so the commit XORs FAULT_BUDGET_STEPS=1 into fr: (0,1) in 0 steps.",
+ "object": "../../objects/inc8.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "inc8",
+  "--input",
+  "8",
+  "--budget",
+  "0"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 1,
+   "payload": 0,
+   "steps": 0
+  }
+ }
+}

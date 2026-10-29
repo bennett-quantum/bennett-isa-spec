@@ -1,0 +1,18 @@
+{
+ "id": "F-borrow-neg-target-outside-b",
+ "suite": "F",
+ "spec": "§15 suite F; §5.6 negative test 3: V = cx b x, whose target is outside B (violates side condition (i))",
+ "derivation": "d is clean, b borrowed: cx b d; cx d t; cx b d; cx d t nets t ^= b (d itself is restored and freely released, which does not rescue the frame): §5.6 diagnostic.",
+ "object": "../../objects/f_borrow_neg3.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§5.6"
+  ]
+ }
+}

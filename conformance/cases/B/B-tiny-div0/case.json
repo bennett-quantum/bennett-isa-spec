@@ -1,0 +1,26 @@
+{
+ "id": "B-tiny-div0",
+ "suite": "B",
+ "spec": "§15 suite B; §4.2 lift.div flag (per-element spot value of the tiny domain)",
+ "derivation": "x=0: rows addr, zext, load, udiv(db, 0) faults at row 4: (0,5), steps 4.",
+ "object": "../../objects/tiny_memory.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "tiny",
+  "--input",
+  "0",
+  "--mem",
+  "db=07",
+  "--budget",
+  "20,0,0,0"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 5,
+   "payload": 0,
+   "steps": 4
+  }
+ }
+}

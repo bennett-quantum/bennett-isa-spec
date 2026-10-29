@@ -1,0 +1,11 @@
+{
+ "id": "F-frame-live-ranges",
+ "suite": "F",
+ "spec": "§15 suite F (frame-descriptor live ranges); §9.4: shared frames only with disjoint live ranges (suite F)",
+ "derivation": "A certificate whose frame descriptor shares one scratch bundle between two callees with overlapping live ranges must be rejected: the shared wires would be live in both at once. No reference-CLI command validates certificate frame descriptors today (certificate checking is library/staged-checker surface).",
+ "object": "../../objects/actions.bisa",
+ "unavailable": {
+  "deliverable": 11,
+  "reason": "certificate/frame-descriptor validation beyond parsing belongs to the staged certificate checker (deliverable 11); check exposes no frame-descriptor verdict"
+ }
+}

@@ -1,0 +1,28 @@
+{
+ "id": "A-uncall-over-measure-traps",
+ "suite": "A",
+ "spec": "§15 suite A (uncall over a measure traps); §7.4: a segment containing a measure frame at any depth cannot be uncalled (FAULT_UB_TRAP)",
+ "derivation": "bad_uncall calls measuring -> measurement (Bell, draw 0.1 < 1/2 selects 00) and then uncalls measuring; the segment contains a measure frame, so it traps with fault 4 after the measurement result 0 was produced.",
+ "object": "../../objects/registers.bisa",
+ "command": [
+  "run-cc",
+  "{object}",
+  "bad_uncall",
+  "--draws",
+  "0.1"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "FAILED",
+   "results": [],
+   "fault": 4,
+   "measurements": [
+    {
+     "bits": "00",
+     "value": 0
+    }
+   ]
+  }
+ }
+}

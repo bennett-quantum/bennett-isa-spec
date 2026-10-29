@@ -1,0 +1,41 @@
+{
+ "id": "D-bell-state",
+ "suite": "D",
+ "spec": "§15 suite D (unitary comparison at epsilon = 0 boundary); §14.2 state semantics; §4.4 h and cx matrices",
+ "derivation": "h on t[0] then cx t[0] t[1] maps |00> to (|00>+|11>)/sqrt(2); the in bundle stays |00>. Keys are mut wires then in wires: 0000 and 1100, each with amplitude 1/sqrt(2), whose binary64 value is 0.7071067811865476 (README: state values are the binary64 values of the exact amplitudes). mut is not basis-definite (null), in is 0.",
+ "object": "../../objects/actions.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "bell",
+  "--mut",
+  "0",
+  "--in",
+  "0"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "mut": [
+    null
+   ],
+   "in": [
+    0
+   ],
+   "wires": 4,
+   "state": {
+    "0000": [
+     0.7071067811865476,
+     0
+    ],
+    "1100": [
+     0.7071067811865476,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state"
+  ]
+ }
+}

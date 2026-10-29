@@ -1,0 +1,11 @@
+{
+ "id": "H-timing-violation",
+ "suite": "H",
+ "spec": "§15 suite H; §11 timing: a start time must be >= the end of every operation the operation depends on, else the schedule is invalid",
+ "derivation": "A start entry pinning the second row's operation to time 0 while it data-depends on the first row (duration 1) violates the dependency order: invalid schedule, not a reschedule.",
+ "object": "../../objects/sched_inc8.bisa",
+ "unavailable": {
+  "deliverable": 10,
+  "reason": "the §11 schedule consumer is staged deliverable 10; no reference-CLI command consumes or validates a schedule for execution"
+ }
+}

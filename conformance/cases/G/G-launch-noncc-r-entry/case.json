@@ -1,0 +1,22 @@
+{
+ "id": "G-launch-noncc-r-entry",
+ "suite": "G",
+ "spec": "§15 suite G; §10 CC-entry rule as in G-launch-noncc-oracle-entry",
+ "derivation": "sum is an R function; R is reached from CC, not launched directly: E_ARG diagnostic.",
+ "object": "../../objects/classical.bisa",
+ "command": [
+  "run-program",
+  "{object}",
+  "sum",
+  "--args",
+  "3"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "E_ARG",
+   "§10"
+  ]
+ }
+}

@@ -1,0 +1,26 @@
+{
+ "id": "C-163-sumdb-n17-memfault",
+ "suite": "C",
+ "spec": "§15 suite C; §16.3 example 2: for n > 16 the check at p faults FAULT_UB_MEMFAULT on the first out-of-range byte",
+ "derivation": "n=17: the first sum level computes p = db_base + 16, one past the 16-byte region; its boundscheck (row 13: oracle 3, sum entry 5, more const/sub/zext/add/boundscheck) faults: (0,7), steps 13.",
+ "object": "../../objects/sum_db.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "sum_db",
+  "--input",
+  "17",
+  "--mem",
+  "db=0102030405060708090a0b0c0d0e0f10",
+  "--budget",
+  "1000,4080,512,64"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 7,
+   "payload": 0,
+   "steps": 13
+  }
+ }
+}

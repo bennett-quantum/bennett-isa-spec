@@ -1,0 +1,18 @@
+{
+ "id": "F-retval-in-lproc",
+ "suite": "F",
+ "spec": "§15 suite F (row classes); §4.2 rules: lift.retval is ill-formed in an lproc, lift.ret is ill-formed outside lprocs",
+ "derivation": "The lproc badlp ends with lift.retval instead of lift.ret: §4.2 diagnostic.",
+ "object": "../../objects/f_retval_in_lproc.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§4.2"
+  ]
+ }
+}

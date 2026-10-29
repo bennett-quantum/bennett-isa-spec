@@ -1,0 +1,11 @@
+{
+ "id": "G-wait-on-suspended",
+ "suite": "G",
+ "spec": "§15 suite G (every §10 state transition); §10 waiting: waiting on a SUSPENDED, REVERSED or CLOSED run is E_INVALID_STATE; bennett_wait returns exactly one of HOST_REQUEST or a result",
+ "derivation": "A suspended run has neither outcome available, so bennett_wait must return E_INVALID_STATE immediately rather than block; the one-shot CLI has no suspend/wait surface at all.",
+ "object": "../../objects/registers.bisa",
+ "unavailable": {
+  "deliverable": 8,
+  "reason": "the full §10 launch library (stateful bennett_* API over runs) is staged deliverable 8; the CLI exposes only the one-shot run-program launch"
+ }
+}

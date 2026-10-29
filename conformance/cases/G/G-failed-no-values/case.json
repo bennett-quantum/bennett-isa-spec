@@ -1,0 +1,27 @@
+{
+ "id": "G-failed-no-values",
+ "suite": "G",
+ "spec": "§15 suite G; §10 results: a FAILED run has at least one fault record and exposes no values; a COMPLETED run has none",
+ "derivation": "unclean (A-qreg-free-unclean) as a launch: FAILED, results empty, exactly the FAULT_UB_TRAP record present, still closed cleanly.",
+ "object": "../../objects/registers.bisa",
+ "command": [
+  "run-program",
+  "{object}",
+  "unclean"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "FAILED",
+   "run_state": "CLOSED",
+   "results": [],
+   "fault": 4,
+   "faults": [
+    {
+     "code": 4,
+     "name": "FAULT_UB_TRAP"
+    }
+   ]
+  }
+ }
+}

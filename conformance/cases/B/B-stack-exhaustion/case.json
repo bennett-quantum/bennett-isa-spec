@@ -1,0 +1,26 @@
+{
+ "id": "B-stack-exhaustion",
+ "suite": "B",
+ "spec": "§15 suite B (stack exhaustion, sp + R_f > stack_limit); §3.7: lift.call flag = (depth+1 > depth_limit) or (sp + R_f > stack_limit), C = FAULT_BUDGET_DEPTH; §16.3: R_sum = 16 cells",
+ "derivation": "n=1 makes two nested calls occupying 16 and then 32 cells; with stack_limit 31 the first call fits (sp 0+16) and the recursive call at row 16 (row count of B-call-step-reversal) has sp+R_f = 32 > 31: (0,3) in 16 steps.",
+ "object": "../../objects/sum_db.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "sum_db",
+  "--input",
+  "1",
+  "--mem",
+  "db=0102030405060708090a0b0c0d0e0f10",
+  "--budget",
+  "100,4080,31,64"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 3,
+   "payload": 0,
+   "steps": 16
+  }
+ }
+}

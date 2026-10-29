@@ -1,0 +1,35 @@
+{
+ "id": "A-hostcall-reply",
+ "suite": "A",
+ "spec": "§15 suite A (hostcall); §10 hostcall: request bytes copied from one live allocation, reply written to [ptr, ptr+min(len, reply length)), rlen = the full reply length",
+ "derivation": "host allocates 3 bytes at heap_base 16, stores a5 at byte 0, so the request payload is a5 00 00 with capacity 3; the 5-byte reply 11 22 33 44 55 writes only 3 bytes but rlen is the full 5.",
+ "object": "../../objects/classical.bisa",
+ "command": [
+  "run-cc",
+  "{object}",
+  "host",
+  "--replies",
+  "{dir}/replies.json"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "COMPLETED",
+   "results": [
+    {
+     "type": "i16",
+     "value": "5"
+    }
+   ],
+   "host_requests": [
+    {
+     "address": 16,
+     "capacity": 3,
+     "payload": "a50000",
+     "reply": "1122334455",
+     "service": "org.bennett.test"
+    }
+   ]
+  }
+ }
+}

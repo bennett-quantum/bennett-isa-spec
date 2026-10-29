@@ -1,0 +1,44 @@
+{
+ "id": "B-prefix-reversal-inc8",
+ "suite": "B",
+ "spec": "§15 suite B (prefix reversal); §14.1 prefix reversal and T2 (§14.3): after the inverse steps every non-interface wire is clean",
+ "derivation": "inc8(8) at B=3 commits (9,0); 3 inverse steps restore pc 0, all locations clean except the input pseudo-location x=8; the object is memoryless (§7.2) so every counter reads 0.",
+ "object": "../../objects/inc8.bisa",
+ "command": [
+  "reverse",
+  "{object}",
+  "inc8",
+  "--input",
+  "8",
+  "--budget",
+  "3"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "REVERSED",
+   "equals_entry": true,
+   "frames_clean": true,
+   "payload": 9,
+   "code": 0,
+   "steps": 3,
+   "state_after_reversal": {
+    "pc": 0,
+    "pc_prime": 0,
+    "faulted": false,
+    "counters": [
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "locations": {
+     "inc8.x": 8,
+     "inc8.one": 0,
+     "inc8.r": 0
+    }
+   }
+  }
+ }
+}

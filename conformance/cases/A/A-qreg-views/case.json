@@ -1,0 +1,20 @@
+{
+ "id": "A-qreg-views",
+ "suite": "A",
+ "spec": "§15 suite A (qreg.*); §3.3: a slice is consumed by exactly one region call, after which the parent is live again",
+ "derivation": "views flips wire 0 through a one-wire slice twice (x then x = identity), so the parent register is back to |00>, live after each call, and free succeeds: 7 instructions.",
+ "object": "../../objects/registers.bisa",
+ "command": [
+  "run-cc",
+  "{object}",
+  "views"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "COMPLETED",
+   "steps": 7,
+   "results": []
+  }
+ }
+}

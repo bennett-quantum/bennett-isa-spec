@@ -1,0 +1,1 @@
+{"kind":"numerical","subject":{"region":"bell","variant":"forward","inherited_controls":0},"metric":"operator_norm","precision_bits":64,"bound":"0","note":"closure_hash and schedule_hash bind at check time per §12.3; exact-gate realisation"}

@@ -1,0 +1,31 @@
+{
+ "id": "C-step-check-sumdb-fixed-db",
+ "suite": "C",
+ "spec": "§15 suite C (T3/T6 on example 2); §5.2 domain restricted to the input bundle when the region is fixed (step-check --mem fixes a region, README Commands)",
+ "derivation": "With db fixed to 1..16 the free domain is the 8-bit n: 256 cases (faulting n>16 included, totality), fixed_regions reports db; interpreter and machine agree with full reversal on every element.",
+ "object": "../../objects/sum_db.bisa",
+ "command": [
+  "step-check",
+  "{object}",
+  "sum_db",
+  "--exhaustive",
+  "--max-bits",
+  "8",
+  "--mem",
+  "db=0102030405060708090a0b0c0d0e0f10",
+  "--budget",
+  "300,4080,512,64"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "cases": 256,
+   "input_and_memory_bits": 8,
+   "mode": "exhaustive",
+   "fixed_regions": [
+    "db"
+   ],
+   "status": "ok"
+  }
+ }
+}

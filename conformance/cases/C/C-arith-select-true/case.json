@@ -1,0 +1,24 @@
+{
+ "id": "C-arith-select-true",
+ "suite": "C",
+ "spec": "§15 suite C (T3 vectors for the §4.2 rows); §4.2 lift.select p a b picks a under p",
+ "derivation": "p is the constant 1, so the result is x=5; rows const, select, retval; F_B = (5, 0) in 3 steps.",
+ "object": "../../objects/arithmetic.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "select",
+  "--input",
+  "5,9",
+  "--budget",
+  "20"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 5,
+   "steps": 3
+  }
+ }
+}

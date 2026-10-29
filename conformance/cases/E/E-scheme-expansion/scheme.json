@@ -1,0 +1,1 @@
+{"name":"probe-mcx","realises":{"op":"mcx","controls":{"min":1,"max":"unbounded"}},"ancillae":{"count":0,"state":"clean","class":"fast"},"template":[{"gate":"cx","wires":["c[i]","t"],"repeat":{"var":"i","from":0,"to":{"var":"k"}}}]}

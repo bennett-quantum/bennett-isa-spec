@@ -1,0 +1,26 @@
+{
+ "id": "B-depth-limit",
+ "suite": "B",
+ "spec": "§15 suite B; §16.3 example 2: with depth_limit <= n the outcome is FAULT_BUDGET_DEPTH; §3.7 call flag as in B-stack-exhaustion",
+ "derivation": "n=3 with depth_limit 3: calls happen at rows 3, 16, 29, 42 (13 rows per sum level up to its call); the fourth call would take depth 3 to 4 > 3, faulting at row 42: (0,3), steps 42.",
+ "object": "../../objects/sum_db.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "sum_db",
+  "--input",
+  "3",
+  "--mem",
+  "db=0102030405060708090a0b0c0d0e0f10",
+  "--budget",
+  "1000,4080,512,3"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 3,
+   "payload": 0,
+   "steps": 42
+  }
+ }
+}

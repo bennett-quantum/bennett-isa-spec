@@ -1,0 +1,32 @@
+{
+ "id": "A-measure-draw-high",
+ "suite": "A",
+ "spec": "§15 suite A; §14.2 Born rule as in A-measure-draw-low",
+ "derivation": "Same Bell state; a draw of 0.9 falls in the second half, selecting 11 = value 3.",
+ "object": "../../objects/registers.bisa",
+ "command": [
+  "run-cc",
+  "{object}",
+  "measurement",
+  "--draws",
+  "0.9"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "COMPLETED",
+   "results": [
+    {
+     "type": "i2",
+     "value": "3"
+    }
+   ],
+   "measurements": [
+    {
+     "bits": "11",
+     "value": 3
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,21 @@
+{
+ "id": "G-reverse-failed-run",
+ "suite": "G",
+ "spec": "§15 suite G (state transitions); §10: bennett_reverse applies to COMPLETED runs only; here E_INVALID_STATE",
+ "derivation": "unclean FAILED, so --reverse is an E_INVALID_STATE diagnostic (the state machine has no FAILED -> REVERSED edge).",
+ "object": "../../objects/registers.bisa",
+ "command": [
+  "run-program",
+  "{object}",
+  "unclean",
+  "--reverse"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "E_INVALID_STATE",
+   "§10"
+  ]
+ }
+}

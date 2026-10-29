@@ -1,0 +1,26 @@
+{
+ "id": "C-163-stack-boundary-271",
+ "suite": "C",
+ "spec": "§15 suite C (stack-capacity boundary); §16.3: with stack_limit < 16(n+1) the outcome is FAULT_BUDGET_DEPTH",
+ "derivation": "Calls occur at rows 3 + 13k with sp = 16k before call k; sp+16 > 271 first at k=16 (256+16=272), i.e. row 3+13*16 = 211: (0,3), steps 211.",
+ "object": "../../objects/sum_db.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "sum_db",
+  "--input",
+  "16",
+  "--mem",
+  "db=0102030405060708090a0b0c0d0e0f10",
+  "--budget",
+  "1000,4080,271,64"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 3,
+   "payload": 0,
+   "steps": 211
+  }
+ }
+}

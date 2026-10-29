@@ -1,0 +1,18 @@
+{
+ "id": "F-bounds-mismatch",
+ "suite": "F",
+ "spec": "§15 suite F; §5.3 bounds: the bounds list must equal the body's qloop trip counts in text order (suite F)",
+ "derivation": "An action with one qloop 3 but declared bounds {2} (and signature bounds [2]): the lists differ, §5.3 diagnostic.",
+ "object": "../../objects/f_bounds_mismatch.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§5.3"
+  ]
+ }
+}

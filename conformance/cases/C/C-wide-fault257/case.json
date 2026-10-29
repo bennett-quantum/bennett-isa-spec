@@ -1,0 +1,24 @@
+{
+ "id": "C-wide-fault257",
+ "suite": "C",
+ "spec": "§15 suite C; §4.2 fault row over a 257-bit fault bundle (§3.3: C < 2^F); §9.1 decimal-string encoding",
+ "derivation": "The body is `fault 1606938044258990275541962092341162602522202993782792835301379` (= 2^200+3, bit 200 set, representable since F=257): one row, payload 0, code that integer as a decimal string.",
+ "object": "../../objects/wide.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "fault257",
+  "--input",
+  "0",
+  "--budget",
+  "5"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": "1606938044258990275541962092341162602522202993782792835301379",
+   "payload": 0,
+   "steps": 1
+  }
+ }
+}

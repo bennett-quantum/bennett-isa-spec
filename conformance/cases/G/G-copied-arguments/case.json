@@ -1,0 +1,11 @@
+{
+ "id": "G-copied-arguments",
+ "suite": "G",
+ "spec": "§15 suite G (ownership rules); §10: arguments and the entropy tape are copied at bennett_run and the caller may free its buffers afterwards",
+ "derivation": "Freeing and scribbling over the caller buffers between bennett_run and bennett_wait must not change the outcome: the run consumed copies. Only observable through the C API's buffer lifetimes.",
+ "object": "../../objects/registers.bisa",
+ "unavailable": {
+  "deliverable": 8,
+  "reason": "the full §10 launch library (stateful bennett_* API over runs) is staged deliverable 8; the CLI exposes only the one-shot run-program launch"
+ }
+}

@@ -1,0 +1,26 @@
+{
+ "id": "H-schedule-staged-probe",
+ "suite": "H",
+ "spec": "§15 suite H; §11: a consumer validates every binding and executes verbatim or rejects (E_SCHEDULE_INFEASIBLE)",
+ "derivation": "Probe only: an object carrying a well-formed §11 schedule section (sched_inc8.bisa; the schedule's own bindings name inc8's closure hash from §16.3) must be refused loudly as staged deliverable 10, never executed unscheduled (reference README, run-program). The semantic expectations are the other suite-H cases.",
+ "object": "../../objects/sched_inc8.bisa",
+ "command": [
+  "run-program",
+  "{object}",
+  "inc8",
+  "--args",
+  ""
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "staged deliverable 10",
+   "§11"
+  ]
+ },
+ "unavailable": {
+  "deliverable": 10,
+  "reason": "the §11 schedule consumer is staged deliverable 10"
+ }
+}

@@ -1,0 +1,11 @@
+{
+ "id": "G-invocation-tree-postorder",
+ "suite": "G",
+ "spec": "§15 suite G (reverse tree order); §10 invocation tree: bennett_reverse reverses post-order - CC segments by history, R calls by LIFO history, top-level Q calls by adjoint",
+ "derivation": "For a CC entry calling an R function that itself calls a Q region, reversal must complete the Q adjoint inside the R subtree before the outer CC frames are undone; the CLI's single-run reversal cannot expose the interleaving order.",
+ "object": "../../objects/registers.bisa",
+ "unavailable": {
+  "deliverable": 8,
+  "reason": "the full §10 launch library (stateful bennett_* API over runs) is staged deliverable 8; the CLI exposes only the one-shot run-program launch"
+ }
+}

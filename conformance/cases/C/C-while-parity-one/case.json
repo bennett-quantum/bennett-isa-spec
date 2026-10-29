@@ -1,0 +1,36 @@
+{
+ "id": "C-while-parity-one",
+ "suite": "C",
+ "spec": "§15 suite C; §4.6 qloop ... while as in C-while-parity",
+ "derivation": "p=5: one enabled iteration, t flips to 1 (key 1101).",
+ "object": "../../objects/control_flow.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "while3",
+  "--mut",
+  "0",
+  "--in",
+  "5"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "mut": [
+    1
+   ],
+   "in": [
+    5
+   ],
+   "state": {
+    "1101": [
+     1,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state"
+  ]
+ }
+}

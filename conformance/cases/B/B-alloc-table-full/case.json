@@ -1,0 +1,24 @@
+{
+ "id": "B-alloc-table-full",
+ "suite": "B",
+ "spec": "§15 suite B; §4.2 lift.alloc: flag includes atop >= 2^A_tab, C = FAULT_BUDGET_HEAP",
+ "derivation": "A_tab=2 gives 4 entries; the pinned global takes 1, so three allocs fill the table (atop 1,2,3) and the fourth (row 4) has atop >= 4: (0,2) in 4 steps.",
+ "object": "../../objects/heap.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "outoftable",
+  "--input",
+  "",
+  "--budget",
+  "20,32,0,0"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 2,
+   "payload": 0,
+   "steps": 4
+  }
+ }
+}

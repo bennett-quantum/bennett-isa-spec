@@ -1,0 +1,11 @@
+{
+ "id": "G-unload-unclosed-run",
+ "suite": "G",
+ "spec": "§15 suite G (ownership rules); §10: bennett_unload with a run not CLOSED is E_INVALID_STATE; tokens are destroyed at unload",
+ "derivation": "After a COMPLETED run that was never closed, bennett_unload must fail with E_INVALID_STATE and free nothing; closing the run first makes the same unload succeed.",
+ "object": "../../objects/registers.bisa",
+ "unavailable": {
+  "deliverable": 8,
+  "reason": "the full §10 launch library (stateful bennett_* API over runs) is staged deliverable 8; the CLI exposes only the one-shot run-program launch"
+ }
+}

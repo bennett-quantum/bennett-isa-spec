@@ -1,0 +1,18 @@
+{
+ "id": "F-section-order",
+ "suite": "F",
+ "spec": "§15 suite F (schemas); §9.1: section order is fixed (symbols imports functions data devices layout schedule certificate coverage)",
+ "derivation": "The inc8 sections swapped so functions precede symbols: out-of-order section, §9.1 diagnostic.",
+ "object": "../../objects/f_section_order.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§9.1"
+  ]
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "id": "E-ast-unbound-variable",
+ "suite": "E",
+ "spec": "§15 suite E; §8.1 variable binding table: referencing a variable the context does not bind is a load-time error",
+ "derivation": "A gates entry's cost context binds k, c and eps only; {\"var\":\"theta\"} there is unbound (theta belongs to scheme/template contexts), so loading the target errors.",
+ "unavailable": {
+  "deliverable": 9,
+  "reason": "target descriptions (§8) are staged deliverable 9"
+ }
+}

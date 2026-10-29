@@ -1,0 +1,50 @@
+{
+ "id": "B-call-step-reversal",
+ "suite": "B",
+ "spec": "§15 suite B; §3.7 suite-B sentence: one forward lift.call step of a recursive call followed by its inverse restores the complete pre-step tuple and every frame field is clean; §3.6 inverse step; §5.2 commit of a non-halted prefix is (0, FAULT_BUDGET_STEPS)",
+ "derivation": "For sum_db n=1 the executed rows are: oracle addr,const,call (3), then sum addr,boundscheck,load,icmp,qbranch (8), more-block const,sub,zext,add,boundscheck,load,add (15), so row 16 is the recursive lift.call. Running 16 steps and 16 inverse steps restores the entry tuple: pc 0, counters heap_used 0, atop 2 (the two pinned pre-entries of §16.3), sp/fp/depth 0, pseudo-location sum_db.n still 1; F_16 is not halted so payload 0 code 1.",
+ "object": "../../objects/sum_db.bisa",
+ "command": [
+  "reverse",
+  "{object}",
+  "sum_db",
+  "--input",
+  "1",
+  "--mem",
+  "db=0102030405060708090a0b0c0d0e0f10",
+  "--budget",
+  "100,4080,512,64",
+  "--steps",
+  "16"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "REVERSED",
+   "equals_entry": true,
+   "frames_clean": true,
+   "forward_steps": 16,
+   "reverse_steps": 16,
+   "payload": 0,
+   "code": 1,
+   "steps": 16,
+   "state_after_reversal": {
+    "pc": 0,
+    "pc_prime": 0,
+    "faulted": false,
+    "counters": [
+     0,
+     2,
+     0,
+     0,
+     0
+    ],
+    "locations": {
+     "sum_db.n": 1,
+     "sum_db.r": 0,
+     "sum.r": 0
+    }
+   }
+  }
+ }
+}

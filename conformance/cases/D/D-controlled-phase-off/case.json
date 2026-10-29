@@ -1,0 +1,36 @@
+{
+ "id": "D-controlled-phase-off",
+ "suite": "D",
+ "spec": "§15 suite D (controlled interference); §5.3 ctl: controlled-U allocates unconditionally and controls every gate of the body",
+ "derivation": "controlled_phase is ctl p on phase (rz). With p=0 no gate fires, so t=1 is untouched: key (t,p) = 10 with amplitude exactly 1.",
+ "object": "../../objects/control_flow.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "controlled_phase",
+  "--mut",
+  "1",
+  "--in",
+  "0"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "mut": [
+    1
+   ],
+   "in": [
+    0
+   ],
+   "state": {
+    "10": [
+     1,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state"
+  ]
+ }
+}

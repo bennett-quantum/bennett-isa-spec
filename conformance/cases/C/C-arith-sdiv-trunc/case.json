@@ -1,0 +1,24 @@
+{
+ "id": "C-arith-sdiv-trunc",
+ "suite": "C",
+ "spec": "§15 suite C (T3 vectors for the §4.2 rows); §3.3: signed division truncates toward zero",
+ "derivation": "249 is -7; -7 / 2 truncates to -3 = 253; F_B = (253, 0) in 2 steps.",
+ "object": "../../objects/arithmetic.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "sdiv",
+  "--input",
+  "249,2",
+  "--budget",
+  "20"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 253,
+   "steps": 2
+  }
+ }
+}

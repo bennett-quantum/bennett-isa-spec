@@ -1,0 +1,26 @@
+{
+ "id": "B-tiny-value",
+ "suite": "B",
+ "spec": "§15 suite B; §5.2 F_B on one domain element of tiny",
+ "derivation": "x=1, db=7: q = 7 udiv 1 = 7; 7 and 1 = 1; 1 != 0 (zero location reads its clean entry value 0) gives bit 1 at row 8: (1,0), steps 8.",
+ "object": "../../objects/tiny_memory.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "tiny",
+  "--input",
+  "1",
+  "--mem",
+  "db=07",
+  "--budget",
+  "20,0,0,0"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 1,
+   "steps": 8
+  }
+ }
+}

@@ -1,0 +1,24 @@
+{
+ "id": "C-lifted-perm-call",
+ "suite": "C",
+ "spec": "§15 suite C; §4.2 lift.perm_call applies the callee permutation to locations",
+ "derivation": "lifted sets r=1 then perm-calls flip on (r) with in x: r = 1 xor x. x=2 gives payload 3 in 3 rows (const, perm_call, retval).",
+ "object": "../../objects/actions.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "lifted",
+  "--input",
+  "2",
+  "--budget",
+  "10"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 3,
+   "steps": 3
+  }
+ }
+}

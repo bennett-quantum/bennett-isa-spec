@@ -1,0 +1,18 @@
+{
+ "id": "F-hash-corrupt",
+ "suite": "F",
+ "spec": "§15 suite F (envelope and hashes); §9.2: the stored interface_hash is verified against the semantic envelope",
+ "derivation": "inc8.bisa with one hex digit of the stored hash changed (8ce5e64f -> 8ce5e64e): the recomputed envelope hash differs, so check is a diagnostic citing §9.2 (the correct value is derived in C-163-inc8-check).",
+ "object": "../../objects/f_hash_corrupt.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§9.2"
+  ]
+ }
+}

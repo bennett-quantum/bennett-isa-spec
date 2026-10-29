@@ -1,0 +1,28 @@
+{
+ "id": "E-target-staged-probe",
+ "suite": "E",
+ "spec": "§15 suite E; §8 target descriptions; §10 bennett_load takes target_jcs",
+ "derivation": "Probe only: supplying any target document to a launch must be refused loudly as staged deliverable 9 (§8), never silently ignored (reference README, run-program). The semantic expectations for the document itself are in the other suite-E cases.",
+ "object": "../../objects/registers.bisa",
+ "command": [
+  "run-program",
+  "{object}",
+  "views",
+  "--args",
+  "",
+  "--target",
+  "{dir}/target.json"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "staged deliverable 9",
+   "§8"
+  ]
+ },
+ "unavailable": {
+  "deliverable": 9,
+  "reason": "target descriptions (§8) are staged deliverable 9"
+ }
+}

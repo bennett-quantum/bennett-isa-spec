@@ -1,0 +1,24 @@
+{
+ "id": "C-arith-parmov-swap",
+ "suite": "C",
+ "spec": "§15 suite C (T3 vectors for the §4.2 rows); §4.2 lift.parmov: every written value is computed into its slot before any exchange (simultaneous assignment)",
+ "derivation": "(r, s) = parmov (s, r) swaps 3 and 9, so r returns 9, not the sequentially-clobbered 3; rows mov, mov, parmov, retval; F_B = (9, 0) in 4 steps.",
+ "object": "../../objects/arithmetic.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "parmov",
+  "--input",
+  "3,9",
+  "--budget",
+  "20"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 9,
+   "steps": 4
+  }
+ }
+}
