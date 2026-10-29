@@ -358,6 +358,14 @@ impl Object {
                             }
                             let version =
                                 format!("{op}:{}:{:?}", a.join(" "), s.read_snapshot(&reads)?);
+                            if op == "qexchm" {
+                                s.check_target(&a[2], false)?;
+                                let mut wires = s.wires(&a[2])?;
+                                wires.push(format!("{}[*]", a[0]));
+                                s.exchange(&wires, version, &reads)?;
+                                *s.cell_epochs.entry(format!("{}[*]", a[0])).or_default() += 1;
+                                continue;
+                            }
                             s.note_reads(&version, &reads)?;
                             s.update_log(&format!("{}[*]", a[0]), &version, false);
                             *s.cell_epochs.entry(format!("{}[*]", a[0])).or_default() += 1;
@@ -535,6 +543,12 @@ impl Object {
                         .map(|w| s.wires(w))
                         .collect::<Result<Vec<_>>>()?
                         .concat();
+                    if op == "swap" {
+                        for t in &targets { s.check_target(t, false)?; }
+                        let wires = targets.iter().map(|t| s.wires(t)).collect::<Result<Vec<_>>>()?.concat();
+                        s.exchange(&wires, version, &reads)?;
+                        continue;
+                    }
                     s.note_reads(&version, &reads)?;
                     if diagonal {
                         // A diagonal gate applies a phase that is a function of its
@@ -579,6 +593,13 @@ impl Object {
                         return err("§3.3", "bundle widths differ");
                     }
                     s.check_target(&a[1], false)?;
+                    if op == "qexch" {
+                        s.check_target(&a[0], false)?;
+                        let wires = [s.wires(&a[0])?, s.wires(&a[1])?].concat();
+                        let version = format!("qexch:{}:{:?}:{:?}", a.join(" "), s.read_snapshot(&[])?, s.predicates);
+                        s.exchange(&wires, version, &[])?;
+                        continue;
+                    }
                     let version = format!(
                         "{op}:{}:{:?}:{:?}",
                         a.join(" "),
@@ -1474,6 +1495,37 @@ impl Discipline {
         }
         Ok(())
     }
+    /// Exchange outputs depend on the union of the OLD operand dependencies.
+    /// Commit their logs simultaneously: the matching exchange may discharge
+    /// its own outputs' mutual reads, but never an outstanding external reader.
+    fn exchange(&mut self, wires: &[String], version: String, extra_reads: &[String]) -> Result<()> {
+        let other = wires.iter().any(|w| self.wire_is_other(w));
+        let mut reads = wires.to_vec();
+        reads.extend_from_slice(extra_reads);
+        self.note_reads(&version, &reads)?;
+        let context = self.read_snapshot(&[])?;
+        let complete = format!("{version}:context{context:?}");
+        self.reads.insert(complete.clone(), self.reads[&version].clone());
+        if other { self.other_versions.insert(complete.clone()); }
+        let reads_group = |v: &String| self.reads.get(v).is_some_and(|r| r.iter().any(|(w,_)| wires.contains(w)));
+        let blocked = other && (
+            self.phases.iter().any(reads_group)
+            || self.versions.iter().any(|(w, log)| !wires.contains(w) && log.iter().any(reads_group))
+            || self.created.values().any(|c| c.versions.iter().any(|(w,_)| wires.contains(w)))
+        );
+        // An exchange is one joint computation. It cannot cancel on one
+        // output while the partner has an intervening write (fuzzer witness).
+        let matching: Vec<bool> = wires.iter().map(|w| self.versions.get(w)
+            .and_then(|log| log.last()).is_some_and(|v| operation_inverse(v).as_deref() == Some(&complete))).collect();
+        let blocked = blocked || (matching.iter().any(|v| *v) && !matching.iter().all(|v| *v));
+        for w in wires { self.update_log(w, &complete, blocked); }
+        Ok(())
+    }
+    fn wire_is_other(&self, w: &str) -> bool {
+        self.versions.get(w).is_some_and(|log| log.iter().any(|v| {
+            self.other_versions.contains(v) || ["h:", "rx:", "ry:", "call_other_"].iter().any(|p| v.starts_with(p))
+        }))
+    }
     fn change(&mut self, n: &str, version: String, other: bool) -> Result<()> {
         self.check_target(n, false)?;
         let context = self.read_snapshot(&[])?;
@@ -1529,17 +1581,7 @@ impl Discipline {
         }
     }
     fn is_other(&self, n: &str) -> Result<bool> {
-        Ok(self.wires(n)?.iter().any(|w| {
-            self.versions.get(w).is_some_and(|log| {
-                log.iter().any(|v| {
-                    self.other_versions.contains(v) || {
-                        ["h:", "rx:", "ry:", "call_other_"]
-                            .iter()
-                            .any(|p| v.starts_with(p))
-                    }
-                })
-            })
-        }))
+        Ok(self.wires(n)?.iter().any(|w| self.wire_is_other(w)))
     }
     fn record_change(&mut self, n: &str, version: String) -> Result<()> {
         for wire in self.wires(n)? {

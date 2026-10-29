@@ -260,3 +260,38 @@ fn r2_regions_are_lexical_function_entry_declarations() {
     let text = action("b = qborrow any 1\nd = qload r p\nqxor d b\nqxor d b\nqunload r p d\nqreturn b\nqloop 0 {\nqregion r 1 1\n}", &[0]);
     accept(&text);
 }
+
+#[test]
+fn r2_exchanges_preserve_transitive_entangling_read_dependencies() {
+    for exchange in ["swap", "qexch"] {
+        let body = format!("d = qalloc any 1\nh d\n{exchange} d m\ncx m t\n{exchange} d m\nh d\nqfree d");
+        reject(&tmp(&body), "§6.2");
+        let good = body.replace("cx m t", "cx m t\ncx m t");
+        run_three_identity(&accept(&tmp(&good)));
+    }
+    let body = "qregion r 1 1\nd = qalloc any 1\nh d\nqexchm r p d\nz = qload r p\ncx z t\nqunload r p z\nqexchm r p d\nh d\nqfree d";
+    reject(&tmp(body), "§6.2");
+    run_three_identity(&accept(&tmp(&body.replace("cx z t", "cx z t\ncx z t"))));
+}
+fn run_three_identity(o: &Object) {
+    for input in 0..9u32 {
+        let mut q = QuantumState::new();
+        let wires = q.allocate(3).unwrap();
+        for (bit,w) in wires.iter().enumerate() {
+            if input == 8 { q.gate("h", &[*w], None, &[]).unwrap(); }
+            else if input >> bit & 1 == 1 { q.gate("x", &[*w], None, &[]).unwrap(); }
+        }
+        let before = q.clone();
+        let mut b = QuantumBindings::default();
+        for (n,w) in ["t", "m", "p"].iter().zip(&wires) { b.bundles.insert((*n).into(), vec![*w]); }
+        o.execute_action("a", &mut q, &b, false, &[]).unwrap();
+        assert_eq!(q, before);
+        o.execute_action("a", &mut q, &b, true, &[]).unwrap();
+        assert_eq!(q, before);
+    }
+}
+
+#[test]
+fn r2_exchange_inverse_must_cancel_both_outputs_together() {
+    reject(&tmp("qregion r 1 1\nd0 = qalloc any 1\nd1 = qalloc any 1\nqexch d0 d1\nqexch d1 t\nx t\nqpred d0\nx t\nqunpred d0\nqexch d1 t\nqexch d0 d1\nqfree d1\nqfree d0"), "§6.2");
+}

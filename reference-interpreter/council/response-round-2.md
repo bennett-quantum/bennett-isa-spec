@@ -103,3 +103,20 @@ for child formals. qinplace token identities use the same environment. Pin:
 rejects x/y in both direct and inlined witnesses (§5.6), accepts x/x and checks
 all x,f,d basis states forward/adjoint. RED: direct x/y parsed successfully.
 No new specification question.
+
+## SOL-R2-B01 — resolved
+
+`validation.rs::Discipline::exchange` snapshots old dependency unions and
+other provenance, records them on every output, and updates exchange logs
+jointly; external transitive readers prevent cleanup of an other value.
+`validate_action_sequence` routes swap, qexch and qexchm through it, including
+region cell versions. Pin:
+`r1_discipline::r2_exchanges_preserve_transitive_entangling_read_dependencies`
+(all three negatives §6.2, doubled middle-CX positives, all small basis inputs
+plus superposition, forward/adjoint and exact restoration). RED: swap witness
+accepted before the fix. The differential generator now includes all three
+exchange operations in compute and middle sequences. It exposed another
+unsound accept: a joint exchange could cancel only one output's log while the
+partner had an intervening write. Both outputs must now cancel together;
+`r2_exchange_inverse_must_cancel_both_outputs_together` pins that witness.
+No new spec question: these are the dependency unions printed in §6.1.

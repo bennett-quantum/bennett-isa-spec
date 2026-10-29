@@ -36,7 +36,7 @@ fn op(line: &str, adjoint: &str) -> Op {
 /// A gate on workspace wire `d`, controlled from `controls`.
 fn compute_op(r: &mut Rng, d: &str, controls: &[String]) -> Op {
     let c = |r: &mut Rng| controls[r.below(controls.len() as u64) as usize].clone();
-    match r.below(13) {
+    match r.below(16) {
         0 => op(&format!("x {d}"), &format!("x {d}")),
         1 | 2 => {
             let c1 = c(r);
@@ -88,6 +88,16 @@ fn compute_op(r: &mut Rng, d: &str, controls: &[String]) -> Op {
                 ),
             )
         }
+        13 | 14 => {
+            let c1 = c(r);
+            let gate = if r.chance(50) { "swap" } else { "qexch" };
+            let line = format!("{gate} {d} {c1}");
+            op(&line, &line)
+        }
+        15 => {
+            let line = format!("qexchm r p {d}");
+            op(&line, &line)
+        }
         _ => {
             let c1 = c(r);
             op(
@@ -100,7 +110,7 @@ fn compute_op(r: &mut Rng, d: &str, controls: &[String]) -> Op {
 /// A middle operation: reads workspace into the interface, or disturbs it.
 fn middle_op(r: &mut Rng, work: &[String]) -> String {
     let d = &work[r.below(work.len() as u64) as usize];
-    match r.below(20) {
+    match r.below(23) {
         0..=2 => format!("cx {d} t"),
         3 => format!("s {d}"),
         4 => "x t".into(),
@@ -118,6 +128,9 @@ fn middle_op(r: &mut Rng, work: &[String]) -> String {
         16 => format!("qstore r {d} t\nqstore r {d} t"),
         17 => format!("qstore r p {d}\nqstore r p {d}"),
         18 => format!("qloop 2 {{\ncx {d} t\n}}"),
+        20 => format!("swap {d} m"),
+        21 => format!("qexch {d} m"),
+        22 => format!("qexchm r p {d}"),
         _ => format!("cz {d} t"),
     }
 }
