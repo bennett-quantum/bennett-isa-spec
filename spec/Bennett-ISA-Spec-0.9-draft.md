@@ -116,10 +116,21 @@ north star §3.1 requires).
 | K2 | §3.3, §4.1, §4.8, §7.4 | **Quantum allocation in R**: `qreg.*` execute in CC and R; ledger frames and their reversal (`qreg.new` ↔ release, clean by construction; `qreg.free` ↔ re-creation with the same id); `measure` stays CC-only | EN BLK-4; DL BLK-4 | S | +bytes |
 | K3 | §3.2, §4.1, §4.8, §5.1, §5.4, §7.4, §10 | **Device-minted budgets**: `budget.mint @o s h st d` in CC and R with `bennett_budget`'s checks; token validity (run-scoped, revoked by reversal); a token may be supplied to any region call of the program; an invocation executes the object's schedule only when its bindings (tuple and `params_hash` included) match, else the §11 defaults; a token is encoded in `params_hash` as its tuple | EN BLK-2; DL BLK-2; bd 4qy; bd 8wn (binding, found while drafting) | S | +bytes |
 | K4 | §4.5, §5.3, §5.4, §6.1, §12.1–§12.3 | **Parametrised in-place**: `qinplace @g @ginv tk x (ins..) (mem..) (args..)`; signature compatibility; inverse-pair obligation carried by an `inverse_pairs` entry with a minimum tuple, exact `arg_tokens` tuples and an `args` domain, by an exhaustive claim (`expected: "inverse_pair"`) or a library claim (`inverse_pair_library`), covering both orientations, checked before any effect of the CC/R region call (executors check inverse-pair claims, §1.2); monotonicity in the tuple; §6.1 transfer with `ins`, `mem` cells and `other` preserved; adjoint swaps the pair and keeps the lists | EN BLK-3; DL BLK-3; bd gv7; RC codex B07, muse s4 | S | +bytes |
-| K5 | §3.4, §4.1, §4.9, §5.4, §7.4, §10, §17 item 16 | **Classical fault contract**: CC trap = R fault record = one terminal record; a cause → code table; `fault C` in CC and R (literal < 2^64, effective cause); an `effect` memory operand out of range is 7; CC/R blocks end in `br`, `ret`, `trap` or `fault`; a `FAILED` run has exactly one record (0.8: "at least one") | EN ISA-7; DL ISA-7; bd 221; RC fable C5, s4 | S | +bytes |
+| K5 | §3.4, §4.1, §4.9, §5.4, §7.4, §10, §14.1, §15, §17 item 16 | **Classical fault contract**: CC trap = R fault record = one terminal record; a cause → code table; `fault C` in CC and R (literal < 2^64, effective cause); an `effect` memory operand out of range is 7; CC/R blocks end in `br`, `ret`, `trap` or `fault`; a `FAILED` run has exactly one record (0.8: "at least one"). Round-1 follow-up (2026-10-29): exact nonzero C through the launch API, no subsequent source effect, intact reversible prefix, and explicit classical charge versus Q step-machine semantics | EN ISA-7; DL ISA-7; bd 221; RC fable C5, s4; dialect draft 0.2.1 §25.1 BLK-5, council D02-21 re-derivation, b-dialect-spec-bz6 | S | +bytes |
 | K6 | §7.4, §10, §14.3 | **Reversible failed runs**: R faults are terminal; `FAILED → REVERSED` under the shared eligibility (no `measure`, no unverified free, ownership); reversal undoes the record, then the rest including open activations (an `effect`'s undo also removes its tape entry); T4 covers `FAILED` runs, the ledger entries of the registers a run created or touched and token validity, and states the exactness hypothesis for quantum state (exact when every undo is the exact inverse of its realisation, else within the declared bounds) | EN ISA-8; DL ISA-8 (terminal reading, DL §17.6); bd 0b9 | S | – |
 | K7 | §3.3, §17 item 14 | 0.8's §17 item 14 default (a `FAILED` record for a condition hardware cannot test) contradicted §7.4's unverified frees: non-verifying executors release unverified and exclude `uncall` and reversal; a verifying executor records `FAULT_UB_TRAP` (host calls: `E_QREG_NOT_CLEAN`) | found while drafting; bd exc | S | – |
 | K8 | §16.3, §15 | Examples 4–9 (one per new family, hand-derived results) and the suite rows for every new instruction and fault | brief | E | new |
+
+**Pending Q14 (2026-10-29, b-isa-spec-7u6).** The worklog session
+"interpreter milestone 1" (`worklog/001_2026-10-28_bootstrap.md`) says
+"Maintainer accepted Q1-Q14" and "the Q14 edit (lproc token/classical
+params) is still to be made." However, `HANDOFF.md`, Q14 in
+`spec/isa-0.9.PROGRESS.md` and bead `b-isa-spec-7u6` still offer two
+alternatives: lproc token/classical parameters or access to the enclosing
+oracle's classical-argument environment. No unambiguous accepted answer
+specifying the edit was found in those records; Q14's semantics are left
+unchanged pending that answer. This remains a capability gap to close,
+not a restriction on north-star scope.
 
 ### 0.3 Group 3: optional efficiency semantics (deferred)
 
@@ -653,7 +664,7 @@ pre-step tuple is restored and every frame field is clean.
 | `call` / `ret` | `results = call @f args` / `ret vals` | arguments and values are bare operands (`r = call @f a b`, `(r1, r2) = call @f a`, `call @f`, `ret v`, `ret`); results bind in order; a parenthesised argument list is ill-formed for `call`; callee tiers per §3.1 |
 | `uncall` | `uncall @f (args) (results)` | **segment uncall**, legal exactly under §7.4: the most recent completed call segment of the history is a call of `@f` whose recorded boundary argument and result values equal the current operand values, every frame after it is pure, and it contains, at any nesting depth, no `measure` frame and no `qreg.free` frame whose cleanliness was not verified; otherwise CC trap / R fault `FAULT_UB_TRAP` with no state change beyond the fault record. The segment is reversed by the cancellation-aware history traversal of §7.4 (LIFO, nested segments included; frames already reversed and `uncall` markers skipped) and its frames are marked reversed; the `uncall` itself pushes a frame naming the segment |
 | `trap` | `trap` | CC trap; R fault record (`FAULT_UB_TRAP`, §4.9) |
-| `fault` | `fault C` | CC trap; R fault record with the effective cause of the literal C, 0 ≤ C < 2^64 (§4.9, §5.4); in an oracle body or lproc, the §4.2 row |
+| `fault` | `fault C` | CC and R; literal 0 ≤ C < 2^64; one terminal record with code C for C ≠ 0, else 4 (§5.4); run ends `FAILED`, no successor executes, prefix history retained for reversal (§7.4, §10, §14.1). One classical instruction (§8.2); in an oracle body or lproc, the one-budget-step §4.2 row instead |
 | `qreg.new qreg.free qreg.slice qreg.concat qreg.width qreg.id qreg.from_id` | §3.3 | CC and R (§3.3) |
 | `measure` | `r = measure q` / `r = measure.iN q` | CC only; Born rule (§14.2); consumes q; `.iN` for a `qreg[*]` (§3.3) |
 | `budget.mint` | `tk = budget.mint @o s h st d` | CC and R; a token for the tuple (s, h, st, d) validated for oracle `@o` (§5.4) |
@@ -828,7 +839,8 @@ appending one **terminal fault record** (its cause code and program
 point, §7.4); the run ends `FAILED` (§10) with no further instruction
 executed, so the CC caller of a faulting R call executes no successor
 instruction and receives no results, and a `FAILED` run has exactly
-one fault record. Its code is fixed by the cause:
+one fault record. Implicit trap causes and explicit faults have the
+following code mapping:
 
 | Cause | Code |
 |---|---|
@@ -846,8 +858,30 @@ one fault record. Its code is fixed by the cause:
 `fault C` takes a literal 0 ≤ C < 2^64 (a launch fault code is a
 `uint64_t`, §10); codes above 10 are program-defined. Its frame is the
 fault record. `bennett_result_fault` returns the record's code
-unchanged. A Q region never produces a fault record: an oracle's fault
-is an outcome in its fault register (§5.2).
+unchanged, including every nonzero program-defined code up to 2^64 − 1;
+it MUST NOT replace such a code with `FAULT_UB_TRAP` or `FAULT_CALLEE`.
+`trap` reports only code 4; it cannot stand in for an arbitrary `fault C`.
+No host service is needed to report C (`hostcall` remains CC-only).
+
+**Charge and history.** A CC/R `fault C` executes as one classical
+instruction, taking `classical_step_time` (§8.2); it does not consume a Q
+oracle's B. An R budget supplied by source instrumentation is enforced
+by that code, not by the Q step machine. The terminal record
+is appended to the existing logical history without erasing, cancelling
+or changing any earlier frame, displaced value, effect-tape entry or
+open activation. No subsequent source effect occurs, in this activation
+or any caller. Forward failure does not reverse the prefix; an eligible
+`bennett_reverse` removes the fault record and reverses that intact
+prefix under §7.4, §10 and T4.
+
+A Q region never produces a fault record: an oracle's fault is an
+outcome in its fault register (§5.2). Its `fault C` is the existing
+§4.2 D row: one executed reference row charges one step of B, writes
+`code ^= C′; faulted ^= 1`, and selects HALT. Remaining forward machine
+steps are the idle steps of §3.6; commit and prefix reversal follow
+§5.2, undoing the fault writes and all preceding rows while retaining
+the committed fault-register XOR (§14.1, T2). The classical terminal
+record and the Q step-machine outcome are distinct reporting paths.
 
 ## 5. Regions
 
@@ -1568,6 +1602,12 @@ than that byte count is `E_ARG` and nothing is written. Fault records
 are read by `bennett_result_nfaults` / `bennett_result_fault` (codes of
 §4.9; a `COMPLETED` run has none, a `FAILED` run has exactly one, its
 terminal record, and exposes no values).
+For an R `fault C`, `bennett_wait` returns `OK` with `*result_out` set
+and `*request_out` NULL as for any `FAILED` run;
+`bennett_result_nvalues` is 0, `bennett_result_nfaults` is 1 and
+`bennett_result_fault(result, 0)` is exactly C when C ≠ 0 (4 when C = 0,
+§5.4), with all 64 bits preserved. The fault code is result data, not a
+`bennett_status` error or a host-service reply.
 
 **Waiting.** `bennett_wait` blocks until the run leaves `RUNNING` and
 returns `OK` with exactly one outcome: `HOST_REQUEST` (`*request_out`
@@ -1871,6 +1911,13 @@ executed), counters are unbounded integers. It **defines** F_B
 and the budget unit and rejects any body that executes a non-permutation
 gate.
 
+For CC/R, `fault C` has the terminal-record semantics of §4.9 and the
+logical history of §7.4: it preserves the complete executed prefix for
+eligible reversal, including activations that have not returned. This
+is T4's history traversal, not the Q machine's B inverse steps. In an
+oracle body or lproc the same spelling remains the §4.2 fault row;
+§3.6 and §5.2 supply its step-machine inverse and T2 prefix reversal.
+
 ### 14.2 Quantum state semantics
 
 The state of a Q region is a vector in ⊗ over live wires in allocation
@@ -1919,13 +1966,13 @@ Born probabilities, consuming the wires.
 
 | Suite | Class | Tests |
 |---|---|---|
-| A | Executor | classical ISA; run history and LIFO reversal with loops, recursion, effects, segment `uncall` (impure suffix traps; nested `uncall` inside an uncalled segment; `uncall` over a `measure` traps; a segment that begins at the run's first instruction, uncalled, then whole-run reversal), `hostcall`, `qreg.*`, fault records (T4); CC `uncall` of a CC segment (§3.1); a use reached before any definition traps 4 whatever the block text order; `qreg[*]` (examples 4, 5): run-time widths 0, 2, 3, an id stored and reloaded, `qreg.from_id` of a stale, consumed or viewed id or of a register owned by another open run traps 4, a width-3 register bound to `wire[2]` or `qreg[2]` traps 4 with no effect, aliases consumed together, ids restored and never reused by reversal, run-time slice `lo` and `len`; `qreg.*` in R with whole-run reversal and segment `uncall` (a hardware-unverified free makes the segment non-uncallable); `budget.mint` valid and invalid and its reversal (example 6); the §4.9 causes — `udiv` by 0 → 5, i8 −128 `sdiv` −1 → 6, `load` at address 0 → 7, `alloc` beyond the heap → 2, `trap` → 4, `fault 1` → 1, `fault 0` → 4 — each with the pre-fault state unchanged and exactly one record; terminal R faults and FAILED-run reversal (example 8) |
-| B | Executor | oracle totality and prefix reversal: every fault code; B = 0; boundary halts; `lift.call`/`lift.ret` recursion with argument capture; one forward `lift.call` and one forward `lift.ret` step of a recursive call each followed by its inverse (§3.7); stack exhaustion (`sp + R_f > stack_limit`); matched `lift.oracle_uncall`, including two calls followed by two uncalls; interface regions restored; pre-entries; `lift.free` on pinned entries, and of a heap entry whose base equals a size-0 global's (the global stays live); inherent load/store checks; row indices of multi-row blocks and their `lift.label` values; `qjumpr` to an in-range interior row enters it and to an out-of-range index faults 4; `fault 0` and a triggered `lift.faultif p 0` commit `FAULT_UB_TRAP`; counters at the §3.7 minimum widths and interface widths above 128 bits |
+| A | Executor | classical ISA; run history and LIFO reversal with loops, recursion, effects, segment `uncall` (impure suffix traps; nested `uncall` inside an uncalled segment; `uncall` over a `measure` traps; a segment that begins at the run's first instruction, uncalled, then whole-run reversal), `hostcall`, `qreg.*`, fault records (T4); CC `uncall` of a CC segment (§3.1); a use reached before any definition traps 4 whatever the block text order; `qreg[*]` (examples 4, 5): run-time widths 0, 2, 3, an id stored and reloaded, `qreg.from_id` of a stale, consumed or viewed id or of a register owned by another open run traps 4, a width-3 register bound to `wire[2]` or `qreg[2]` traps 4 with no effect, aliases consumed together, ids restored and never reused by reversal, run-time slice `lo` and `len`; `qreg.*` in R with whole-run reversal and segment `uncall` (a hardware-unverified free makes the segment non-uncallable); `budget.mint` valid and invalid and its reversal (example 6); the §4.9 causes — `udiv` by 0 → 5, i8 −128 `sdiv` −1 → 6, `load` at address 0 → 7, `alloc` beyond the heap → 2, `trap` → 4, `fault 1` → 1, `fault 0` → 4 — each with the pre-fault state unchanged and exactly one record; terminal R faults and FAILED-run reversal (example 8), also with `fault 2`, `fault 3` and `fault 18446744073709551615`: exact record code, no caller continuation or subsequent source effect, earlier memory/device/tape history intact until reversal |
+| B | Executor | oracle totality and prefix reversal: every fault code; B = 0; boundary halts; `lift.call`/`lift.ret` recursion with argument capture; one forward `lift.call` and one forward `lift.ret` step of a recursive call each followed by its inverse (§3.7); stack exhaustion (`sp + R_f > stack_limit`); matched `lift.oracle_uncall`, including two calls followed by two uncalls; interface regions restored; pre-entries; `lift.free` on pinned entries, and of a heap entry whose base equals a size-0 global's (the global stays live); inherent load/store checks; row indices of multi-row blocks and their `lift.label` values; `qjumpr` to an in-range interior row enters it and to an out-of-range index faults 4; `fault 0` and a triggered `lift.faultif p 0` commit `FAULT_UB_TRAP`; `fault C` as the B-th executed row reports C′, whereas a cut just before that row reports 1; subsequent HALT steps and inverse steps preserve the §5.2 outcome and clean every frame; counters at the §3.7 minimum widths and interface widths above 128 bits |
 | C | Executor, Producer | T3 over full D at exhaustive widths for oracles, permutation actions, `qinplace` pairs, borrow frames; T6 agreement among VM, specialiser, transformed forms and the reference interpreter; the §16.3 examples as normative test vectors, including the stack-capacity boundary of example 2 and example 3 over its 8 basis and 16 controlled configurations with an entangled reference on the borrowed wire; `qinplace` with `ins` and `args` (example 7) over all x, y, a and both control values, scratch clean, and its adjoint (covered by the same entry); a library (`inverse_pair_library`) claim covering every `args` value; a token argument whose tuple differs from `arg_tokens` traps 4 |
 | D | Executor | channel and unitary comparison for ε > 0 realisations; controlled-interference tests; checker-computed bounds; the diamond-norm SDP witness check of §12.1, including d = 2, J(Φ) = 0, Y = I₄/8, mu = bound = 3/8 (accepted: every pivot 1/8) and Y = 0, mu = 0 (rejected: pivot 0) |
 | E | Target author, Executor | JCS parsing; AST evaluation; matching; scheme expansion and correctness; aggregation from event lists; timing model; imports |
 | F | Producer | versioning, disjointness incl. control context; operand schema; row classes and frame sizing; index-space flattening; terminators; name resolution; permutation-only oracles; §6 transfer and windows; adjoint table; translation lemma side conditions with the four negative tests; `in`-wire use; acyclic action graphs; grammar; schemas; the §3.1 call-tier table (R → CC rejected); envelope and hashes, acyclic (inc8, zero, sum_db) and cyclic (sum, and a mutual SCC); SCC placement in the index space (mutual f, g whose member hashes order opposite to their names); empty data lines (`NAME SP LF` accepted, two spaces rejected); canonical `INT`/`FLOAT` at every literal site; const literal ranges; the region call graph with lifted calls and `qinplace`; `call` operand spelling; param role suffixes; interface-region names; local regions as call operands; the widened `in`-wire uses of §5.1; LIFO matched uncalls and an unmatched uncall rejected; the static view rule of §3.3 (a view passed through `br`, used twice, or left unconsumed is rejected); lifted-call `args` that are locations rejected; `qreg[*]` typing, the `measure.iN` form and width checks; `budget.mint` rejected in regions; CC/R block terminators; `qinplace` signature compatibility, its short form exactly when the three lists are empty, and its §6.1 transfer (cleaning a value that depends on x after changing an `ins` wire is rejected); CC/R `fault` literal range; linking; frame-descriptor live ranges |
-| G | Launch | every §10 entry point, state transition, binding rule, ownership rule; HOST_REQUEST/reply (a reply whose length does not fit `ptr_width` bits is `E_ARG`); reverse eligibility and tree order; `QREG` bound to `qreg[*]`; `FAILED → REVERSED` (example 8) and `E_NOT_REVERSIBLE` after a `measure` or an unverified free; exactly one fault record per `FAILED` run; a device-minted token used after its run is CLOSED is `E_ARG` |
+| G | Launch | every §10 entry point, state transition, binding rule, ownership rule; HOST_REQUEST/reply (a reply whose length does not fit `ptr_width` bits is `E_ARG`); reverse eligibility and tree order; `QREG` bound to `qreg[*]`; `FAILED → REVERSED` (example 8) and `E_NOT_REVERSIBLE` after a `measure` or an unverified free; exactly one fault record per `FAILED` run; an R `fault C` returns `OK` from `bennett_wait` with a result and no request, zero values and the exact nonzero 64-bit C (including 2^64 − 1) from `bennett_result_fault(result, 0)`; a device-minted token used after its run is CLOSED is `E_ARG` |
 | H | Scheduler | §6 validity; capacity; reproducibility; specificity resolution; verbatim execution; INFEASIBLE/UNSUPPORTED; invocation contexts covering default-only invocations (an action calling one region twice, one call scheduled explicitly: a claim with one witness rejects, two passing witnesses accept); a device-minted tuple binds the schedule (a schedule bound to B = 3 is not applied to an invocation minted with B = 2, which runs under the defaults) |
 
 ## 16. Canonical textual form (normative)
