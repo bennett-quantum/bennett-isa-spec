@@ -144,3 +144,63 @@ fn wide_structured_bundles_are_not_limited_to_integer_widths() {
         .unwrap();
     assert_eq!(q.read_basis(&[t[255]]).unwrap(), 0);
 }
+
+#[test]
+fn sol_r4_b01_tiny_projection_preserves_entangled_residual_and_second_born_weights() {
+    // The rare branch of Rx(theta)|1> is correlated with a residual Bell pair.
+    // Its conditional state has two equal finite amplitudes, and measuring
+    // one Bell wire subsequently has probabilities 1/2,1/2, despite the
+    // unnormalised exact shadow having a norm below binary64 range.
+    for angle in [1e-162, 1e-200, f64::from_bits(1)] {
+        let mut q = QuantumState::new();
+        let w = q.allocate(3).unwrap();
+        q.gate("x", &[w[0]], None, &[]).unwrap();
+        q.gate("rx", &[w[0]], Some(angle), &[]).unwrap();
+        q.gate("h", &[w[1]], None, &[]).unwrap();
+        q.gate("cx", &[w[1], w[2]], None, &[]).unwrap();
+        // Entangle the measured system with the residual pair (odd parity on
+        // the common branch, even parity on the rare branch).
+        q.gate("cx", &[w[0], w[1]], None, &[]).unwrap();
+        let first = q.measurement_branches(&[w[0]]).unwrap();
+        assert_eq!(first.len(), 2);
+        assert_eq!(first[0].bits, [false]);
+        let residual = &first[0].state;
+        let amps = residual.amplitudes().unwrap();
+        assert!(amps.iter().all(|a| a.re.is_finite() && a.im.is_finite()));
+        assert!((amps.iter().map(|a| a.re * a.re + a.im * a.im).sum::<f64>() - 1.0).abs() < 1e-12);
+        let second = residual.measurement_branches(&[w[1]]).unwrap();
+        assert_eq!(second.len(), 2);
+        for branch in second {
+            assert!((branch.probability - 0.5).abs() < 1e-12);
+            assert_eq!(
+                branch.state.read_basis(&[w[2]]).unwrap(),
+                u128::from(branch.bits[0])
+            );
+            let a = branch.state.amplitudes().unwrap();
+            assert!((a.iter().map(|z| z.re * z.re + z.im * z.im).sum::<f64>() - 1.0).abs() < 1e-12);
+        }
+    }
+}
+
+#[test]
+fn sol_r4_b01_projection_recovers_amplitudes_below_binary64_range() {
+    // Two rare independent rotations give amplitude about 2.5e-401 on 00.
+    // It still projects to a normalized residual |+>, and applying H cleans it.
+    let mut q = QuantumState::new();
+    let w = q.allocate(3).unwrap();
+    for wire in &w[..2] {
+        q.gate("x", &[*wire], None, &[]).unwrap();
+        q.gate("rx", &[*wire], Some(1e-200), &[]).unwrap();
+    }
+    q.gate("h", &[w[2]], None, &[]).unwrap();
+    let branches = q.measurement_branches(&w[..2]).unwrap();
+    assert_eq!(branches.len(), 4);
+    let mut rare = branches[0].state.clone();
+    for a in rare.amplitudes().unwrap() {
+        assert!((a.re.abs() - std::f64::consts::FRAC_1_SQRT_2).abs() < 1e-12);
+        assert!(a.im.abs() < 1e-12);
+    }
+    rare.gate("h", &[w[2]], None, &[]).unwrap();
+    assert_eq!(rare.read_basis(&[w[2]]).unwrap(), 0);
+    rare.release(&[w[2]]).unwrap();
+}

@@ -276,7 +276,11 @@ reference-interpreter/target/debug/bennett-isa-ref run-program reference-interpr
 - `QuantumState` is the §14.2 simulator: a basis fast path and a sparse
   superposition over any number of wires, each with an exact amplitude shadow
   in Q(√2, i)[z, 1/z] (`src/exact.rs`). Cleanliness, basis reads and state
-  equality are exact; binary64 amplitudes serve Born probabilities only.
+  equality are exact. Born selection compares exact-shadow norm ratios using
+  outward-rounded dyadic enclosures, refining without a precision cutoff.
+  Supported outcomes survive underflow; conditional binary64 amplitudes are
+  normalized with a shared extended exponent. Display probabilities remain
+  approximations (a positive value can display as zero).
   `QuantumState::set_state_vector` installs a sparse superposition with each
   binary64 amplitude held exactly as its dyadic value.
   `Object::execute_action` runs structured Q bodies and their adjoints;

@@ -1194,3 +1194,44 @@ fn r4_dynamic_region_aliases_report_failed_json_and_reverse_the_prefix() {
         }
     }
 }
+
+#[test]
+fn sol_r4_b01_tiny_born_branch_is_selectable() {
+    // Rx(theta)|1> = -i sin(theta/2)|0> + cos(theta/2)|1>.
+    // For nonzero theta, draw=0 selects the first supported outcome, even
+    // when sin^2(theta/2) is below binary64's least positive number.
+    let a = r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
+    let p = r#"{"abi":"0.8","kind":"cc","params":["qreg[1]"],"results":["i1"],"tier":"cc"}"#;
+    for angle in ["1e-100", "1e-161", "1e-162", "1e-200", "5e-324", "0.0"] {
+        let action = format!("action @a (t:wire mut) () () () ()\n^entry():\nrx {angle} t");
+        let parent = "fn cc @p (q:qreg[1]) (r:i1) () () ()\n^entry():\naction_call @a (q) () () ()\nr = measure q\nret r";
+        let o = support::rehash(&support::object(
+            &[("a", a, &action), ("p", p, parent)],
+            "{}",
+            "",
+        ));
+        let path = tmp_file(&format!("sol-r4-b01-{angle}.bisa"), &o.text);
+        ok(&["check", &path]);
+        for draw in ["0", "0.5"] {
+            let v = ok(&["run-cc", &path, "p", "--arg", "qreg:1", "--draws", draw]);
+            let expected = if draw == "0" && angle != "0.0" {
+                "0"
+            } else {
+                "1"
+            };
+            assert_eq!(text(&v, "status"), "COMPLETED");
+            assert_eq!(uint(&v, "steps"), 3);
+            assert_eq!(field(&v, "fault"), &Json::Null);
+            assert_eq!(
+                result(&array(&v, "results")[0]).1,
+                expected,
+                "angle={angle}, draw={draw}"
+            );
+            assert_eq!(text(&array(&v, "measurements")[0], "bits"), expected);
+        }
+        fails(
+            &["reverse", &path, "p", "--arg", "qreg:1", "--draws", "0"],
+            "measure",
+        );
+    }
+}

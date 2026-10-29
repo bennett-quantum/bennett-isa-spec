@@ -6,6 +6,18 @@ under `reference-interpreter/`; commit own paths
 (`git add -A -- reference-interpreter && git commit -- reference-interpreter`),
 never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
+## Council round 4, sol second pass (2026-10-29)
+
+SOL-R4-B01 resolved: exact-shadow Born weights and refined outward-rounded
+CDF comparisons preserve nonzero branches under probability/amplitude
+underflow. Conditional display amplitudes normalize with a shared extended
+exponent; later measurements use exact norm ratios. Exact CLI and independent
+entangled-residual regressions were witnessed RED, then GREEN, including the
+smallest positive binary64 angle and an amplitude below binary64 range.
+Normal suite: **226 passed, 0 failed, 5 ignored**; initial strict Clippy clean.
+Details and named pins: council/response-round-4.md. No new ambiguity or cap.
+The response remains appendable for SOL-R4-B02/B03 and the pending muse seat.
+
 ## Council round 4, codex first pass (2026-10-29)
 
 R4-B01 resolved after RED on the exact loop-local borrow witness. Borrow/Return

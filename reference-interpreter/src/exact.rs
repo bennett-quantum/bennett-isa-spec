@@ -167,8 +167,8 @@ impl BigInt {
         }
         n
     }
-    /// Exact right shift of a value divisible by 2^bits.
-    fn shr_exact(&self, bits: u64) -> Self {
+    /// Right shift of the magnitude, truncating toward zero.
+    fn shr(&self, bits: u64) -> Self {
         let words = (bits / 32) as usize;
         let shift = (bits % 32) as u32;
         let src = &self.limbs[words.min(self.limbs.len())..];
@@ -232,7 +232,7 @@ impl Dyadic {
         }
         let t = self.n.trailing_zeros().min(self.k);
         if t > 0 {
-            self.n = self.n.shr_exact(t);
+            self.n = self.n.shr(t);
             self.k -= t;
         }
         self
@@ -695,3 +695,6 @@ impl Decimal {
         }
     }
 }
+
+mod measurement;
+pub(crate) use measurement::{normalized, probability};

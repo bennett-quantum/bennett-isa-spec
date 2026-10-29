@@ -208,17 +208,19 @@ impl QuantumRegisters {
         }
         let wires = self.ordinary(id)?.wires.clone();
         let branches = self.state.measurement_branches(&wires)?;
-        let mut cursor = draw;
+        let total = branches
+            .iter()
+            .fold(crate::exact::Amplitude::zero(), |s, b| s.add(&b.weight));
+        let threshold = total.times_f64(draw)?;
+        let mut cumulative = crate::exact::Amplitude::zero();
         let mut selected = None;
         for branch in branches {
-            cursor -= branch.probability;
-            let last = branch.probability > 0.0;
-            if cursor < 0.0 {
+            cumulative = cumulative.add(&branch.weight);
+            if cumulative.add(&threshold.times_f64(-1.0)?).real_sign()
+                == std::cmp::Ordering::Greater
+            {
                 selected = Some(branch);
                 break;
-            }
-            if last {
-                selected = Some(branch);
             }
         }
         let branch =

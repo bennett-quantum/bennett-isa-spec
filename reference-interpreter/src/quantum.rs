@@ -1,6 +1,6 @@
 //! §14.2 state semantics: a sparse basis-permutation fast path and a state
 //! vector, each carrying an exact shadow (src/exact.rs) beside the binary64
-//! amplitudes. The binary64 amplitudes serve Born probabilities; every
+//! amplitudes. Born selection uses refined exact-shadow enclosures; every
 //! cleanliness and basis-value decision uses the exact amplitudes, so a
 //! component is zero iff it is exactly zero (no tolerance, council B15).
 //! The vector has no fixed wire limit: it is bounded only by host memory,
@@ -26,9 +26,6 @@ impl Complex {
     }
     fn phase(a: f64) -> Self {
         Self::new(a.cos(), a.sin())
-    }
-    fn norm2(self) -> f64 {
-        self.re * self.re + self.im * self.im
     }
     fn scale(self, s: f64) -> Self {
         Self::new(self.re * s, self.im * s)
@@ -147,6 +144,7 @@ pub struct MeasurementBranch {
     pub probability: f64,
     pub bits: Vec<bool>,
     pub state: QuantumState,
+    pub(crate) weight: Amplitude,
 }
 #[derive(Clone, Debug, Default)]
 pub struct QuantumBindings {
@@ -692,6 +690,7 @@ impl QuantumState {
             };
             return Ok(vec![MeasurementBranch {
                 probability: 1.0,
+                weight: Amplitude::one(),
                 bits: result,
                 state,
             }]);
@@ -714,17 +713,27 @@ impl QuantumState {
                 .or_default()
                 .insert(compress(k, &remove), a.clone());
         }
+        let weights: Vec<_> = groups
+            .values()
+            .map(|g| {
+                g.values()
+                    .fold(Amplitude::zero(), |s, (_, e)| s.add(&e.norm_squared()))
+            })
+            .collect();
+        let total = weights.iter().fold(Amplitude::zero(), |s, w| s.add(w));
         let mut branches = Vec::new();
-        for (bits, mut group) in groups {
-            let probability: f64 = group.values().map(|(f, _)| f.norm2()).sum();
-            for (f, _) in group.values_mut() {
-                *f = f.scale(1.0 / probability.sqrt());
+        for ((bits, mut group), weight) in groups.into_iter().zip(weights) {
+            let probability = exact::probability(&weight, &total);
+            let projected: Vec<_> = group.values().map(|(_, e)| e.clone()).collect();
+            for ((f, _), (re, im)) in group.values_mut().zip(exact::normalized(&projected)) {
+                *f = Complex::new(re, im);
             }
             let mut state = self.clone();
             state.ids = kept_ids.clone();
             state.state = State::Vector { amplitudes: group };
             branches.push(MeasurementBranch {
                 probability,
+                weight,
                 bits,
                 state,
             });

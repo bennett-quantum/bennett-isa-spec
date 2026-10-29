@@ -97,3 +97,36 @@ DISPLAY/WAYLAND_DISPLAY/DBUS_SESSION_BUS_ADDRESS/BROWSER unset, and
 TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/.tmp.
 No dependencies, spec edits, seed changes, declines or pushes. README retains
 the failed-result promise and documents lifetime and dynamic-alias semantics.
+
+## SOL-R4-B01 — resolved
+
+RED: `cli_xam::sol_r4_b01_tiny_born_branch_is_selectable` selected 1 instead
+of 0 at theta=1e-162, draw=0. Independently,
+`quantum::sol_r4_b01_tiny_projection_preserves_entangled_residual_and_second_born_weights`
+failed on nonfinite conditional amplitudes.
+
+`quantum.rs::measurement_branches` now derives exact Laurent-polynomial
+weights from the exact amplitude shadows. `registers.rs::measure` compares
+cumulative weights against draw times the total weight, preserving ascending
+outcome order and strict CDF boundaries. `exact/measurement.rs` decides exact
+zero first, then refines outward-rounded dyadic enclosures until the sign is
+proved. Phase enclosures use a Taylor tail bound on |x| <= 1/2 and repeated
+squaring; sqrt(2) uses bounding binary digits. There is no precision cutoff,
+probability floor or guessed clamp. Projection display amplitudes use refined
+shadows and a shared binary exponent before normalization; subsequent Born
+weights use norm ratios of the unnormalised shadows. Binary64 probability
+fields remain diagnostic approximations and may display zero for a positive
+weight. README documents this distinction.
+
+Pins: the exact memoryless ptr_width=32 CLI witness at 1e-100, 1e-161,
+1e-162, 1e-200 and the smallest positive binary64 angle: draw=0 selects 0,
+draw=0.5 selects 1; angle=0 selects 1. Each completes in three rows, without
+fault; every measured reversal is refused. The residual entangled-pair pin
+checks finite normalized amplitudes and a second measurement's independent
+1/2,1/2 probabilities and correlations. A third pin,
+`quantum::sol_r4_b01_projection_recovers_amplitudes_below_binary64_range`,
+uses two tiny rotations (amplitude ~2.5e-401), projects a residual |+>, then
+cleans it with H and releases it exactly.
+
+GREEN: full normal suite **226 passed, 0 failed, 5 ignored**. No new spec
+question: §§3.3, 4.4 and 14.2 specify this behavior directly. No seed changes.
