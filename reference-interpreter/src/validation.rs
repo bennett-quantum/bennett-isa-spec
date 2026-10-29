@@ -298,10 +298,9 @@ impl Object {
                         s.predicates.push(control.clone());
                     }
                     self.validate_region_call(f, &call.instruction, &s.types)?;
-                    let callee = self
-                        .functions
-                        .get(call.instruction.operands[0].trim_start_matches('@'));
-                    if f.kind == "perm_action" && callee.is_some_and(|c| c.kind == "action") {
+                    let callee =
+                        self.declaration(call.instruction.operands[0].trim_start_matches('@'))?;
+                    if f.kind == "perm_action" && callee.kind == "action" {
                         return err("§5.3", "permutation action calls non-permutation action");
                     }
                     let ca = &call.instruction.operands;
@@ -311,7 +310,7 @@ impl Object {
                         list(&ca[1])?
                     };
                     for target in targets {
-                        let other = callee.is_some_and(|c| c.kind == "action");
+                        let other = callee.kind == "action";
                         s.change(
                             &target,
                             format!("call:{}:{}:{}", call.adjoint, ca.join(" "), i.line),
@@ -398,10 +397,7 @@ impl Object {
         let n = a[0]
             .strip_prefix('@')
             .ok_or_else(|| Error("§4.8: call requires @symbol".into()))?;
-        let callee = self
-            .functions
-            .get(n)
-            .ok_or_else(|| Error(format!("§9.3: undefined region {n}")))?;
+        let callee = self.declaration(n)?;
         if oracle && callee.kind != "oracle"
             || !oracle && !matches!(callee.kind.as_str(), "action" | "perm_action")
         {
@@ -656,10 +652,10 @@ impl Object {
                             if a.is_empty() {
                                 return err("§4.8", "missing callee");
                             }
-                            let callee = a[0]
-                                .strip_prefix('@')
-                                .and_then(|n| self.functions.get(n))
-                                .ok_or_else(|| Error("§9.3: undefined classical callee".into()))?;
+                            let callee = self
+                                .declaration(a[0].strip_prefix('@').ok_or_else(|| {
+                                    Error("§4.8: call requires @symbol".into())
+                                })?)?;
                             if !matches!(callee.kind.as_str(), "cc" | "r")
                                 || op == "uncall" && callee.kind != "r"
                             {
@@ -799,7 +795,7 @@ impl Object {
                 }
             }
         }
-        Ok(())
+        self.validate_handle_views(f, types)
     }
     pub(crate) fn validate_call_graph(&self) -> Result<()> {
         fn calls<'a>(i: &'a Instruction, output: &mut Vec<&'a str>) {

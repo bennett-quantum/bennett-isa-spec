@@ -3,9 +3,12 @@ use crate::{
     err,
     object::{is_binop, is_div, list, mask, parse_bits},
     oracle::{binop, compare, divide, signed, Memory},
-    Budget, Error, Object, OracleInput, Result, Type,
+    registers::RegisterUndo,
+    validation::normalize_call,
+    Argument, Budget, Error, Instruction, Object, OracleInput, QuantumBindings, QuantumRegion,
+    QuantumRegisters, Result, Type,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ClassicalValue {
@@ -63,7 +66,7 @@ struct Devices {
     blocks: BTreeMap<u128, Vec<u8>>,
     tape: Vec<(String, String, Vec<u128>)>,
 }
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ClassicalSnapshot {
     instances: BTreeMap<Key, Vec<ClassicalValue>>,
     memory: Memory,
@@ -73,6 +76,7 @@ pub struct ClassicalSnapshot {
     fault: Option<u128>,
     finished: Option<Vec<ClassicalValue>>,
     pending: Option<HostRequest>,
+    quantum: QuantumRegisters,
 }
 #[derive(Clone, Debug)]
 struct Undo {
@@ -87,6 +91,17 @@ struct Undo {
     fault: Option<u128>,
     finished: Option<Vec<ClassicalValue>>,
     pending: Option<HostRequest>,
+    registers: Vec<RegisterUndo>,
+    region: Option<RegionRecord>,
+}
+#[derive(Clone, Debug)]
+struct RegionRecord {
+    name: String,
+    bindings: QuantumBindings,
+    budget: Option<Budget>,
+    adjoint: bool,
+    controls: Vec<u64>,
+    wire_next: u64,
 }
 #[derive(Clone, Debug)]
 enum DeviceUndo {
@@ -103,6 +118,7 @@ struct HistoryFrame {
     pure: bool,
     irreversible: bool,
     host: Option<HostExchange>,
+    measurement: Option<(u64, Vec<bool>)>,
 }
 #[derive(Clone, Debug)]
 struct Segment {
@@ -140,6 +156,8 @@ pub struct ClassicalMachine<'a> {
     segments: Vec<Segment>,
     entropy: Vec<u8>,
     initial: ClassicalSnapshot,
+    measurement_draws: VecDeque<f64>,
+    measurement_rng: [u64; 4],
 }
 
 impl<'a> ClassicalMachine<'a> {
@@ -148,6 +166,15 @@ impl<'a> ClassicalMachine<'a> {
         entry: &str,
         args: &[ClassicalValue],
         entropy: &[u8],
+    ) -> Result<Self> {
+        Self::construct(object, entry, args, entropy, QuantumRegisters::new())
+    }
+    fn construct(
+        object: &'a Object,
+        entry: &str,
+        args: &[ClassicalValue],
+        entropy: &[u8],
+        registers: QuantumRegisters,
     ) -> Result<Self> {
         let f = object
             .functions
@@ -161,6 +188,13 @@ impl<'a> ClassicalMachine<'a> {
                 .any(|(a, p)| !a.matches(&p.ty, object.ptr_width))
         {
             return err("§10", "classical entry argument type/count mismatch");
+        }
+        for (p, a) in f.params[0].iter().zip(args) {
+            if let (Type::Qreg(n), ClassicalValue::Qreg(id)) = (&p.ty, a) {
+                if registers.bundle(*id)?.len() as u64 != *n {
+                    return err("§10", "E_ARG: qreg argument width differs");
+                }
+            }
         }
         let instances = f.params[0]
             .iter()
@@ -195,6 +229,7 @@ impl<'a> ClassicalMachine<'a> {
             fault: None,
             finished: None,
             pending: None,
+            quantum: registers,
         };
         Ok(Self {
             object,
@@ -203,7 +238,49 @@ impl<'a> ClassicalMachine<'a> {
             segments: Vec::new(),
             entropy: entropy.into(),
             initial: state,
+            measurement_draws: VecDeque::new(),
+            measurement_rng: [1, 2, 3, 4],
         })
+    }
+    pub fn with_quantum_registers(
+        object: &'a Object,
+        entry: &str,
+        args: &[ClassicalValue],
+        entropy: &[u8],
+        registers: QuantumRegisters,
+    ) -> Result<Self> {
+        Self::construct(object, entry, args, entropy, registers)
+    }
+    pub fn quantum_registers(&self) -> &QuantumRegisters {
+        &self.state.quantum
+    }
+    pub fn push_measurement_draw(&mut self, draw: f64) -> Result<()> {
+        if !(0.0..1.0).contains(&draw) {
+            return err("§14.2", "measurement draw must be finite in [0,1)");
+        }
+        self.measurement_draws.push_back(draw);
+        Ok(())
+    }
+    pub fn measurements(&self) -> Vec<(u64, Vec<bool>)> {
+        self.history
+            .iter()
+            .filter_map(|h| h.measurement.clone())
+            .collect()
+    }
+    fn measurement_draw(&mut self) -> f64 {
+        if let Some(draw) = self.measurement_draws.pop_front() {
+            return draw;
+        }
+        let s = &mut self.measurement_rng;
+        let result = s[1].wrapping_mul(5).rotate_left(7).wrapping_mul(9);
+        let t = s[1] << 17;
+        s[2] ^= s[0];
+        s[3] ^= s[1];
+        s[1] ^= s[2];
+        s[0] ^= s[3];
+        s[2] ^= t;
+        s[3] = s[3].rotate_left(45);
+        ((result >> 11) as f64) * (1.0 / 9_007_199_254_740_992.0)
     }
     pub fn snapshot(&self) -> ClassicalSnapshot {
         self.state.clone()
@@ -328,6 +405,153 @@ impl<'a> ClassicalMachine<'a> {
     fn bits(&self, name: &str) -> Result<u128> {
         self.read(name)?.bits()
     }
+    fn qreg(&self, name: &str) -> Result<u64> {
+        match self.read(name)? {
+            ClassicalValue::Qreg(id) => {
+                self.state.quantum.bundle(id)?;
+                Ok(id)
+            }
+            _ => err("§3.3", "region operand is not a qreg"),
+        }
+    }
+    fn region_record(&self, instruction: &Instruction) -> Result<(RegionRecord, Vec<u64>)> {
+        let call = normalize_call(instruction)?;
+        let a = &call.instruction.operands;
+        let name = a[0].trim_start_matches('@');
+        let callee = self
+            .object
+            .functions
+            .get(name)
+            .ok_or_else(|| Error(format!("§9.3: unresolved region @{name}")))?;
+        let mut bindings = QuantumBindings::default();
+        let mut ids = Vec::new();
+        let mut controls = Vec::new();
+        if let Some(control) = call.control {
+            let id = self.qreg(&control)?;
+            let wires = self.state.quantum.bundle(id)?;
+            if wires.len() != 1 {
+                return err("§3.3", "ctl requires qreg[1]");
+            }
+            controls.push(wires[0]);
+            ids.push(id);
+        }
+        let oracle = call.instruction.op == "oracle_call";
+        let (groups, memory, args, budget) = if oracle {
+            let token = match self.read(&a[1])? {
+                ClassicalValue::Token(b) => b,
+                _ => return err("§3.3", "oracle_call needs a budget token"),
+            };
+            (
+                vec![
+                    (0, list(&a[2])?),
+                    (1, vec![a[3].clone()]),
+                    (2, vec![a[4].clone()]),
+                ],
+                (3, list(&a[5])?),
+                (4, list(&a[6])?),
+                Some(token),
+            )
+        } else {
+            (
+                vec![(0, list(&a[1])?), (1, list(&a[2])?)],
+                (2, list(&a[3])?),
+                (3, list(&a[4])?),
+                None,
+            )
+        };
+        for (group, names) in groups {
+            for (p, n) in callee.params[group].iter().zip(names) {
+                let id = self.qreg(&n)?;
+                let wires = self.state.quantum.bundle(id)?.to_vec();
+                bindings.bundles.insert(p.name.clone(), wires);
+                if !ids.contains(&id) {
+                    ids.push(id);
+                }
+            }
+        }
+        for (p, n) in callee.params[memory.0].iter().zip(memory.1) {
+            let id = self.qreg(&n)?;
+            let wires = self.state.quantum.bundle(id)?;
+            let Type::Region(a, w) = p.ty else {
+                unreachable!("validated region")
+            };
+            if wires.len() as u128 != (1u128 << a) * (w as u128) {
+                return err("§3.3", "qreg does not fill region dimensions");
+            }
+            bindings.regions.insert(
+                p.name.clone(),
+                QuantumRegion {
+                    address_width: a,
+                    cell_width: w,
+                    cells: wires.chunks_exact(w as usize).map(|c| c.to_vec()).collect(),
+                },
+            );
+            if !ids.contains(&id) {
+                ids.push(id);
+            }
+        }
+        for (p, n) in callee.params[args.0].iter().zip(args.1) {
+            let arg = match self.read(&n)? {
+                ClassicalValue::Int(_, v) | ClassicalValue::Ptr(v) => Argument::Bits(v),
+                ClassicalValue::F64(bits) => Argument::Float(f64::from_bits(bits)),
+                ClassicalValue::Token(b) => Argument::Token(b),
+                _ => return err("§3.3", "qreg is not a classical region argument"),
+            };
+            bindings.args.insert(p.name.clone(), arg);
+        }
+        Ok((
+            RegionRecord {
+                name: name.into(),
+                bindings,
+                budget,
+                adjoint: call.adjoint,
+                controls,
+                wire_next: self.state.quantum.state.next_wire_id(),
+            },
+            ids,
+        ))
+    }
+    fn execute_region(&mut self, record: &RegionRecord, inverse: bool) -> Result<()> {
+        let callee = &self.object.functions[&record.name];
+        let mut state = self.state.quantum.state.clone();
+        if let Some(budget) = record.budget {
+            let ins = callee.params[0]
+                .iter()
+                .map(|p| record.bindings.bundles[&p.name].clone())
+                .collect::<Vec<_>>();
+            let target = &record.bindings.bundles[&callee.params[1][0].name];
+            let fault = &record.bindings.bundles[&callee.params[2][0].name];
+            let args = callee.params[4]
+                .iter()
+                .map(|p| record.bindings.args[&p.name].clone())
+                .collect::<Vec<_>>();
+            self.object.oracle_quantum(
+                callee,
+                &mut state,
+                &ins,
+                target,
+                fault,
+                &record.bindings.regions,
+                &args,
+                budget,
+                &record
+                    .controls
+                    .iter()
+                    .map(|w| (*w, true))
+                    .collect::<Vec<_>>(),
+            )?;
+        } else {
+            self.object.execute_action(
+                &record.name,
+                &mut state,
+                &record.bindings,
+                record.adjoint ^ inverse,
+                &record.controls,
+            )?;
+        }
+        self.state.quantum.state = state;
+        Ok(())
+    }
     fn define(&mut self, name: &str, value: ClassicalValue, undo: &mut Undo) -> Result<()> {
         let id = self
             .state
@@ -354,6 +578,16 @@ impl<'a> ClassicalMachine<'a> {
         }
     }
     fn undo_record(&mut self, undo: Undo) -> Result<()> {
+        for record in undo.registers.into_iter().rev() {
+            self.state.quantum.undo(record)?;
+        }
+        if let Some(record) = undo.region {
+            self.execute_region(&record, true)?;
+            self.state
+                .quantum
+                .state
+                .restore_next_wire_id(record.wire_next)?;
+        }
         for key in undo.definitions.into_iter().rev() {
             let stack = self
                 .state
@@ -532,11 +766,14 @@ impl<'a> ClassicalMachine<'a> {
             fault: self.state.fault,
             finished: self.state.finished.clone(),
             pending: self.state.pending.clone(),
+            registers: Vec::new(),
+            region: None,
         };
         self.state.control.last_mut().expect("activation").ip += 1;
         let mut fault = None;
         let mut output = None;
         let mut marker = false;
+        let mut measurement = None;
         let pure = op.starts_with("const.")
             || is_binop(op)
             || is_div(op)
@@ -789,12 +1026,56 @@ impl<'a> ClassicalMachine<'a> {
                             });
                         }
                     }
-                    "qreg.new" | "qreg.free" | "qreg.slice" | "qreg.concat" | "measure"
-                    | "oracle_call" | "action_call" | "adj" | "ctl" => {
-                        return err(
-                            "§4.1",
-                            "Q integration in classical history is not implemented yet",
-                        )
+                    "qreg.new" => {
+                        let n = a[1]
+                            .parse::<usize>()
+                            .map_err(|_| Error("§3.3: qreg size exceeds host storage".into()))?;
+                        let (id, record) = self.state.quantum.allocate_recorded(n)?;
+                        undo.registers.push(record);
+                        output = Some(ClassicalValue::Qreg(id));
+                    }
+                    "qreg.free" => {
+                        let id = self.qreg(&a[0])?;
+                        undo.registers.push(self.state.quantum.free_recorded(id)?);
+                    }
+                    "qreg.slice" => {
+                        let id = self.qreg(&a[0])?;
+                        let lo = a[1]
+                            .parse::<usize>()
+                            .map_err(|_| Error("§3.3: slice offset exceeds host storage".into()))?;
+                        let len = a[2]
+                            .parse::<usize>()
+                            .map_err(|_| Error("§3.3: slice length exceeds host storage".into()))?;
+                        let (id, record) = self.state.quantum.slice_recorded(id, lo, len)?;
+                        undo.registers.push(record);
+                        output = Some(ClassicalValue::Qreg(id));
+                    }
+                    "qreg.concat" => {
+                        let a = self.qreg(&a[0])?;
+                        let b = self.qreg(&i.operands[1])?;
+                        let (id, record) = self.state.quantum.concat_recorded(a, b)?;
+                        undo.registers.push(record);
+                        output = Some(ClassicalValue::Qreg(id));
+                    }
+                    "measure" => {
+                        let id = self.qreg(&a[0])?;
+                        let draw = self.measurement_draw();
+                        let bits = self.state.quantum.measure(id, draw)?;
+                        let value = bits
+                            .iter()
+                            .enumerate()
+                            .fold(0, |v, (i, b)| v | ((*b as u128) << i));
+                        output = Some(ClassicalValue::Int(bits.len() as u16, value));
+                        measurement = Some((id, bits));
+                    }
+                    "oracle_call" | "action_call" | "adj" | "ctl" => {
+                        let (record, ids) = self.region_record(&i)?;
+                        let mut trial = self.state.quantum.clone();
+                        trial.complete_call(&ids)?;
+                        self.execute_region(&record, false)?;
+                        undo.registers
+                            .push(self.state.quantum.complete_call_recorded(&ids)?);
+                        undo.region = Some(record);
                     }
                     _ => return err("§4.8", format!("unimplemented classical opcode {op}")),
                 }
@@ -802,7 +1083,10 @@ impl<'a> ClassicalMachine<'a> {
             Ok(())
         })();
         if let Err(e) = execute {
-            if e.0.starts_with("§7.4: instance") {
+            if e.0.starts_with("§7.4: instance")
+                || e.0.starts_with("§3.3:")
+                || e.0.contains("E_QREG_NOT_CLEAN")
+            {
                 fault = Some(4);
             } else {
                 self.undo_record(undo)?;
@@ -819,7 +1103,8 @@ impl<'a> ClassicalMachine<'a> {
             reversed: false,
             marker,
             pure: pure && fault.is_none(),
-            irreversible: false,
+            irreversible: measurement.is_some(),
+            measurement,
             host: self.state.pending.clone().map(|request| HostExchange {
                 request,
                 reply: Vec::new(),

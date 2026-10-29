@@ -3,8 +3,8 @@
 Rust 2021, standard library only, ISA 0.8. The implementation is in progress;
 [PROGRESS.md](PROGRESS.md) records verified work and remaining obligations.
 It is not yet a complete conformance reference. In particular
-quantum-register history integration, linking, borrow proofs and comprehensive
-static validation are unfinished. The numerical simulator uses `f64`; it does
+certificate composition, borrow proofs and comprehensive static validation
+are unfinished. The numerical simulator uses `f64`; it does
 not implement the rigorous certificate checker of §12.
 
 Build and test offline from the repository root:
@@ -82,6 +82,14 @@ basis permutations, small state vectors, gates, clean release and enumerated
 Born measurement branches. `execute_action` executes structured Q bodies and
 their adjoints. State vectors are limited to 24 live wires; basis permutations
 can use larger wire stores. Numerical cleanliness uses tolerance 1e-12.
+
+`Object::link` resolves imported declarations and pinned closures, rejects
+conflicting definitions/layout/device/data entries, deduplicates definitions,
+and regenerates canonical linked identities. `QuantumRegisters` implements
+live/viewed/consumed handles and clean preparation. Pass it to
+`ClassicalMachine::with_quantum_registers` for qreg entry arguments. Measurement
+uses a reproducible xoshiro256** stream; `push_measurement_draw` supplies a
+specific uniform draw for differential tests. Measured traces cannot reverse.
 
 Canonical `.bisa` fixtures have adjacent `.comments` files with hand-derived
 expected outcomes; comments are not an extension to the §16 grammar.

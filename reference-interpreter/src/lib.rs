@@ -1,12 +1,15 @@
 //! Executable reference semantics for the Bennett ISA, version 0.8.
 mod action;
 mod classical;
+mod handle_validation;
 mod identity;
 pub mod json;
+mod linking;
 mod machine;
 mod object;
 mod oracle;
 mod quantum;
+mod registers;
 mod sha256;
 mod validation;
 pub use classical::{ClassicalMachine, ClassicalOutcome, ClassicalSnapshot, ClassicalValue};
@@ -16,6 +19,7 @@ pub use machine::{BasisConfiguration, OracleMachine};
 pub use object::*;
 pub use oracle::{Argument, Budget, OracleInput, OracleOutcome};
 pub use quantum::{Complex, MeasurementBranch, QuantumBindings, QuantumRegion, QuantumState};
+pub use registers::QuantumRegisters;
 pub use sha256::{sha256, sha256_hex};
 
 /// A diagnostic always names the normative rule that was violated.

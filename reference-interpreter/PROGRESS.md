@@ -6,6 +6,53 @@ repository-wide worklog rule, so this file also serves as this job's worklog.
 
 ## Session 2026-10-29
 
+### Continuation: imports and linking (current)
+
+Tracking: Beads issue b-isa-spec-zq2, already in_progress. Read beads skill and
+ran bd prime. Claim was rejected because the existing job issue is already in
+progress; updated its notes with the status guard instead of changing ownership.
+The new AGENTS instruction authorizes Beads tracking metadata; implementation
+edits remain confined to reference-interpreter/. No git or remote sync ran.
+
+Red: `cargo test --manifest-path reference-interpreter/Cargo.toml --offline
+--test linking` failed because Object::link did not exist. Implemented imported
+declaration schemas, import fingerprint validation, explicit unresolved-call
+execution errors, resolution by signature, pins, equal-definition dedup,
+data/layout/device conflicts and regenerated canonical linked symbol hashes.
+Green: four linking tests pass; full cargo test passes 41 normal tests with no
+warnings (two ignored sweeps unchanged). Hand count: call + const + add + ret +
+retval = 5; input 255 produces zero through 8-bit wrap, now tested after linking.
+
+Files: src/linking.rs; Function::from_signature and Object::declaration;
+tests/linking.rs plus tests/support/mod.rs. Remaining linking limitation:
+different schedule/certificate metadata is still treated as conflicting;
+certificate composition and stronger metadata validation are unfinished.
+Next active work remains deliverable 1: inherited-control and nested-uncall
+validation, then Q handle integration and remaining formal verification.
+
+### Continuation: CC quantum handles and region history
+
+Red: `cargo test --manifest-path reference-interpreter/Cargo.toml --offline
+--test registers` failed on missing QuantumRegisters and measurement APIs.
+Implemented live/viewed/consumed handles, slices and concat, clean preparation
+and free, quantum action/oracle history frames, Born branch selection, and
+measurement reversal/uncall exclusions. Handle reversal stores affected handle
+records and released-wire positions; region reversal applies the actual inverse
+operation once, not a saved quantum state. Trial execution only makes a failing
+region invocation atomic; trial states are not retained as inverse history.
+
+Red view-lifetime test initially accepted use of a viewed parent. Added CFG
+validation of view-only-one-region-call and parent restrictions. Green: all 5
+register tests pass. Full cargo test passes 46 normal tests; strict Clippy with
+--all-targets -- -D warnings passes. New registers.bisa fixture has expected
+results in registers.comments and validated identities.
+
+Hand checks: for inc8(7), existing target 31 becomes 31 XOR 8 = 23, existing
+fault 3 stays 3; at B=2 target stays 31 and fault becomes 3 XOR 1 = 2. Both calls
+reverse to their complete entry tuples. Bell draws below/above 1/2 select 00/11.
+Numerical Q state comparisons use 1e-12; reversible basis tests remain exact.
+Beads issue b-isa-spec-zq2 remains in_progress; no deliverable is claimed done.
+
 Read CLAUDE.md, HANDOFF.md, spec/README.md, the complete 1,675-line specification,
 the complete Python seed, the workspace handoff, and the budget design note.
 Rust 1.99.1 / Cargo 1.99.1 are available. No dependencies are permitted.

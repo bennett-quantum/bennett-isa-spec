@@ -119,6 +119,133 @@ pub struct Function {
     pub lines: Vec<String>,
 }
 impl Function {
+    /// An imported declaration has the same operand schema as a definition.
+    /// Its synthetic parameter names are local to validation, never executable.
+    pub(crate) fn from_signature(name: &str, signature: &Json) -> Result<Self> {
+        let kind = signature.get("kind")?.string()?;
+        let fields: &[&str] = match kind {
+            "oracle" => &["abi", "tier", "kind", "in", "tgt", "fault", "mem", "args"],
+            "action" | "perm_action" => {
+                &["abi", "tier", "kind", "mut", "in", "mem", "args", "bounds"]
+            }
+            "lproc" => &["abi", "tier", "kind", "params", "result"],
+            "cc" | "r" => &["abi", "tier", "kind", "params", "results"],
+            _ => return err("§9.1", "unknown function signature kind"),
+        };
+        signature.fields(fields, &[])?;
+        let mut f = Self {
+            kind: kind.into(),
+            name: name.into(),
+            params: Default::default(),
+            regs: Vec::new(),
+            bounds: Vec::new(),
+            blocks: Vec::new(),
+            lines: Vec::new(),
+        };
+        let widths = |key: &str, reg: bool, role: Option<&str>| -> Result<Vec<Param>> {
+            signature
+                .get(key)?
+                .array()?
+                .iter()
+                .enumerate()
+                .map(|(i, v)| {
+                    let w = v.uint()?;
+                    let ty = Type::parse(&format!("{}[{w}]", if reg { "reg" } else { "wire" }))?;
+                    Ok(Param {
+                        name: format!("{key}_{i}"),
+                        ty,
+                        role: role.map(str::to_string),
+                    })
+                })
+                .collect()
+        };
+        let scalar = |key: &str, reg: bool| -> Result<Vec<Param>> {
+            let w = signature.get(key)?.uint()?;
+            Ok(vec![Param {
+                name: key.into(),
+                ty: Type::parse(&format!("{}[{w}]", if reg { "reg" } else { "wire" }))?,
+                role: None,
+            }])
+        };
+        let types = |key: &str| -> Result<Vec<Param>> {
+            signature
+                .get(key)?
+                .array()?
+                .iter()
+                .enumerate()
+                .map(|(i, v)| {
+                    Ok(Param {
+                        name: format!("{key}_{i}"),
+                        ty: Type::parse(v.string()?)?,
+                        role: None,
+                    })
+                })
+                .collect()
+        };
+        let memory = || -> Result<Vec<Param>> {
+            signature
+                .get("mem")?
+                .array()?
+                .iter()
+                .enumerate()
+                .map(|(i, v)| {
+                    v.fields(&["A", "W", "role"], &[])?;
+                    let a = v.get("A")?.uint()?;
+                    let w = v.get("W")?.uint()?;
+                    let role = v.get("role")?.string()?;
+                    if !["in", "mut"].contains(&role) {
+                        return err("§5.1", "invalid interface region role");
+                    }
+                    Ok(Param {
+                        name: format!("mem_{i}"),
+                        ty: Type::parse(&format!("region[{a},{w}]"))?,
+                        role: Some(role.into()),
+                    })
+                })
+                .collect()
+        };
+        match kind {
+            "oracle" => {
+                f.params[0] = widths("in", false, Some("in"))?;
+                f.params[1] = scalar("tgt", false)?;
+                f.params[2] = scalar("fault", false)?;
+                f.params[3] = memory()?;
+                f.params[4] = types("args")?;
+            }
+            "action" | "perm_action" => {
+                f.params[0] = widths("mut", false, Some("mut"))?;
+                f.params[1] = widths("in", false, Some("in"))?;
+                f.params[2] = memory()?;
+                f.params[3] = types("args")?;
+                f.bounds = signature
+                    .get("bounds")?
+                    .array()?
+                    .iter()
+                    .map(|n| {
+                        u64::try_from(n.uint()?).map_err(|_| {
+                            Error("§5.3: loop bound exceeds implementation counter".into())
+                        })
+                    })
+                    .collect::<Result<_>>()?;
+            }
+            "lproc" => {
+                f.params[0] = widths("params", true, None)?;
+                f.params[1] = scalar("result", true)?;
+            }
+            _ => {
+                f.params[0] = types("params")?;
+                f.params[1] = types("results")?;
+            }
+        }
+        validate_header(&f)?;
+        if &f.signature() != signature {
+            return err(
+                "§9.1",
+                "invalid signature version, tier, or field representation",
+            );
+        }
+        Ok(f)
+    }
     pub fn locations(&self) -> Vec<&Param> {
         let mut out = Vec::new();
         if self.kind == "lproc" {
@@ -389,6 +516,17 @@ fn instruction(lines: &[(usize, &str)], pos: &mut usize) -> Result<Instruction> 
 }
 
 impl Object {
+    pub(crate) fn declaration(&self, name: &str) -> Result<Function> {
+        if let Some(f) = self.functions.get(name) {
+            return Ok(f.clone());
+        }
+        let import = self
+            .section("imports")
+            .and_then(|s| s.object().ok())
+            .and_then(|s| s.get(name))
+            .ok_or_else(|| Error(format!("§9.3: undefined symbol @{name}")))?;
+        Function::from_signature(name, import.get("signature")?)
+    }
     pub fn parse(text: &str) -> Result<Self> {
         if !text.ends_with('\n') || text.contains('\r') || text.contains('\t') {
             return err(
@@ -719,6 +857,18 @@ impl Object {
                     );
                 }
                 im.fields(&["signature"], &["pinned_closure_hash"])?;
+                let signature = im.get("signature")?;
+                if signature.get("kind")?.string()? == "data" {
+                    signature.fields(&["abi", "tier", "kind", "size"], &[])?;
+                    if signature.get("abi")?.string()? != "0.8"
+                        || signature.get("tier")?.string()? != "-"
+                    {
+                        return err("§9.1", "invalid imported data signature");
+                    }
+                    signature.get("size")?.uint()?;
+                } else {
+                    Function::from_signature(n, signature)?;
+                }
                 if let Some(p) = im.object()?.get("pinned_closure_hash") {
                     let h = p.string()?;
                     if h.len() != 64
@@ -788,10 +938,7 @@ impl Object {
                 if !seen.insert(name.clone()) {
                     continue;
                 }
-                let function = self
-                    .functions
-                    .get(&name)
-                    .ok_or_else(|| Error(format!("§3.7: unknown lproc @{name}")))?;
+                let function = self.declaration(&name)?;
                 count += function.instructions().count() as u128;
                 for call in function.instructions().filter(|i| i.op == "lift.call") {
                     let target = call
@@ -1010,10 +1157,11 @@ impl Object {
                 }
                 "lift.call" => {
                     arity(2, 1)?;
-                    let callee = args[0]
-                        .strip_prefix('@')
-                        .and_then(|n| self.functions.get(n))
-                        .ok_or_else(|| Error("§3.7: unknown lproc".into()))?;
+                    let callee = self.declaration(
+                        args[0]
+                            .strip_prefix('@')
+                            .ok_or_else(|| Error("§4.8: lift.call requires @symbol".into()))?,
+                    )?;
                     if callee.kind != "lproc" {
                         return err("§3.7", "lift.call requires lproc");
                     }

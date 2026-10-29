@@ -201,10 +201,12 @@ impl<'a> Program<'a> {
         let mut reachable = BTreeSet::new();
         let mut pending = vec![root.to_string()];
         while let Some(n) = pending.pop() {
-            for i in object.functions[&n]
-                .instructions()
-                .filter(|i| i.op == "lift.call")
-            {
+            let function = object.functions.get(&n).ok_or_else(|| {
+                Error(format!(
+                    "§9.3: oracle closure has unresolved lproc @{n}; link before execution"
+                ))
+            })?;
+            for i in function.instructions().filter(|i| i.op == "lift.call") {
                 let n = i.operands[0].trim_start_matches('@').to_string();
                 if reachable.insert(n.clone()) {
                     pending.push(n);

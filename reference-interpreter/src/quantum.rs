@@ -44,11 +44,31 @@ enum State {
     Basis { bits: Vec<bool>, phase: Complex },
     Vector(Vec<Complex>),
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct QuantumState {
     ids: Vec<Wire>,
     next: Wire,
     state: State,
+}
+impl PartialEq for QuantumState {
+    fn eq(&self, other: &Self) -> bool {
+        if self.ids != other.ids || self.next != other.next {
+            return false;
+        }
+        let close =
+            |a: Complex, b: Complex| (a.re - b.re).abs() <= 1e-12 && (a.im - b.im).abs() <= 1e-12;
+        match (&self.state, &other.state) {
+            (State::Basis { bits: a, phase: p }, State::Basis { bits: b, phase: q }) => {
+                a == b && close(*p, *q)
+            }
+            _ => match (self.amplitudes(), other.amplitudes()) {
+                (Ok(a), Ok(b)) => {
+                    a.len() == b.len() && a.into_iter().zip(b).all(|(a, b)| close(a, b))
+                }
+                _ => false,
+            },
+        }
+    }
 }
 impl Default for QuantumState {
     fn default() -> Self {
@@ -76,6 +96,73 @@ pub struct QuantumRegion {
 }
 
 impl QuantumState {
+    pub(crate) fn next_wire_id(&self) -> u64 {
+        self.next
+    }
+    pub(crate) fn restore_next_wire_id(&mut self, next: u64) -> Result<()> {
+        if self.ids.iter().any(|id| *id >= next) {
+            return err("§7.4", "cannot restore wire counter over live wires");
+        }
+        self.next = next;
+        Ok(())
+    }
+    pub(crate) fn restore_clean(&mut self, positions: &[(usize, Wire)]) -> Result<()> {
+        let n = self
+            .ids
+            .len()
+            .checked_add(positions.len())
+            .ok_or_else(|| Error("§7.4: wire count overflow".into()))?;
+        let mut removed = BTreeMap::new();
+        for (pos, wire) in positions {
+            if *pos >= n || removed.insert(*pos, *wire).is_some() || self.ids.contains(wire) {
+                return err("§7.4", "invalid released-wire history");
+            }
+        }
+        let mut ids = Vec::with_capacity(n);
+        let mut source = self.ids.iter();
+        for i in 0..n {
+            ids.push(if let Some(w) = removed.get(&i) {
+                *w
+            } else {
+                *source.next().expect("restored wire count")
+            });
+        }
+        match &mut self.state {
+            State::Basis { bits, .. } => {
+                let mut old = bits.iter();
+                let next = (0..n)
+                    .map(|i| {
+                        if removed.contains_key(&i) {
+                            false
+                        } else {
+                            *old.next().expect("basis width")
+                        }
+                    })
+                    .collect();
+                *bits = next;
+            }
+            State::Vector(vector) => {
+                if n > 24 {
+                    return err("§14.2", "restored state exceeds vector limit");
+                }
+                let mut next = vec![Complex::ZERO; 1usize << n];
+                for (i, a) in vector.iter().enumerate() {
+                    let mut bit = 0;
+                    let mut destination = 0;
+                    for pos in 0..n {
+                        if !removed.contains_key(&pos) {
+                            destination |= ((i >> bit) & 1) << pos;
+                            bit += 1;
+                        }
+                    }
+                    next[destination] = *a;
+                }
+                *vector = next;
+            }
+        }
+        self.ids = ids;
+        Ok(())
+    }
     pub fn new() -> Self {
         Self {
             ids: Vec::new(),
