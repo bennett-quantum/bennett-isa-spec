@@ -130,3 +130,36 @@ cleans it with H and releases it exactly.
 
 GREEN: full normal suite **226 passed, 0 failed, 5 ignored**. No new spec
 question: §§3.3, 4.4 and 14.2 specify this behavior directly. No seed changes.
+
+## SOL-R4-B02 — resolved
+
+RED: `r1_certificates::sol_r4_b02_translation_claim_must_prove_its_complete_named_frame`
+returned Proof for the exact two-gate truncated frame. The separately run
+nested-line positive failed with `unknown instruction ordinal` before the fix.
+
+`claims.rs::check_translation_witness` now resolves every V/W point AND both
+frame endpoints through the shared canonical §9.2 resolver in `metadata.rs`.
+`borrow.rs::check_translation_frame` uses an opt-in trace of the existing
+borrow compiler, retaining physical wires, live borrow identities, inherited
+controls, loop structure and complete instruction expansion. It requires the
+actual contiguous named frame to equal V;W;reverse(V);W, with the listed V/W
+points naming its leading instructions in order. It checks X/B side conditions
+on the compiled flips, requires B to name live borrowed wires and cover every
+borrowed touch, and rejects omitted adjacent touches in the permutation run.
+Lifetime changes/non-permutation operations bound that run. No source line,
+intervening operation, swap, phase or control can silently disappear. Tracing
+is disabled in ordinary borrow validation; no exhaustive limit is added.
+
+Pins exercise both `verify_claim` and `verify_certificate`, leaving
+`verification.borrow_frames` empty: truncated [1,2] rejects, full [1,4] proves;
+nonexistent/reversed endpoints, nonexistent or misplaced V/W, fake B and changed
+second W reject. `sol_r4_b02_translation_claim_uses_nested_line_ordinals`
+proves gates 2..5 inside a qloop and rejects its truncated frame.
+`sol_r4_b02_translation_frame_rejects_omissions_and_checks_reverse_order`
+proves a two-gate V in exact reverse order, rejects a skipped intervening gate,
+and rejects a four-gate slice omitting adjacent borrowed touches. The negative
+objects themselves remain valid full circuits, so the claim checker is tested
+independently of parse-time factorisation. README documents the complete check.
+
+GREEN: all 3 new structural regressions pass; whole normal suite is green.
+No SPEC-QUESTIONS entry: §§5.6, 9.2 and 12.1 specify the checks directly.

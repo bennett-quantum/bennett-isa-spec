@@ -41,8 +41,9 @@ fn certificate(text: &str, n: u64, claims: &str, borrow_frames: &str) -> String 
     let id = identity.closure_hashes["id"].clone().unwrap();
     let signature = o.functions["a"].signature().canonical();
     let claims = claims.replace("ID", &id);
+    let bounds = format!("{:?}", o.functions["a"].bounds);
     let cert = json(&format!(
-        r#"{{"versions":{{"isa":"0.8","object":"0.8","launch":"0.8","sched":"0.8","cert":"0.8","coverage":"0.8","target":"0.8"}},"bindings":{{"object_hash":"{}","interface_hash":"{}","closure_hash":"{a}","reference_program_hash":"{}","dialect_mapping_version":"test.1","target_hash":"{}"}},"producer":{{"name":"tests","version":"1","materialisation":{{"llvm_version":"none","pipeline":"none","normaliser_version":"1"}}}},"regions":{{"{a}":{{"kind":"perm_action","signature":{signature},"bounds":[],"frame":{{"interface":[{{"role":"mut","width":{n},"class":"any"}},{{"role":"in","width":1,"class":"any"}}],"scratch":{{}},"retained_history":0,"borrow":{{"any":1}},"scheme_ancillae":{{}}}},"resources":{{}},"gates_used":{{}},"claims":[{claims}],"verification":{{"oracle":null,"borrow_frames":[{borrow_frames}],"inverse_pairs":[],"unitary":[],"channel":[],"fault_rate":{{"domain":{{"bundles":[],"borrowed":[],"regions":[]}},"faults_by_code":{{}},"undefined_excluded":0,"layout_dependent_excluded":0}}}},"cleanup":{{}},"error":{{}},"definedness_assumptions":[]}}}},"composition":{{"multiplicities":{{}},"epsilon_total":{{"diamond":0}},"method":"sum_over_multiplicities"}}}}"#,
+        r#"{{"versions":{{"isa":"0.8","object":"0.8","launch":"0.8","sched":"0.8","cert":"0.8","coverage":"0.8","target":"0.8"}},"bindings":{{"object_hash":"{}","interface_hash":"{}","closure_hash":"{a}","reference_program_hash":"{}","dialect_mapping_version":"test.1","target_hash":"{}"}},"producer":{{"name":"tests","version":"1","materialisation":{{"llvm_version":"none","pipeline":"none","normaliser_version":"1"}}}},"regions":{{"{a}":{{"kind":"perm_action","signature":{signature},"bounds":{bounds},"frame":{{"interface":[{{"role":"mut","width":{n},"class":"any"}},{{"role":"in","width":1,"class":"any"}}],"scratch":{{}},"retained_history":0,"borrow":{{"any":1}},"scheme_ancillae":{{}}}},"resources":{{}},"gates_used":{{}},"claims":[{claims}],"verification":{{"oracle":null,"borrow_frames":[{borrow_frames}],"inverse_pairs":[],"unitary":[],"channel":[],"fault_rate":{{"domain":{{"bundles":[],"borrowed":[],"regions":[]}},"faults_by_code":{{}},"undefined_excluded":0,"layout_dependent_excluded":0}}}},"cleanup":{{}},"error":{{}},"definedness_assumptions":[]}}}},"composition":{{"multiplicities":{{}},"epsilon_total":{{"diamond":0}},"method":"sum_over_multiplicities"}}}}"#,
         identity.object_hash,
         identity.interface_hashes["a"],
         identity.interface_hashes["a"],
@@ -241,4 +242,125 @@ fn r2_interval_claim_diagnostics_name_deliverable_eleven() {
             other => panic!("staged interval checker cannot prove a claim: {other:?}"),
         }
     }
+}
+
+fn sol_translation_object(gates: &str, nested: bool) -> String {
+    let sig = r#"{"abi":"0.8","args":[],"bounds":[],"in":[1],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}"#;
+    let asig = if nested {
+        sig.replace("\"bounds\":[]", "\"bounds\":[2]")
+    } else {
+        sig.into()
+    };
+    let regs = if nested { "regs {  } bounds {2}\n" } else { "" };
+    let body = format!("perm_action @a (t:wire mut) (p:wire in) () () ()\n{regs}^entry():\nb = qborrow any 1\n{}\nqreturn b", if nested { format!("qloop 2 {{\n{gates}\n}}") } else { gates.into() });
+    support::rehash(&support::object(
+        &[
+            ("a", &asig, &body),
+            (
+                "id",
+                sig,
+                "perm_action @id (u:wire mut) (v:wire in) () () ()\n^entry():\nx u\nx u",
+            ),
+        ],
+        "{}",
+        "",
+    ))
+    .text
+}
+fn sol_translation_claim(text: &str, start: u32, end: u32, v: u32, w: u32, b: &str) -> String {
+    let o = Object::parse(text).unwrap();
+    let h = &o.identity().unwrap().interface_hashes["a"];
+    format!(
+        r#"{{"kind":"structural","rule":"translation_lemma","subclaims":[],"witness":{{"V":[["{h}","entry",{v}]],"W":[["{h}","entry",{w}]],"X":["p"],"B":["{b}"],"frame":[["{h}","entry",{start}],["{h}","entry",{end}]]}}}}"#
+    )
+}
+fn sol_assert_translation(text: &str, claim: &str, valid: bool) {
+    let o = Object::parse(&certificate(text, 1, claim, "")).unwrap();
+    let h = o.identity().unwrap().closure_hashes["a"].clone().unwrap();
+    for verdict in [
+        o.verify_claim(&h, 0),
+        o.verify_certificate().map(|r| r[0].verdict.clone()),
+    ] {
+        if valid {
+            assert_eq!(verdict.unwrap(), ClaimVerdict::Proof);
+        } else {
+            let e = verdict
+                .expect_err("false structural frame proved")
+                .to_string();
+            assert!(e.contains("§5.6") || e.contains("§12.1"), "{e}");
+        }
+    }
+}
+#[test]
+fn sol_r4_b02_translation_claim_must_prove_its_complete_named_frame() {
+    // Full frame: b ^= p; t ^= b; b ^= p; t ^= b => (t ^= p, b unchanged).
+    // Truncated frame: b ^= p; t ^= b => b dirty and t dependent on entry b.
+    let text = sol_translation_object("cx p b\ncx b t\ncx p b\ncx b t", false);
+    for (start, end, v, w, valid) in [
+        (1, 2, 1, 2, false),
+        (1, 4, 1, 2, true),
+        (99, 100, 1, 2, false),
+        (4, 1, 1, 2, false),
+        (1, 4, 99, 2, false),
+        (1, 4, 1, 3, false),
+    ] {
+        sol_assert_translation(
+            &text,
+            &sol_translation_claim(&text, start, end, v, w, "b"),
+            valid,
+        );
+    }
+    sol_assert_translation(&text, &sol_translation_claim(&text, 1, 4, 1, 2, "p"), false);
+    // The object itself is still valid, but its first four gates have a
+    // changed second W; later gates complete the actual independent circuit.
+    let changed = sol_translation_object("cx p b\ncx b t\ncx p b\nx t\ncx b t\nx t", false);
+    sol_assert_translation(
+        &changed,
+        &sol_translation_claim(&changed, 1, 4, 1, 2, "b"),
+        false,
+    );
+}
+#[test]
+fn sol_r4_b02_translation_claim_uses_nested_line_ordinals() {
+    // qborrow=0, qloop=1, nested gates=2..5, qreturn=6. Prove the
+    // complete body frame, uniformly for both loop iterations.
+    let text = sol_translation_object("cx p b\ncx b t\ncx p b\ncx b t", true);
+    sol_assert_translation(&text, &sol_translation_claim(&text, 2, 5, 2, 3, "b"), true);
+    sol_assert_translation(&text, &sol_translation_claim(&text, 2, 3, 2, 3, "b"), false);
+}
+
+#[test]
+fn sol_r4_b02_translation_frame_rejects_omissions_and_checks_reverse_order() {
+    let gates = "x b\ncx p b\ncx b t\ncx p b\nx b\ncx b t";
+    let text = sol_translation_object(gates, false);
+    let mut claim = json(&sol_translation_claim(&text, 1, 6, 1, 3, "b"));
+    let h = Object::parse(&text)
+        .unwrap()
+        .identity()
+        .unwrap()
+        .interface_hashes["a"]
+        .clone();
+    let Json::Object(c) = &mut claim else {
+        panic!()
+    };
+    let Json::Object(w) = c.get_mut("witness").unwrap() else {
+        panic!()
+    };
+    w.insert(
+        "V".into(),
+        json(&format!(r#"[["{h}","entry",1],["{h}","entry",2]]"#)),
+    );
+    sol_assert_translation(&text, &claim.canonical(), true);
+    // Skip x b between the named V and W; the remaining four gates happen
+    // to form a valid independent circuit, but the named frame contains six.
+    sol_assert_translation(&text, &sol_translation_claim(&text, 1, 6, 2, 3, "b"), false);
+    let twice = sol_translation_object(
+        "cx p b\ncx b t\ncx p b\ncx b t\ncx p b\ncx b t\ncx p b\ncx b t",
+        false,
+    );
+    sol_assert_translation(
+        &twice,
+        &sol_translation_claim(&twice, 1, 4, 1, 2, "b"),
+        false,
+    );
 }

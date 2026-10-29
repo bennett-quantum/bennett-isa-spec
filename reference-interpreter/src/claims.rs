@@ -560,27 +560,23 @@ impl Object {
         Ok(verdict)
     }
     fn check_translation_witness(&self, f: &Function, w: &Json) -> Result<()> {
-        let identity = self.identity()?;
-        let hash = &identity.interface_hashes[&f.name];
-        let points = |key: &str| -> Result<Vec<crate::Instruction>> {
+        let hash = &self.identity()?.interface_hashes[&f.name];
+        let points = |key: &str| -> Result<Vec<&crate::Instruction>> {
             w.get(key)?
                 .array()?
                 .iter()
                 .map(|p| {
                     let p = p.array()?;
-                    if p[0].string()? != hash {
-                        return err("§12", "translation-lemma point outside the region");
+                    if p.len() != 3 || p[0].string()? != hash {
+                        return err("§5.6/§12.1", "translation-lemma point outside the region");
                     }
-                    let block = f
-                        .blocks
-                        .iter()
-                        .find(|b| b.name == p[1].string().unwrap_or(""))
-                        .ok_or_else(|| Error("§12: unknown block".into()))?;
-                    block
-                        .instructions
-                        .get(p[2].uint()? as usize)
-                        .cloned()
-                        .ok_or_else(|| Error("§12: unknown instruction ordinal".into()))
+                    let point = self
+                        .point(hash, p[1].string()?, p[2].uint()?)
+                        .map_err(|e| Error(format!("§5.6/§12.1: {e}")))?;
+                    if !std::ptr::eq(point.function, f) {
+                        return err("§5.6/§12.1", "point outside subject");
+                    }
+                    Ok(point.instruction)
                 })
                 .collect()
         };
@@ -591,7 +587,18 @@ impl Object {
                 .map(|s| Ok(s.string()?.to_string()))
                 .collect()
         };
-        crate::validate_translation_lemma(&points("V")?, &points("W")?, &names("X")?, &names("B")?)
+        let frame = points("frame")?;
+        if frame.len() != 2 {
+            return err("§5.6/§12.1", "frame needs two endpoints");
+        }
+        self.check_translation_frame(
+            f,
+            [frame[0], frame[1]],
+            &points("V")?,
+            &points("W")?,
+            &names("X")?,
+            &names("B")?,
+        )
     }
     /// Checks every claim of the certificate: false claims are errors, and
     /// the report lists each claim's verdict.

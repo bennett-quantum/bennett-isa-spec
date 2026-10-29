@@ -69,13 +69,18 @@ fn selector(value: &Json, positive: bool) -> Result<()> {
 fn contextual<T>(rule: &str, f: impl FnOnce() -> Result<T>) -> Result<T> {
     f().map_err(|e| Error(format!("{rule}: {e}")))
 }
-struct Point<'a> {
-    function: &'a Function,
-    instruction: &'a Instruction,
+pub(crate) struct Point<'a> {
+    pub(crate) function: &'a Function,
+    pub(crate) instruction: &'a Instruction,
     loops: Vec<u64>,
 }
 impl Object {
-    fn point<'a>(&'a self, symbol: &str, block: &str, ordinal: u128) -> Result<Point<'a>> {
+    pub(crate) fn point<'a>(
+        &'a self,
+        symbol: &str,
+        block: &str,
+        ordinal: u128,
+    ) -> Result<Point<'a>> {
         hash(&Json::String(symbol.into()))?;
         let candidates = self
             .symbols()?

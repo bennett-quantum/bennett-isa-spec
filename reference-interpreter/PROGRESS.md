@@ -18,6 +18,14 @@ Normal suite: **226 passed, 0 failed, 5 ignored**; initial strict Clippy clean.
 Details and named pins: council/response-round-4.md. No new ambiguity or cap.
 The response remains appendable for SOL-R4-B02/B03 and the pending muse seat.
 
+SOL-R4-B02 resolved after RED on the exact truncated frame and the nested-line
+positive. Canonical point resolution and an opt-in borrow compilation trace
+check the complete named V;W;reverse(V);W circuit, actual borrowed identities,
+inherited controls, syntactic side conditions and omitted adjacent touches.
+Three new tests exercise verify_claim and verify_certificate independently of
+borrow_frames admission, including full/nested positives and endpoint, changed-W,
+fake-B and omitted-gate negatives. The full suite remains green; no spec question.
+
 ## Council round 4, codex first pass (2026-10-29)
 
 R4-B01 resolved after RED on the exact loop-local borrow witness. Borrow/Return

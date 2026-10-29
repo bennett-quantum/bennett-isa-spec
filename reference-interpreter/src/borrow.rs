@@ -101,7 +101,7 @@ impl Poly {
 }
 
 /// A compiled operation on named wires.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum Node {
     /// Target ^= AND of controls (with polarity).
     Flip(Vec<(String, bool)>, String),
@@ -186,7 +186,15 @@ impl Node {
     }
 }
 
+#[derive(Clone)]
+struct Trace {
+    bundles: BTreeMap<String, Vec<String>>,
+    borrowed: BTreeSet<String>,
+    nodes: Vec<Node>,
+}
 struct Compiler<'a> {
+    trace: Option<BTreeMap<usize, Vec<Trace>>>,
+    live_borrowed: BTreeSet<String>,
     object: &'a Object,
     bundles: BTreeMap<String, Vec<String>>,
     regions: BTreeMap<String, (u64, Vec<Vec<String>>)>,
@@ -304,6 +312,12 @@ impl Compiler<'_> {
     ) -> Result<()> {
         let mut predicate = context.to_vec();
         for i in seq {
+            let start = out.len();
+            let snapshot = self.trace.as_ref().map(|_| Trace {
+                bundles: self.bundles.clone(),
+                borrowed: self.live_borrowed.clone(),
+                nodes: Vec::new(),
+            });
             let a = &i.operands;
             let op = i.op.as_str();
             let with = |extra: &[(String, bool)], base: &[(String, bool)]| {
@@ -321,13 +335,20 @@ impl Compiler<'_> {
                     let wires = self.produce(&i.lhs[0], n);
                     if op == "qborrow" {
                         self.borrowed.extend(wires.iter().cloned());
+                        self.live_borrowed.extend(wires.iter().cloned());
                         out.push(Node::Borrow(wires));
                     } else {
                         out.push(Node::Alloc(wires.clone()));
                     }
                 }
                 "qfree" => out.push(Node::Free(self.bundle(&a[0])?)),
-                "qreturn" => out.push(Node::Return(self.bundle(&a[0])?)),
+                "qreturn" => {
+                    let wires = self.bundle(&a[0])?;
+                    for w in &wires {
+                        self.live_borrowed.remove(w);
+                    }
+                    out.push(Node::Return(wires));
+                }
                 "qpred" => predicate.push((self.scalar(&a[0])?, true)),
                 "qunpred" => {
                     predicate
@@ -470,6 +491,8 @@ impl Compiler<'_> {
                         // Inline the exact permutation (the call graph is acyclic).
                         let f = &self.object.functions[&callee.name];
                         let mut child = Compiler {
+                            trace: None,
+                            live_borrowed: BTreeSet::new(),
                             object: self.object,
                             bundles: BTreeMap::new(),
                             regions: BTreeMap::new(),
@@ -552,6 +575,10 @@ impl Compiler<'_> {
                         format!("unknown action opcode {op} in borrow analysis"),
                     )
                 }
+            }
+            if let (Some(mut snapshot), Some(trace)) = (snapshot, &mut self.trace) {
+                snapshot.nodes = out[start..].to_vec();
+                trace.entry(i.line).or_default().push(snapshot);
             }
         }
         Ok(())
@@ -897,15 +924,10 @@ fn factorises(frame: &[Node], borrowed: &BTreeSet<String>) -> Result<()> {
     Ok(())
 }
 impl Object {
-    pub(crate) fn validate_borrow_frames(&self, f: &Function) -> Result<()> {
-        fn has_borrow(seq: &[Instruction]) -> bool {
-            seq.iter()
-                .any(|i| i.op == "qborrow" || i.bodies.iter().any(|b| has_borrow(b)))
-        }
-        if !f.blocks.iter().any(|b| has_borrow(&b.instructions)) {
-            return Ok(());
-        }
+    fn borrow_compiler<'a>(&'a self, f: &Function) -> Result<Compiler<'a>> {
         let mut compiler = Compiler {
+            trace: None,
+            live_borrowed: BTreeSet::new(),
             object: self,
             bundles: BTreeMap::new(),
             regions: BTreeMap::new(),
@@ -936,6 +958,199 @@ impl Object {
                 _ => {}
             }
         }
+        Ok(compiler)
+    }
+    /// Check a named source frame against the complete compiled circuit,
+    /// including inherited predicates, loop structure and physical wire names.
+    pub(crate) fn check_translation_frame(
+        &self,
+        f: &Function,
+        endpoints: [&Instruction; 2],
+        v: &[&Instruction],
+        w: &[&Instruction],
+        x: &BTreeSet<String>,
+        b: &BTreeSet<String>,
+    ) -> Result<()> {
+        fn locate<'a>(
+            seq: &[&'a Instruction],
+            first: &Instruction,
+            last: &Instruction,
+        ) -> Option<(Vec<&'a Instruction>, usize, usize)> {
+            if let (Some(a), Some(b)) = (
+                seq.iter().position(|i| std::ptr::eq(*i, first)),
+                seq.iter().position(|i| std::ptr::eq(*i, last)),
+            ) {
+                return Some((seq.to_vec(), a, b));
+            }
+            seq.iter()
+                .flat_map(|i| &i.bodies)
+                .find_map(|body| locate(&body.iter().collect::<Vec<_>>(), first, last))
+        }
+        let root: Vec<_> = f.blocks.iter().flat_map(|b| &b.instructions).collect();
+        let (seq, start, end) = locate(&root, endpoints[0], endpoints[1]).ok_or_else(|| {
+            Error("§5.6/§12.1: frame endpoints do not delimit one contiguous source circuit".into())
+        })?;
+        if start > end {
+            return err("§5.6/§12.1", "reversed frame endpoints");
+        }
+        let leading: Vec<_> = v.iter().chain(w).copied().collect();
+        if leading.len() > end - start + 1
+            || leading
+                .iter()
+                .zip(&seq[start..])
+                .any(|(a, b)| !std::ptr::eq(*a, *b))
+        {
+            return err(
+                "§5.6/§12.1",
+                "V and W must name every leading instruction of the frame in order",
+            );
+        }
+        let mut compiler = self.borrow_compiler(f)?;
+        compiler.trace = Some(BTreeMap::new());
+        compiler.compile_function(f, &[], &mut Vec::new())?;
+        let trace = compiler
+            .trace
+            .ok_or_else(|| Error("§5.6: missing structural trace".into()))?;
+        let entries = trace
+            .get(&endpoints[0].line)
+            .ok_or_else(|| Error("§5.6: frame has no compiled context".into()))?;
+        for (context, entry) in entries.iter().enumerate() {
+            let resolve = |names: &BTreeSet<String>| -> Result<BTreeSet<String>> {
+                let mut out = BTreeSet::new();
+                for name in names {
+                    let (base, index) = match name.split_once('[') {
+                        Some((base, index)) => (
+                            base,
+                            Some(crate::object::host_count(
+                                index.trim_end_matches(']'),
+                                "wire index",
+                            )? as usize),
+                        ),
+                        None => (name.as_str(), None),
+                    };
+                    let wires = entry
+                        .bundles
+                        .get(base)
+                        .ok_or_else(|| Error(format!("§5.6: unknown witness wire {name}")))?;
+                    if let Some(i) = index {
+                        out.insert(
+                            wires
+                                .get(i)
+                                .ok_or_else(|| {
+                                    Error("§5.6: witness wire index out of range".into())
+                                })?
+                                .clone(),
+                        );
+                    } else {
+                        out.extend(wires.iter().cloned());
+                    }
+                }
+                Ok(out)
+            };
+            let (x, b) = (resolve(x)?, resolve(b)?);
+            if !b.is_subset(&entry.borrowed) || b.is_empty() {
+                return err("§5.6/§12.1", "B must identify actual live borrowed wires");
+            }
+            let get = |i: &Instruction| -> Result<&[Node]> {
+                trace
+                    .get(&i.line)
+                    .and_then(|t| t.get(context))
+                    .map(|t| t.nodes.as_slice())
+                    .ok_or_else(|| {
+                        Error("§5.6: inconsistent structural invocation contexts".into())
+                    })
+            };
+            let collect = |points: &[&Instruction]| -> Result<Vec<Node>> {
+                let mut nodes = Vec::new();
+                for i in points {
+                    nodes.extend_from_slice(get(i)?);
+                }
+                Ok(nodes)
+            };
+            let vn = collect(v)?;
+            let wn = collect(w)?;
+            let frame_points = &seq[start..=end];
+            let frame = collect(frame_points)?;
+            let expected: Vec<_> = vn
+                .iter()
+                .cloned()
+                .chain(wn.iter().cloned())
+                .chain(vn.iter().rev().map(Node::adjoint))
+                .chain(wn.iter().cloned())
+                .collect();
+            if frame != expected {
+                return err("§5.6/§12.1", "named frame is not V; W; exact reverse V; W");
+            }
+            fn flips(nodes: &[Node], out: &mut Vec<Instruction>) -> Result<()> {
+                for node in nodes {
+                    match node {
+                        Node::Flip(c, t) => out.push(instruction(
+                            &c.iter().map(|(w, _)| w.clone()).collect::<Vec<_>>(),
+                            t,
+                        )),
+                        Node::Repeat(_, body) => flips(body, out)?,
+                        _ => {
+                            return err(
+                                "§5.6/§12.1",
+                                "translation frame contains a non-X-family operation",
+                            )
+                        }
+                    }
+                }
+                Ok(())
+            }
+            let (mut vf, mut wf) = (Vec::new(), Vec::new());
+            flips(&vn, &mut vf)?;
+            flips(&wn, &mut wf)?;
+            validate_translation_lemma(&vf, &wf, &x, &b)?;
+            let mut touched = BTreeSet::new();
+            for node in &frame {
+                node.wires(&mut touched);
+            }
+            if !touched.intersection(&entry.borrowed).all(|w| b.contains(w)) {
+                return err(
+                    "§5.6/§12.1",
+                    "witness omits borrowed wires touched by the frame",
+                );
+            }
+            // First/last borrowed touches delimit the maximal permutation run;
+            // lifetime changes and non-permutation operations are boundaries.
+            let boundary = |nodes: &[Node]| {
+                nodes
+                    .iter()
+                    .any(|n| !n.permutation() || matches!(n, Node::Borrow(_) | Node::Return(_)))
+            };
+            if !frame.first().is_some_and(|n| touches(n, &b))
+                || !frame.last().is_some_and(|n| touches(n, &b))
+            {
+                return err("§5.6/§12.1", "frame endpoints must touch B");
+            }
+            for adjacent in [
+                seq[..start].iter().rev().collect::<Vec<_>>(),
+                seq[end + 1..].iter().collect(),
+            ] {
+                for i in adjacent {
+                    let nodes = get(i)?;
+                    if boundary(nodes) {
+                        break;
+                    }
+                    if nodes.iter().any(|n| touches(n, &b)) {
+                        return err("§5.6/§12.1", "named frame omits an adjacent borrowed touch");
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+    pub(crate) fn validate_borrow_frames(&self, f: &Function) -> Result<()> {
+        fn has_borrow(seq: &[Instruction]) -> bool {
+            seq.iter()
+                .any(|i| i.op == "qborrow" || i.bodies.iter().any(|b| has_borrow(b)))
+        }
+        if !f.blocks.iter().any(|b| has_borrow(&b.instructions)) {
+            return Ok(());
+        }
+        let mut compiler = self.borrow_compiler(f)?;
         let mut nodes = Vec::new();
         compiler.compile_function(f, &[], &mut nodes)?;
         let borrowed = compiler.borrowed;

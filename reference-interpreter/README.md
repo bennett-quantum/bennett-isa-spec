@@ -287,7 +287,9 @@ reference-interpreter/target/debug/bennett-isa-ref run-program reference-interpr
   `Object::borrow_capacity` sizes an action's §5.6 borrow pool.
 - `Object::verify_certificate` and `verify_claim` re-execute exhaustive and
   sampled claims (`ClaimVerdict::Proof` only for exhaustive claims over D),
-  check translation-lemma and library structural claims, and report interval
+  check the complete named translation frame (canonical nested-line points,
+  actual borrowed wires, exact reverse V, repeated W and side conditions) and
+  library structural claims, and report interval
   claims and `expected: "oracle"` as `Unverified` with the reason.
 - `Xoshiro256` is the §12.1 sampler.
 
