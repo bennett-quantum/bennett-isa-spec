@@ -4,6 +4,24 @@ Inputs: `out-sol.json` (8 blockers), `out-codex.json` (7 blockers), reviewed
 snapshot dc46d07. Member prefixes disambiguate IDs. This response is appendable
 for the pending muse second pass. No specification or Python seed edits.
 
+## Per-blocker status
+
+| Member ID(s) | Status |
+|---|---|
+| SOL-R2-B01 | resolved |
+| SOL-R2-B02; codex R2-B01 | resolved |
+| SOL-R2-B03 | resolved |
+| SOL-R2-B04 | resolved |
+| SOL-R2-B05; codex R2-B07 | resolved |
+| SOL-R2-B06; codex R2-B04 | resolved |
+| SOL-R2-B07; codex R2-B05 | resolved |
+| SOL-R2-B08; codex R2-B06 | resolved |
+| codex R2-B02 | resolved |
+| codex R2-B03 | resolved |
+
+All 15 blocker IDs are resolved. No decline or partial resolution in this
+round. Pending muse feedback is a subsequent pass, not an omitted input.
+
 ## SOL-R2-B05 — resolved
 
 Coincides with codex R2-B07 below. `src/validation.rs::validate_action_sequence`
@@ -200,3 +218,14 @@ were also audited separately and all failed their rejection assertions. The
 unchanged integer/ptr comparison positive passed on dc46d07. This archive is
 verification-only, not a checkout or deliverable; no source outside the owned
 crate was changed.
+
+A subsequent full sweep was SIGKILLed by the OS. A deterministic small
+regression reproduced geometric identity-text growth: 24 alternating
+exchange/write events expanded to **715,850,424 bytes** of version keys.
+`Discipline::value_ids` now interns collision-free snapshot references;
+`update_log` and `record_change` register each complete key, while `snapshot`
+references that key without recursively serializing its history. Every complete
+identity and inverse comparison is retained; no threshold or rejection was
+added. `validation::tests::exchange_entry_histories_have_compact_references`
+was red on the expanded representation and now passes immediately. The full
+normal and ignored suites are rerun after this change.

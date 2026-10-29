@@ -8,7 +8,7 @@ never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
 ## Council round 2: sol/codex implementation (2026-10-29)
 
-The 15 blockers from the dc46d07 round-2 snapshot are implemented in nine
+The 15 blockers from the dc46d07 round-2 snapshot are implemented in ten
 coincident groups; `council/response-round-2.md` has one entry per member ID
 and is appendable for muse's pending second pass. No declines or partial
 round-2 blocker resolutions. Deliverables 8–11 remain staged below; this
@@ -21,7 +21,8 @@ qinplace explicit inverse recognition; complete classical environments in
 borrow proofs; joint exchange dependency/provenance and entry-version
 identities; full effective-control polarity in memory/phase/change identities;
 bounded-factor phase rendering for finite rotations with unbounded combined
-angles. SPEC-QUESTIONS 28 resolves cross-arm unconditional lifetimes by taking
+angles; collision-free interned references to full version keys (preventing
+geometric identity-text growth found by the extended sweep). SPEC-QUESTIONS 28 resolves cross-arm unconditional lifetimes by taking
 the adjoint of the full qif expansion (else before then); entry 21 and interval
 claim diagnostics now consistently name deliverable 11.
 

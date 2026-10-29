@@ -1340,6 +1340,9 @@ struct Discipline {
     predicate_floor: usize,
     created: BTreeMap<String, Creation>,
     versions: BTreeMap<String, Vec<String>>,
+    /// Collision-free identities for version references inside snapshots.
+    /// Keep keys once; do not recursively duplicate their computing histories.
+    value_ids: BTreeMap<String, String>,
     /// Window-closing events per wire (non-diagonal gates, non-permutation
     /// calls): a window opens at its computation (§6.2), so cleanups compare
     /// counts snapshotted at the computation rather than a permanent set.
@@ -1370,6 +1373,7 @@ impl Discipline {
             predicate_floor: 0,
             created: BTreeMap::new(),
             versions: BTreeMap::new(),
+            value_ids: BTreeMap::new(),
             closed: BTreeMap::new(),
             phases: Vec::new(),
             reads: BTreeMap::new(),
@@ -1421,7 +1425,13 @@ impl Discipline {
         wires
             .iter()
             .map(|w| {
-                let mut log = self.versions.get(w).cloned().unwrap_or_default();
+                let mut log: Vec<String> = self
+                    .versions
+                    .get(w)
+                    .into_iter()
+                    .flatten()
+                    .map(|v| self.value_ids[v].clone())
+                    .collect();
                 if let Some(epoch) = self.cell_epochs.get(w) {
                     log.push(format!("cell_version:{epoch}"));
                 }
@@ -1647,6 +1657,10 @@ impl Discipline {
         Ok(())
     }
     fn update_log(&mut self, wire: &str, version: &str, blocked: bool) {
+        let next = self.value_ids.len();
+        self.value_ids
+            .entry(version.into())
+            .or_insert_with(|| format!("v{next}"));
         self.modified.insert(wire.into());
         let log = self.versions.entry(wire.into()).or_default();
         if !blocked
@@ -1666,6 +1680,10 @@ impl Discipline {
         Ok(self.wires(n)?.iter().any(|w| self.wire_is_other(w)))
     }
     fn record_change(&mut self, n: &str, version: String) -> Result<()> {
+        let next = self.value_ids.len();
+        self.value_ids
+            .entry(version.clone())
+            .or_insert_with(|| format!("v{next}"));
         for wire in self.wires(n)? {
             let log = self.versions.entry(wire).or_default();
             if log
@@ -1804,4 +1822,37 @@ pub(crate) fn region_declarations(f: &Function) -> Vec<&Instruction> {
         gather(&block.instructions, &mut out);
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn exchange_entry_histories_have_compact_references() {
+        let f = Function {
+            kind: "action".into(),
+            name: "a".into(),
+            params: std::array::from_fn(|_| vec![]),
+            regs: vec![],
+            bounds: vec![],
+            blocks: vec![],
+            lines: vec![],
+        };
+        let mut s = Discipline::new(
+            &f,
+            BTreeMap::from([("a".into(), Type::Wire(1)), ("b".into(), Type::Wire(1))]),
+        );
+        let wires = ["a[0]".to_string(), "b[0]".to_string()];
+        for _ in 0..12 {
+            s.exchange(&wires, "qexch:a b".into(), &[]).unwrap();
+            s.change("a", "x:a".into(), false).unwrap();
+        }
+        // Alternating exchanges and writes have only 24 computing events;
+        // a snapshot must reference them, not recursively duplicate their text.
+        let size: usize = s.versions.values().flatten().map(String::len).sum();
+        assert!(
+            size < 16_384,
+            "24 events expanded to {size} bytes of version keys"
+        );
+    }
 }
