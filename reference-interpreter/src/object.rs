@@ -1687,9 +1687,20 @@ fn validate_header(f: &Function) -> Result<()> {
             {
                 return err("§5.1", "oracle inputs and regions require in role");
             }
+            if f.params[1]
+                .iter()
+                .chain(&f.params[2])
+                .chain(&f.params[4])
+                .any(|p| p.role.is_some())
+            {
+                return err("§16.2", "oracle target, fault and arguments carry no role");
+            }
         }
         "lproc" => {
             empty(&[2, 3, 4])?;
+            if f.params.iter().flatten().any(|p| p.role.is_some()) {
+                return err("§16.2", "lproc parameters carry no role");
+            }
             if f.params[1].len() != 1 {
                 return err("§3.7", "lproc needs one result location");
             }
@@ -1699,6 +1710,22 @@ fn validate_header(f: &Function) -> Result<()> {
         "action" | "perm_action" => {
             all(&f.params[3], classical)?;
             empty(&[4])?;
+            // §16.2 fhead: action groups are (mut..) (in..) (mem..) (args..) ();
+            // a written role must agree with its group (muse suggestion).
+            for (group, role) in [(0, "mut"), (1, "in")] {
+                if f.params[group]
+                    .iter()
+                    .any(|p| p.role.as_deref() != Some(role))
+                {
+                    return err(
+                        "§16.2",
+                        format!("action parameter group {group} holds {role} wires and says so"),
+                    );
+                }
+            }
+            if f.params[3].iter().any(|p| p.role.is_some()) {
+                return err("§16.2", "classical arguments carry no role");
+            }
             for j in 0..2 {
                 all(&f.params[j], |t| matches!(t, Type::Wire(_)))?;
             }
@@ -1712,6 +1739,9 @@ fn validate_header(f: &Function) -> Result<()> {
         }
         _ => {
             empty(&[2, 3, 4])?;
+            if f.params.iter().flatten().any(|p| p.role.is_some()) {
+                return err("§16.2", "CC/R parameters carry no role");
+            }
             for group in 0..2 {
                 all(&f.params[group], |t| {
                     matches!(
@@ -1727,6 +1757,14 @@ fn validate_header(f: &Function) -> Result<()> {
                 );
             }
         }
+    }
+    if f.regs.iter().any(|p| p.role.is_some())
+        || f.blocks
+            .iter()
+            .flat_map(|b| &b.params)
+            .any(|p| p.role.is_some())
+    {
+        return err("§16.2", "locations and block parameters carry no role");
     }
     if matches!(f.kind.as_str(), "oracle" | "lproc") {
         all(&f.regs, |t| matches!(t, Type::Reg(_)))?;

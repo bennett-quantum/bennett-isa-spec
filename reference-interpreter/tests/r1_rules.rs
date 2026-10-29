@@ -293,3 +293,32 @@ fn muse_b4_qstore_value_is_a_qxor_source_and_may_be_in() {
         "§5.1",
     );
 }
+
+#[test]
+fn parameter_roles_agree_with_their_header_group() {
+    // muse suggestion: (mut..) (in..) for actions, §16.2 fhead comment.
+    let sig = r#"{"abi":"0.8","args":[],"bounds":[],"in":[2],"kind":"action","mem":[],"mut":[2],"tier":"q"}"#;
+    rejects(
+        &object(
+            &[(
+                "a",
+                sig,
+                "action @a (t:wire[2] in) (p:wire[2] mut) () () ()\n^entry():\nx t[0]",
+            )],
+            "{}",
+            "",
+        ),
+        "§16.2",
+    );
+    rejects(
+        &include_str!("fixtures/inc8.bisa").replace("(t:wire[8])", "(t:wire[8] mut)"),
+        "§16.2",
+    );
+    rejects(
+        &include_str!("fixtures/inc8.bisa").replace(
+            "regs { one:reg[8], r:reg[8] }",
+            "regs { one:reg[8] in, r:reg[8] }",
+        ),
+        "§16.2",
+    );
+}
