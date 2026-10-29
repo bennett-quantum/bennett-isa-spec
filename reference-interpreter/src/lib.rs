@@ -22,7 +22,7 @@ mod sha256;
 mod validation;
 pub use bits::BitVector;
 pub use borrow::validate_translation_lemma;
-pub use claims::{ClaimReport, ClaimVerdict};
+pub use claims::{ClaimReport, ClaimVerdict, Xoshiro256};
 pub use classical::{ClassicalMachine, ClassicalOutcome, ClassicalSnapshot, ClassicalValue};
 pub use classical::{HostExchange, HostRequest};
 pub use identity::Identity;

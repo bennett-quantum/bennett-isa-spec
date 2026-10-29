@@ -1,9 +1,9 @@
 use bennett_isa_ref::{
     json::Json, Argument, BitVector, Budget, Error, Object, OracleInput, OracleVectorInput,
-    OracleVectorMachine, Result, Type,
+    OracleVectorMachine, Result, Type, Xoshiro256,
 };
 
-const USAGE:&str="bennett-isa-ref check <object>\nbennett-isa-ref hash <object>\nbennett-isa-ref run-oracle <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref step-check <object> <oracle> --exhaustive [--budget B[,heap,stack,depth]] [--arg value] [--max-bits N]";
+const USAGE:&str="bennett-isa-ref check <object>\nbennett-isa-ref hash <object>\nbennett-isa-ref run-oracle <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref step-check <object> <oracle> (--exhaustive [--max-bits N] | --suite | --samples N) [--seed a,b,c,d] [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]";
 fn fail(message: impl std::fmt::Display) -> Error {
     Error(message.to_string())
 }
@@ -114,12 +114,25 @@ fn run() -> Result<()> {
                 ]),
             )
         }));
+        // An object with unresolved imports is valid text but not executable
+        // until linked (§9.3): say so instead of a bare "ok".
+        let unresolved: Vec<Json> = program
+            .section("imports")
+            .map(|i| i.object().map(|o| o.keys().cloned().map(string).collect()))
+            .transpose()?
+            .unwrap_or_default();
+        let status = if unresolved.is_empty() {
+            "ok"
+        } else {
+            "unlinked"
+        };
         println!(
             "{}",
             object([
                 ("object_hash".into(), string(identity.object_hash)),
-                ("status".into(), string("ok")),
-                ("symbols".into(), symbols)
+                ("status".into(), string(status)),
+                ("symbols".into(), symbols),
+                ("unresolved_imports".into(), Json::Array(unresolved)),
             ])
             .canonical()
         );
@@ -143,7 +156,10 @@ fn run() -> Result<()> {
         1_000_000
     })?;
     let mut exhaustive = false;
-    let mut max_bits = 16u16;
+    let mut suite = false;
+    let mut samples: Option<u128> = None;
+    let mut seed = [1u64, 2, 3, 4];
+    let mut max_bits = 16u128;
     let mut fixed_regions = Vec::new();
     let mut pos = 3;
     while pos < args.len() {
@@ -151,6 +167,10 @@ fn run() -> Result<()> {
         pos += 1;
         if option == "--exhaustive" {
             exhaustive = true;
+            continue;
+        }
+        if option == "--suite" {
+            suite = true;
             continue;
         }
         let value = args
@@ -178,7 +198,18 @@ fn run() -> Result<()> {
                 }
             }
             "--budget" => limits = budget(value, limits)?,
-            "--max-bits" => max_bits = value.parse().map_err(fail)?,
+            "--max-bits" => max_bits = uint(value)?,
+            "--samples" => samples = Some(uint(value)?),
+            "--seed" => {
+                let words = value
+                    .split(',')
+                    .map(|w| w.parse::<u64>().map_err(fail))
+                    .collect::<Result<Vec<_>>>()?;
+                if words.len() != 4 || words.iter().all(|w| *w == 0) {
+                    return Err(fail("§12.1: --seed needs four u64 words, not all zero"));
+                }
+                seed = [words[0], words[1], words[2], words[3]];
+            }
             "--mem" => {
                 let (name, hex) = value
                     .split_once('=')
@@ -211,9 +242,12 @@ fn run() -> Result<()> {
     for p in &oracle.params[3] {
         if !input.regions.contains_key(&p.name) {
             let Type::Region(a, _) = p.ty else {
-                unreachable!("region type")
+                return Err(fail("§5.1: mem slot requires region type"));
             };
-            let n = usize::try_from(1u128 << a).map_err(fail)?;
+            let n = (a < 64)
+                .then(|| 1usize.checked_shl(a as u32))
+                .flatten()
+                .ok_or_else(|| fail("host limit: interface region exceeds host memory"))?;
             let mut zero = Vec::new();
             zero.try_reserve_exact(n).map_err(fail)?;
             zero.resize(n, 0);
@@ -241,52 +275,72 @@ fn run() -> Result<()> {
         );
         return Ok(());
     }
-    if !exhaustive {
-        return Err(fail("step-check requires --exhaustive"));
-    }
-    if max_bits > 24 {
-        return Err(fail("--max-bits exceeds the CLI enumeration limit of 24"));
-    }
-    let input_widths = oracle.params[0]
+    let modes = [exhaustive, suite, samples.is_some()]
         .iter()
-        .map(|p| p.ty.width(program.ptr_width))
-        .collect::<Result<Vec<_>>>()?;
-    let mut bits = input_widths.iter().map(|w| *w as u128).sum::<u128>();
+        .filter(|m| **m)
+        .count();
+    if modes != 1 {
+        return Err(fail(
+            "step-check needs exactly one of --exhaustive, --suite, --samples N",
+        ));
+    }
+    // The domain: every input bundle and every byte of every unfixed interface
+    // region (target/fault entry values do not affect the computation).
+    let mut components: Vec<usize> = oracle.params[0]
+        .iter()
+        .map(|p| p.ty.bits(program.ptr_width))
+        .collect::<Result<_>>()?;
+    let input_count = components.len();
     for p in &oracle.params[3] {
         if !fixed_regions.contains(&p.name) {
-            let Type::Region(a, w) = p.ty else {
-                unreachable!("region type")
-            };
-            bits = bits
-                .checked_add((1u128 << a) * w as u128)
-                .ok_or_else(|| fail("domain bit count overflow"))?;
+            components.extend(std::iter::repeat_n(8, input.regions[&p.name].len()));
         }
     }
-    if bits > max_bits as u128 {
-        return Err(fail(format!("§17.13: exhaustive domain has {bits} input/memory bits, above --max-bits {max_bits}; no sampling performed")));
+    let bits: u128 = components.iter().map(|w| *w as u128).sum();
+    // §17 item 13: exhaustive for <= 16 interface bits, 2^16 samples above.
+    let sampled = samples.is_some() || (suite && bits > 16);
+    let count = samples.unwrap_or(1 << 16);
+    if exhaustive && bits > max_bits {
+        return Err(fail(format!("§17.13: the exhaustive domain has {bits} bits, above --max-bits {max_bits}; raise --max-bits, or use --suite or --samples N")));
     }
-    let cases = 1u128 << (bits as u32);
-    for value in 0..cases {
-        let mut cursor = 0;
-        input.ins.clear();
-        for w in &input_widths {
-            let mask = if *w == 128 {
-                u128::MAX
-            } else {
-                (1u128 << w) - 1
-            };
-            input.ins.push((value >> cursor) & mask);
-            cursor += *w as u32;
+    let mut rng = Xoshiro256(seed);
+    let mut current: Vec<BitVector> = components
+        .iter()
+        .map(|w| BitVector::zero(*w))
+        .collect::<Result<_>>()?;
+    let mut cases = 0u128;
+    loop {
+        if sampled {
+            if cases == count {
+                break;
+            }
+            for (v, w) in current.iter_mut().zip(&components) {
+                *v = rng.bits(*w)?;
+            }
         }
+        let mut vector_input = OracleVectorInput {
+            ins: current[..input_count].to_vec(),
+            args: input.args.clone(),
+            regions: input.regions.clone(),
+        };
+        let mut cursor = input_count;
         for p in &oracle.params[3] {
             if !fixed_regions.contains(&p.name) {
-                for byte in input.regions.get_mut(&p.name).expect("region initialised") {
-                    *byte = ((value >> cursor) & 255) as u8;
-                    cursor += 8;
+                let bytes = vector_input
+                    .regions
+                    .get_mut(&p.name)
+                    .ok_or_else(|| fail("§5.1: missing interface region"))?;
+                for byte in bytes.iter_mut() {
+                    *byte = current[cursor].to_u128()? as u8;
+                    cursor += 1;
                 }
             }
         }
-        let vector_input = OracleVectorInput::from_input(&program, name, &input)?;
+        let label = current
+            .iter()
+            .map(BitVector::to_decimal)
+            .collect::<Vec<_>>()
+            .join(",");
         let expected = program.run_oracle_vectors(name, &vector_input, limits)?;
         let mut machine = OracleVectorMachine::new(&program, name, &vector_input, limits)?;
         let before = machine.snapshot();
@@ -294,13 +348,36 @@ fn run() -> Result<()> {
             machine.forward_step()?;
         }
         if machine.outcome()? != expected {
-            return Err(fail(format!("§14.3 T6: disagreement at input {value}")));
+            return Err(fail(format!(
+                "§14.3 T6: disagreement at domain element [{label}]"
+            )));
         }
         for _ in 0..limits.steps {
             machine.inverse_step()?;
         }
         if machine.snapshot() != before || !machine.frames_clean() {
-            return Err(fail(format!("§14.3 T2: dirty prefix at input {value}")));
+            return Err(fail(format!(
+                "§14.3 T2: dirty prefix at domain element [{label}]"
+            )));
+        }
+        cases += 1;
+        if !sampled {
+            // Odometer, last component fastest (§12.2 order).
+            let mut i = current.len();
+            let mut wrapped = true;
+            while i > 0 {
+                i -= 1;
+                let next = current[i].binary("add", &BitVector::from_u128(components[i], 1)?)?;
+                let carry = next.is_zero();
+                current[i] = next;
+                if !carry {
+                    wrapped = false;
+                    break;
+                }
+            }
+            if wrapped {
+                break;
+            }
         }
     }
     let fixed = Json::Array(fixed_regions.into_iter().map(string).collect());
@@ -309,6 +386,10 @@ fn run() -> Result<()> {
         object([
             ("cases".into(), number(cases)),
             ("input_and_memory_bits".into(), number(bits)),
+            (
+                "mode".into(),
+                string(if sampled { "sampled" } else { "exhaustive" })
+            ),
             ("fixed_regions".into(), fixed),
             ("status".into(), string("ok")),
             (

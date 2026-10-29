@@ -83,9 +83,9 @@ fn decimal_json(v: &BitVector) -> Json {
 }
 
 /// xoshiro256** (Blackman and Vigna), the §12.1 sampler.
-pub(crate) struct Xoshiro([u64; 4]);
-impl Xoshiro {
-    pub(crate) fn next(&mut self) -> u64 {
+pub struct Xoshiro256(pub [u64; 4]);
+impl Xoshiro256 {
+    pub fn next_word(&mut self) -> u64 {
         let s = &mut self.0;
         let result = s[1].wrapping_mul(5).rotate_left(7).wrapping_mul(9);
         let t = s[1] << 17;
@@ -96,6 +96,12 @@ impl Xoshiro {
         s[2] ^= t;
         s[3] = s[3].rotate_left(45);
         result
+    }
+    /// A uniform value of `width` bits (R = 2^width: no redraws, §12.1).
+    pub fn bits(&mut self, width: usize) -> Result<BitVector> {
+        let lo = BitVector::zero(width)?;
+        let hi = ones(width)?;
+        self.draw(width, &lo, &hi)
     }
     /// §12.1: m = ceil(ceil(log2 R)/64) words, least significant first,
     /// reduced modulo 2^ceil(log2 R), redrawn while >= R, plus lo.
@@ -111,7 +117,7 @@ impl Xoshiro {
         loop {
             let mut v = BitVector::zero(width + 1)?;
             for word in 0..bits.div_ceil(64) {
-                let w = self.next();
+                let w = self.next_word();
                 for b in 0..64 {
                     let i = word * 64 + b;
                     if i < bits && w >> b & 1 == 1 {
@@ -443,7 +449,7 @@ impl Object {
                                 .map_err(|_| Error("§12.1: seed".into()))
                         })
                         .collect::<Result<Vec<_>>>()?;
-                    let mut rng = Xoshiro([seed[0], seed[1], seed[2], seed[3]]);
+                    let mut rng = Xoshiro256([seed[0], seed[1], seed[2], seed[3]]);
                     for _ in 0..sampler.get("count")?.uint()? {
                         elements.push(
                             domain
