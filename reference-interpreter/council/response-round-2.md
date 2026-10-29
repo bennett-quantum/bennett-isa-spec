@@ -66,3 +66,19 @@ including rows inside a block. Pin:
 the call and rejects §5.5 (RED: accepted); computing call at entry dominating
 all numeric destinations accepts and runs/reverses to (0,0,5). No target-value
 analysis or new spec question.
+
+## SOL-R2-B06 — resolved
+
+Coincides with codex R2-B04. `validation.rs::region_declarations` recursively
+gathers lexical declarations; `validate_structured`/`declare_region` register
+and validate each once at entry. Sequence occurrences are no-ops; duplicate
+lexical declarations still reject. `borrow.rs::Compiler::declare_regions`
+hoists allocations in root and inlined child functions too. Pin:
+`r1_discipline::r2_regions_are_lexical_function_entry_declarations` (loop 2,
+loop 0, use before text, qif, duplicate, borrow-compiler positive; all t,p basis
+values, clean forward and adjoint, exact restoration). RED: loop 2 rejected
+"region name already defined". No new question: §4.6 states function entry.
+
+## codex R2-B04 — resolved
+
+Same change and tests as SOL-R2-B06.

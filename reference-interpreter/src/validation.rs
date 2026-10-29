@@ -19,6 +19,9 @@ impl Object {
             return self.validate_classical(f, types, labels);
         }
         let mut state = Discipline::new(f, types.clone());
+        for i in region_declarations(f) {
+            self.declare_region(i, &mut state)?;
+        }
         fn bounds(seq: &[Instruction], out: &mut Vec<u64>) -> Result<()> {
             for i in seq {
                 if i.op == "qloop" {
@@ -71,6 +74,34 @@ impl Object {
             );
         }
         self.validate_borrow_frames(f)?;
+        Ok(())
+    }
+    fn declare_region(&self, i: &Instruction, s: &mut Discipline) -> Result<()> {
+        let a = &i.operands;
+                    if !i.lhs.is_empty() || !matches!(a.len(), 3 | 4) || !name(&a[0]) {
+                        return err("§4.8", "qregion operand schema");
+                    }
+                    let aw = crate::object::host_count(&a[1], "qregion address width")?;
+                    let w = crate::object::host_count(&a[2], "qregion cell width")?;
+                    if w == 0 {
+                        return err("§3.3", "qregion cell width must be positive");
+                    }
+                    if a.len() == 4 {
+                        let img = a[3]
+                            .strip_prefix('@')
+                            .ok_or_else(|| Error("§4.6: qregion image must be @data".into()))?;
+                        let size = self.data_size(img)?;
+                        // 2^A * W bits = 8 * size bytes (§4.6), compared exactly.
+                        let bits = crate::oracle::power_of_two(aw as u128)
+                            .and_then(|cells| cells.checked_mul(w as u128));
+                        if bits.is_none_or(|bits| bits % 8 != 0 || bits / 8 != size) {
+                            return err("§4.6", "image size differs from 2^A*W/8 bytes");
+                        }
+                    }
+                    if s.types.insert(a[0].clone(), Type::Region(aw, w)).is_some() {
+                        return err("§3.3", "region name already defined");
+                    }
+                    s.local_regions.insert(a[0].clone());
         Ok(())
     }
     fn validate_action_sequence(
@@ -266,32 +297,7 @@ impl Object {
                     }
                     s.consume(&a[1])?;
                 }
-                "qregion" => {
-                    if !i.lhs.is_empty() || !matches!(a.len(), 3 | 4) || !name(&a[0]) {
-                        return err("§4.8", "qregion operand schema");
-                    }
-                    let aw = crate::object::host_count(&a[1], "qregion address width")?;
-                    let w = crate::object::host_count(&a[2], "qregion cell width")?;
-                    if w == 0 {
-                        return err("§3.3", "qregion cell width must be positive");
-                    }
-                    if a.len() == 4 {
-                        let img = a[3]
-                            .strip_prefix('@')
-                            .ok_or_else(|| Error("§4.6: qregion image must be @data".into()))?;
-                        let size = self.data_size(img)?;
-                        // 2^A * W bits = 8 * size bytes (§4.6), compared exactly.
-                        let bits = crate::oracle::power_of_two(aw as u128)
-                            .and_then(|cells| cells.checked_mul(w as u128));
-                        if bits.is_none_or(|bits| bits % 8 != 0 || bits / 8 != size) {
-                            return err("§4.6", "image size differs from 2^A*W/8 bytes");
-                        }
-                    }
-                    if s.types.insert(a[0].clone(), Type::Region(aw, w)).is_some() {
-                        return err("§3.3", "region name already defined");
-                    }
-                    s.local_regions.insert(a[0].clone());
-                }
+                "qregion" => {} // Declared once at function entry (§4.6).
                 "qload" | "qunload" | "qstore" | "qexchm" => {
                     let load = op == "qload";
                     arity(if load { 2 } else { 3 }, if load { 1 } else { 0 })?;
@@ -1646,4 +1652,17 @@ pub(crate) fn normalize_call(i: &Instruction) -> Result<NormalCall> {
         control,
         adjoint,
     })
+}
+
+/// Lexical declarations, including zero-trip loops and both qif arms.
+pub(crate) fn region_declarations(f: &Function) -> Vec<&Instruction> {
+    fn gather<'a>(seq: &'a [Instruction], out: &mut Vec<&'a Instruction>) {
+        for i in seq {
+            if i.op == "qregion" { out.push(i); }
+            for body in &i.bodies { gather(body, out); }
+        }
+    }
+    let mut out = Vec::new();
+    for block in &f.blocks { gather(&block.instructions, &mut out); }
+    out
 }

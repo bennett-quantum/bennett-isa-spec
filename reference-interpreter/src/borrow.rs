@@ -239,6 +239,38 @@ impl Compiler<'_> {
             .map(|(bit, w)| (w, i >> bit & 1 == 1))
             .collect())
     }
+    fn declare_regions(&mut self, f: &Function, out: &mut Vec<Node>) -> Result<()> {
+        for i in crate::validation::region_declarations(f) {
+            let a = &i.operands;
+                    let aw = crate::object::host_count(&a[1], "qregion address width")?;
+                    let w = crate::object::host_count(&a[2], "qregion cell width")? as usize;
+                    let cells = crate::oracle::power_of_two(aw as u128)
+                        .and_then(|n| usize::try_from(n).ok())
+                        .ok_or_else(|| {
+                            Error("host limit: region exceeds host address space".into())
+                        })?;
+                    let image = match a.get(3) {
+                        Some(img) => self
+                            .object
+                            .data
+                            .get(img.trim_start_matches('@'))
+                            .cloned()
+                            .ok_or_else(|| Error("§4.6: unresolved qregion image".into()))?,
+                        None => vec![0; (cells * w).div_ceil(8)],
+                    };
+                    let mut all = Vec::new();
+                    for _ in 0..cells {
+                        all.push(self.fresh(w));
+                    }
+                    let flat: Vec<String> = all.iter().flatten().cloned().collect();
+                    let bits = (0..flat.len())
+                        .map(|b| image[b / 8] >> (b % 8) & 1 == 1)
+                        .collect();
+                    out.push(Node::Alloc(flat, bits));
+                    self.regions.insert(a[0].clone(), (aw, all));
+        }
+        Ok(())
+    }
     fn compile(
         &mut self,
         seq: &[Instruction],
@@ -338,34 +370,7 @@ impl Compiler<'_> {
                         }
                     }
                 }
-                "qregion" => {
-                    let aw = crate::object::host_count(&a[1], "qregion address width")?;
-                    let w = crate::object::host_count(&a[2], "qregion cell width")? as usize;
-                    let cells = crate::oracle::power_of_two(aw as u128)
-                        .and_then(|n| usize::try_from(n).ok())
-                        .ok_or_else(|| {
-                            Error("host limit: region exceeds host address space".into())
-                        })?;
-                    let image = match a.get(3) {
-                        Some(img) => self
-                            .object
-                            .data
-                            .get(img.trim_start_matches('@'))
-                            .cloned()
-                            .ok_or_else(|| Error("§4.6: unresolved qregion image".into()))?,
-                        None => vec![0; (cells * w).div_ceil(8)],
-                    };
-                    let mut all = Vec::new();
-                    for _ in 0..cells {
-                        all.push(self.fresh(w));
-                    }
-                    let flat: Vec<String> = all.iter().flatten().cloned().collect();
-                    let bits = (0..flat.len())
-                        .map(|b| image[b / 8] >> (b % 8) & 1 == 1)
-                        .collect();
-                    out.push(Node::Alloc(flat, bits));
-                    self.regions.insert(a[0].clone(), (aw, all));
-                }
+                "qregion" => {} // Hoisted once at function entry.
                 "qload" | "qunload" | "qstore" | "qexchm" => {
                     let (_, cells) = self
                         .regions
@@ -448,6 +453,7 @@ impl Compiler<'_> {
                             child.regions.insert(p.name.clone(), r);
                         }
                         let mut body = Vec::new();
+                        child.declare_regions(f, &mut body)?;
                         for b in &f.blocks {
                             child.compile(&b.instructions, &c, &mut body)?;
                         }
@@ -796,6 +802,7 @@ impl Object {
             }
         }
         let mut nodes = Vec::new();
+        compiler.declare_regions(f, &mut nodes)?;
         for block in &f.blocks {
             compiler.compile(&block.instructions, &[], &mut nodes)?;
         }

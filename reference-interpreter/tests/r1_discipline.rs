@@ -244,3 +244,19 @@ fn fuzz_witnesses_of_entangling_reads_are_rejected() {
     accept(&tmp("d0 = qalloc any 1\nd1 = qcopy p\nh d0\nccx d0 p d1\ncx d1 t\ncx d1 t\nccx d0 p d1\nh d0\nquncopy p d1\nqfree d0"));
     accept(&tmp("d0 = qalloc any 1\nd1 = qcopy t\nh d0\ncx d0 d1\ncz d1 t\ncz d1 t\ncx d0 d1\nh d0\nquncopy t d1\nqfree d0"));
 }
+
+#[test]
+fn r2_regions_are_lexical_function_entry_declarations() {
+    for (body, bounds) in [
+        ("qloop 2 {\nqregion r 1 1\n}", vec![2]),
+        ("d = qload r p\nqunload r p d\nqregion r 1 1", vec![]),
+        ("d = qload r p\nqunload r p d\nqloop 0 {\nqregion r 1 1\n}", vec![0]),
+        ("qif p {\nqregion r 1 1\n} {\nd = qload r p\nqunload r p d\n}", vec![]),
+    ] {
+        run_basis(&accept(&action(body, &bounds)), |t, _| t);
+    }
+    reject(&action("qregion r 1 1\nqloop 0 {\nqregion r 1 1\n}", &[0]), "§3.3");
+    // Exercise borrow Compiler too: region use before a zero-trip declaration.
+    let text = action("b = qborrow any 1\nd = qload r p\nqxor d b\nqxor d b\nqunload r p d\nqreturn b\nqloop 0 {\nqregion r 1 1\n}", &[0]);
+    accept(&text);
+}
