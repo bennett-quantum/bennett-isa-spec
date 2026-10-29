@@ -3,7 +3,8 @@
 //! value below is hand-derived from the fixture text and the ISA rules cited
 //! in the comments; the fixtures' own `.comments` files carry the same
 //! derivations for the library-level outcomes.
-use bennett_isa_ref::json::Json;
+mod support;
+use bennett_isa_ref::{json::Json, Object};
 use std::process::Command;
 
 fn fixture(name: &str) -> String {
@@ -48,8 +49,9 @@ fn uint(v: &Json, key: &str) -> u128 {
 fn array<'a>(v: &'a Json, key: &str) -> &'a [Json] {
     field(v, key).array().unwrap()
 }
-/// A `{"type":..,"value":..}` result object renders an iN as its signed
-/// decimal string (§10 INT binding; the dialect checker's INT(w):v form).
+/// A `{"type":..,"value":..}` result object renders an iN as the unsigned
+/// decimal string of its bit-vector value (the dialect checker's
+/// INT(w):v form; bd note on b-isa-spec-xam records the reading).
 fn result(v: &Json) -> (String, String) {
     (
         field(v, "type").string().unwrap().to_string(),
@@ -662,4 +664,240 @@ fn run_action_rejects_ambiguous_and_malformed_inputs() {
         "§5.3",
     );
     fails(&["run-action", &bell, "missing", "--mut", "0"], "§5.3");
+}
+
+#[test]
+fn run_program_region_calls_complete_and_close() {
+    // registers.bisa @views: qreg.new, slice, action_call @toggle, slice,
+    // action_call @toggle, qreg.free, ret = 7 instructions with no result
+    // values (fixture comment). The one-shot §10 launch walks
+    // CREATED -> RUNNING -> COMPLETED and closes the run record.
+    let v = ok(&["run-program", &fixture("registers"), "views", "--args", ""]);
+    assert_eq!(text(&v, "status"), "COMPLETED");
+    assert_eq!(text(&v, "run_state"), "CLOSED");
+    assert_eq!(field(&v, "reversed"), &Json::Bool(false));
+    assert_eq!(uint(&v, "steps"), 7);
+    assert_eq!(array(&v, "results").len(), 0);
+    assert_eq!(array(&v, "faults").len(), 0);
+    assert_eq!(field(&v, "fault"), &Json::Null);
+    assert_eq!(array(&v, "measurements").len(), 0);
+    assert_eq!(array(&v, "budgets").len(), 0);
+    // With --reverse the completed run is reversed (§10) before closing.
+    let v = ok(&[
+        "run-program",
+        &fixture("registers"),
+        "views",
+        "--args",
+        "",
+        "--reverse",
+    ]);
+    assert_eq!(text(&v, "status"), "REVERSED");
+    assert_eq!(field(&v, "reversed"), &Json::Bool(true));
+    assert_eq!(field(&v, "memory_equals_entry"), &Json::Bool(true));
+    assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
+}
+
+#[test]
+fn run_program_measurements_use_fixed_draws() {
+    // registers.bisa @measurement: qreg.new, action_call @bell, measure,
+    // ret = 4 instructions. Draw 0.9 selects the |11> branch above 1/2, so
+    // the measured value and the i2 result are 3 (fixture comment). The
+    // first allocated register has id 1.
+    let v = ok(&[
+        "run-program",
+        &fixture("registers"),
+        "measurement",
+        "--args",
+        "",
+        "--draws",
+        "0.9",
+    ]);
+    assert_eq!(text(&v, "status"), "COMPLETED");
+    assert_eq!(uint(&v, "steps"), 4);
+    assert_eq!(
+        array(&v, "results").iter().map(result).collect::<Vec<_>>(),
+        [("i2".to_string(), "3".to_string())]
+    );
+    let measurements = array(&v, "measurements");
+    assert_eq!(measurements.len(), 1);
+    assert_eq!(uint(&measurements[0], "reg"), 1);
+    assert_eq!(text(&measurements[0], "bits"), "11");
+    assert_eq!(uint(&measurements[0], "value"), 3);
+    // A run that measured is not reverse-eligible (§10).
+    fails(
+        &[
+            "run-program",
+            &fixture("registers"),
+            "measurement",
+            "--args",
+            "",
+            "--draws",
+            "0.1",
+            "--reverse",
+        ],
+        "E_NOT_REVERSIBLE",
+    );
+}
+
+#[test]
+fn run_program_failed_launch_exposes_no_values() {
+    // registers.bisa @unclean: qreg.new, action_call @toggle, qreg.free
+    // traps with FAULT_UB_TRAP (4) because the flipped register is not
+    // clean (fixture comment). §10: a FAILED run exposes no values.
+    let v = ok(&[
+        "run-program",
+        &fixture("registers"),
+        "unclean",
+        "--args",
+        "",
+    ]);
+    assert_eq!(text(&v, "status"), "FAILED");
+    assert_eq!(uint(&v, "steps"), 3);
+    assert_eq!(uint(&v, "fault"), 4);
+    assert_eq!(array(&v, "results").len(), 0);
+    // bennett_reverse applies only to COMPLETED runs (§10).
+    fails(
+        &[
+            "run-program",
+            &fixture("registers"),
+            "unclean",
+            "--args",
+            "",
+            "--reverse",
+        ],
+        "E_INVALID_STATE",
+    );
+}
+
+#[test]
+fn run_program_oracle_call_with_qreg_and_token_arguments() {
+    // A CC entry that calls the inc8 oracle as a region (§10 invocation
+    // tree), linked from the inc8 fixture object the way tests/registers.rs
+    // builds it. At token B = 3 the oracle delivers
+    // t ^= (x + 1 mod 256): with x = 7 and entry t = 31 that is 31 ^ 8 =
+    // 23; measuring t (a basis state, any draw) returns 23. Registers are
+    // allocated in argument order, so t is register 2 and its bits in
+    // wire-0-first order are 11101000.
+    let inc = Object::parse(include_str!("fixtures/inc8.bisa")).unwrap();
+    let oracle_sig = inc.symbols().unwrap()["0"]
+        .get("signature")
+        .unwrap()
+        .canonical();
+    let sig = r#"{"abi":"0.8","kind":"cc","params":["qreg[8]","qreg[8]","qreg[4]","token"],"results":["i8"],"tier":"cc"}"#;
+    let body = "fn cc @invoke (x:qreg[8], t:qreg[8], f:qreg[4], tk:token) (r:i8) () () ()\n^entry():\noracle_call @inc8 tk (x) t f () ()\nr = measure t\nret r";
+    let caller = support::rehash(&support::object(
+        &[("invoke", sig, body)],
+        &format!(r#"{{"inc8":{{"signature":{oracle_sig}}}}}"#),
+        "",
+    ));
+    let linked = Object::link(&[caller, inc]).unwrap();
+    let path = tmp_file("xam-invoke.bisa", &linked.text);
+    let v = ok(&[
+        "run-program",
+        &path,
+        "invoke",
+        "--arg",
+        "qreg:11100000",
+        "--arg",
+        "qreg:11111000",
+        "--arg",
+        "qreg:1100",
+        "--arg",
+        "token:3",
+        "--draws",
+        "0.5",
+    ]);
+    assert_eq!(text(&v, "status"), "COMPLETED");
+    assert_eq!(uint(&v, "steps"), 3);
+    assert_eq!(
+        array(&v, "results").iter().map(result).collect::<Vec<_>>(),
+        [("i8".to_string(), "23".to_string())]
+    );
+    let measurements = array(&v, "measurements");
+    assert_eq!(measurements.len(), 1);
+    assert_eq!(uint(&measurements[0], "reg"), 2);
+    assert_eq!(text(&measurements[0], "bits"), "11101000");
+    assert_eq!(uint(&measurements[0], "value"), 23);
+    let budgets = array(&v, "budgets");
+    assert_eq!(budgets.len(), 1);
+    assert_eq!(uint(&budgets[0], "steps"), 3);
+    assert_eq!(uint(&budgets[0], "heap"), 0);
+}
+
+#[test]
+fn run_program_host_request_lifecycle() {
+    // classical.bisa @host under the launch ABI: const, alloc, const,
+    // store, hostcall, ret = 6 instructions and rlen 5 for the 5-byte
+    // reply (§10; same hand derivation as the run-cc hostcall test).
+    let replies = tmp_file(
+        "xam-program-replies.json",
+        r#"[{"payload":"a50000","reply":"1122334455","service":"org.bennett.test"}]"#,
+    );
+    let v = ok(&[
+        "run-program",
+        &fixture("classical"),
+        "host",
+        "--args",
+        "",
+        "--replies",
+        &replies,
+    ]);
+    assert_eq!(text(&v, "status"), "COMPLETED");
+    assert_eq!(uint(&v, "steps"), 6);
+    assert_eq!(
+        array(&v, "results").iter().map(result).collect::<Vec<_>>(),
+        [("i16".to_string(), "5".to_string())]
+    );
+}
+
+#[test]
+fn run_program_rejects_non_cc_entries_and_staged_inputs() {
+    // §10: a run executes a device CC entry; an R or oracle symbol is E_ARG.
+    fails(
+        &["run-program", &fixture("classical"), "sum", "--args", "3"],
+        "§10",
+    );
+    fails(
+        &["run-program", &fixture("inc8"), "inc8", "--args", ""],
+        "§10",
+    );
+    // bennett_load's target_jcs needs §8 target descriptions: staged
+    // deliverable 9, an explicit diagnostic, never a silent run.
+    let target = tmp_file("xam-target.json", "{}");
+    let output = cli(&[
+        "run-program",
+        &fixture("registers"),
+        "views",
+        "--args",
+        "",
+        "--target",
+        &target,
+    ]);
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("staged deliverable 9"), "{stderr}");
+    assert!(stderr.contains("§8"), "{stderr}");
+    // A schedule section needs verbatim scheduled execution: staged
+    // deliverable 10 (§11 schedule consumer). The schedule JSON is the
+    // valid inc8 schedule of tests/r1_certificates.rs.
+    let schedule = Json::parse(&format!(
+        r#"{{"bindings":{{"budget":[3,0,0,0],"closure_hash":"8ce5e64f15830d8e596ba9b4861def6565dd567b5804300f427d8b9566d5be93","epsilon":0,"expansion":{{"hash":"{}","name":"ref","version":"0.8"}},"inherited_controls":0,"params_hash":"{}","region":"inc8","scheduler":{{"name":"test","version":"1"}},"target_hash":"{}","variant":"forward"}},"entries":[{{"generated":"*","kind":"start","path":[{{"iteration":[],"point":"entry:0","symbol":"8ce5e64f15830d8e596ba9b4861def6565dd567b5804300f427d8b9566d5be93"}}],"phase":"fwd","start":{{"time":0}},"step":1}}]}}"#,
+        "1".repeat(64),
+        "2".repeat(64),
+        "3".repeat(64)
+    ))
+    .unwrap()
+    .canonical();
+    let scheduled = tmp_file(
+        "xam-scheduled.bisa",
+        &format!(
+            "{}\nsection schedule\n{schedule}\n",
+            include_str!("fixtures/inc8.bisa")
+        ),
+    );
+    let output = cli(&["run-program", &scheduled, "inc8", "--args", ""]);
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("staged deliverable 10"), "{stderr}");
+    assert!(stderr.contains("§11"), "{stderr}");
 }

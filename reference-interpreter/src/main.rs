@@ -6,7 +6,7 @@ use bennett_isa_ref::{
 };
 use std::collections::VecDeque;
 
-const USAGE:&str="bennett-isa-ref check <object>\nbennett-isa-ref hash <object>\nbennett-isa-ref run-oracle <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref step-check <object> <oracle> (--exhaustive [--max-bits N] | --suite | --samples N) [--seed a,b,c,d] [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref run-cc <object> <entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex]\nbennett-isa-ref reverse <object> <entry> [run-cc options] [--steps N]\nbennett-isa-ref reverse <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--steps N] [--mem name=hex] [--arg value]\nbennett-isa-ref reverse <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]>] [--adjoint]\nbennett-isa-ref run-action <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]> | --arg value...] [--adjoint]";
+const USAGE:&str="bennett-isa-ref check <object>\nbennett-isa-ref hash <object>\nbennett-isa-ref run-oracle <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref step-check <object> <oracle> (--exhaustive [--max-bits N] | --suite | --samples N) [--seed a,b,c,d] [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref run-cc <object> <entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex]\nbennett-isa-ref reverse <object> <entry> [run-cc options] [--steps N]\nbennett-isa-ref reverse <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--steps N] [--mem name=hex] [--arg value]\nbennett-isa-ref reverse <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]>] [--adjoint]\nbennett-isa-ref run-action <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]> | --arg value...] [--adjoint]\nbennett-isa-ref run-program <object> <cc-entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex] [--reverse] [--target file]";
 fn fail(message: impl std::fmt::Display) -> Error {
     Error(message.to_string())
 }
@@ -93,23 +93,15 @@ fn float_json(v: f64) -> Result<Json> {
     }
     Json::parse(&v.to_string())
 }
-fn signed_decimal(width: u16, v: u128) -> String {
-    if width == 128 {
-        (v as i128).to_string()
-    } else if width > 0 && (v >> (width - 1)) & 1 == 1 {
-        format!("-{}", (1u128 << width) - v)
-    } else {
-        v.to_string()
-    }
-}
-/// One classical value as `{"type","value"}`: integers are signed decimal
-/// strings (the §10 INT spelling at any width, §9.1), pointers unsigned
-/// decimal strings, f64 a JSON number, token its four §5.4 components.
+/// One classical value as `{"type","value"}`: integers and pointers are
+/// unsigned decimal strings of their bit-vector values (§9.1; a signed
+/// reading at the declared width is the caller's, §3.3), f64 a JSON
+/// number, token its four §5.4 components.
 fn value_json(v: &ClassicalValue) -> Result<Json> {
     Ok(match v {
         ClassicalValue::Int(w, bits) => object([
             ("type".into(), string(format!("i{w}"))),
-            ("value".into(), string(signed_decimal(*w, *bits))),
+            ("value".into(), string(bits.to_string())),
         ]),
         ClassicalValue::Ptr(bits) => object([
             ("type".into(), string("ptr")),
@@ -1485,6 +1477,129 @@ fn run_action(program: &Object, name: &str, options: ActionOptions) -> Result<Js
         ("wires".into(), number(run.interface_wires.len() as u128)),
     ]))
 }
+/// One-shot §10 launch: bennett_load (object parsed and hash-checked by the
+/// caller), positional bennett_run of a device CC entry with copied
+/// arguments and entropy, HOST_REQUEST/reply through the checked reply
+/// queue, bennett_result_* reporting, optional bennett_reverse, and
+/// bennett_run_close. Paths that need staged deliverables 8-11 (PROGRESS)
+/// fail by name before any run is reported.
+fn run_program(program: &Object, name: &str, options: CcOptions) -> Result<Json> {
+    if let Some(target) = &options.target {
+        std::fs::read(target).map_err(|e| fail(format!("{target}: {e}")))?;
+        return Err(fail(
+            "§10 bennett_load: a target description cannot be honoured yet (staged deliverable 9: §8 target descriptions, suite E; PROGRESS.md deliverables 8-11); no run is reported",
+        ));
+    }
+    if program.section("schedule").is_some() {
+        return Err(fail(
+            "§10 bennett_load: the object's schedule cannot be executed verbatim yet (staged deliverable 10: §11 schedule consumer, suite H; PROGRESS.md deliverables 8-11); no run is reported",
+        ));
+    }
+    let f = program
+        .functions
+        .get(name)
+        .ok_or_else(|| earg(format!("unknown CC entry @{name}")))?;
+    if f.kind != "cc" {
+        return Err(earg(format!(
+            "entry @{name} has kind {}; a launch executes a device CC entry",
+            f.kind
+        )));
+    }
+    let (args, registers) = classical_args(program, f, &options.args, options.token_defaults)?;
+    let budgets = Json::Array(
+        args.iter()
+            .filter_map(|a| match a {
+                ClassicalValue::Token(b) => Some(object([
+                    ("depth".into(), number(b.depth)),
+                    ("heap".into(), number(b.heap)),
+                    ("stack".into(), number(b.stack)),
+                    ("steps".into(), number(b.steps as u128)),
+                ])),
+                _ => None,
+            })
+            .collect(),
+    );
+    let mut machine = ClassicalMachine::with_quantum_registers_and_globals(
+        program,
+        name,
+        &args,
+        &options.entropy,
+        registers,
+        &options.mem,
+    )?;
+    for draw in &options.draws {
+        machine.push_measurement_draw(*draw)?;
+    }
+    let entry = machine.snapshot();
+    let entry_digest = machine.memory_digest();
+    let mut replies = load_replies(options.replies.as_deref())?;
+    let steps = drive(&mut machine, &mut replies, options.fuel, None, None)?;
+    check_replies_consumed(&replies)?;
+    let outcome = machine.outcome();
+    let failed = outcome.fault.is_some();
+    // §10: a FAILED run exposes no values; its fault records are the result.
+    let results = if failed {
+        Json::Array(Vec::new())
+    } else {
+        values_json(&outcome.values)?
+    };
+    let forward_tape = tape_json(&machine);
+    let forward_requests = host_requests_json(&machine);
+    let forward_measurements = measurements_json(&machine);
+    let mut status = if failed { "FAILED" } else { "COMPLETED" };
+    let mut reversed = false;
+    if options.reverse_flag {
+        if failed {
+            return Err(fail(
+                "§10: E_INVALID_STATE: bennett_reverse applies to a COMPLETED run; this run FAILED",
+            ));
+        }
+        // Eligibility (no measure, untouched registers) is the machine's:
+        // a measured run fails here with §10 E_NOT_REVERSIBLE.
+        machine.reverse()?;
+        reversed = true;
+        status = "REVERSED";
+    }
+    let after = machine.snapshot();
+    Ok(object([
+        ("budgets".into(), budgets),
+        ("clock".into(), number(machine.clock() as u128)),
+        ("console".into(), console_json(&machine)),
+        ("console_hex".into(), string(hex(machine.console()))),
+        (
+            "effect_tape_length".into(),
+            number(machine.effect_tape_len() as u128),
+        ),
+        ("entry".into(), string(name)),
+        ("entry_memory_digest".into(), string(entry_digest)),
+        ("equals_entry".into(), Json::Bool(after == entry)),
+        (
+            "fault".into(),
+            outcome.fault.map(number).unwrap_or(Json::Null),
+        ),
+        ("faults".into(), faults_json(outcome.fault)),
+        (
+            "first_difference".into(),
+            entry
+                .first_difference(&after)
+                .map(string)
+                .unwrap_or(Json::Null),
+        ),
+        ("host_requests".into(), forward_requests),
+        ("measurements".into(), forward_measurements),
+        ("memory_digest".into(), string(machine.memory_digest())),
+        (
+            "memory_equals_entry".into(),
+            Json::Bool(entry.memory_equals(&after)),
+        ),
+        ("results".into(), results),
+        ("reversed".into(), Json::Bool(reversed)),
+        ("run_state".into(), string("CLOSED")),
+        ("status".into(), string(status)),
+        ("steps".into(), number(steps as u128)),
+        ("tape".into(), forward_tape),
+    ]))
+}
 fn main() {
     if let Err(e) = run() {
         eprintln!("{e}");
@@ -1509,6 +1624,7 @@ fn run() -> Result<()> {
         "run-cc",
         "reverse",
         "run-action",
+        "run-program",
     ]
     .contains(&command)
     {
@@ -1560,6 +1676,16 @@ fn run() -> Result<()> {
             ])
             .canonical()
         );
+        return Ok(());
+    }
+    if command == "run-program" {
+        let name = args
+            .get(2)
+            .ok_or_else(|| fail(USAGE))?
+            .trim_start_matches('@');
+        program.check_hashes()?;
+        let options = parse_cc_options(&program, command, &args, 3)?;
+        println!("{}", run_program(&program, name, options)?.canonical());
         return Ok(());
     }
     if command == "run-action" {

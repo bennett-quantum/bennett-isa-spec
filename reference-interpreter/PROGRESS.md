@@ -18,8 +18,8 @@ hand-derived in the test comments.
 |---|---|---|---|
 | `run-cc` | done | `tests/cli_xam.rs` | bc63483 |
 | `reverse` | done | `tests/cli_xam.rs` | d987500 |
-| `run-action` | done | `tests/cli_xam.rs` | — |
-| `run-program` | in progress | `tests/cli_xam.rs` | — |
+| `run-action` | done | `tests/cli_xam.rs` | 9d4c0dc |
+| `run-program` | done | `tests/cli_xam.rs` | — |
 
 ## Session 2026-10-29 (Opus, council fix loop): milestone 1 reached
 
