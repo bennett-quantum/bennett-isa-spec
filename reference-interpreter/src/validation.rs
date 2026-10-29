@@ -1569,6 +1569,15 @@ fn operation_inverse(version: &str) -> Option<String> {
         "call_perm_adj" => "call_perm_fwd",
         "x" | "cx" | "ccx" | "mcx" | "swap" | "h" | "cz" | "qxor" | "qexch" | "qexchm"
         | "qstore" | "oracle_call" => op,
+        "qinplace" => {
+            // §5.3: exchange the two oracle identities, retaining tk, target
+            // and the complete captured effective-control version suffix.
+            let mut fields = rest.splitn(3, ' ');
+            let g = fields.next()?;
+            let ginv = fields.next()?;
+            let tail = fields.next()?;
+            return Some(format!("qinplace:{ginv} {g} {tail}"));
+        }
         "rx" | "ry" | "rz" => {
             let (angle, tail) = rest.split_once(' ')?;
             let bits = u64::from_str_radix(angle.strip_prefix('#')?, 16).ok()?;

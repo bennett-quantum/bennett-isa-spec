@@ -82,3 +82,13 @@ values, clean forward and adjoint, exact restoration). RED: loop 2 rejected
 ## codex R2-B04 — resolved
 
 Same change and tests as SOL-R2-B06.
+
+## codex R2-B03 — resolved
+
+`validation.rs::operation_inverse` exchanges the two qinplace oracle names,
+preserving token/target and the entire captured effective-control suffix.
+`validate_action_sequence` already captures that suffix in `Discipline::change`.
+Pin: `r1_qinplace::r2_qinplace_explicit_adjoint_cleans_workspace`: identity and
+NOT/NOT (B=1/3), distinct callee names to verify the exchange, both workspace
+basis values via copying t, forward/adjoint; changed predicate rejects §6.2.
+RED: the identity-pair explicit cleanup rejected at load. No new question.
