@@ -11,7 +11,10 @@ never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 Received SOL-R3-B01..B05 on snapshot 2e61144; response-round-3.md is appendable
 for the pending seats. B01 resolved with a witnessed RED then GREEN (16
 r1_rules tests): nested target/fault/uncall deliveries invalidate outstanding
-input readers while commuting output deliveries remain legal. Bead zq2.
+input readers while commuting output deliveries remain legal. B02 resolved:
+joint call dependency/provenance and inverse groups, including mutable cells;
+17 discipline and 3 generator tests pass, including odd/even call wrapping.
+Bead b-isa-spec-zq2.
 
 ## Council round 2: sol/codex implementation (2026-10-29)
 

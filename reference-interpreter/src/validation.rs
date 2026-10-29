@@ -500,19 +500,32 @@ impl Object {
                             s.predicates
                         )
                     };
-                    s.note_reads(&version, &reads)?;
-                    for target in targets {
-                        s.change(&target, version.clone(), other)?;
-                    }
-                    for (mem, param) in mems.iter().zip(mem_params) {
-                        if param.role.as_deref() == Some("mut") {
-                            let cell = format!("{mem}[*]");
-                            s.update_log(&cell, &version, false);
-                            s.modified.insert(cell.clone());
-                            *s.cell_epochs.entry(cell.clone()).or_default() += 1;
-                            if other {
-                                *s.closed.entry(cell).or_default() += 1;
+                    if call.instruction.op == "action_call" {
+                        let mut outputs = Vec::new();
+                        for target in &targets {
+                            s.check_target(target, false)?;
+                            outputs.extend(s.wires(target)?);
+                        }
+                        for (mem, param) in mems.iter().zip(mem_params) {
+                            if param.role.as_deref() == Some("mut") {
+                                outputs.push(format!("{mem}[*]"));
                             }
+                        }
+                        // Snapshot every OLD output, including mutable cells, before
+                        // any write. The joint inverse may cancel only the whole group.
+                        s.joint_change(&outputs, version, &reads, other)?;
+                        for output in &outputs {
+                            if other {
+                                *s.closed.entry(output.clone()).or_default() += 1;
+                            }
+                            if output.ends_with("[*]") {
+                                *s.cell_epochs.entry(output.clone()).or_default() += 1;
+                            }
+                        }
+                    } else {
+                        s.note_reads(&version, &reads)?;
+                        for target in targets {
+                            s.change(&target, version.clone(), other)?;
                         }
                     }
                     if call.control.is_some() {
@@ -1552,8 +1565,19 @@ impl Discipline {
         version: String,
         extra_reads: &[String],
     ) -> Result<()> {
-        let other = wires.iter().any(|w| self.wire_is_other(w));
-        let context = self.read_snapshot(&[])?;
+        self.joint_change(wires, version, extra_reads, false)
+    }
+    /// Multi-output effects share an entry snapshot and cancel as one event.
+    /// This includes all mutable call bundles and all passed mutable cells.
+    fn joint_change(
+        &mut self,
+        wires: &[String],
+        version: String,
+        extra_reads: &[String],
+        force_other: bool,
+    ) -> Result<()> {
+        let other = force_other || wires.iter().any(|w| self.wire_is_other(w));
+        let context = self.read_snapshot(extra_reads)?;
         let base = format!("{version}:context{context:?}:polarity{:?}", self.predicates);
         let prior = wires
             .first()
@@ -1561,18 +1585,24 @@ impl Discipline {
             .and_then(|v| v.last());
         let inverse = prior
             .filter(|prior| {
-                self.exchanges
-                    .get(*prior)
-                    .is_some_and(|(op, outputs)| op == &base && outputs == wires)
-                    && wires
-                        .iter()
-                        .all(|w| self.versions.get(w).and_then(|v| v.last()) == Some(*prior))
+                self.exchanges.get(*prior).is_some_and(|(op, outputs)| {
+                    operation_inverse(op).as_ref() == Some(&base) && outputs == wires
+                }) && wires
+                    .iter()
+                    .all(|w| self.versions.get(w).and_then(|v| v.last()) == Some(*prior))
             })
             .cloned();
         let complete = if let Some(prior) = inverse {
             // The whole joint computation is still current: use the captured
             // entry versions, rather than treating its outputs as new inputs.
-            prior
+            let complete = operation_inverse(&prior)
+                .ok_or_else(|| Error("§6.2: joint operation has no inverse identity".into()))?;
+            if let Some(reads) = self.reads.get(&prior).cloned() {
+                self.reads.insert(complete.clone(), reads);
+            }
+            self.exchanges
+                .insert(complete.clone(), (base, wires.to_vec()));
+            complete
         } else {
             let complete = format!("{base}:exchange_inputs{:?}", self.snapshot(wires));
             let mut reads = wires.to_vec();

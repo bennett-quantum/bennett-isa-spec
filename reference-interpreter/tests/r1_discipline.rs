@@ -352,3 +352,26 @@ fn r2_memory_operations_pin_predicate_polarity() {
 fn r2_complementary_diagonal_phases_do_not_cancel() {
     reject(&tmp("d0 = qalloc any 1\nd1 = qalloc any 1\nh d0\ncx d0 d1\nqif p {\ncz d1 t\n} {\ncz d1 t\n}\ncx d0 d1\nh d0\nqfree d1\nqfree d0"), "§6.2");
 }
+
+#[test]
+fn r3_action_calls_transfer_the_old_joint_dependencies() {
+    let cs = r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1,1],"tier":"q"}"#;
+    let ps = cs.replace("perm_action", "action");
+    let child = "perm_action @child (a:wire mut, b:wire mut) () () () ()\n^entry():\nswap a b";
+    let body = "d = qalloc any 1\nh d\naction_call @child (d, m) () () ()\ncx m t\nadj action_call @child (d, m) () () ()\nh d\nqfree d";
+    let build = |body: &str| {
+        support::object(&[("child",cs,child),("a",&ps,&format!("action @a (t:wire mut, m:wire mut) () () () ()\n^entry():\n{body}"))],"{}", "\nsection layout\n{\"A_tab\":0,\"H\":0,\"S_cells\":0,\"globals\":{},\"heap_base\":1,\"heap_limit_max\":0,\"interface_regions\":{},\"null_size\":1,\"ptr_width\":32}\n")
+    };
+    reject(&build(body), "§6.2");
+    run_three_identity(&accept(&build(&body.replace("cx m t", "cx m t\ncx m t"))));
+    // Mutable cell outputs carry the old workspace's H provenance too.
+    let cs = r#"{"abi":"0.8","args":[],"bounds":[],"in":[1],"kind":"perm_action","mem":[{"A":1,"W":1,"role":"mut"}],"mut":[1],"tier":"q"}"#;
+    let child = "perm_action @child (d:wire mut) (p:wire in) (r:region[1,1] mut) () ()\n^entry():\nqexchm r p d";
+    let ps = r#"{"abi":"0.8","args":[],"bounds":[],"in":[1],"kind":"action","mem":[],"mut":[1,1],"tier":"q"}"#;
+    let body = "qregion r 1 1\nd = qalloc any 1\nh d\naction_call @child (d) (p) (r) ()\nz = qload r p\ncx z t\nqunload r p z\nadj action_call @child (d) (p) (r) ()\nh d\nqfree d";
+    let build = |body: &str| {
+        support::object(&[("child",cs,child),("a",ps,&format!("action @a (t:wire mut, m:wire mut) (p:wire in) () () ()\n^entry():\n{body}"))],"{}", "\nsection layout\n{\"A_tab\":0,\"H\":0,\"S_cells\":0,\"globals\":{},\"heap_base\":1,\"heap_limit_max\":0,\"interface_regions\":{},\"null_size\":1,\"ptr_width\":32}\n")
+    };
+    reject(&build(body), "§6.2");
+    run_three_identity(&accept(&build(&body.replace("cx z t", "cx z t\ncx z t"))));
+}

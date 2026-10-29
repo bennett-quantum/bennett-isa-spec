@@ -369,3 +369,36 @@ fn generated_borrow_frames_keep_differing_classical_bindings_distinct() {
         }
     }
 }
+
+#[test]
+fn generated_child_call_wrapping_preserves_bell_cleanup_obligations() {
+    let cs = r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1,1],"tier":"q"}"#;
+    let ps = cs
+        .replace("\"in\":[]", "\"in\":[1]")
+        .replace("perm_action", "action");
+    for count in 0..6 {
+        for wrapped in [false, true] {
+            let (compute, uncompute) = if wrapped {
+                (
+                    "action_call @child (d, m) () () ()",
+                    "adj action_call @child (d, m) () () ()",
+                )
+            } else {
+                ("swap d m", "swap d m")
+            };
+            let body = format!("action @a (t:wire mut, m:wire mut) (p:wire in) () () ()\n^entry():\nd = qalloc any 1\nh d\n{compute}\n{}{uncompute}\nh d\nqfree d", "cx m t\n".repeat(count));
+            let text = support::object(&[("child",cs,"perm_action @child (a:wire mut, b:wire mut) () () () ()\n^entry():\nswap a b"),("a",&ps,&body)],"{}", "");
+            // Odd CX count copies the H-created bit into t: Bell entanglement
+            // survives uncompute. Even count is exactly the identity.
+            if count % 2 == 1 {
+                assert!(Object::parse(&text)
+                    .unwrap_err()
+                    .to_string()
+                    .contains("§6.2"));
+            } else {
+                let o = Object::parse(&text).unwrap();
+                runs_clean(&o).unwrap();
+            }
+        }
+    }
+}
