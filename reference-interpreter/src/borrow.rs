@@ -8,7 +8,11 @@
 //! borrowed output equals its input variable and no other output mentions a
 //! borrowed variable. This is a total, exact decision over the frame's full
 //! domain (T3), with no wire-count limit; loops are composed by repeated
-//! squaring, never unrolled bound times. Calls whose black-box outputs would
+//! squaring, never unrolled bound times. Opaque applications retain their full
+//! input expressions: composition substitutes recursively into those inputs and
+//! interns the resulting application, rather than freezing an ANF variable.
+//! This proves identities valid for arbitrary black-box functions; unresolved
+//! function-specific identities need a checked claim. Calls whose outputs would
 //! depend on borrowed wires cannot be decided this way: they require the
 //! §12 borrow_frames claim the specification names, checked when present
 //! (src/claims.rs). SPEC-QUESTIONS 20 records this reading.
@@ -62,7 +66,7 @@ pub fn validate_translation_lemma(
 
 /// An ANF monomial: sorted, distinct variable ids (the empty monomial is 1).
 type Mono = Vec<u32>;
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
 struct Poly(BTreeSet<Mono>);
 impl Poly {
     fn zero() -> Self {
@@ -93,17 +97,6 @@ impl Poly {
     }
     fn mentions(&self, vars: &BTreeSet<u32>) -> bool {
         self.0.iter().flatten().any(|v| vars.contains(v))
-    }
-    fn substitute(&self, map: &BTreeMap<u32, Poly>) -> Self {
-        let mut out = Self::zero();
-        for m in &self.0 {
-            let mut term = Self::one();
-            for v in m {
-                term = term.and(map.get(v).unwrap_or(&Self::var(*v)));
-            }
-            out = out.xor(&term);
-        }
-        out
     }
 }
 
@@ -534,14 +527,69 @@ impl Compiler<'_> {
     }
 }
 
+/// Extensional identity of one black-box output bit at its symbolic inputs.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Application {
+    key: String,
+    bit: usize,
+    inputs: Vec<Poly>,
+}
 /// Symbolic evaluation state of one frame.
 struct Evaluation<'a> {
     vars: BTreeMap<String, u32>,
     state: BTreeMap<String, Poly>,
-    opaque: BTreeMap<String, u32>,
+    opaque: BTreeMap<Application, u32>,
+    applications: BTreeMap<u32, Application>,
     borrowed: &'a BTreeSet<u32>,
 }
 impl Evaluation<'_> {
+    fn symbol(&mut self, app: Application) -> Result<Poly> {
+        if app.inputs.iter().any(|p| p.mentions(self.borrowed)) {
+            return err("§5.6", "composed black-box input depends on borrowed wires; needs a §12 borrow_frames claim");
+        }
+        let next = self.vars.len() as u32 + self.opaque.len() as u32;
+        let id = *self.opaque.entry(app.clone()).or_insert(next);
+        self.applications.insert(id, app);
+        Ok(Poly::var(id))
+    }
+    /// Simultaneous substitution, recursively through applications. Inserted
+    /// replacement polynomials are already in the destination coordinate system.
+    fn substitute(&mut self, p: &Poly, map: &BTreeMap<u32, Poly>) -> Result<Poly> {
+        let mut out = Poly::zero();
+        for m in &p.0 {
+            let mut term = Poly::one();
+            for v in m {
+                let value = if let Some(value) = map.get(v) {
+                    value.clone()
+                } else if let Some(mut app) = self.applications.get(v).cloned() {
+                    app.inputs = app
+                        .inputs
+                        .iter()
+                        .map(|p| self.substitute(p, map))
+                        .collect::<Result<_>>()?;
+                    self.symbol(app)?
+                } else {
+                    Poly::var(*v)
+                };
+                term = term.and(&value);
+            }
+            out = out.xor(&term);
+        }
+        Ok(out)
+    }
+    fn compose(
+        &mut self,
+        first: &BTreeMap<String, Poly>,
+        then: &BTreeMap<String, Poly>,
+    ) -> Result<BTreeMap<String, Poly>> {
+        let sub = first
+            .iter()
+            .filter_map(|(w, p)| self.vars.get(w).map(|v| (*v, p.clone())))
+            .collect();
+        then.iter()
+            .map(|(w, p)| Ok((w.clone(), self.substitute(p, &sub)?)))
+            .collect()
+    }
     fn var(&mut self, w: &str) -> Poly {
         if let Some(p) = self.state.get(w) {
             return p.clone();
@@ -610,9 +658,11 @@ impl Evaluation<'_> {
                 let olds: Vec<Poly> = outputs.iter().map(|w| self.var(w)).collect();
                 for (j, (w, old)) in outputs.iter().zip(olds).enumerate() {
                     // A canonical symbol for output j of the black box at these inputs.
-                    let id = format!("{key}#{j}#{:?}", ins);
-                    let next = self.vars.len() as u32 + self.opaque.len() as u32;
-                    let symbol = Poly::var(*self.opaque.entry(id).or_insert(next));
+                    let symbol = self.symbol(Application {
+                        key: key.clone(),
+                        bit: j,
+                        inputs: ins.clone(),
+                    })?;
                     let value = if *assign { symbol } else { old.xor(&symbol) };
                     // Under the control condition c: c*value + (1+c)*old.
                     let merged = c.and(&value).xor(&c.xor(&Poly::one()).and(&old));
@@ -641,17 +691,6 @@ impl Evaluation<'_> {
                     self.apply(b)?;
                 }
                 let body_map = std::mem::replace(&mut self.state, saved);
-                let compose = |first: &BTreeMap<String, Poly>,
-                               then: &BTreeMap<String, Poly>,
-                               vars: &BTreeMap<String, u32>| {
-                    let sub: BTreeMap<u32, Poly> = first
-                        .iter()
-                        .filter_map(|(w, p)| vars.get(w).map(|v| (*v, p.clone())))
-                        .collect();
-                    then.iter()
-                        .map(|(w, p)| (w.clone(), p.substitute(&sub)))
-                        .collect::<BTreeMap<_, _>>()
-                };
                 let mut power: BTreeMap<String, Poly> = body_map;
                 let mut result: BTreeMap<String, Poly> = wires
                     .iter()
@@ -660,15 +699,16 @@ impl Evaluation<'_> {
                 let mut k = *n;
                 while k > 0 {
                     if k & 1 == 1 {
-                        result = compose(&result, &power, &self.vars);
+                        result = self.compose(&result, &power)?;
                     }
                     k >>= 1;
                     if k > 0 {
-                        power = compose(&power, &power, &self.vars);
+                        power = self.compose(&power, &power)?;
                     }
                 }
                 for (w, p) in result {
-                    self.state.insert(w, p.substitute(&entry));
+                    let value = self.substitute(&p, &entry)?;
+                    self.state.insert(w, value);
                 }
             }
             Node::Other(_) => return err("§5.6", "non-permutation operation inside a frame"),
@@ -760,6 +800,7 @@ fn factorises(frame: &[Node], borrowed: &BTreeSet<String>) -> Result<()> {
             .collect(),
         vars,
         opaque: BTreeMap::new(),
+        applications: BTreeMap::new(),
         borrowed: &borrowed_vars,
     };
     for n in frame {

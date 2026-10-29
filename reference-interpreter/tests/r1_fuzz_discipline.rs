@@ -402,3 +402,73 @@ fn generated_child_call_wrapping_preserves_bell_cleanup_obligations() {
         }
     }
 }
+
+#[test]
+fn generated_changing_input_opaque_loops_match_independent_parity() {
+    use bennett_isa_ref::{Argument, Budget};
+    let os =
+        r#"{"abi":"0.8","args":[],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#;
+    for flip in [false, true] {
+        for n in 0..8 {
+            for nested in [false, true] {
+                let count = if nested { 2 * n } else { n };
+                let bounds = if nested {
+                    format!("[2,{n}]")
+                } else {
+                    format!("[{n}]")
+                };
+                let regs = if nested {
+                    format!("2, {n}")
+                } else {
+                    n.to_string()
+                };
+                let ps = format!(
+                    r#"{{"abi":"0.8","args":["token"],"bounds":{bounds},"in":[],"kind":"perm_action","mem":[],"mut":[1,4],"tier":"q"}}"#
+                );
+                let body = format!(
+                    "qloop {n} {{\noracle_call @o tk (t) d f () ()\n{}\n}}",
+                    if flip { "x t" } else { "" }
+                );
+                let body = if nested {
+                    format!("qloop 2 {{\n{body}\n}}")
+                } else {
+                    body
+                };
+                let body = body.replace("\n\n", "\n");
+                let text = support::object(&[("o",os,"oracle @o (x:wire in) (t:wire) (f:wire[4]) () ()\n^entry():\nlift.retval x"),("a",&ps,&format!("perm_action @a (t:wire mut, f:wire[4] mut) () () (tk:token) ()\nregs {{  }} bounds {{{regs}}}\n^entry():\nd = qborrow any 1\n{body}\nqreturn d"))],"{}", "");
+                // Identity oracle: without flips, d' = d XOR (count%2)*t;
+                // with flips, pairs contribute t XOR !t = 1. Identity on d
+                // for ALL t iff count is even (no flips) or a multiple of 4.
+                let valid = count % (if flip { 4 } else { 2 }) == 0;
+                let parsed = Object::parse(&text);
+                if !valid {
+                    assert!(parsed.unwrap_err().to_string().contains("§5.6"), "{body}");
+                    continue;
+                }
+                let o = parsed.unwrap_or_else(|e| panic!("{e}: {body}"));
+                for input in 0..65u32 {
+                    let mut q = QuantumState::new();
+                    let w = q.allocate(6).unwrap();
+                    for (bit, wire) in w.iter().enumerate() {
+                        if input == 64 {
+                            q.gate("h", &[*wire], None, &[]).unwrap();
+                        } else if input >> bit & 1 == 1 {
+                            q.gate("x", &[*wire], None, &[]).unwrap();
+                        }
+                    }
+                    let before = q.clone();
+                    let mut b = QuantumBindings::default();
+                    b.bundles.insert("t".into(), vec![w[0]]);
+                    b.bundles.insert("f".into(), w[1..5].to_vec());
+                    b.borrowed.push(vec![w[5]]);
+                    b.args
+                        .insert("tk".into(), Argument::Token(Budget::steps(1)));
+                    o.execute_action("a", &mut q, &b, false, &[]).unwrap();
+                    assert_eq!(q, before, "{body}");
+                    o.execute_action("a", &mut q, &b, true, &[]).unwrap();
+                    assert_eq!(q, before, "{body}");
+                }
+            }
+        }
+    }
+}

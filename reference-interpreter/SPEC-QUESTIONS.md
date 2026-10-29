@@ -134,7 +134,10 @@ changed in response to the council's round-1 review
     translation lemma". Reading: the reference checker establishes it itself,
     exactly, by deciding the frame's Boolean functions in algebraic normal form
     (a canonical form, so the decision is a proof over the full domain, with no
-    wire limit; loops by repeated squaring); a frame it cannot decide (a black-box
+    wire limit; loops by repeated squaring with recursive substitution into
+    opaque application inputs, corrected in round 3). With opaque functions this
+    is a sound symbolic proof, not a complete function-specific decision; a
+    frame it cannot prove (a black-box
     call whose inputs depend on borrowed wires) is admitted only through verified
     certificate `borrow_frames` claims (proofs over D whose borrowed components
     are restored and do not influence the other outputs). *Proposed 0.9:* "A

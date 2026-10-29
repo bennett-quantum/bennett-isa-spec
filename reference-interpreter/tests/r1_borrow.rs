@@ -170,3 +170,59 @@ fn r2_opaque_borrow_calls_bind_classical_args_and_tokens_through_inlining() {
         }
     }
 }
+
+#[test]
+fn r3_opaque_loop_composition_substitutes_inside_applications() {
+    use bennett_isa_ref::{Argument, Budget};
+    let os =
+        r#"{"abi":"0.8","args":[],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#;
+    let ps = r#"{"abi":"0.8","args":["token"],"bounds":[2],"in":[],"kind":"perm_action","mem":[],"mut":[1,4],"tier":"q"}"#;
+    let call = "oracle_call @o tk (t) d f () ()";
+    let build = |flip: bool, looped: bool| {
+        let pair = format!("{call}{}", if flip { "\nx t" } else { "" });
+        let body = if looped {
+            format!("qloop 2 {{\n{pair}\n}}")
+        } else {
+            format!("{pair}\n{pair}")
+        };
+        let sig = if looped {
+            ps.to_string()
+        } else {
+            ps.replace("[2]", "[]")
+        };
+        let regs = if looped { "regs {  } bounds {2}\n" } else { "" };
+        support::object(&[("o",os,"oracle @o (x:wire in) (t:wire) (f:wire[4]) () ()\n^entry():\nlift.retval x"),("a",&sig,&format!("perm_action @a (t:wire mut, f:wire[4] mut) () () (tk:token) ()\n{regs}^entry():\nd = qborrow any 1\n{body}\nqreturn d"))],"{}", "")
+    };
+    for looped in [true, false] {
+        // d' = d XOR t XOR (t XOR 1) = d XOR 1: never a borrow identity.
+        support::reject_cli(
+            &build(true, looped),
+            "§5.6",
+            &format!("opaque-loop-{looped}"),
+        );
+        let o = Object::parse(&build(false, looped)).unwrap();
+        // Invariant inputs: d' = d XOR t XOR t = d; all 64 t,f,d values.
+        for input in 0..65u32 {
+            let mut q = QuantumState::new();
+            let w = q.allocate(6).unwrap();
+            for (bit, wire) in w.iter().enumerate() {
+                if input == 64 {
+                    q.gate("h", &[*wire], None, &[]).unwrap();
+                } else if input >> bit & 1 == 1 {
+                    q.gate("x", &[*wire], None, &[]).unwrap();
+                }
+            }
+            let before = q.clone();
+            let mut b = QuantumBindings::default();
+            b.bundles.insert("t".into(), vec![w[0]]);
+            b.bundles.insert("f".into(), w[1..5].to_vec());
+            b.borrowed.push(vec![w[5]]);
+            b.args
+                .insert("tk".into(), Argument::Token(Budget::steps(1)));
+            o.execute_action("a", &mut q, &b, false, &[]).unwrap();
+            assert_eq!(q, before);
+            o.execute_action("a", &mut q, &b, true, &[]).unwrap();
+            assert_eq!(q, before);
+        }
+    }
+}

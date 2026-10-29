@@ -35,3 +35,24 @@ generates 12 direct/wrapped, odd/even CX variants; independent Bell/parity
 reasoning requires rejection or clean execution over the full small interface.
 RED: exact witness accepted. GREEN: 17 discipline + 3 active generator tests.
 No SPEC-QUESTIONS entry: this is the explicit §6.1 union and §6.2 identity rule.
+
+## SOL-R3-B03 — resolved
+
+`borrow.rs::Application` retains callee/classical identity, output bit and full
+symbolic input tuple. `Evaluation::{symbol,substitute,compose,apply}` substitutes
+recursively inside applications at every Repeat composition and at the final
+entry substitution; equal applications are re-interned. A substituted borrowed
+input explicitly requires the existing verified §12 claim route. No frozen
+opaque symbol remains across a changing-input substitution.
+Pin: `r1_borrow::r3_opaque_loop_composition_substitutes_inside_applications`:
+exact loop and unrolled witness reject §5.6 in parser/hash/check; invariant-input
+positives preserve all 64 t,f,d basis entries and a superposition, forward/adjoint.
+`r1_fuzz_discipline::generated_changing_input_opaque_loops_match_independent_parity`
+generates 32 loops/nested loops, n=0..7, with/without input X; independent parity
+requires precisely the valid borrow identities and checks all accepted programs
+on all 64 entries plus a superposition, forward/adjoint.
+RED: exact changing-input loop accepted. GREEN: 5 active borrow tests and the
+new generator pass. SPEC-QUESTIONS 20 and module prose now distinguish exact
+Boolean decisions from sound opaque-function symbolic proofs; unresolved
+function-specific identities retain the verified certificate path. This corrects
+the existing reading's description, with no new ambiguity or scope restriction.

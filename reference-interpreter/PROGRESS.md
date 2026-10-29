@@ -14,6 +14,10 @@ r1_rules tests): nested target/fault/uncall deliveries invalidate outstanding
 input readers while commuting output deliveries remain legal. B02 resolved:
 joint call dependency/provenance and inverse groups, including mutable cells;
 17 discipline and 3 generator tests pass, including odd/even call wrapping.
+B03 resolved: opaque applications retain recursively substituted inputs during
+loop squaring. Exact loop/unrolled negatives reject; invariant inputs and 32
+changing-input/nested generated loops pass their independent parity checks.
+SPEC-QUESTIONS 20 now precisely describes the opaque symbolic proof route.
 Bead b-isa-spec-zq2.
 
 ## Council round 2: sol/codex implementation (2026-10-29)
