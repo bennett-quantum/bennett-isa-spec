@@ -40,3 +40,29 @@ mutates sum_db load.i8 → i08 and heap store.i16 → i016 (the actual heap fixt
 uses i16, not i8); parser and hash/check reject with §16.1. RED: load.i08 was
 accepted. Canonical fixture execution remains covered by the existing suite.
 No new specification question.
+
+## SOL-R2-B02 — resolved
+
+Coincides with codex R2-B01. `call_discipline.rs::Invocation` stores callee,
+token, parsed ins/mem/args, target and fault. `validate_matched_oracle_calls`
+never serializes/splits keys, nor discards list parse errors. Pins:
+`r1_rules::r2_multi_input_invocation_keys_preserve_tuple_boundaries` (sum2
+witness, changes to either input; unchanged pair returns (0,0,5) and reverses),
+`r2_codex_changed_second_input_and_two_memory_regions` (codex exact witness,
+positive (0,0,4), writes into either supplied region). RED: both reviewers'
+changed-input class was accepted before the fix. No new question.
+
+## codex R2-B01 — resolved
+
+Same change and tests as SOL-R2-B02. Existing multiplicity and disjoint-global
+store tests still pass.
+
+## SOL-R2-B03 — resolved
+
+`call_discipline.rs::validate_matched_oracle_calls` conservatively includes
+every containing-function row as a qjumpr successor, matching §4.2's range,
+including rows inside a block. Pin:
+`r1_rules::r2_qjumpr_can_enter_an_uncall_at_a_non_label_row`: label+1 bypasses
+the call and rejects §5.5 (RED: accepted); computing call at entry dominating
+all numeric destinations accepts and runs/reverses to (0,0,5). No target-value
+analysis or new spec question.

@@ -322,3 +322,63 @@ fn parameter_roles_agree_with_their_header_group() {
         "§16.2",
     );
 }
+
+#[test]
+fn r2_multi_input_invocation_keys_preserve_tuple_boundaries() {
+    let si = r#"{"abi":"0.8","args":[],"fault":4,"in":[8,8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}"#;
+    let so = r#"{"abi":"0.8","args":["token"],"fault":4,"in":[8,8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}"#;
+    let build = |middle: &str| object(&[
+        ("sum2", si, "oracle @sum2 (x:wire[8] in, y:wire[8] in) (t:wire[8]) (f:wire[4]) () ()\nregs { r:reg[8] }\n^entry():\nr = lift.add x y\nlift.retval r"),
+        ("p", so, &format!("oracle @p (a:wire[8] in, b:wire[8] in) (t:wire[8]) (f:wire[4]) () (tk:token)\nregs {{ x:reg[8], y:reg[8], out:reg[8], fr:reg[4] }}\n^entry():\nx = lift.mov a\ny = lift.mov b\nlift.oracle_call @sum2 tk (x, y) out fr () ()\n{middle}lift.oracle_uncall @sum2 tk (x, y) out fr () ()\nlift.retval out"))], "{}", "");
+    for middle in ["x = lift.add x y\n", "y = lift.const.i8 1\n"] {
+        rejects(&build(middle), "§5.5");
+    }
+    // (1+2) XOR (1+2)=0; 2 moves + call + uncall + retval = 5.
+    let o = rehash(&build(""));
+    let mut input = OracleInput::bits(&[1,2]);
+    input.args.push(Argument::Token(Budget::steps(2)));
+    assert_eq!(check(&o, "p", &input, Budget::steps(5)), (0,0,5));
+}
+
+#[test]
+fn r2_qjumpr_can_enter_an_uncall_at_a_non_label_row() {
+    let si = r#"{"abi":"0.8","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}"#;
+    let so = r#"{"abi":"0.8","args":["token"],"fault":4,"in":[],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}"#;
+    let inner = "oracle @inner (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()\n^entry():\nlift.retval x";
+    let bad = "oracle @p () (t:wire[8]) (f:wire[4]) () (tk:token)\nregs { x:reg[8], dest:reg[32], off:reg[32], out:reg[8], fr:reg[4] }\n^entry():\nx = lift.const.i8 1\ndest = lift.label ^pair\noff = lift.const.i32 1\ndest = lift.add dest off\nqjumpr dest\n^pair():\nlift.oracle_call @inner tk (x) out fr () ()\nlift.oracle_uncall @inner tk (x) out fr () ()\nlift.retval out";
+    rejects(&object(&[("inner", si, inner),("p", so, bad)], "{}", ""), "§5.5");
+    // Call at entry dominates all targets of the computed jump. Every route
+    // to the uncall has an outstanding call (even if the jump revisits entry).
+    let good = "oracle @p () (t:wire[8]) (f:wire[4]) () (tk:token)\nregs { x:reg[8], dest:reg[32], out:reg[8], fr:reg[4] }\n^entry():\nlift.oracle_call @inner tk (x) out fr () ()\ndest = lift.label ^cleanup\nqjumpr dest\n^cleanup():\nlift.oracle_uncall @inner tk (x) out fr () ()\nlift.retval out";
+    let o = rehash(&object(&[("inner", si, inner),("p", so, good)], "{}", ""));
+    let mut input = OracleInput::bits(&[]);
+    input.args.push(Argument::Token(Budget::steps(1)));
+    assert_eq!(check(&o, "p", &input, Budget::steps(5)), (0,0,5));
+}
+
+#[test]
+fn r2_codex_changed_second_input_and_two_memory_regions() {
+    let si = r#"{"abi":"0.8","args":[],"fault":4,"in":[8,8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}"#;
+    let so = r#"{"abi":"0.8","args":["token"],"fault":4,"in":[8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}"#;
+    let inner = "oracle @inner (x:wire[8] in, y:wire[8] in) (t:wire[8]) (f:wire[4]) () ()\n^entry():\nlift.retval y";
+    let outer = "oracle @outer (x:wire[8] in) (t:wire[8]) (f:wire[4]) () (tk:token)\nregs { a:reg[8], b:reg[8], r:reg[8], fr:reg[4] }\n^entry():\na = lift.mov x\nlift.oracle_call @inner tk (a, b) r fr () ()\nb = lift.const.i8 1\nlift.oracle_uncall @inner tk (a, b) r fr () ()\nlift.retval r";
+    rejects(&object(&[("inner", si, inner),("outer", so, outer)], "{}", ""), "§5.5");
+    let good = outer.replace("b = lift.const.i8 1\n", "");
+    let o = rehash(&object(&[("inner", si, inner),("outer", so, &good)], "{}", ""));
+    for x in [0, 1, 255] {
+        let mut input = OracleInput::bits(&[x]);
+        input.args.push(Argument::Token(Budget::steps(1)));
+        assert_eq!(check(&o, "outer", &input, Budget::steps(4)), (0,0,4));
+    }
+    let mem = r#"[{"A":1,"W":8,"role":"in"},{"A":1,"W":8,"role":"in"}]"#;
+    let si = si.replace("\"mem\":[]", &format!("\"mem\":{mem}"));
+    let so = so.replace("\"mem\":[]", &format!("\"mem\":{mem}"));
+    let inner = inner.replace("(f:wire[4]) () ()", "(f:wire[4]) (db:region[1,8] in, aux:region[1,8] in) ()");
+    let layout = "\nsection layout\n{\"A_tab\":2,\"H\":8,\"S_cells\":0,\"globals\":{},\"heap_base\":64,\"heap_limit_max\":0,\"interface_regions\":{\"inner\":{\"aux\":{\"base\":32},\"db\":{\"base\":16}},\"outer\":{\"aux\":{\"base\":32},\"db\":{\"base\":16}}},\"null_size\":16,\"ptr_width\":32}\n";
+    let outer = good.replace("(f:wire[4]) () (tk:token)", "(f:wire[4]) (db:region[1,8] in, aux:region[1,8] in) (tk:token)").replace("fr:reg[4]", "fr:reg[4], p:reg[32]").replace("r fr () ()", "r fr (db, aux) ()");
+    Object::parse(&object(&[("inner", &si, &inner),("outer", &so, &outer)], "{}", layout)).unwrap();
+    for region in ["db", "aux"] {
+        let bad = outer.replace("lift.oracle_uncall", &format!("p = lift.addr @{region}\nlift.store.i8 p a\nlift.oracle_uncall"));
+        rejects(&object(&[("inner", &si, &inner),("outer", &so, &bad)], "{}", layout), "§5.5");
+    }
+}

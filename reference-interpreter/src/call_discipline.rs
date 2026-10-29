@@ -5,6 +5,24 @@ use crate::{
     Error, Function, Instruction, Object, Result, Type,
 };
 use std::collections::{BTreeMap, BTreeSet};
+/// Complete §5.5 invocation identity; lists retain their operand boundaries.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct Invocation {
+    callee: String,
+    token: String,
+    ins: Vec<String>,
+    target: String,
+    fault: String,
+    mem: Vec<String>,
+    args: Vec<String>,
+}
+impl Invocation {
+    fn from_row(row: &Instruction) -> Result<Self> {
+        let o = &row.operands;
+        Ok(Self { callee: o[0].clone(), token: o[1].clone(), ins: list(&o[2])?,
+            target: o[3].clone(), fault: o[4].clone(), mem: list(&o[5])?, args: list(&o[6])? })
+    }
+}
 impl Object {
     fn interface_targets(
         &self,
@@ -161,7 +179,7 @@ impl Object {
             successors.push(match row.op.as_str() {
                 "qjump" => vec![label(&row.operands[0])?],
                 "qbranch" => vec![label(&row.operands[1])?, label(&row.operands[2])?],
-                "qjumpr" => labels.values().copied().collect(),
+                "qjumpr" => (0..rows.len()).collect(),
                 "fault" | "lift.ret" | "lift.retval" => Vec::new(),
                 _ => vec![k + 1],
             });
@@ -171,7 +189,7 @@ impl Object {
         let stores_in_closure = |callee: &str| -> Result<bool> { self.closure_may_store(callee) };
         #[derive(Clone, PartialEq, Eq)]
         struct State {
-            outstanding: BTreeMap<String, u64>,
+            outstanding: BTreeMap<Invocation, u64>,
             constants: BTreeMap<String, u128>,
         }
         let meet = |a: &State, b: &State| State {
@@ -193,7 +211,7 @@ impl Object {
         let transfer = |row: &Instruction, state: &State| -> Result<State> {
             let mut next = state.clone();
             let op = row.op.as_str();
-            let key = row.operands.join(" ");
+
             let mut writes: BTreeSet<String> = row.lhs.iter().cloned().collect();
             if op == "lift.perm_call" {
                 writes.extend(list(&row.operands[1])?);
@@ -217,14 +235,11 @@ impl Object {
                 }
             }
             next.outstanding.retain(|k, _| {
-                let o: Vec<&str> = k.split(' ').collect();
-                let ins = list(o[2]).unwrap_or_default();
-                let mem = list(o[5]).unwrap_or_default();
-                let touches = ins
+                let touches = k.ins
                     .iter()
-                    .chain([&o[3].to_string(), &o[4].to_string()])
+                    .chain([&k.target, &k.fault])
                     .any(|w| writes.contains(w));
-                let clobbers = mem.iter().any(|r| {
+                let clobbers = k.mem.iter().any(|r| {
                     mut_regions.contains(r)
                         || cells.iter().any(|c| match (c, regions.get(r)) {
                             (None, _) | (_, None) => true,
@@ -240,8 +255,9 @@ impl Object {
                 next.constants.remove(w);
             }
             match op {
-                "lift.oracle_call" => *next.outstanding.entry(key).or_default() += 1,
+                "lift.oracle_call" => *next.outstanding.entry(Invocation::from_row(row)?).or_default() += 1,
                 "lift.oracle_uncall" => {
+                    let key = Invocation::from_row(row)?;
                     if let Some(n) = next.outstanding.get_mut(&key) {
                         *n -= 1;
                         if *n == 0 {
@@ -283,7 +299,7 @@ impl Object {
                 continue;
             }
             let Some(state) = &entry[k] else { continue };
-            if !state.outstanding.contains_key(&row.operands.join(" ")) {
+            if !state.outstanding.contains_key(&Invocation::from_row(row)?) {
                 return err(
                     "§5.5",
                     format!(
