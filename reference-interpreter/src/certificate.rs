@@ -2,7 +2,7 @@
 use crate::{
     err,
     json::Json,
-    metadata::{hash, nonnegative, text},
+    metadata::{hash, nonnegative, text, variant},
     sha256_hex, Error, Function, Object, Result, Type,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -29,18 +29,12 @@ fn metric_map(value: &Json) -> Result<()> {
     Ok(())
 }
 fn context_key(key: &str) -> Result<(&str, u128)> {
-    let (variant, controls) = key
-        .rsplit_once(':')
+    let (name, controls) = key
+        .split_once(':')
         .ok_or_else(|| Error("§12: variant:inherited_controls key required".into()))?;
-    if variant.is_empty() {
-        return err("§12", "empty variant");
-    }
-    Ok((
-        variant,
-        controls
-            .parse()
-            .map_err(|_| Error("§12: invalid inherited control count".into()))?,
-    ))
+    variant(&Json::String(name.into()))?;
+    let n = crate::object::host_count(controls, "inherited control count")?;
+    Ok((name, n as u128))
 }
 /// The closed §8.1 AST; frame expressions bind only c.
 pub(crate) fn expression(value: &Json, variables: &BTreeSet<&str>) -> Result<()> {
@@ -164,10 +158,18 @@ fn domain(value: &Json, f: &Function) -> Result<()> {
                 return err("§12.2", "repeated domain component");
             }
             let width = b.get("width")?.uint()?;
-            let lo = b.get("lo")?.uint()?;
-            let hi = b.get("hi")?.uint()?;
-            if width == 0 || lo > hi || (width < 128 && hi >= 1u128 << (width as u32)) {
-                return err("§12.2", "domain interval outside bundle width");
+            let bits =
+                usize::try_from(width).map_err(|_| Error("host limit: domain width".into()))?;
+            if width == 0 {
+                return err("§12.2", "zero-width domain component");
+            }
+            // Bounds are exact integers of any size, within the bundle width.
+            let lo = crate::BitVector::parse_unsigned_exact(bits, b.get("lo")?.uint_text()?)
+                .map_err(|e| Error(format!("§12.2: domain lo outside bundle width: {e}")))?;
+            let hi = crate::BitVector::parse_unsigned_exact(bits, b.get("hi")?.uint_text()?)
+                .map_err(|e| Error(format!("§12.2: domain hi outside bundle width: {e}")))?;
+            if lo.unsigned_cmp(&hi)? == std::cmp::Ordering::Greater {
+                return err("§12.2", "domain interval with lo > hi");
             }
             if group == "bundles" {
                 let p = f
@@ -212,12 +214,12 @@ fn domain(value: &Json, f: &Function) -> Result<()> {
         for cell in cells.array()? {
             cell.fields(&["index", "lo", "hi"], &[])?;
             let index = cell.get("index")?.uint()?;
-            let lo = cell.get("lo")?.uint()?;
-            let hi = cell.get("hi")?.uint()?;
-            if (a < 128 && index >= 1u128 << a)
+            let bits = usize::try_from(w).map_err(|_| Error("host limit: cell width".into()))?;
+            let lo = crate::BitVector::parse_unsigned_exact(bits, cell.get("lo")?.uint_text()?)?;
+            let hi = crate::BitVector::parse_unsigned_exact(bits, cell.get("hi")?.uint_text()?)?;
+            if crate::oracle::power_of_two(a as u128).is_some_and(|cells| index >= cells)
                 || !indices.insert(index)
-                || lo > hi
-                || (w < 128 && hi >= 1u128 << w)
+                || lo.unsigned_cmp(&hi)? == std::cmp::Ordering::Greater
             {
                 return err("§12.2", "invalid domain cell interval");
             }
@@ -245,7 +247,7 @@ fn subject(value: &Json) -> Result<()> {
     )?;
     hash(value.get("closure_hash")?)?;
     hash(value.get("schedule_hash")?)?;
-    text(value.get("variant")?)?;
+    variant(value.get("variant")?)?;
     value.get("inherited_controls")?.uint()?;
     Ok(())
 }

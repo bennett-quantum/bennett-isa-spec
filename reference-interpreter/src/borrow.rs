@@ -800,12 +800,23 @@ impl Object {
             compiler.compile(&block.instructions, &[], &mut nodes)?;
         }
         let borrowed = compiler.borrowed;
+        match self.decide_frames(&nodes, &borrowed) {
+            Ok(()) => Ok(()),
+            // The library route of §5.6: verified certificate borrow_frames claims.
+            Err(e) if self.borrow_frames_certified(f)? => {
+                let _ = e;
+                Ok(())
+            }
+            Err(e) => Err(e),
+        }
+    }
+    fn decide_frames(&self, nodes: &[Node], borrowed: &BTreeSet<String>) -> Result<()> {
         // Frames: maximal permutation-only runs, from the first to the last
         // operation touching a borrowed wire.
         let mut start = 0;
         while start < nodes.len() {
             if !nodes[start].permutation() {
-                if touches(&nodes[start], &borrowed) {
+                if touches(&nodes[start], borrowed) {
                     return err(
                         "§5.6",
                         "borrowed wire touched by a non-permutation instruction",
@@ -817,12 +828,12 @@ impl Object {
             let end = (start..nodes.len())
                 .find(|i| !nodes[*i].permutation())
                 .unwrap_or(nodes.len());
-            let first = (start..end).find(|i| touches(&nodes[*i], &borrowed));
-            let last = (start..end).rfind(|i| touches(&nodes[*i], &borrowed));
+            let first = (start..end).find(|i| touches(&nodes[*i], borrowed));
+            let last = (start..end).rfind(|i| touches(&nodes[*i], borrowed));
             if let (Some(first), Some(last)) = (first, last) {
                 let frame = &nodes[first..=last];
-                if !translation_lemma(frame, &borrowed) {
-                    factorises(frame, &borrowed)?;
+                if !translation_lemma(frame, borrowed) {
+                    factorises(frame, borrowed)?;
                 }
             }
             start = end;

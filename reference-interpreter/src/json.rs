@@ -76,8 +76,9 @@ impl Json {
             .get(key)
             .ok_or_else(|| crate::Error(format!("§9.1: missing field {key}")))
     }
-    /// Metadata integers may be JSON numbers or decimal strings (§9.1).
-    pub fn uint(&self) -> Result<u128> {
+    /// The canonical decimal text of a metadata integer of any size (§9.1):
+    /// a JSON number iff it is at most 2^53 - 1, otherwise a decimal string.
+    pub fn uint_text(&self) -> Result<&str> {
         let s = match self {
             Self::Number(s) | Self::String(s) => s,
             _ => return err("§9.1", "expected unsigned integer"),
@@ -85,9 +86,21 @@ impl Json {
         if !crate::object::integer(s) || s.starts_with('-') {
             return err("§9.1", format!("invalid canonical unsigned integer {s}"));
         }
-        let value = s
-            .parse::<u128>()
-            .map_err(|_| crate::Error(format!("§9.1: invalid unsigned integer {s}")))?;
+        let exact = s.len() < 16 || (s.len() == 16 && s.as_str() <= "9007199254740991");
+        if matches!(self, Self::Number(_)) != exact {
+            return err(
+                "§9.1",
+                format!("integer {s} must be a JSON number iff it is at most 2^53 - 1"),
+            );
+        }
+        Ok(s)
+    }
+    /// Metadata integers may be JSON numbers or decimal strings (§9.1).
+    pub fn uint(&self) -> Result<u128> {
+        let s = self.uint_text()?;
+        let value = s.parse::<u128>().map_err(|_| {
+            crate::Error(format!("§9.1: integer {s} exceeds this field's u128 range"))
+        })?;
         // §9.1 "Integers that may exceed 2^53 are decimal strings": a value above
         // 2^53 - 1 is a string and a smaller one a number (SPEC-QUESTIONS 17).
         let exact = value <= 9_007_199_254_740_991;

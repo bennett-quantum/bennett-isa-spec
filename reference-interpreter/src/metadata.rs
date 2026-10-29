@@ -21,6 +21,20 @@ pub(crate) fn text(value: &Json) -> Result<&str> {
     }
     Ok(s)
 }
+/// A variant identifier: §6.4/§12.3 key cleanup, error and multiplicity entries
+/// by "<variant>:<inherited_controls>" (and "<hash>:<variant>:<controls>"), so a
+/// variant is a nonempty string without ':' (SPEC-QUESTIONS 11). The
+/// specification does not enumerate variant names.
+pub(crate) fn variant(value: &Json) -> Result<&str> {
+    let s = text(value)?;
+    if s.contains(':') {
+        return err(
+            "§12.3",
+            "a variant contains no ':' (keys are <variant>:<controls>)",
+        );
+    }
+    Ok(s)
+}
 pub(crate) fn nonnegative(value: &Json) -> Result<()> {
     let s = match value {
         Json::String(s) | Json::Number(s) => s,
@@ -186,7 +200,7 @@ impl Object {
             if identity.closure_hashes[region].as_deref() != Some(hash(b.get("closure_hash")?)?) {
                 return err("§11", "schedule closure binding mismatch");
             }
-            text(b.get("variant")?)?;
+            variant(b.get("variant")?)?;
             b.get("inherited_controls")?.uint()?;
             nonnegative(b.get("epsilon")?)?;
             let budget = b.get("budget")?.array()?;
