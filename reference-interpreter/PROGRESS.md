@@ -18,7 +18,21 @@ The new deterministic 32-case family checks trip counts 1..4 against per-return
 parity: 16 accepted / 16 rejected. Existing RNG/Python seeds unchanged.
 Normal suite after B01: **217 passed, 0 failed, 5 ignored**. 11 active borrow
 and 5 active generator tests pass. Response: council/response-round-4.md;
-appendable for sol/muse. B02 and final exhaustive/conformance gates follow.
+appendable for sol/muse.
+
+R4-B02 resolved: physical region slot disjointness is checked before handle
+deduplication; effective controls are bound to transitive actual targets.
+Only specified alias preconditions become terminal fault-4 frames; internal
+errors remain diagnostics. Exact CC/R select witnesses, oracle aliases,
+regions, block parameters, nested targets and directly aliased R bindings
+are pinned. Both quantum state and handles are unchanged on fault and complete
+prefix reversal restores entry. CLI run-cc/run-program give FAILED/fault=4/
+steps=2/results=[]; reverse equals_entry=true. Disjoint c=0 remains three-step
+completion and control/read-only-input overlap remains legal. Both main
+witnesses were RED; replaying the five library pins against pre-fix source
+found oracle aliases had silently completed as well. GREEN: 11 register +
+29 CLI tests; full normal suite **223 passed, 0 failed, 5 ignored**.
+Final exhaustive/conformance gates follow.
 No new ambiguity, decline, spec edit or narrowed capability. Bead b-isa-spec-zq2.
 
 ## Council round 3, codex second pass (2026-10-29)

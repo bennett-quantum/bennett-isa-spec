@@ -31,7 +31,7 @@ impl Invocation {
     }
 }
 impl Object {
-    fn interface_targets(
+    pub(crate) fn interface_targets(
         &self,
         name: &str,
         active: &mut BTreeSet<String>,

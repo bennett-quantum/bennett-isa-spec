@@ -806,10 +806,26 @@ impl<'a> ClassicalMachine<'a> {
                 None,
             )
         };
+        // Check the physical interface BEFORE deduplicating lifecycle handles.
+        // Distinct SSA names (e.g. select results or block parameters) can bind
+        // the very same register. Controls may share read-only inputs, so they
+        // are checked separately against actual targets below.
+        let mut interface_wires = std::collections::BTreeSet::new();
+        let mut bind_wires = |wires: &[crate::quantum::Wire]| -> Result<()> {
+            for w in wires {
+                if !interface_wires.insert(*w) {
+                    return Err(trap(Error(
+                        "§3.3: region interface bundles and regions overlap".into(),
+                    )));
+                }
+            }
+            Ok(())
+        };
         for (group, names) in groups {
             for (p, n) in callee.params[group].iter().zip(names) {
                 let id = self.qreg(&n)?;
                 let wires = self.state.quantum.bundle(id)?.to_vec();
+                bind_wires(&wires)?;
                 bindings.bundles.insert(p.name.clone(), wires);
                 if !ids.contains(&id) {
                     ids.push(id);
@@ -827,6 +843,7 @@ impl<'a> ClassicalMachine<'a> {
             {
                 return err("§3.3", "qreg does not fill region dimensions");
             }
+            bind_wires(wires)?;
             bindings.regions.insert(
                 p.name.clone(),
                 QuantumRegion {
@@ -838,6 +855,32 @@ impl<'a> ClassicalMachine<'a> {
             if !ids.contains(&id) {
                 ids.push(id);
             }
+        }
+        let mut targets = std::collections::BTreeSet::new();
+        if oracle {
+            for p in callee.params[1].iter().chain(&callee.params[2]) {
+                targets.extend(bindings.bundles[&p.name].iter().copied());
+            }
+        } else if !controls.is_empty() {
+            // The same transitive bit-level target analysis used at load,
+            // now bound to physical wire ids. This includes diagonal targets
+            // and targets reached through nested action calls.
+            for (param, index) in self
+                .object
+                .interface_targets(name, &mut Default::default())?
+            {
+                targets.insert(bindings.bundles[&param][index as usize]);
+            }
+            for p in &callee.params[memory.0] {
+                if p.role.as_deref() == Some("mut") {
+                    targets.extend(bindings.regions[&p.name].cells.iter().flatten().copied());
+                }
+            }
+        }
+        if controls.iter().any(|w| targets.contains(w)) {
+            return Err(trap(Error(
+                "§3.3: effective control aliases region target".into(),
+            )));
         }
         for (p, n) in callee.params[args.0].iter().zip(args.1) {
             let arg = match self.read(&n)? {

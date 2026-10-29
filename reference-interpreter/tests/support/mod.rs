@@ -187,3 +187,48 @@ pub fn borrow_identity(o: &Object) {
         }
     }
 }
+
+/// R4-B02: select dynamically chooses q itself (c=1) or distinct r (c=0).
+/// Both handles have the same static type; the precondition is physical.
+pub fn dynamic_region_alias_object(kind: &str, tier: &str) -> Object {
+    let ac = r#"{"abi":"0.8","args":[],"bounds":[],"in":[1],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
+    let xc = r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
+    let os =
+        r#"{"abi":"0.8","args":[],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#;
+    let (sig, child, call, extra_types, extra_params) = match kind {
+        "interface" => (
+            ac,
+            "action @a (t:wire mut) (s:wire in) () () ()\n^entry():\ncx s t",
+            "action_call @a (q) (s) () ()",
+            "",
+            "",
+        ),
+        "control" => (
+            xc,
+            "action @a (t:wire mut) () () () ()\n^entry():\nx t",
+            "ctl s action_call @a (q) () () ()",
+            "",
+            "",
+        ),
+        "readonly-control" => (
+            ac,
+            "action @a (t:wire mut) (s:wire in) () () ()\n^entry():\ncx s t",
+            "ctl s action_call @a (q) (s) () ()",
+            "",
+            "",
+        ),
+        "oracle" => (
+            os,
+            "oracle @a (s:wire in) (t:wire) (f:wire[4]) () ()\n^entry():\nlift.retval s",
+            "oracle_call @a tk (s) q f () ()",
+            ",\"qreg[4]\",\"token\"",
+            ", f:qreg[4], tk:token",
+        ),
+        _ => panic!("unknown fixture family {kind}"),
+    };
+    let ps = format!(
+        r#"{{"abi":"0.8","kind":"{tier}","params":["i1","qreg[1]","qreg[1]"{extra_types}],"results":[],"tier":"{tier}"}}"#
+    );
+    let parent = format!("fn {tier} @p (c:i1, q:qreg[1], r:qreg[1]{extra_params}) () () () ()\n^entry():\ns = select c q r\n{call}\nret");
+    rehash(&object(&[("a", sig, child), ("p", &ps, &parent)], "{}", ""))
+}

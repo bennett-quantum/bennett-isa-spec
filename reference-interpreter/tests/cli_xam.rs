@@ -1138,3 +1138,59 @@ fn r2_qinplace_identity_workspace_cleanup_runs_and_reverses() {
         (0, 0, 10)
     );
 }
+
+#[test]
+fn r4_dynamic_region_aliases_report_failed_json_and_reverse_the_prefix() {
+    for tier in ["cc", "r"] {
+        for kind in ["interface", "control", "readonly-control", "oracle"] {
+            let o = support::dynamic_region_alias_object(kind, tier);
+            let path = tmp_file(&format!("r4-alias-{tier}-{kind}.bisa"), &o.text);
+            for c in ["0", "1"] {
+                for command in ["run-cc", "reverse", "run-program"] {
+                    if command == "run-program" && tier == "r" {
+                        continue;
+                    }
+                    let mut args = vec![
+                        command, &path, "p", "--arg", c, "--arg", "qreg:0", "--arg", "qreg:1",
+                    ];
+                    if kind == "oracle" {
+                        args.extend(["--arg", "qreg:0000", "--arg", "token:1"]);
+                    }
+                    let v = ok(&args);
+                    // The faulting call is the second executed row. No ret or
+                    // output delivery executes. §7.4 reversal undoes both frames.
+                    assert_eq!(
+                        text(&v, "status"),
+                        if command == "reverse" {
+                            "REVERSED"
+                        } else if c == "1" {
+                            "FAILED"
+                        } else {
+                            "COMPLETED"
+                        }
+                    );
+                    assert_eq!(uint(&v, "steps"), if c == "1" { 2 } else { 3 });
+                    assert_eq!(
+                        field(&v, "fault"),
+                        &if c == "1" {
+                            Json::Number("4".into())
+                        } else {
+                            Json::Null
+                        }
+                    );
+                    assert!(array(&v, "results").is_empty());
+                    if c == "1" {
+                        let faults = array(&v, "faults");
+                        assert_eq!(faults.len(), 1);
+                        assert_eq!(uint(&faults[0], "code"), 4);
+                        assert_eq!(text(&faults[0], "name"), "FAULT_UB_TRAP");
+                    }
+                    if command == "reverse" {
+                        assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
+                        assert_eq!(field(&v, "first_difference"), &Json::Null);
+                    }
+                }
+            }
+        }
+    }
+}

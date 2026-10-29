@@ -183,3 +183,163 @@ fn r3_typed_cc_controlled_calls_execute_and_restore_history() {
         }
     }
 }
+
+fn dynamic_region_alias_case(kind: &str) {
+    use bennett_isa_ref::Budget;
+    for tier in ["cc", "r"] {
+        let o = support::dynamic_region_alias_object(kind, tier);
+        for c in 0..2 {
+            let mut regs = QuantumRegisters::new();
+            let q = regs.allocate(1).unwrap();
+            let r = regs.allocate(1).unwrap();
+            regs.prepare(r, &[true]).unwrap();
+            let mut args = vec![
+                ClassicalValue::int(1, c).unwrap(),
+                ClassicalValue::Qreg(q),
+                ClassicalValue::Qreg(r),
+            ];
+            if kind == "oracle" {
+                let f = regs.allocate(4).unwrap();
+                args.extend([
+                    ClassicalValue::Qreg(f),
+                    ClassicalValue::Token(Budget::steps(1)),
+                ]);
+            }
+            let before_regs = regs.clone();
+            let mut m =
+                ClassicalMachine::with_quantum_registers(&o, "p", &args, &[], regs).unwrap();
+            let entry = m.snapshot();
+            let result = m.run(10).unwrap();
+            // select is row 1; the failed call is terminal row 2. The
+            // disjoint branch executes CX/X/XOR(1) then ret: 3 rows, q=1.
+            assert_eq!(
+                (result.fault, result.steps),
+                if c == 1 { (Some(4), 2) } else { (None, 3) },
+                "{tier}/{kind}"
+            );
+            assert!(result.values.is_empty());
+            let regs = m.quantum_registers();
+            if c == 1 {
+                assert_eq!(
+                    regs, &before_regs,
+                    "a failed call must not mutate state or handles"
+                );
+            } else {
+                assert_eq!(
+                    regs.quantum_state()
+                        .read_basis(regs.bundle(q).unwrap())
+                        .unwrap(),
+                    1
+                );
+                assert_eq!(
+                    regs.quantum_state()
+                        .read_basis(regs.bundle(r).unwrap())
+                        .unwrap(),
+                    1
+                );
+            }
+            m.reverse().unwrap();
+            assert_eq!(m.snapshot(), entry, "{tier}/{kind}/{c}");
+        }
+    }
+}
+
+#[test]
+fn r4_dynamic_interface_alias_is_an_atomic_reversible_cc_and_r_fault() {
+    dynamic_region_alias_case("interface");
+}
+#[test]
+fn r4_dynamic_control_target_alias_is_an_atomic_reversible_cc_and_r_fault() {
+    dynamic_region_alias_case("control");
+}
+#[test]
+fn r4_dynamic_control_can_overlap_a_readonly_input() {
+    dynamic_region_alias_case("readonly-control");
+}
+#[test]
+fn r4_dynamic_oracle_input_output_alias_is_an_atomic_reversible_cc_and_r_fault() {
+    dynamic_region_alias_case("oracle");
+}
+
+#[test]
+fn r4_dynamic_alias_checks_cover_regions_block_parameters_and_child_targets() {
+    // Mut bundle q[2] and region m[1,1] must be disjoint even if the child
+    // is an identity. c=1 aliases both slots; c=0 binds two distinct handles.
+    let ac = r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[{"A":1,"W":1,"role":"mut"}],"mut":[2],"tier":"q"}"#;
+    let ps =
+        r#"{"abi":"0.8","kind":"cc","params":["i1","qreg[2]","qreg[2]"],"results":[],"tier":"cc"}"#;
+    let o = rehash(&object(&[("a",ac,"action @a (t:wire[2] mut) () (m:region[1,1] mut) () ()\n^entry():\nx t[0]\nx t[0]"),("p",ps,"fn cc @p (c:i1, q:qreg[2], r:qreg[2]) () () () ()\n^entry():\ns = select c q r\naction_call @a (q) () (s) ()\nret")],"{}", "\nsection layout\n{\"A_tab\":0,\"H\":0,\"S_cells\":0,\"globals\":{},\"heap_base\":1,\"heap_limit_max\":0,\"interface_regions\":{},\"null_size\":1,\"ptr_width\":32}\n"));
+    for c in 0..2 {
+        let mut regs = QuantumRegisters::new();
+        let q = regs.allocate(2).unwrap();
+        let r = regs.allocate(2).unwrap();
+        let before = regs.clone();
+        let mut m = ClassicalMachine::with_quantum_registers(
+            &o,
+            "p",
+            &[
+                ClassicalValue::int(1, c).unwrap(),
+                ClassicalValue::Qreg(q),
+                ClassicalValue::Qreg(r),
+            ],
+            &[],
+            regs,
+        )
+        .unwrap();
+        let entry = m.snapshot();
+        let outcome = m.run(10).unwrap();
+        assert_eq!(
+            (outcome.fault, outcome.steps),
+            if c == 1 { (Some(4), 2) } else { (None, 3) }
+        );
+        assert_eq!(m.quantum_registers(), &before);
+        m.reverse().unwrap();
+        assert_eq!(m.snapshot(), entry);
+    }
+    // A block parameter is another dynamic alias, and inherited controls
+    // must be checked against targets reached through the child action.
+    let base = support::dynamic_region_alias_object("control", "r");
+    let ac = r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
+    let ps =
+        r#"{"abi":"0.8","kind":"r","params":["i1","qreg[1]","qreg[1]"],"results":[],"tier":"r"}"#;
+    let o = rehash(&object(&[("leaf",ac,"action @leaf (t:wire mut) () () () ()\n^entry():\nx t"),("a",ac,"action @a (t:wire mut) () () () ()\n^entry():\naction_call @leaf (t) () () ()"),("p",ps,"fn r @p (c:i1, q:qreg[1], r:qreg[1]) () () () ()\n^entry():\ns = select c q r\nbr ^invoke(s)\n^invoke(v:qreg[1]):\nctl v action_call @a (q) () () ()\nret")],"{}",""));
+    // Also bind q and r directly to the SAME register at the R entry.
+    for entry_alias in [false, true] {
+        for o in [&base, &o] {
+            let mut regs = QuantumRegisters::new();
+            let q = regs.allocate(1).unwrap();
+            let r = if entry_alias {
+                q
+            } else {
+                regs.allocate(1).unwrap()
+            };
+            let before = regs.clone();
+            let mut m = ClassicalMachine::with_quantum_registers(
+                o,
+                "p",
+                &[
+                    ClassicalValue::int(1, 1).unwrap(),
+                    ClassicalValue::Qreg(q),
+                    ClassicalValue::Qreg(r),
+                ],
+                &[],
+                regs,
+            )
+            .unwrap();
+            let entry = m.snapshot();
+            let outcome = m.run(10).unwrap();
+            assert_eq!(outcome.fault, Some(4));
+            assert_eq!(
+                outcome.steps,
+                if o.functions.contains_key("leaf") {
+                    3
+                } else {
+                    2
+                }
+            );
+            assert_eq!(m.quantum_registers(), &before);
+            m.reverse().unwrap();
+            assert_eq!(m.snapshot(), entry);
+        }
+    }
+}

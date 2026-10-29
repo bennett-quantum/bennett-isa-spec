@@ -34,8 +34,44 @@ GREEN: 11 active borrow + 5 active generator tests; whole normal suite
 217 passed, 0 failed, 5 ignored. No SPEC-QUESTIONS entry: §§4.3, 4.6, 5.1
 and 5.6 explicitly require return AFTER its frame and factorisation on B.
 
-## R4-B02 — implementation in progress
+## R4-B02 — resolved
 
-Dynamic physical alias validation and reversible CC/R fault-frame pins follow
-in the next blocker commit. Final exhaustive/conformance validation follows
-both received blockers. No declined capabilities or scope changes.
+RED: exact select-created interface alias in the library and CLI produced an
+internal §3.3 error instead of fault JSON. Replaying all five new library
+regressions against pre-fix classical.rs also witnessed the control-target
+internal error, region-interface internal error, and an oracle alias silently
+completing. The combined CLI pin initially failed at the exact action witness.
+
+`src/classical.rs::ClassicalMachine::region_record` validates physical wire
+uniqueness in every interface bundle and passed region BEFORE handle-id
+deduplication. Effective controls are checked against oracle target/fault
+wires, transitive action interface targets and mutable-region cells, before
+execution or lifecycle changes. `call_discipline.rs::interface_targets` is
+shared with the static checker. Only the specified runtime alias preconditions
+are marked `trap`; simulator/internal failures still propagate as diagnostics.
+The existing step path pushes the ordinary terminal fault-4 history frame.
+Control/read-only-input overlap remains valid and bookkeeping still deduplicates
+its handle. No gate runs and no handle is consumed when validation fails.
+
+Pins in `tests/registers.rs`: `r4_dynamic_interface_alias_is_an_atomic_reversible_cc_and_r_fault`,
+`r4_dynamic_control_target_alias_is_an_atomic_reversible_cc_and_r_fault`,
+`r4_dynamic_oracle_input_output_alias_is_an_atomic_reversible_cc_and_r_fault`,
+`r4_dynamic_control_can_overlap_a_readonly_input`, and
+`r4_dynamic_alias_checks_cover_regions_block_parameters_and_child_targets`.
+Exact select witnesses run in both CC and R: c=1 records fault 4 at two steps,
+no results, unchanged quantum state AND handles; c=0 completes at three steps,
+target 1, read-only source 1. Both restore the complete entry snapshot under
+reversal. Extra pins cover passed-region aliases, block parameters, nested
+child targets and directly aliased R entry bindings.
+
+`cli_xam::r4_dynamic_region_aliases_report_failed_json_and_reverse_the_prefix`
+pins all four families for run-cc/reverse (CC and R), plus run-program (CC).
+The invalid branch exits 0 with FAILED/fault=4/steps=2/results=[], one named
+FAULT_UB_TRAP record; reverse exits 0 with equals_entry=true after the faulted
+prefix. Disjoint branches remain COMPLETED at three steps with exact reversal.
+GREEN: 11 register tests + 29 CLI tests, and the full normal suite: **223
+passed, 0 failed, 5 ignored**. No SPEC-QUESTIONS entry: §§3.3, 4.7 and 7.4
+explicitly prescribe physical disjointness, the trap and prefix reversal.
+
+Both received blockers are resolved; no declines or partials. This response
+remains appendable for sol/muse. Final exhaustive/conformance gates follow.
