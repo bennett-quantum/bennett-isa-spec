@@ -1,0 +1,57 @@
+{
+ "id": "G-argument-kinds",
+ "suite": "G",
+ "spec": "§10: \"INT(width, bytes) to iN with width = N (else E_ARG), F64 to f64, QREG to qreg[n] with the register's n, TOKEN to token\"",
+ "derivation": "Construct args with all four setters. Width-8 INT bytes 34 maps to 52, F64 0.5 stays 0.5, qreg[2] bits [1,0] maps wire 0=1, TOKEN preserves its four limits. Replacing any kind or INT width rejects with E_ARG.",
+ "scenario": {
+  "entry_params": [
+   "i8",
+   "f64",
+   "qreg[2]",
+   "token"
+  ],
+  "arguments": [
+   {
+    "kind": "INT",
+    "width": 8,
+    "bytes": "34"
+   },
+   {
+    "kind": "F64",
+    "value": 0.5
+   },
+   {
+    "kind": "QREG",
+    "width": 2,
+    "bits": "10"
+   },
+   {
+    "kind": "TOKEN",
+    "budget": [
+     3,
+     0,
+     0,
+     0
+    ]
+   }
+  ]
+ },
+ "expected_outcome": {
+  "bound_values": [
+   52,
+   0.5,
+   "10",
+   [
+    3,
+    0,
+    0,
+    0
+   ]
+  ],
+  "kind_or_width_mismatch": "E_ARG"
+ },
+ "unavailable": {
+  "deliverable": 8,
+  "reason": "the full §10 C launch library is staged deliverable 8"
+ }
+}

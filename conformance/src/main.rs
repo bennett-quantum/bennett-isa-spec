@@ -58,6 +58,10 @@ fn main() -> ExitCode {
             return ExitCode::from(1);
         }
     }
+    if cases.is_empty() {
+        eprintln!("no cases under {}", cases_root.display());
+        return ExitCode::from(1);
+    }
     if list {
         for c in &cases {
             println!("{} [{}] {}", c.id, c.suite, c.spec);

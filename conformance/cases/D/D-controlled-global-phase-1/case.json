@@ -1,0 +1,32 @@
+{
+ "id": "D-controlled-global-phase-1",
+ "suite": "D",
+ "spec": "§4.4: \"conformant iff equal to the specified unitary exactly including global phase\"; §5.3: \"ctl w @a is controlled-U\"; §15 D: \"controlled-interference tests\"",
+ "derivation": "The callee is X,Z,X,Z (Z=S*S), hence -I on both target basis values. Put control 0 through H, controlled -I, H: HZH=X on the control. Target 1 remains 1; output bits (control,target)=(1,1) with amplitude exactly +1. Dropping the callee global phase would instead leave control 0.",
+ "object": "../../objects/interference.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "interference",
+  "--mut",
+  "0,1"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "mut": [
+    1,
+    1
+   ],
+   "state": {
+    "11": [
+     1,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state"
+  ]
+ }
+}

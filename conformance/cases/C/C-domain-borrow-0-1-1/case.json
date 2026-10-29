@@ -1,0 +1,37 @@
+{
+ "id": "C-domain-borrow-0-1-1",
+ "suite": "C",
+ "spec": "§5.6: \"The frame's realised permutation P_F on its wires MUST factor as P_F = P' ⊗ I_B, established by a T3 claim over the frame's full domain\"",
+ "derivation": "The exact four gates of borrowed in control_flow.bisa are exposed with b as an interface wire so the CLI can enumerate its entry state, rather than fixing its borrow pool to zero. b goes 1 -> 1^1 -> 1; t goes 0 -> 0^(1^1) -> 0^(1^1)^1 = 1. Thus every (t,b,x) maps to (t XOR x,b,x), amplitude 1, independently of b. All eight basis entries prove the frame factorisation by T3; linearity includes external entanglement.",
+ "object": "../../objects/t3_domains.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "borrow_tuple",
+  "--mut",
+  "0,1",
+  "--in",
+  "1"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "mut": [
+    1,
+    1
+   ],
+   "in": [
+    1
+   ],
+   "state": {
+    "111": [
+     1,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state"
+  ]
+ }
+}

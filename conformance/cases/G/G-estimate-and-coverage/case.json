@@ -7,5 +7,32 @@
  "unavailable": {
   "deliverable": 8,
   "reason": "the full §10 launch library (stateful bennett_* API over runs) is staged deliverable 8; the CLI exposes only the one-shot run-program launch"
+ },
+ "scenario": {
+  "region": "inc8",
+  "budget": [
+   3,
+   0,
+   0,
+   0
+  ],
+  "target_resources": [
+   "time",
+   "peak_qubits",
+   "qubit_second"
+  ],
+  "coverage": {
+   "entries": []
+  }
+ },
+ "expected_outcome": {
+  "estimate_resource_names": [
+   "time",
+   "peak_qubits",
+   "qubit_second"
+  ],
+  "coverage": {
+   "entries": []
+  }
  }
 }

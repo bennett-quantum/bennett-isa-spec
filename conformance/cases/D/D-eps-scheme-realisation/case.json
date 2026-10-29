@@ -2,10 +2,22 @@
  "id": "D-eps-scheme-realisation",
  "suite": "D",
  "spec": "§15 suite D (channel and unitary comparison for epsilon > 0 realisations); §8.3: a scheme's error is the sum of its template gates' charged errors; §12.3 inclusive error composition",
- "derivation": "With a target whose only rz realisation is a scheme of two template gates each charged epsilon 1/1000, the scheme-realised rz carries inclusive operator_norm error 2/1000 (sum over the template, §8.3), converting to diamond 4/1000 when first combined with a diamond value (§12.3). Checking a realised-vs-reference comparison at bound 1/500 must therefore accept on operator_norm and the same claim at bound 1/1000 must reject. Needs targeted scheduling (deliverables 9, 10) before the checker (11).",
+ "derivation": "A scheme with two leaves whose verified operator-norm upper bounds are each 1/1000 is charged 2/1000 by §8.3. On first combination with a diamond bound, §12.3 converts it once to 4/1000. This checks accounting only: upper bounds do not imply that a tighter checker-computed claim must fail; actual unitaries and interval enclosures decide that.",
  "object": "../../objects/control_flow.bisa",
  "unavailable": {
   "deliverable": 11,
   "reason": "epsilon > 0 realisations need target descriptions (deliverable 9), the schedule consumer (10) and the rigorous checker (11); none has a reference-CLI surface"
+ },
+ "scenario": {
+  "template_errors": [
+   "0.001",
+   "0.001"
+  ],
+  "metric": "operator_norm",
+  "diamond_conversion_count": 1
+ },
+ "expected_outcome": {
+  "local_operator_norm_bound": "0.002",
+  "converted_diamond_bound": "0.004"
  }
 }

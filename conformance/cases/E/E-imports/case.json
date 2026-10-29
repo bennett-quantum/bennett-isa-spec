@@ -1,0 +1,23 @@
+{
+ "id": "E-imports",
+ "suite": "E",
+ "spec": "§8.3: \"imports: { <model>: { version, map: { <quantity>: [<resource>, factor] } } }\"",
+ "derivation": "An imported model quantity of 3 mapped to a count resource with factor 2 contributes exactly 6 in that resource.",
+ "scenario": {
+  "quantity": 3,
+  "mapping": [
+   "gates",
+   2
+  ],
+  "model_version": "0.8"
+ },
+ "expected_outcome": {
+  "resources": {
+   "gates": 6
+  }
+ },
+ "unavailable": {
+  "deliverable": 9,
+  "reason": "§8 target evaluation is staged deliverable 9"
+ }
+}

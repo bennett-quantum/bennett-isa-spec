@@ -33,5 +33,8 @@ fn suite_against_reference_binary() {
         report.failed(),
         bin.display()
     );
-    assert!(report.passed() > 0, "no case passed; harness is not running cases");
+    assert!(
+        report.passed() > 0,
+        "no case passed; harness is not running cases"
+    );
 }

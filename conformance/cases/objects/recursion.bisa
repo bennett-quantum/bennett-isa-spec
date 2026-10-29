@@ -1,0 +1,19 @@
+bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"5bdea0ed2575baa5d9e5f7ce10a0cd0e08293ff3acdf592816ec96249cd48b50","kind":"r","name":"rsum","signature":{"abi":"0.8","kind":"r","params":["i8"],"results":["i8"],"tier":"r"}}}
+
+section functions
+fn r @rsum (n:i8) (r:i8) () () ()
+^entry():
+zero = const.i8 0
+p = icmp.eq n zero
+br p ^done(n) ^more(n)
+^more(m:i8):
+one = const.i8 1
+next = sub m one
+sub_total = call @rsum next
+r = add sub_total m
+ret r
+^done(z:i8):
+ret z

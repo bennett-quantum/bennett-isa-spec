@@ -7,5 +7,13 @@
  "unavailable": {
   "deliverable": 10,
   "reason": "the §11 schedule consumer is staged deliverable 10; no reference-CLI command consumes or validates a schedule for execution"
+ },
+ "scenario": {
+  "schedule_file": "schedule.json",
+  "dependency_end": 1,
+  "start": 0
+ },
+ "expected_outcome": {
+  "consumer": "E_SCHEDULE_INFEASIBLE"
  }
 }

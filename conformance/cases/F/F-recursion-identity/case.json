@@ -1,0 +1,23 @@
+{
+ "id": "F-recursion-identity",
+ "suite": "F",
+ "spec": "§9.2: \"Semantic envelope ... every part ends with LF\"; \"Reference replacement\"; \"member hash = SHA-256 ... <scc_hash hex>:<decimal index>\"",
+ "derivation": "Hashes independently assembled with Python hashlib from isa=0.8 LF, ptr_width=32 LF, JCS signature LF, canonical function lines LF, and each referenced callee hash LF (§9.2); definitions retain their own name, call references use callee hashes. rsum is a self-recursive SCC: replace call @rsum by @$0; hash the envelope, then hash ASCII scc_hex + :0.",
+ "object": "../../objects/recursion.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "ok",
+   "symbols": {
+    "rsum": {
+     "interface_hash": "5bdea0ed2575baa5d9e5f7ce10a0cd0e08293ff3acdf592816ec96249cd48b50",
+     "closure_hash": "5bdea0ed2575baa5d9e5f7ce10a0cd0e08293ff3acdf592816ec96249cd48b50"
+    }
+   }
+  }
+ }
+}

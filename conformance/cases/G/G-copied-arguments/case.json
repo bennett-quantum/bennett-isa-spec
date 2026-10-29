@@ -7,5 +7,18 @@
  "unavailable": {
   "deliverable": 8,
   "reason": "the full §10 launch library (stateful bennett_* API over runs) is staged deliverable 8; the CLI exposes only the one-shot run-program launch"
+ },
+ "scenario": {
+  "argument": {
+   "kind": "INT",
+   "width": 8,
+   "bytes": "03"
+  },
+  "entropy": "0b1621",
+  "after_run": "overwrite and free caller buffers"
+ },
+ "expected_outcome": {
+  "argument_value": 3,
+  "entropy": "0b1621"
  }
 }

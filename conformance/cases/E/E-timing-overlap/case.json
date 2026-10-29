@@ -1,0 +1,62 @@
+{
+ "id": "E-timing-overlap",
+ "suite": "E",
+ "spec": "§8.2: \"time is the makespan\"; \"peak is the maximum over time ... concurrent demands sum\"",
+ "derivation": "Two disjoint CX events, both starting at 0 with duration 1, and four fast wires live for [0,1): time 1, peak 4, occupancy 4 at rate 1.",
+ "scenario": {
+  "events": [
+   {
+    "start": 0,
+    "duration": 1,
+    "wires": [
+     0,
+     1
+    ]
+   },
+   {
+    "start": 0,
+    "duration": 1,
+    "wires": [
+     2,
+     3
+    ]
+   }
+  ],
+  "live_intervals": [
+   [
+    0,
+    0,
+    1
+   ],
+   [
+    1,
+    0,
+    1
+   ],
+   [
+    2,
+    0,
+    1
+   ],
+   [
+    3,
+    0,
+    1
+   ]
+  ],
+  "rate": 1
+ },
+ "expected_outcome": {
+  "time": 1,
+  "peak_qubits": {
+   "fast": 4
+  },
+  "qubit_second": {
+   "fast": 4
+  }
+ },
+ "unavailable": {
+  "deliverable": 9,
+  "reason": "§8 target evaluation is staged deliverable 9"
+ }
+}

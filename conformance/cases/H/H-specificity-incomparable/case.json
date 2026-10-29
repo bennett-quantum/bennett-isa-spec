@@ -1,11 +1,18 @@
 {
  "id": "H-specificity-incomparable",
  "suite": "H",
- "spec": "§15 suite H (specificity resolution); §11 matching: among matching entries the unique maximal one applies; two incomparable maximal entries make the schedule invalid (document order is never significant)",
- "derivation": "schedule.json has two cleanup entries matching the same operation with specificity (1,1,0,0,0) and (1,0,1,0,0): neither is >= the other, so the schedule is invalid even though each entry is individually well-formed.",
+ "spec": "§11: \"Specificity is the lexicographic tuple (path length, number of non-* iterations, step non-*, phase non-*, generated non-*)\"; \"document order is never significant\"",
+ "derivation": "§11 explicitly defines a lexicographic tuple. For matching entries with (1,1,0,0,0) and (1,0,1,0,0), the first wins at the second component, 1>0. Reversing document order cannot change the winner. The old fixture incorrectly treated the order componentwise; no incomparable pair exists between these two lexicographic tuples.",
  "object": "../../objects/sched_inc8.bisa",
  "unavailable": {
   "deliverable": 10,
   "reason": "the §11 schedule consumer is staged deliverable 10; no reference-CLI command consumes or validates a schedule for execution"
+ },
+ "scenario": {
+  "schedule_file": "schedule.json",
+  "order": "lexicographic"
+ },
+ "expected_outcome": {
+  "winner_index": 0
  }
 }

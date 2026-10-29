@@ -7,5 +7,28 @@
  "unavailable": {
   "deliverable": 11,
   "reason": "certificate/frame-descriptor validation beyond parsing belongs to the staged certificate checker (deliverable 11); check exposes no frame-descriptor verdict"
+ },
+ "scenario": {
+  "shared_bundle": "scratch",
+  "callees": [
+   {
+    "name": "a",
+    "live": [
+     0,
+     2
+    ]
+   },
+   {
+    "name": "b",
+    "live": [
+     1,
+     3
+    ]
+   }
+  ]
+ },
+ "expected_outcome": {
+  "certificate": "reject",
+  "reason": "overlapping shared frame live ranges"
  }
 }

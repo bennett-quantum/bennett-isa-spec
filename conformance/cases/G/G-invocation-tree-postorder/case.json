@@ -7,5 +7,22 @@
  "unavailable": {
   "deliverable": 8,
   "reason": "the full §10 launch library (stateful bennett_* API over runs) is staged deliverable 8; the CLI exposes only the one-shot run-program launch"
+ },
+ "scenario": {
+  "tree": {
+   "CC": [
+    "R",
+    [
+     "Q"
+    ]
+   ]
+  }
+ },
+ "expected_outcome": {
+  "reversal_order": [
+   "Q_adjoint",
+   "R_LIFO",
+   "CC_LIFO"
+  ]
  }
 }

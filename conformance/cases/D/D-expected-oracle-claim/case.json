@@ -2,10 +2,39 @@
  "id": "D-expected-oracle-claim",
  "suite": "D",
  "spec": "§15 suite D; §12.1 exhaustive claim with expected \"oracle\" re-executes every domain element on the reference interpreter; §12.3: executable claims bind to schedule_hash through their subject",
- "derivation": "An exhaustive claim over D for inc8 (256 inputs) with expected \"oracle\" holds by definition of F_B (§5.2) when re-executed at the claim's budget B=3: every tuple is (x, 0^(x+1 mod 256), 0) on (ins, tgt, fr) from clean tgt/fr. Expected verdict: proof. No CLI command verifies certificates today.",
- "object": "../../objects/inc8.bisa",
+ "derivation": "inc2 at B=3 computes (x+1 mod 4,0). D contains x, initial target, initial fault (2+2+4 bits), hence 256 complete tuples. Each becomes (x,tgt XOR ((x+1) mod 4),fault). Exhaustively comparing all of D with the same scheduled construction earns proof; input-only coverage would be evidence (§12.2).",
+ "object": "../../objects/t3_domains.bisa",
  "unavailable": {
   "deliverable": 11,
   "reason": "certificate claim checking has no reference-CLI command; the rigorous checker of §12.1 is staged deliverable 11"
+ },
+ "scenario": {
+  "oracle": "inc2",
+  "object": "../../objects/t3_domains.bisa",
+  "budget": [
+   3,
+   0,
+   0,
+   0
+  ],
+  "domain": {
+   "x": [
+    0,
+    3
+   ],
+   "tgt": [
+    0,
+    3
+   ],
+   "fault": [
+    0,
+    15
+   ]
+  },
+  "expected": "oracle"
+ },
+ "expected_outcome": {
+  "verdict": "proof",
+  "domain_elements": 256
  }
 }

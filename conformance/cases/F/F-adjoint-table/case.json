@@ -1,0 +1,34 @@
+{
+ "id": "F-adjoint-table",
+ "suite": "F",
+ "spec": "§5.3: \"qinplace @g @ginv ↦ qinplace @ginv @g\"",
+ "derivation": "inc2(x)=x+1 mod 4, dec2(x)=x-1 mod 4, both total under token B=10. Adjoint exchanges g and ginv, hence 0 maps to 3; the exact output bits are 11 with amplitude 1.",
+ "object": "../../objects/qinplace.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "inc_inplace",
+  "--mut",
+  "0",
+  "--arg",
+  "token:10,0,0,0",
+  "--adjoint"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "mut": [
+    3
+   ],
+   "state": {
+    "11": [
+     1,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state"
+  ]
+ }
+}

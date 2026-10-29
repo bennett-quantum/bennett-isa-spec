@@ -1,0 +1,24 @@
+{
+ "id": "G-accessor-lifetimes",
+ "suite": "G",
+ "spec": "§10: \"Accessor-returned pointers are valid until the owning object is freed.\"; \"A function that returns an object transfers ownership to the caller, released with the matching *_free.\"",
+ "derivation": "Keep request, result, estimate, coverage and tape iterator objects alive while reading their accessors, then release each once with its matching free. The pointers remain valid until the corresponding free. This requires the C ownership surface.",
+ "scenario": {
+  "owners": {
+   "bennett_args_t": "bennett_args_free",
+   "bennett_result_t": "bennett_result_free",
+   "bennett_request_t": "bennett_request_free",
+   "bennett_tape_iter_t": "bennett_tape_free",
+   "bennett_estimate_t": "bennett_estimate_free",
+   "bennett_coverage_t": "bennett_coverage_free"
+  }
+ },
+ "expected_outcome": {
+  "pointer_valid_until": "owner_free",
+  "ownership": "caller"
+ },
+ "unavailable": {
+  "deliverable": 8,
+  "reason": "the full §10 C launch library is staged deliverable 8"
+ }
+}

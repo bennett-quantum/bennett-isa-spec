@@ -7,5 +7,15 @@
  "unavailable": {
   "deliverable": 11,
   "reason": "the rigorous interval certificate checker (§12.1, interval Cholesky) is staged deliverable 11; no reference-CLI command checks channel claims"
+ },
+ "scenario": {
+  "claim_file": "claim.json",
+  "dimension": 2,
+  "realised": "toggle",
+  "reference": "toggle"
+ },
+ "expected_outcome": {
+  "verdict": "accept",
+  "diamond_bound": "0.1875"
  }
 }

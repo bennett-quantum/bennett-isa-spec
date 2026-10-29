@@ -1,0 +1,18 @@
+{
+ "id": "F-name-resolution",
+ "suite": "F",
+ "spec": "§3.7: \"A read operand in an lproc is a param or location of that lproc; nothing else.\"",
+ "derivation": "peek reads secret, which is a location only of the caller oracle top, not a param or location of peek: ill-formed.",
+ "object": "../../objects/f_name_resolution.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§"
+  ]
+ }
+}

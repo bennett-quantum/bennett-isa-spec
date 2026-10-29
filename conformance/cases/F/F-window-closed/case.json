@@ -1,0 +1,18 @@
+{
+ "id": "F-window-closed",
+ "suite": "F",
+ "spec": "§6.2: \"a non-diagonal gate on a wire in S or in g\" closes the window; \"Every perm value MUST be cleaned within its window\"",
+ "derivation": "d=qcopy t records dependency t; h t is non-diagonal, so subsequent quncopy t d is outside the window: ill-formed.",
+ "object": "../../objects/f_window_closed.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§"
+  ]
+ }
+}

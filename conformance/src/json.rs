@@ -162,7 +162,10 @@ fn diff_at(expected: &Json, actual: &Json, path: &str) -> Option<String> {
 }
 
 pub fn parse(text: &str) -> Result<Json, String> {
-    let mut p = Parser { bytes: text.as_bytes(), pos: 0 };
+    let mut p = Parser {
+        bytes: text.as_bytes(),
+        pos: 0,
+    };
     p.ws();
     let v = p.value()?;
     p.ws();
@@ -179,13 +182,18 @@ struct Parser<'a> {
 
 impl Parser<'_> {
     fn ws(&mut self) {
-        while self.pos < self.bytes.len() && matches!(self.bytes[self.pos], b' ' | b'\t' | b'\n' | b'\r') {
+        while self.pos < self.bytes.len()
+            && matches!(self.bytes[self.pos], b' ' | b'\t' | b'\n' | b'\r')
+        {
             self.pos += 1;
         }
     }
 
     fn peek(&self) -> Result<u8, String> {
-        self.bytes.get(self.pos).copied().ok_or_else(|| "unexpected end of input".to_string())
+        self.bytes
+            .get(self.pos)
+            .copied()
+            .ok_or_else(|| "unexpected end of input".to_string())
     }
 
     fn value(&mut self) -> Result<Json, String> {
@@ -197,7 +205,10 @@ impl Parser<'_> {
             b'f' => self.literal("false", Json::Bool(false)),
             b'n' => self.literal("null", Json::Null),
             b'-' | b'0'..=b'9' => self.number(),
-            c => Err(format!("unexpected character {:?} at byte {}", c as char, self.pos)),
+            c => Err(format!(
+                "unexpected character {:?} at byte {}",
+                c as char, self.pos
+            )),
         }
     }
 
@@ -296,7 +307,10 @@ impl Parser<'_> {
                                 if self.bytes[self.pos..].starts_with(b"\\u") {
                                     self.pos += 2;
                                     let lo = self.hex4()?;
-                                    let c = 0x10000 + ((cp - 0xD800) << 10) + lo.wrapping_sub(0xDC00);
+                                    if !(0xDC00..=0xDFFF).contains(&lo) {
+                                        return Err("bad low surrogate".into());
+                                    }
+                                    let c = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00);
                                     out.push(char::from_u32(c).ok_or("bad surrogate pair")?);
                                 } else {
                                     return Err("lone high surrogate".into());
@@ -308,6 +322,7 @@ impl Parser<'_> {
                         _ => return Err(format!("bad escape at byte {}", self.pos)),
                     }
                 }
+                0..=0x1f => return Err("unescaped control character in string".into()),
                 _ => {
                     // Copy one UTF-8 scalar starting at the previous byte.
                     let start = self.pos - 1;
@@ -337,15 +352,39 @@ impl Parser<'_> {
         if self.peek()? == b'-' {
             self.pos += 1;
         }
-        while self.pos < self.bytes.len()
-            && matches!(self.bytes[self.pos], b'0'..=b'9' | b'.' | b'e' | b'E' | b'+' | b'-')
-        {
+        match self.peek()? {
+            b'0' => self.pos += 1,
+            b'1'..=b'9' => self.digits()?,
+            _ => return Err(format!("expected integer at byte {}", self.pos)),
+        }
+        if self.bytes.get(self.pos) == Some(&b'.') {
             self.pos += 1;
+            self.digits()?;
+        }
+        if matches!(self.bytes.get(self.pos), Some(b'e' | b'E')) {
+            self.pos += 1;
+            if matches!(self.bytes.get(self.pos), Some(b'+' | b'-')) {
+                self.pos += 1;
+            }
+            self.digits()?;
         }
         let s = std::str::from_utf8(&self.bytes[start..self.pos])
             .map_err(|_| "bad number".to_string())?;
-        s.parse::<f64>()
-            .map(Json::Num)
-            .map_err(|_| format!("bad number {s:?}"))
+        let n = s.parse::<f64>().map_err(|_| format!("bad number {s:?}"))?;
+        if !n.is_finite() {
+            return Err(format!("number outside finite binary64 range: {s:?}"));
+        }
+        Ok(Json::Num(n))
+    }
+
+    fn digits(&mut self) -> Result<(), String> {
+        let start = self.pos;
+        while matches!(self.bytes.get(self.pos), Some(b'0'..=b'9')) {
+            self.pos += 1;
+        }
+        if self.pos == start {
+            return Err(format!("expected digit at byte {}", self.pos));
+        }
+        Ok(())
     }
 }

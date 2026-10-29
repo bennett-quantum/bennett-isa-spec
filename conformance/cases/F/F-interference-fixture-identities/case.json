@@ -1,0 +1,27 @@
+{
+ "id": "F-interference-fixture-identities",
+ "suite": "F",
+ "spec": "§9.2: \"Semantic envelope ... every part ends with LF\"; \"Reference replacement\"; \"member hash = SHA-256 ... <scc_hash hex>:<decimal index>\"",
+ "derivation": "Hashes independently assembled with Python hashlib from isa=0.8 LF, ptr_width=32 LF, JCS signature LF, canonical function lines LF, and each referenced callee hash LF (§9.2); definitions retain their own name, call references use callee hashes. All references form a DAG; closure and interface hashes coincide. No layout/data/device leaves exist.",
+ "object": "../../objects/interference.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "ok",
+   "symbols": {
+    "minus_identity": {
+     "interface_hash": "d85842cd3622a6a9fb9aec2c66599620d714299aa4742a3840e3d90ba3b814af",
+     "closure_hash": "d85842cd3622a6a9fb9aec2c66599620d714299aa4742a3840e3d90ba3b814af"
+    },
+    "interference": {
+     "interface_hash": "bea67f9c57bb93d92b2fa047a4e9ef417cb40981b78d105d6de72c7a211d3a4f",
+     "closure_hash": "bea67f9c57bb93d92b2fa047a4e9ef417cb40981b78d105d6de72c7a211d3a4f"
+    }
+   }
+  }
+ }
+}

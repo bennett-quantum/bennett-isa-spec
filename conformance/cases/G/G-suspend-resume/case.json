@@ -1,0 +1,32 @@
+{
+ "id": "G-suspend-resume",
+ "suite": "G",
+ "spec": "§10: \"CREATED → RUNNING → (SUSPENDED ⇄ RUNNING)\"; \"Waiting on a SUSPENDED ... run is E_INVALID_STATE\"",
+ "derivation": "Suspend a RUNNING run: SUSPENDED; wait fails immediately with E_INVALID_STATE; resume returns it to RUNNING, then wait produces the result once COMPLETED.",
+ "scenario": {
+  "operations": [
+   "bennett_run",
+   "bennett_suspend",
+   "bennett_wait",
+   "bennett_resume",
+   "bennett_wait"
+  ]
+ },
+ "expected_outcome": {
+  "states": [
+   "RUNNING",
+   "SUSPENDED",
+   "SUSPENDED",
+   "RUNNING",
+   "COMPLETED"
+  ],
+  "wait_statuses": [
+   "E_INVALID_STATE",
+   "OK"
+  ]
+ },
+ "unavailable": {
+  "deliverable": 8,
+  "reason": "the full §10 C launch library is staged deliverable 8"
+ }
+}

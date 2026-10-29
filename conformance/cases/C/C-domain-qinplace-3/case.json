@@ -1,0 +1,33 @@
+{
+ "id": "C-domain-qinplace-3",
+ "suite": "C",
+ "spec": "§4.5: \"qinplace ... g∘ginv = ginv∘g = id\"; §15 C: \"T3 over full D ... qinplace pairs\"",
+ "derivation": "inc2(x)=x+1 mod 4, dec2(x)=x-1 mod 4; at B=10 both finish their 3 rows. Expansion computes g(3)=0, exchanges it into x, then dec2(0)=3 clears the saved value. All four values of the two-bit encoding are covered.",
+ "object": "../../objects/qinplace.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "inc_inplace",
+  "--mut",
+  "3",
+  "--arg",
+  "token:10,0,0,0"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "mut": [
+    0
+   ],
+   "state": {
+    "00": [
+     1,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state"
+  ]
+ }
+}

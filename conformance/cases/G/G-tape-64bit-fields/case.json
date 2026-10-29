@@ -7,5 +7,64 @@
  "unavailable": {
   "deliverable": 8,
   "reason": "the full §10 launch library (stateful bennett_* API over runs) is staged deliverable 8; the CLI exposes only the one-shot run-program launch"
+ },
+ "scenario": {
+  "effects": [
+   [
+    "entropy",
+    "read",
+    [
+     16,
+     3
+    ]
+   ],
+   [
+    "console",
+    "write",
+    [
+     16,
+     3
+    ]
+   ],
+   [
+    "clock",
+    "read",
+    [
+     16
+    ]
+   ],
+   [
+    "block",
+    "write",
+    [
+     7,
+     16
+    ]
+   ],
+   [
+    "block",
+    "read",
+    [
+     7,
+     16
+    ]
+   ]
+  ]
+ },
+ "expected_outcome": {
+  "alen": [
+   16,
+   16,
+   8,
+   16,
+   16
+  ],
+  "args_hex": [
+   "10000000000000000300000000000000",
+   "10000000000000000300000000000000",
+   "1000000000000000",
+   "07000000000000001000000000000000",
+   "07000000000000001000000000000000"
+  ]
  }
 }

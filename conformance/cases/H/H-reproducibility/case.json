@@ -2,10 +2,19 @@
  "id": "H-reproducibility",
  "suite": "H",
  "spec": "§15 suite H (reproducibility); §11 obligations: the schedule must be reproducible from the request plus scheduler version; §9.2 schedule_hash = SHA-256 of the schedule's JCS bytes",
- "derivation": "Two requests identical except for whitespace-equivalent encodings of one decimal must canonicalise to the same schedule bytes and hence the same schedule_hash; a consumer validates the binding schedule_hash against the bytes it received.",
+ "derivation": "Submit the identical canonical request twice to the same scheduler version. §11 requires reproducibility, so the resulting schedule bytes must match and §9.2 then gives equal schedule hashes. This does not demand that a consumer check a schedule_hash inside schedule.bindings: the §11 schema has no such field.",
  "object": "../../objects/sched_inc8.bisa",
  "unavailable": {
   "deliverable": 10,
   "reason": "the §11 schedule consumer is staged deliverable 10; no reference-CLI command consumes or validates a schedule for execution"
+ },
+ "scenario": {
+  "request_file": "request.json",
+  "repeat_count": 2,
+  "scheduler_version": "0.8"
+ },
+ "expected_outcome": {
+  "schedule_bytes_equal": true,
+  "schedule_hashes_equal": true
  }
 }

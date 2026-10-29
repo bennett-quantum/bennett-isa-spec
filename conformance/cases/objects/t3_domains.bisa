@@ -1,0 +1,21 @@
+bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"d42f3ddc94103b7c18a08340ae54ab5d98d173bae714c5f7477039b1c7b3543e","kind":"oracle","name":"inc2","signature":{"abi":"0.8","args":[],"fault":4,"in":[2],"kind":"oracle","mem":[],"tgt":2,"tier":"q"}},"1":{"interface_hash":"62a10b7f392b7c432fa43d3450b3319b938a617781cec6012e0151fc2222becd","kind":"perm_action","name":"oracle_tuple","signature":{"abi":"0.8","args":["token"],"bounds":[],"in":[2],"kind":"perm_action","mem":[],"mut":[2,4],"tier":"q"}},"2":{"interface_hash":"791f8aa2af142cdcdd0b6688a06a76c22f96984d3dc73959494b850ebcac2277","kind":"perm_action","name":"borrow_tuple","signature":{"abi":"0.8","args":[],"bounds":[],"in":[1],"kind":"perm_action","mem":[],"mut":[1,1],"tier":"q"}}}
+
+section functions
+oracle @inc2 (x:wire[2] in) (t:wire[2]) (f:wire[4]) () ()
+regs { one:reg[2], r:reg[2] }
+^entry():
+one = lift.const.i2 1
+r = lift.add x one
+lift.retval r
+perm_action @oracle_tuple (t:wire[2] mut, f:wire[4] mut) (x:wire[2] in) () (tk:token) ()
+^entry():
+oracle_call @inc2 tk (x) t f () ()
+perm_action @borrow_tuple (t:wire mut, b:wire mut) (x:wire in) () () ()
+^entry():
+cx x b
+cx b t
+cx x b
+cx b t

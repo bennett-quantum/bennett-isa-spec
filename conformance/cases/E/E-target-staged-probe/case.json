@@ -24,5 +24,12 @@
  "unavailable": {
   "deliverable": 9,
   "reason": "target descriptions (§8) are staged deliverable 9"
+ },
+ "scenario": {
+  "target_file": "target.json",
+  "entry": "views"
+ },
+ "expected_outcome": {
+  "diagnostic": "staged deliverable 9"
  }
 }

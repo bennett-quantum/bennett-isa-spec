@@ -1,0 +1,18 @@
+{
+ "id": "H-unsupported",
+ "suite": "H",
+ "spec": "§11: \"typedef enum { BENNETT_SCHED_OK, BENNETT_SCHED_INFEASIBLE, BENNETT_SCHED_UNSUPPORTED } bennett_sched_outcome\"",
+ "derivation": "An UNSUPPORTED response is a distinct outcome, must have a readable reason, and cannot be counted as a feasible schedule.",
+ "scenario": {
+  "response_outcome": "BENNETT_SCHED_UNSUPPORTED",
+  "reason": "expansion library is not implemented"
+ },
+ "expected_outcome": {
+  "outcome": "BENNETT_SCHED_UNSUPPORTED",
+  "accepted_schedule": false
+ },
+ "unavailable": {
+  "deliverable": 10,
+  "reason": "§11 scheduling is staged deliverable 10"
+ }
+}

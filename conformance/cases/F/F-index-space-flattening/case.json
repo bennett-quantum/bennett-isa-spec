@@ -1,0 +1,24 @@
+{
+ "id": "F-index-space-flattening",
+ "suite": "F",
+ "spec": "§3.6: \"lprocs ordered by closure hash with SCC members in SCC index order\"; §9.2: \"members ordered by name bytewise\"",
+ "derivation": "The mutually recursive SCC members f then g follow main (2 rows). f has 2 rows, so g entry is canonical index 4. main calls g, which returns that label; unrelated dynamic execution does not change it. Six executed rows.",
+ "object": "../../objects/mutual.bisa",
+ "command": [
+  "run-oracle",
+  "{object}",
+  "main",
+  "--input",
+  "",
+  "--budget",
+  "20,0,32,4"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "code": 0,
+   "payload": 4,
+   "steps": 6
+  }
+ }
+}

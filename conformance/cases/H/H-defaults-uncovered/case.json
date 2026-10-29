@@ -7,5 +7,18 @@
  "unavailable": {
   "deliverable": 10,
   "reason": "the §11 schedule consumer is staged deliverable 10; no reference-CLI command consumes or validates a schedule for execution"
+ },
+ "scenario": {
+  "schedule_file": "schedule.json",
+  "epsilon": "0.01",
+  "positive_error_operations": 4,
+  "native_gate_matches": true
+ },
+ "expected_outcome": {
+  "epsilon_share": "0.0025",
+  "cleanup": "reverse",
+  "gate": "native",
+  "allocation": "first JCS class with capacity",
+  "timing": "sequential"
  }
 }

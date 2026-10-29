@@ -1,0 +1,19 @@
+{
+ "id": "G-register-exclusive",
+ "suite": "G",
+ "spec": "§10: \"A run owns the registers and memory it touches exclusively while not CLOSED.\"; \"no register it touched has been prepared, freed, sliced or used by another run since; else E_NOT_REVERSIBLE\"",
+ "derivation": "A second run cannot concurrently use an owned register. Once ownership releases, a subsequent operation touching that register invalidates reversal eligibility of the old completed run.",
+ "scenario": {
+  "register": "q",
+  "first_state": "COMPLETED",
+  "second_operation": "use q in another run"
+ },
+ "expected_outcome": {
+  "exclusive_until": "CLOSED",
+  "reverse_after_later_use": "E_NOT_REVERSIBLE"
+ },
+ "unavailable": {
+  "deliverable": 8,
+  "reason": "the full §10 C launch library is staged deliverable 8"
+ }
+}

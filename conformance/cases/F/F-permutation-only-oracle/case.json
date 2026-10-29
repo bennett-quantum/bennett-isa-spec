@@ -1,0 +1,18 @@
+{
+ "id": "F-permutation-only-oracle",
+ "suite": "F",
+ "spec": "§5.2: \"Body: lifted and control rows over its locations and lproc closure; exact-permutation only\"; §14.1: \"rejects any body that executes a non-permutation gate.\"",
+ "derivation": "The oracle body executes h, whose matrix mixes basis vectors: not a permutation row, so load must reject.",
+ "object": "../../objects/f_oracle_gate.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§"
+  ]
+ }
+}

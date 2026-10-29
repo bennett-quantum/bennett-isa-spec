@@ -1,0 +1,41 @@
+{
+ "id": "E-scheme-correctness-negative",
+ "suite": "E",
+ "spec": "§8.3: \"A scheme's correctness is the target author's obligation (suite E: T3 for permutation schemes, suite D for ε > 0).\"",
+ "derivation": "A proposed mcx(3) scheme consisting of CX c[0],t; CX c[1],t; CX c[2],t computes parity, not conjunction. Basis witness c=(1,0,0),t=0 yields t=1 for the template but t=0 for mcx(3). T3 fails even though the template expands and costs correctly.",
+ "unavailable": {
+  "deliverable": 9,
+  "reason": "target scheme correctness is staged deliverable 9; no reference-CLI target checker"
+ },
+ "scenario": {
+  "realises": "mcx(3)",
+  "template": [
+   [
+    "cx",
+    "c0",
+    "t"
+   ],
+   [
+    "cx",
+    "c1",
+    "t"
+   ],
+   [
+    "cx",
+    "c2",
+    "t"
+   ]
+  ],
+  "input": [
+   1,
+   0,
+   0,
+   0
+  ]
+ },
+ "expected_outcome": {
+  "correct": false,
+  "template_target": 1,
+  "reference_target": 0
+ }
+}

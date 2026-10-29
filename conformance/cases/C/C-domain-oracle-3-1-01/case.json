@@ -1,0 +1,39 @@
+{
+ "id": "C-domain-oracle-3-1-01",
+ "suite": "C",
+ "spec": "§5.2: \"tgt final = initial ⊕ payload(F_B(x)); fr final = initial ⊕ code(F_B(x))\"; §4.2: \"Every row is one budget step\"; §15 C: \"T3 over full D\"",
+ "derivation": "inc2 executes const,add,retval (3 steps). At B=3, F_B(3)=((3+1) mod 4,0)=(0,0). Initial target 1 XOR 0 = 1; initial fault 1 XOR 0 = 1; input 3 unchanged. This enumerates all 2+2+4=8 interface bits (256 tuples); there is no memory/borrowed state. The wrapper only exposes the oracle tuple, with no transformed arithmetic.",
+ "object": "../../objects/t3_domains.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "oracle_tuple",
+  "--mut",
+  "1,1",
+  "--in",
+  "3",
+  "--arg",
+  "token:3,0,0,0"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "mut": [
+    1,
+    1
+   ],
+   "in": [
+    3
+   ],
+   "state": {
+    "10100011": [
+     1,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state"
+  ]
+ }
+}

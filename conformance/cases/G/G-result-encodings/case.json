@@ -1,0 +1,45 @@
+{
+ "id": "G-result-encodings",
+ "suite": "G",
+ "spec": "§10: \"INT as ⌈N/8⌉ little-endian bytes\"; \"F64 as the 8 IEEE 754 binary64 little-endian bytes\"; \"QREG and TOKEN as the 8-byte little-endian id\"",
+ "derivation": "INT i9=258 needs two bytes 02 01 (width 9); F64 1.0 is 00 00 00 00 00 00 f0 3f (width 64); QREG/TOKEN id 7 is 07 followed by seven zero bytes (width 64). Counts, measurement bits, tape length and fault order are read by their dedicated result accessors.",
+ "scenario": {
+  "values": [
+   {
+    "kind": "INT",
+    "width": 9,
+    "value": 258
+   },
+   {
+    "kind": "F64",
+    "value": 1.0
+   },
+   {
+    "kind": "QREG",
+    "id": 7
+   },
+   {
+    "kind": "TOKEN",
+    "id": 7
+   }
+  ]
+ },
+ "expected_outcome": {
+  "bytes": [
+   "0201",
+   "000000000000f03f",
+   "0700000000000000",
+   "0700000000000000"
+  ],
+  "widths": [
+   9,
+   64,
+   64,
+   64
+  ]
+ },
+ "unavailable": {
+  "deliverable": 8,
+  "reason": "the full §10 C launch library is staged deliverable 8"
+ }
+}

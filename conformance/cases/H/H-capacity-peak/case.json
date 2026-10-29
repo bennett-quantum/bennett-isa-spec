@@ -7,5 +7,14 @@
  "unavailable": {
   "deliverable": 10,
   "reason": "the §11 schedule consumer is staged deliverable 10; no reference-CLI command consumes or validates a schedule for execution"
+ },
+ "scenario": {
+  "request_file": "request.json",
+  "minimum_peak": 2,
+  "capacity": 1
+ },
+ "expected_outcome": {
+  "scheduler": "BENNETT_SCHED_INFEASIBLE",
+  "consumer": "E_SCHEDULE_INFEASIBLE"
  }
 }

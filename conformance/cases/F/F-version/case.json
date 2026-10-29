@@ -1,0 +1,18 @@
+{
+ "id": "F-version",
+ "suite": "F",
+ "spec": "Specification preamble Versioning: \"drafts are not compatible with each other\"; §9.2: \"The full version string ... is part of every semantic envelope\"",
+ "derivation": "Header declares ISA/object/launch/sched/cert/coverage/target 0.7, while the supplied contract and symbol ABI are 0.8: incompatible versions must reject at load.",
+ "object": "../../objects/f_version.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 1,
+  "stdout_empty": true,
+  "stderr_contains": [
+   "§"
+  ]
+ }
+}

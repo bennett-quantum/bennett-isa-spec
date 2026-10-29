@@ -1,0 +1,18 @@
+bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"0000000000000000000000000000000000000000000000000000000000000000","kind":"oracle","name":"top","signature":{"abi":"0.8","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}},"1":{"interface_hash":"0000000000000000000000000000000000000000000000000000000000000000","kind":"lproc","name":"peek","signature":{"abi":"0.8","kind":"lproc","params":[8],"result":8,"tier":"q"}}}
+
+section functions
+oracle @top (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
+regs { secret:reg[8], r:reg[8] }
+^entry():
+r = lift.call @peek (x)
+lift.retval r
+lproc @peek (a:reg[8]) (r:reg[8]) () () ()
+^entry():
+r = lift.add a secret
+lift.ret r
+
+section layout
+{"A_tab":0,"H":4,"S_cells":4,"globals":{},"heap_base":1,"heap_limit_max":0,"interface_regions":{},"null_size":1,"ptr_width":32}

@@ -121,7 +121,10 @@ fn collect_case_files(dir: &Path, out: &mut Vec<PathBuf>) -> std::io::Result<()>
 fn load_case(file: &Path) -> Result<Case, String> {
     let text = fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
     let doc = json::parse(&text).map_err(|e| format!("{}: {e}", file.display()))?;
-    let dir = file.parent().ok_or("case.json has no parent")?.to_path_buf();
+    let dir = file
+        .parent()
+        .ok_or("case.json has no parent")?
+        .to_path_buf();
     let req_str = |key: &str| -> Result<String, String> {
         doc.get(key)
             .and_then(Json::as_str)
@@ -171,7 +174,10 @@ fn load_case(file: &Path) -> Result<Case, String> {
                 .and_then(Json::as_str)
                 .ok_or_else(|| format!("{id}: unavailable.reason is required"))?
                 .to_string();
-            Some(Unavailable { deliverable, reason })
+            Some(Unavailable {
+                deliverable,
+                reason,
+            })
         }
     };
     Ok(Case {
@@ -274,7 +280,10 @@ pub fn run_case(bin: &Path, case: &Case, tmpdir: &Path) -> Outcome {
     let dir_str = case.dir.to_string_lossy().into_owned();
     let args: Vec<String> = command
         .iter()
-        .map(|a| a.replace("{object}", &object_str).replace("{dir}", &dir_str))
+        .map(|a| {
+            a.replace("{object}", &object_str)
+                .replace("{dir}", &dir_str)
+        })
         .collect();
     let output = match Command::new(bin)
         .args(&args)
@@ -339,7 +348,9 @@ fn check_expect(case: &Case, exit: i32, stdout: &str, stderr: &str) -> Result<()
     }
     if let (Some(want), Some(got)) = (&exp.stdout_json, &parsed) {
         if let Some(d) = json::subset_diff(want, got) {
-            return Err(format!("stdout JSON mismatch at {d}; full stdout={stdout:?}"));
+            return Err(format!(
+                "stdout JSON mismatch at {d}; full stdout={stdout:?}"
+            ));
         }
         for path in &exp.exact_at {
             let (w, g) = (want.at_path(path), got.at_path(path));
@@ -419,7 +430,7 @@ pub fn run_all(bin: &Path, cases: &[Case], tmpdir: &Path) -> Report {
             } => {
                 tally.2 += 1;
                 report.lines.push(format!(
-                    "UNAVAILABLE {}: deliverable {} — {}{}",
+                    "UNAVAILABLE {}: unavailable: deliverable {} — {}{}",
                     case.id,
                     deliverable,
                     reason,

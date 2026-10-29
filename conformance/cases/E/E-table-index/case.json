@@ -1,0 +1,26 @@
+{
+ "id": "E-table-index",
+ "suite": "E",
+ "spec": "§8.1: \"a table index outside the array [is a] load-time error\"",
+ "derivation": "The table has two entries (indices 0,1); k=2 is outside it: reject at load.",
+ "scenario": {
+  "tables": {
+   "cost": [
+    1,
+    2
+   ]
+  },
+  "expression": {
+   "table": "cost",
+   "index": "k"
+  },
+  "k": 2
+ },
+ "expected_outcome": {
+  "load": "reject"
+ },
+ "unavailable": {
+  "deliverable": 9,
+  "reason": "§8 target evaluation is staged deliverable 9"
+ }
+}

@@ -7,5 +7,18 @@
  "unavailable": {
   "deliverable": 8,
   "reason": "the full §10 launch library (stateful bennett_* API over runs) is staged deliverable 8; the CLI exposes only the one-shot run-program launch"
+ },
+ "scenario": {
+  "run_states": [
+   "COMPLETED",
+   "CLOSED"
+  ]
+ },
+ "expected_outcome": {
+  "unload_statuses": [
+   "E_INVALID_STATE",
+   "OK"
+  ],
+  "tokens_destroyed_at": "successful unload"
  }
 }

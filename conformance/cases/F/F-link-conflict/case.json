@@ -2,10 +2,28 @@
  "id": "F-link-conflict",
  "suite": "F",
  "spec": "§15 suite F (linking); §9.3: unequal closure hashes under one name, or conflicting devices/layout/data entries, are a link error; equal-closure-hash duplicates deduplicate",
- "derivation": "Linking caller (F-import-unlinked) against an object defining ext_inc with a different body - hence a different closure hash - under the same name and signature must be a link error, while linking against the identical definition resolves and deduplicates. No reference-CLI command links two objects; linking is exposed only in the library, and bennett_load (the §10 library surface, deliverable 8) is staged.",
+ "derivation": "Two defined ext_inc symbols with equal signatures but bodies x+1 and x+2 have unequal closure hashes, so linking their objects is an error (§9.3). Equal-closure duplicates deduplicate. A bare unresolved unpinned import plus a single matching definition instead resolves successfully and is not itself a conflict.",
  "object": "../../objects/f_import_unlinked.bisa",
  "unavailable": {
   "deliverable": 8,
   "reason": "the full §10 launch library (bennett_load and its linking) is staged deliverable 8; the CLI has no link command"
+ },
+ "scenario": {
+  "definitions": [
+   {
+    "name": "ext_inc",
+    "signature": "i8 -> i8",
+    "body": "x+1"
+   },
+   {
+    "name": "ext_inc",
+    "signature": "i8 -> i8",
+    "body": "x+2"
+   }
+  ]
+ },
+ "expected_outcome": {
+  "link": "reject",
+  "identical_definition_duplicates": "deduplicate"
  }
 }

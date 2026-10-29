@@ -6,5 +6,11 @@
  "unavailable": {
   "deliverable": 9,
   "reason": "target descriptions (§8) are staged deliverable 9; no reference-CLI command loads a target"
+ },
+ "scenario": {
+  "target_file": "target.json"
+ },
+ "expected_outcome": {
+  "target_hash": "71e1973c642abe3ea4ae5b4c7211fd4e2b2b7817894ca958d138c992cc321596"
  }
 }

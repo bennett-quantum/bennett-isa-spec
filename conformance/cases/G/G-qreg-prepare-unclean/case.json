@@ -7,5 +7,18 @@
  "unavailable": {
   "deliverable": 8,
   "reason": "the full §10 launch library (stateful bennett_* API over runs) is staged deliverable 8; the CLI exposes only the one-shot run-program launch"
+ },
+ "scenario": {
+  "register_state": "1",
+  "operations": [
+   "bennett_qreg_prepare",
+   "bennett_qreg_free"
+  ]
+ },
+ "expected_outcome": {
+  "statuses": [
+   "E_QREG_NOT_CLEAN",
+   "E_QREG_NOT_CLEAN"
+  ]
  }
 }

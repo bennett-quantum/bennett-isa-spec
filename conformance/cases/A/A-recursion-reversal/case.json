@@ -1,0 +1,29 @@
+{
+ "id": "A-recursion-reversal",
+ "suite": "A",
+ "spec": "§15 suite A: \"run history and LIFO reversal with loops, recursion\"; §7.4: \"Whole-run reversal is that traversal on the whole history.\"",
+ "derivation": "rsum(3) = rsum(2)+3 = rsum(1)+2+3 = rsum(0)+1+2+3 = 6. Non-base activations execute const,icmp,br,const,sub,call,add,ret (8 each); base executes const,icmp,br,ret (4): 28 rows. Reversing all retained frames restores every entry component (T4).",
+ "object": "../../objects/recursion.bisa",
+ "command": [
+  "reverse",
+  "{object}",
+  "rsum",
+  "--args",
+  "3"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "REVERSED",
+   "steps": 28,
+   "results": [
+    {
+     "type": "i8",
+     "value": "6"
+    }
+   ],
+   "equals_entry": true,
+   "memory_equals_entry": true
+  }
+ }
+}

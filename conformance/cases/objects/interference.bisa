@@ -1,0 +1,19 @@
+bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"d85842cd3622a6a9fb9aec2c66599620d714299aa4742a3840e3d90ba3b814af","kind":"action","name":"minus_identity","signature":{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}},"1":{"interface_hash":"bea67f9c57bb93d92b2fa047a4e9ef417cb40981b78d105d6de72c7a211d3a4f","kind":"action","name":"interference","signature":{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1,1],"tier":"q"}}}
+
+section functions
+action @minus_identity (t:wire mut) () () () ()
+^entry():
+x t
+s t
+s t
+x t
+s t
+s t
+action @interference (c:wire mut, t:wire mut) () () () ()
+^entry():
+h c
+ctl c action_call @minus_identity (t) () () ()
+h c

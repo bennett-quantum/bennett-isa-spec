@@ -6,5 +6,12 @@
  "unavailable": {
   "deliverable": 9,
   "reason": "target descriptions (§8) are staged deliverable 9"
+ },
+ "scenario": {
+  "target_file": "target.json"
+ },
+ "expected_outcome": {
+  "load": "reject",
+  "reason": "epsilon zero entry references eps"
  }
 }

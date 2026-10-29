@@ -1,0 +1,26 @@
+{
+ "id": "D-channel-nonpositive-rejected",
+ "suite": "D",
+ "spec": "§12.1: \"The checker proves each of the three matrices positive definite ... the interval lower bound of every pivot is strictly positive, and rejects otherwise\"",
+ "derivation": "For Phi=0, take Y=diag(0,-1,0,0), mu=1, bound=1. The first pivot is 0, not strictly positive; the next diagonal is negative. Interval Cholesky cannot prove positive definiteness, so reject regardless of the scalar bound.",
+ "unavailable": {
+  "deliverable": 11,
+  "reason": "§12.1 rigorous interval checker is staged deliverable 11"
+ },
+ "scenario": {
+  "choi_difference": "zero 4x4",
+  "Y_diagonal": [
+   0,
+   -1,
+   0,
+   0
+  ],
+  "mu": 1,
+  "bound": 1,
+  "precision_bits": 64
+ },
+ "expected_outcome": {
+  "verdict": "reject",
+  "reason": "nonpositive pivot"
+ }
+}

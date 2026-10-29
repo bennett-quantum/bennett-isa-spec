@@ -6,5 +6,26 @@
  "unavailable": {
   "deliverable": 9,
   "reason": "target descriptions (§8) are staged deliverable 9"
+ },
+ "scenario": {
+  "target_file": "target.json",
+  "op": "cx",
+  "own_controls": 1,
+  "inherited_controls": [
+   0,
+   1
+  ],
+  "epsilon_share": "0.01"
+ },
+ "expected_outcome": {
+  "no_inherited": {
+   "cost": {
+    "time": 1
+   },
+   "epsilon": 0
+  },
+  "one_inherited": {
+   "load": "reject"
+  }
  }
 }

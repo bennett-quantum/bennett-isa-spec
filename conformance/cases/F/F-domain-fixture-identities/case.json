@@ -1,0 +1,31 @@
+{
+ "id": "F-domain-fixture-identities",
+ "suite": "F",
+ "spec": "§9.2: \"Semantic envelope ... every part ends with LF\"; \"Reference replacement\"; \"member hash = SHA-256 ... <scc_hash hex>:<decimal index>\"",
+ "derivation": "Hashes independently assembled with Python hashlib from isa=0.8 LF, ptr_width=32 LF, JCS signature LF, canonical function lines LF, and each referenced callee hash LF (§9.2); definitions retain their own name, call references use callee hashes. All references form a DAG; closure and interface hashes coincide. No layout/data/device leaves exist.",
+ "object": "../../objects/t3_domains.bisa",
+ "command": [
+  "check",
+  "{object}"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "status": "ok",
+   "symbols": {
+    "inc2": {
+     "interface_hash": "d42f3ddc94103b7c18a08340ae54ab5d98d173bae714c5f7477039b1c7b3543e",
+     "closure_hash": "d42f3ddc94103b7c18a08340ae54ab5d98d173bae714c5f7477039b1c7b3543e"
+    },
+    "oracle_tuple": {
+     "interface_hash": "62a10b7f392b7c432fa43d3450b3319b938a617781cec6012e0151fc2222becd",
+     "closure_hash": "62a10b7f392b7c432fa43d3450b3319b938a617781cec6012e0151fc2222becd"
+    },
+    "borrow_tuple": {
+     "interface_hash": "791f8aa2af142cdcdd0b6688a06a76c22f96984d3dc73959494b850ebcac2277",
+     "closure_hash": "791f8aa2af142cdcdd0b6688a06a76c22f96984d3dc73959494b850ebcac2277"
+    }
+   }
+  }
+ }
+}

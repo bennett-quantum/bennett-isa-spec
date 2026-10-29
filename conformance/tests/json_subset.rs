@@ -14,8 +14,14 @@ fn bad(expected: &str, actual: &str) {
 
 #[test]
 fn object_subset_ignores_extra_fields() {
-    ok(r#"{"code":0,"payload":9}"#, r#"{"code":0,"payload":9,"steps":3}"#);
-    ok(r#"{"a":{"b":[1,2]}}"#, r#"{"a":{"b":[1,2],"c":true},"d":null}"#);
+    ok(
+        r#"{"code":0,"payload":9}"#,
+        r#"{"code":0,"payload":9,"steps":3}"#,
+    );
+    ok(
+        r#"{"a":{"b":[1,2]}}"#,
+        r#"{"a":{"b":[1,2],"c":true},"d":null}"#,
+    );
 }
 
 #[test]
@@ -53,4 +59,22 @@ fn parser_handles_escapes_and_nested() {
     assert!(parse(r#"{"a":}"#).is_err());
     assert!(parse("").is_err());
     assert!(parse("{} trailing").is_err());
+}
+
+#[test]
+fn rejects_invalid_json_output() {
+    for text in [
+        "01",
+        "-01",
+        "1.",
+        "1.e2",
+        "1e999",
+        "\"raw\nnewline\"",
+        r#""\uD800\u0041""#,
+    ] {
+        assert!(
+            bennett_isa_conformance::json::parse(text).is_err(),
+            "accepted invalid JSON: {text:?}"
+        );
+    }
 }

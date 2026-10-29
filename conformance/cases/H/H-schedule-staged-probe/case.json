@@ -22,5 +22,11 @@
  "unavailable": {
   "deliverable": 10,
   "reason": "the §11 schedule consumer is staged deliverable 10"
+ },
+ "scenario": {
+  "object": "../../objects/sched_inc8.bisa"
+ },
+ "expected_outcome": {
+  "diagnostic": "staged deliverable 10"
  }
 }

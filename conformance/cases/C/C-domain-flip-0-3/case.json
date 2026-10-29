@@ -1,0 +1,36 @@
+{
+ "id": "C-domain-flip-0-3",
+ "suite": "C",
+ "spec": "§4.5: \"qxor s t | cx s[i] t[i]\"; §15 C: \"T3 over full D ... permutation actions\"",
+ "derivation": "qcopy p followed by qxor d t and quncopy restores workspace and gives t XOR p = 0 XOR 3 = 3. Both two-bit bundles range independently over 0..3 (16 inputs).",
+ "object": "../../objects/actions.bisa",
+ "command": [
+  "run-action",
+  "{object}",
+  "flip",
+  "--mut",
+  "0",
+  "--in",
+  "3"
+ ],
+ "expect": {
+  "exit": 0,
+  "stdout_json": {
+   "mut": [
+    3
+   ],
+   "in": [
+    3
+   ],
+   "state": {
+    "1111": [
+     1,
+     0
+    ]
+   }
+  },
+  "stdout_json_exact_at": [
+   "state"
+  ]
+ }
+}
