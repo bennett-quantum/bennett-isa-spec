@@ -277,3 +277,121 @@ fn r3_nonpermutation_calls_touch_all_effective_controls() {
         assert_eq!(q, before);
     }
 }
+
+/// c is identity (X twice), so CX(b,t); c[†]; CX(b,t) is identity on
+/// every t,b and on any reference entangled with b. Local images/lifetimes
+/// are unconditional even if c is called under a borrowed control.
+fn check_local_region_lifetime(declaration: &str, bounds: &[u64], image: bool) {
+    let ps = r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}"#;
+    let cs = ps.replace("\"bounds\":[]", &format!("\"bounds\":{bounds:?}"));
+    let regs = if bounds.is_empty() {
+        String::new()
+    } else {
+        "regs {  } bounds {0}\n".into()
+    };
+    let child = format!(
+        "perm_action @c (t:wire mut) () () () ()\n{regs}^entry():\n{declaration}\nx t\nx t"
+    );
+    for direction in ["", "adj "] {
+        for controlled in [false, true] {
+            let call = format!("{direction}action_call @c (t) () () ()");
+            let call = if controlled {
+                format!("qpred b\n{call}\nqunpred b")
+            } else {
+                call
+            };
+            let parent = format!("perm_action @a (t:wire mut) () () () ()\n^entry():\nb = qborrow any 1\ncx b t\n{call}\ncx b t\nqreturn b");
+            let layout = "\nsection layout\n{\"A_tab\":0,\"H\":0,\"S_cells\":0,\"globals\":{},\"heap_base\":1,\"heap_limit_max\":0,\"interface_regions\":{},\"null_size\":1,\"ptr_width\":32}\n";
+            let text = support::object_with_data(
+                &[("c", &cs, &child), ("a", ps, &parent)],
+                if image { &[("image", "ff")] } else { &[] },
+                layout,
+            );
+            let o = support::rehash(&text);
+            o.check_hashes().unwrap();
+            // Four t,b basis entries, a superposition, and a Bell pair b/ref.
+            for input in 0..6u32 {
+                let mut q = QuantumState::new();
+                let w = q.allocate(3).unwrap();
+                if input == 5 {
+                    q.gate("h", &[w[1]], None, &[]).unwrap();
+                    q.gate("cx", &[w[1], w[2]], None, &[]).unwrap();
+                    q.gate("h", &[w[0]], None, &[]).unwrap();
+                } else {
+                    for (bit, wire) in w[..2].iter().enumerate() {
+                        if input == 4 {
+                            q.gate("h", &[*wire], None, &[]).unwrap();
+                        } else if input >> bit & 1 == 1 {
+                            q.gate("x", &[*wire], None, &[]).unwrap();
+                        }
+                    }
+                }
+                let before = q.clone();
+                let mut bindings = QuantumBindings::default();
+                bindings.bundles.insert("t".into(), vec![w[0]]);
+                bindings.borrowed.push(vec![w[1]]);
+                for adjoint in [false, true] {
+                    o.execute_action("a", &mut q, &bindings, adjoint, &[])
+                        .unwrap();
+                    assert_eq!(q, before, "{declaration}, {direction}, controlled={controlled}, input={input}, adjoint={adjoint}");
+                }
+            }
+            // Pin the reported CLI acceptance and t=0/1 exact reversal too.
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join(".tmp")
+                .join(format!(
+                    "codex-local-{image}-{}-{}-{controlled}.bisa",
+                    bounds.len(),
+                    direction.len()
+                ));
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, &o.text).unwrap();
+            for t in ["0", "1"] {
+                for command in ["run-action", "reverse"] {
+                    let output = std::process::Command::new(env!("CARGO_BIN_EXE_bennett-isa-ref"))
+                        .arg(command)
+                        .arg(&path)
+                        .args(["a", "--mut", t])
+                        .output()
+                        .unwrap();
+                    assert!(
+                        output.status.success(),
+                        "{}",
+                        String::from_utf8_lossy(&output.stderr)
+                    );
+                    let value = support::json(std::str::from_utf8(&output.stdout).unwrap());
+                    let expected = support::json(&format!(r#"{{"{t}":[1,0]}}"#));
+                    let field = if command == "reverse" {
+                        "forward_state"
+                    } else {
+                        "state"
+                    };
+                    assert_eq!(value.get(field).unwrap(), &expected);
+                    if command == "reverse" {
+                        assert_eq!(
+                            value.get("equals_entry").unwrap(),
+                            &bennett_isa_ref::json::Json::Bool(true)
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn codex_r3_b03_adjoint_child_local_region_exact_witness() {
+    check_local_region_lifetime("qregion r 1 1", &[], false);
+}
+
+#[test]
+fn codex_r3_b03_adjoint_child_nonzero_image() {
+    check_local_region_lifetime("qregion r 1 4 @image", &[], true);
+}
+
+#[test]
+fn codex_r3_b03_adjoint_child_zero_trip_region_declaration() {
+    // The load precedes the lexical declaration: even a zero-trip declaration
+    // creates the region at function entry. The loaded image is restored.
+    check_local_region_lifetime("z = qalloc any 1\nv = qload r z\nqunload r z v\nqfree z\nqloop 0 {\nqregion r 1 4 @image\n}", &[0], true);
+}

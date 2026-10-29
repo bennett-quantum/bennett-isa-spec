@@ -142,3 +142,28 @@ generator tests pass** (1 ignored sweep deferred to final verification).
 No new semantic RED: these witnesses already pass after the SOL commit.
 Re-read §§5.1, 5.7, 6.1–6.3 and SPEC-QUESTIONS: full joint dependency union
 and exact inverse obligations are explicit; no new ambiguity or decline.
+
+## Codex R3-B03 — resolved
+
+RED witnessed for all three new regressions: exact adjoint child, nonzero
+image and zero-trip declaration each rejected with §5.6's unclean-release
+error before the fix. `borrow.rs::Compiler::compile_function` now emits the
+complete local-region entry/body/exit for top-level analysis and every inlined
+child. Clean `Node::Alloc` and explicit unconditional image-X `Node::Flip`s
+replace image-carrying allocations; the exit is the entry's exact adjoint.
+The call adjoint reverses the complete lifetime, preserving image preparation
+and restoration. No cleanliness or borrow-factorisation diagnostic is weakened.
+
+Pins: `r1_borrow::codex_r3_b03_adjoint_child_local_region_exact_witness`,
+`codex_r3_b03_adjoint_child_nonzero_image`, and
+`codex_r3_b03_adjoint_child_zero_trip_region_declaration`. Each exercises
+forward/adjoint children, with/without an inherited borrowed predicate,
+all four t,b basis values, superposition, and b entangled with an untouched
+external reference. Parent execution and its adjoint each equal entry exactly;
+no workspace remains. The zero-trip case reads the image before its lexical
+declaration. The nonzero image is the requested one-byte ff for region[1,4].
+CLI run-action for t=0/1 returns the unchanged basis state and reverse reports
+equals_entry=true for every variant; hashes check. All **9 active borrow tests
+pass** (1 ignored), and the full normal suite is **214 passed, 0 failed,
+5 ignored**. Re-read §§4.6, 5.3 and 5.6; no new ambiguity. SPEC-QUESTIONS 28
+retains its proposed wording and now references these local-lifetime pins.

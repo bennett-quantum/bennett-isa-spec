@@ -121,7 +121,8 @@ enum Node {
     /// A non-permutation operation (non-diagonal or diagonal gate, measurement-free
     /// non-permutation call): it ends a frame and may not touch a borrowed wire.
     Other(Vec<String>),
-    Alloc(Vec<String>, Vec<bool>),
+    /// Allocate clean wires; image preparation is represented by explicit flips.
+    Alloc(Vec<String>),
     Free(Vec<String>),
 }
 impl Node {
@@ -147,7 +148,7 @@ impl Node {
                 out.extend(inputs.iter().cloned());
                 out.extend(outputs.iter().cloned());
             }
-            Self::Other(w) | Self::Alloc(w, _) | Self::Free(w) => out.extend(w.iter().cloned()),
+            Self::Other(w) | Self::Alloc(w) | Self::Free(w) => out.extend(w.iter().cloned()),
         }
     }
     fn permutation(&self) -> bool {
@@ -171,11 +172,8 @@ impl Node {
                 outputs: outputs.clone(),
                 assign: true,
             },
-            Self::Alloc(w, image) => {
-                let _ = image;
-                Self::Free(w.clone())
-            }
-            Self::Free(w) => Self::Alloc(w.clone(), vec![false; w.len()]),
+            Self::Alloc(w) => Self::Free(w.clone()),
+            Self::Free(w) => Self::Alloc(w.clone()),
             other => other.clone(),
         }
     }
@@ -261,12 +259,34 @@ impl Compiler<'_> {
                 all.push(self.fresh(w));
             }
             let flat: Vec<String> = all.iter().flatten().cloned().collect();
-            let bits = (0..flat.len())
-                .map(|b| image[b / 8] >> (b % 8) & 1 == 1)
-                .collect();
-            out.push(Node::Alloc(flat, bits));
+            out.push(Node::Alloc(flat.clone()));
+            for (bit, wire) in flat.into_iter().enumerate() {
+                if image[bit / 8] >> (bit % 8) & 1 == 1 {
+                    // §4.6: image gates, like allocation/release, are unconditional.
+                    out.push(Node::Flip(Vec::new(), wire));
+                }
+            }
             self.regions.insert(a[0].clone(), (aw, all));
         }
+        Ok(())
+    }
+    /// Compile the complete §4.6 local-region lifetime, not just its entry.
+    /// Reversing these nodes (§5.3) recreates each image before the inverse
+    /// body and restores/releases it afterward, even under a call predicate.
+    fn compile_function(
+        &mut self,
+        f: &Function,
+        context: &[(String, bool)],
+        out: &mut Vec<Node>,
+    ) -> Result<()> {
+        let mut entry = Vec::new();
+        self.declare_regions(f, &mut entry)?;
+        let exit: Vec<_> = entry.iter().rev().map(Node::adjoint).collect();
+        out.extend(entry);
+        for block in &f.blocks {
+            self.compile(&block.instructions, context, out)?;
+        }
+        out.extend(exit);
         Ok(())
     }
     fn compile(
@@ -295,7 +315,7 @@ impl Compiler<'_> {
                     if op == "qborrow" {
                         self.borrowed.extend(wires);
                     } else {
-                        out.push(Node::Alloc(wires.clone(), vec![false; wires.len()]));
+                        out.push(Node::Alloc(wires.clone()));
                     }
                 }
                 "qfree" => out.push(Node::Free(self.bundle(&a[0])?)),
@@ -311,7 +331,7 @@ impl Compiler<'_> {
                     let target = match op {
                         "qcopy" => {
                             let w = self.produce(&i.lhs[0], source.len());
-                            out.push(Node::Alloc(w.clone(), vec![false; w.len()]));
+                            out.push(Node::Alloc(w.clone()));
                             w
                         }
                         _ => self.bundle(&a[1])?,
@@ -377,7 +397,7 @@ impl Compiler<'_> {
                         .ok_or_else(|| Error("§4.6: unknown region".into()))?;
                     let value = if op == "qload" {
                         let w = self.produce(&i.lhs[0], cells.first().map_or(0, Vec::len));
-                        out.push(Node::Alloc(w.clone(), vec![false; w.len()]));
+                        out.push(Node::Alloc(w.clone()));
                         w
                     } else {
                         self.bundle(&a[2])?
@@ -465,10 +485,7 @@ impl Compiler<'_> {
                             child.classical.insert(p.name.clone(), self.classical(&n)?);
                         }
                         let mut body = Vec::new();
-                        child.declare_regions(f, &mut body)?;
-                        for b in &f.blocks {
-                            child.compile(&b.instructions, &c, &mut body)?;
-                        }
+                        child.compile_function(f, &c, &mut body)?;
                         self.generation = child.generation;
                         self.borrowed.extend(child.borrowed);
                         if call.adjoint {
@@ -628,10 +645,9 @@ impl Evaluation<'_> {
                 self.state.insert(a.clone(), x.xor(&d));
                 self.state.insert(b.clone(), y.xor(&d));
             }
-            Node::Alloc(wires, image) => {
-                for (w, bit) in wires.iter().zip(image) {
-                    self.state
-                        .insert(w.clone(), if *bit { Poly::one() } else { Poly::zero() });
+            Node::Alloc(wires) => {
+                for w in wires {
+                    self.state.insert(w.clone(), Poly::zero());
                 }
             }
             Node::Free(wires) => {
@@ -875,10 +891,7 @@ impl Object {
             }
         }
         let mut nodes = Vec::new();
-        compiler.declare_regions(f, &mut nodes)?;
-        for block in &f.blocks {
-            compiler.compile(&block.instructions, &[], &mut nodes)?;
-        }
+        compiler.compile_function(f, &[], &mut nodes)?;
         let borrowed = compiler.borrowed;
         match self.decide_frames(&nodes, &borrowed) {
             Ok(()) => Ok(()),

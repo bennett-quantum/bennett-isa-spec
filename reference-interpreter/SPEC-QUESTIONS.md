@@ -214,3 +214,10 @@ changed in response to the council's round-1 review
     each arm's workspace lifetimes are self-contained; otherwise take the
     adjoint of the complete §4.6 expansion, reversing unconditional lifetime
     operations as well."
+
+    Round-3 local-region regression: `r1_borrow::codex_r3_b03_adjoint_child_local_region_exact_witness`
+    and its nonzero-image/zero-trip-declaration variants pin the same complete
+    lifetime principle for inlined calls: unconditional entry allocation and
+    image preparation, body, inverse image gates and release. Both call directions
+    preserve the image, including under inherited predicates. This follows the
+    explicit §4.6 rule; no additional ambiguity or restriction is introduced.

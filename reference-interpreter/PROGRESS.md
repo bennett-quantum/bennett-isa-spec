@@ -21,6 +21,17 @@ The call-wrapping generator now covers swap, CX and mutable-region exchange:
 36 cases, 18 accepted / 18 rejected by independent parity, full execution of
 accepts. 17 discipline + 4 active generator tests pass; random seeds unchanged.
 
+R3-B03 resolved after RED on the exact witness, ff image and zero-trip
+lexical declaration: borrow compilation now wraps every function/inlined child
+in complete entry/body/exit region lifetimes. Allocations are clean, image Xs
+explicit and unconditional, so adjoints preserve preparation/restoration.
+Three regressions cover both call directions and inherited predicates, all
+t,b bases, superposition and an entangled external reference, plus CLI t=0/1
+run/reverse and checked hashes. 9 active borrow tests pass, 1 ignored; full
+normal suite: 214 passed, 0 failed, 5 ignored. SPEC-QUESTIONS 28 gains pin
+references, without new ambiguity. All three second-pass blockers resolved;
+no declines, no scope narrowed. Final conformance/quality gates follow below.
+
 ## Council round 3 (2026-10-29)
 
 Received SOL-R3-B01..B05 on snapshot 2e61144; response-round-3.md is appendable
