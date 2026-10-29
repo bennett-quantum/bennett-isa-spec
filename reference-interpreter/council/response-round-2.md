@@ -120,3 +120,21 @@ unsound accept: a joint exchange could cancel only one output's log while the
 partner had an intervening write. Both outputs must now cancel together;
 `r2_exchange_inverse_must_cancel_both_outputs_together` pins that witness.
 No new spec question: these are the dependency unions printed in §6.1.
+
+## SOL-R2-B08 — resolved
+
+Coincides with codex R2-B06. `exact.rs::Amplitude::approximate` evaluates the
+phase as a product of bounded limb phases, with complex squaring for exponent
+bits beyond binary64's finite angle range; it never converts the combined
+exponent to an f64 angle. The exact Laurent shadow still decides support,
+cleanliness and equality, with no tolerance. Subnormal limb phases are scaled
+before rounding. `QuantumState::exact_support` and the CLI use the corrected
+display conversion without further changes. Pin:
+`cli_xam::r2_finite_rotations_render_when_the_combined_angle_exceeds_binary64`
+(four literal rz and four argument rz, both basis states, finite unit-modulus
+amplitude 0.588863244801576 ± 0.8082326886001081i; reverse exactly [1,0]).
+RED: run-action exited 1 with non-finite JSON diagnostic. No new question.
+
+## codex R2-B06 — resolved
+
+Same change and tests as SOL-R2-B08; finite f64 1e308 is not rejected.

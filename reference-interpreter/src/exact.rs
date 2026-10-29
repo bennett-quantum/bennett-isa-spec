@@ -390,13 +390,30 @@ impl Amplitude {
         let mut re = 0f64;
         let mut im = 0f64;
         for (e, c) in &self.terms {
-            let angle = Dyadic {
-                n: e.clone(),
-                k: 1075,
+            // Evaluate exp(i * e * 2^-1075) as a product of finite
+            // limb phases. The exponent is unbounded even though each input
+            // angle is binary64. Converting their sum first can overflow.
+            let (mut co, mut si) = (1.0, 0.0);
+            for (j, limb) in e.limbs.iter().enumerate() {
+                if *limb == 0 { continue; }
+                let scale = 32 * j as i64 - 1075;
+                // A u32 limb times 2^991 is finite and represented exactly.
+                let bounded = scale.min(991);
+                let angle = if bounded < -1022 {
+                    // Scale the limb before rounding a subnormal phase.
+                    (*limb as f64 * 2f64.powi((bounded + 1022) as i32)) * 2f64.powi(-1022)
+                } else { *limb as f64 * 2f64.powi(bounded as i32) };
+                let (mut s, mut c) = angle.sin_cos();
+                for _ in bounded..scale {
+                    (c, s) = (c*c-s*s, 2.0*c*s);
+                    // Squaring a rounded unit complex otherwise amplifies
+                    // radial error; this affects display only, never equality.
+                    let norm = c.hypot(s);
+                    (c, s) = (c/norm, s/norm);
+                }
+                (co, si) = (co*c-si*s, co*s+si*c);
             }
-            .normalize()
-            .to_f64();
-            let (s, co) = angle.sin_cos();
+            let s = if e.negative { -si } else { si };
             let (x, y) = (c.re.to_f64(), c.im.to_f64());
             re += x * co - y * s;
             im += x * s + y * co;

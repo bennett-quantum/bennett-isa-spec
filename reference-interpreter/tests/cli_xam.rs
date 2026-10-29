@@ -1047,3 +1047,35 @@ fn malformed_cli_inputs_are_cited_diagnostics_without_json() {
         "expected JSON array",
     );
 }
+
+#[test]
+fn r2_finite_rotations_render_when_the_combined_angle_exceeds_binary64() {
+    for literal in [true, false] {
+        let sig = if literal { r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"# } else { r#"{"abi":"0.8","args":["f64"],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"# };
+        let angle = if literal { "1e+308" } else { "theta" };
+        let params = if literal { "" } else { "theta:f64" };
+        let body = format!("action @a (t:wire mut) () () ({params}) ()\n^entry():\nrz {angle} t\nrz {angle} t\nrz {angle} t\nrz {angle} t");
+        let o = support::rehash(&support::object(&[("a", sig, &body)], "{}", ""));
+        let path = tmp_file(if literal { "r2-large-literal.bisa" } else { "r2-large-arg.bisa" }, &o.text);
+        for t in ["0", "1"] {
+            let mut args = vec!["run-action", &path, "a", "--mut", t];
+            if !literal { args.extend(["--arg", "f64:1e308"]); }
+            let v = ok(&args);
+            let state = field(&v, "state").object().unwrap();
+            assert_eq!(state.len(), 1);
+            let amp = state[t].array().unwrap();
+            let re: f64 = amp[0].canonical().parse().unwrap();
+            let im: f64 = amp[1].canonical().parse().unwrap();
+            // theta is the EXACT binary64 1e308. Four single-gate phases
+            // multiply to exp(-i*2*theta) on |0>, its conjugate on |1>.
+            assert!((re - 0.588863244801576).abs() < 1e-12, "{re}");
+            let sign = if t == "0" { 1.0 } else { -1.0 };
+            assert!((im - sign * 0.8082326886001081).abs() < 1e-12, "{im}");
+            assert!((re*re+im*im-1.0).abs() < 1e-12);
+            args[0] = "reverse";
+            let v = ok(&args);
+            assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
+            assert_eq!(field(&v, "state").canonical(), format!("{{\"{t}\":[1,0]}}"));
+        }
+    }
+}
