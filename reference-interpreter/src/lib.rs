@@ -1,5 +1,6 @@
 //! Executable reference semantics for the Bennett ISA, version 0.8.
 mod action;
+mod bits;
 mod borrow;
 mod call_discipline;
 mod certificate;
@@ -16,7 +17,10 @@ mod quantum;
 mod registers;
 mod sha256;
 mod validation;
+mod wide_oracle;
+pub use wide_oracle::{OracleVectorInput,OracleVectorOutcome};
 pub use borrow::validate_translation_lemma;
+pub use bits::BitVector;
 pub use classical::{ClassicalMachine, ClassicalOutcome, ClassicalSnapshot, ClassicalValue};
 pub use classical::{HostExchange, HostRequest};
 pub use identity::Identity;

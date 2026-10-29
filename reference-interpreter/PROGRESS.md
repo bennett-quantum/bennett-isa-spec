@@ -6,6 +6,41 @@ repository-wide worklog rule, so this file also serves as this job's worklog.
 
 ## Session 2026-10-29
 
+### Current checkpoint: deeper suite F and metadata validation
+
+`cargo test --manifest-path reference-interpreter/Cargo.toml --offline` PASSED
+71 normal tests, two ignored sweeps pending rerun. `cargo clippy --manifest-path
+reference-interpreter/Cargo.toml --offline --all-targets -- -D warnings` PASSED.
+`cargo fmt --manifest-path reference-interpreter/Cargo.toml` applied formatting.
+
+Red-green: discipline now rejects H d; CX d,t; H d; free d (scratch remains
+entangled), and accepts it after cancelling the two CX readers. Cleanup pins
+predicate values and qif arm polarity. Local regions must be explicitly
+restored; cell version advances prevent stale qunload even after inverse
+stores. Calls transfer mut-region versions and permit local region actuals;
+two oracle calls cancel because the oracle is its own adjoint. Coherent while
+rejects writes to the selector's dependency set, including changes undone
+inside the body. Hand checks: H-CX-H produces entangled scratch; X under both
+qif arms is one unconditional X; two XOR stores restore a local image but
+still advance its cell versions. Twelve discipline tests pass.
+
+Red-green: five new metadata tests first accepted malformed documents. Added
+src/metadata.rs and src/certificate.rs. Schedules now require expansion binding,
+real closure binding, typed budgets/selectors, valid invocation paths and loop
+iteration depths, no ambiguous equal-specificity matches. Coverage resolves
+program-point tuples. Certificate parsing checks versions/bindings, all claim
+kind schemas, domain widths/ranges, samplers, subclaim/index references,
+subjects, frame c-only expressions/live-range disjointness, errors and
+composition shape. Hand checks: 256 cannot be the high endpoint of wire[8];
+all-zero xoshiro state is invalid; instruction ordinal3 is outside inc8.
+
+These are schema and static checks, NOT a completed certificate proof engine.
+Re-executing exhaustive/sampled claims, interval numerical/channel checks,
+error composition semantics and certificate linking are still unfinished.
+Frame JSON field choices and tuple encodings must be recorded in
+SPEC-QUESTIONS.md. Next: persist verification fixtures, extend certificate
+checking/composition and continue the remaining suite-F audit.
+
 ### Current continuation: suite F, borrow frames, full-domain reversal
 
 The current baseline passes 61 normal tests (two ignored sweeps). Commands:

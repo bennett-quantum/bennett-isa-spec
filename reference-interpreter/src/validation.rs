@@ -198,9 +198,7 @@ impl Object {
                 }
                 "qalloc" | "qborrow" => {
                     arity(2, 1)?;
-                    if !name(&a[0]) {
-                        return err("§4.8", "invalid wire class");
-                    }
+                    crate::object::literal_name(&a[0])?;
                     let n = a[1]
                         .parse::<u16>()
                         .map_err(|_| Error("§3.3: invalid allocation width".into()))?;
@@ -900,7 +898,8 @@ impl Object {
                                 .section("devices")
                                 .and_then(|d| d.get("services").ok())
                                 .and_then(|s| s.object().ok());
-                            if service.is_none_or(|s| !s.contains_key(&a[0])) {
+                            let service_name = crate::object::literal_name(&a[0])?;
+                            if service.is_none_or(|s| !s.contains_key(&service_name)) {
                                 return err("§10", "hostcall service undeclared");
                             }
                             result = Some(Type::Int(self.ptr_width));

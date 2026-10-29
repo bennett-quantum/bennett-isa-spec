@@ -235,3 +235,32 @@ fn exhaustive_unsigned_and_signed_division_u8() {
         }
     }
 }
+#[test]
+fn integer_literals_are_reduced_at_the_destination_width_without_host_overflow() {
+    use bennett_isa_ref::{Budget, Object, OracleInput, OracleMachine};
+    // 2^128+5 is 5 mod256; its negative is251 mod256.
+    for (literal, addend) in [
+        ("340282366920938463463374607431768211461", 5),
+        ("-340282366920938463463374607431768211461", 251),
+    ] {
+        let text = include_str!("fixtures/inc8.bisa")
+            .replace("lift.const.i8 1", &format!("lift.const.i8 {literal}"));
+        let o = Object::parse(&text).unwrap();
+        for x in 0..256 {
+            let input = OracleInput::bits(&[x]);
+            let budget = Budget::steps(3);
+            let result = o.run_oracle("inc8", &input, budget).unwrap();
+            assert_eq!((result.payload, result.code), ((x + addend) & 255, 0));
+            let mut machine = OracleMachine::new(&o, "inc8", &input, budget).unwrap();
+            let before = machine.snapshot();
+            for _ in 0..3 {
+                machine.forward_step().unwrap();
+            }
+            assert_eq!(machine.outcome(), result);
+            for _ in 0..3 {
+                machine.inverse_step().unwrap();
+            }
+            assert_eq!(machine.snapshot(), before);
+        }
+    }
+}

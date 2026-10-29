@@ -241,3 +241,10 @@ fn coherent_while_cannot_write_selector_dependencies_even_if_restored() {
     let text=object(&[("a",signature,"action @a (t:wire mut) (p:wire in) () () ()\nregs {  } bounds {1}\n^entry():\ncond = qcopy t\nqloop 1 while cond {\nx t\nx t\n}\nquncopy t cond")],"{}","");
     reject(&text, "§4.6");
 }
+
+#[test]
+fn large_exact_loop_bounds_use_decimal_strings_in_the_signature() {
+    let signature=r#"{"abi":"0.8","args":[],"bounds":["1152921504606846976"],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}"#;
+    let body="perm_action @a (t:wire mut) () () () ()\nregs {  } bounds {1152921504606846976}\n^entry():\nqloop 1152921504606846976 {\nx t\n}";
+    Object::parse(&object(&[("a",signature,body)],"{}","")).unwrap();
+}

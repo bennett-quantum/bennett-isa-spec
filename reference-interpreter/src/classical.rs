@@ -1054,7 +1054,7 @@ impl<'a> ClassicalMachine<'a> {
                             })?;
                             let payload = self.memory_bytes(address, count)?;
                             self.state.pending = Some(HostRequest {
-                                service: a[0].clone(),
+                                service: crate::object::literal_name(&a[0])?,
                                 payload,
                                 address,
                                 capacity,

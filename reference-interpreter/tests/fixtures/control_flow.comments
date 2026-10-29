@@ -1,0 +1,14 @@
+Hand-derived expectations, recorded before execution:
+while3: flag_i is AND of p[0] through p[i]. X flips t once per true flag.
+Thus t is XORed with the parity of the initial consecutive ones in p, and p
+is unchanged. At p=3 (011) it flips twice; at p=5 (101) it flips once.
+Adjoint reverses those same enabled iterations and clears all three flags.
+conditional: starting with t=0 and p=+ gives amplitudes [0,1/sqrt(2),1/2,1/2]
+in allocation order (t low bit). Applying the adjoint restores t=0,p=+.
+controlled_phase: Rz(2*pi) = -I on t. Controlled by p, it is Z on p;
+H p; controlled_phase; H p therefore produces p=1 with probability one.
+exchange: qexchm swaps t with m[a] and leaves the other cell unchanged.
+image: data dead has cell0=0xde and cell1=0xad. With t initially0x35 the
+result is0xeb or0x98 respectively. Scratch and local image are restored.
+borrowed: CX x,b; CX b,t; CX x,b; CX b,t gives t XOR x, restores b,
+and has no dependence on b, including when b is entangled externally.

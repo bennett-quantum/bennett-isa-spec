@@ -42,3 +42,23 @@ unchanged. Each entry records the applicable rule and the chosen reading.
    then ends with a space. Honor the explicit data grammar: accept exactly
    `NAME SP LF` for a zero-sized data image, as the sole trailing-space
    exception. All nonempty data and all other lines keep §16.1's space rule.
+10. **Fault width in shared lprocs (§3.3, §3.7).** An lproc signature has no
+    fault width. Check its fault literals against every enclosing oracle's F;
+    equivalently use the minimum F among its enclosing oracle closures. An
+    unattached lproc is checked again when linked to an oracle. This permits
+    fault31 under F=5 and rejects it if the same procedure is used under F=4.
+11. **Metadata encodings omitted by the schema sketches (§9.2, §9.4, §12–13).**
+    Encode a program-point tuple as `[interface_hash, block_name, ordinal]`;
+    schedule paths retain §11's explicit `{symbol,point,iteration}` form.
+    Certificate `versions` uses the seven version names from the object
+    header. A frame uses `interface` (role/width/class slots), class maps
+    `scratch`, `borrow`, `scheme_ancillae`, and `retained_history` (an expression
+    in c). Scratch counts may separate `clean` and `dirty`. Optional
+    `live_ranges` holds `{frame,start,end}` half-open generated-event intervals;
+    reuse of one frame requires disjoint intervals. These concrete JSON
+    choices implement the prose fields without adding semantic permissions.
+    Coverage classification `trapped` requires its fault_code; `shimmed`
+    requires its shim_hash. The specification does not enumerate variant
+    names, so nonempty variant identifiers are retained without inventing an
+    enum. Certificate proof verification remains a separate obligation from
+    validating these encodings.

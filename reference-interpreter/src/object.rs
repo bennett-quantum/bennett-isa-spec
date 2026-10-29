@@ -59,16 +59,27 @@ impl Type {
             _ if s.starts_with("wire[") && s.ends_with(']') => {
                 Self::Wire(bundle_width(&s[5..s.len() - 1])?)
             }
-            _ if s.starts_with("reg[") && s.ends_with(']') => Self::Reg(width(&s[4..s.len() - 1])?),
-            _ if s.starts_with("qreg[") && s.ends_with(']') => Self::Qreg(
-                s[5..s.len() - 1]
-                    .parse()
-                    .map_err(|_| Error("§3.3: invalid qreg size".into()))?,
-            ),
+            _ if s.starts_with("reg[") && s.ends_with(']') => Self::Reg(bundle_width(&s[4..s.len() - 1])?),
+            _ if s.starts_with("qreg[") && s.ends_with(']') => {
+                let raw = &s[5..s.len() - 1];
+                let n = raw
+                    .parse::<u64>()
+                    .map_err(|_| Error("§3.3: invalid qreg size".into()))?;
+                if !integer(raw) || raw.starts_with('-') || n == 0 {
+                    return err("§3.3", "qreg width must use positive canonical INT");
+                }
+                Self::Qreg(n)
+            }
             _ if s.starts_with("region[") && s.ends_with(']') => {
                 let (a, w) = s[7..s.len() - 1]
                     .split_once(',')
                     .ok_or_else(|| Error("§3.3: malformed region type".into()))?;
+                if !integer(a) || a.starts_with('-') {
+                    return err(
+                        "§3.3",
+                        "region address width must use canonical unsigned INT",
+                    );
+                }
                 let a = a
                     .parse()
                     .map_err(|_| Error("§3.3: invalid address width".into()))?;
@@ -354,7 +365,7 @@ impl Function {
                     Json::Array(
                         self.bounds
                             .iter()
-                            .map(|n| Json::Number(n.to_string()))
+                            .map(|n| if *n>9_007_199_254_740_991 {Json::String(n.to_string())}else{Json::Number(n.to_string())})
                             .collect(),
                     ),
                 );
@@ -386,6 +397,89 @@ pub(crate) fn name(s: &str) -> bool {
 pub(crate) fn integer(s: &str) -> bool {
     let s = s.strip_prefix('-').unwrap_or(s);
     s == "0" || (!s.starts_with('0') && !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()))
+}
+pub(crate) fn literal_name(s: &str) -> Result<String> {
+    if !s.starts_with('"') {
+        return if name(s) {
+            Ok(s.into())
+        } else {
+            err("§16.1", "expected NAME or STRING literal")
+        };
+    }
+    let mut escaped = false;
+    for c in s[1..].chars() {
+        if escaped {
+            if !['"', '\\', 'n'].contains(&c) {
+                return err(
+                    "§16.1",
+                    "instruction strings admit only quote, backslash and newline escapes",
+                );
+            }
+            escaped = false;
+        } else if c == '\\' {
+            escaped = true;
+        }
+    }
+    if escaped {
+        return err("§16.1", "incomplete STRING escape");
+    }
+    let value = Json::parse(s)?;
+    Ok(value.string()?.into())
+}
+fn operand_lexical(s: &str) -> Result<()> {
+    if name(s) || integer(s) {
+        return Ok(());
+    }
+    if s.starts_with('"') {
+        literal_name(s)?;
+        return Ok(());
+    }
+    if s.starts_with('(') {
+        list(s)?;
+        return Ok(());
+    }
+    if let Some(n) = s.strip_prefix('@') {
+        if name(n) {
+            return Ok(());
+        }
+    }
+    if let Some(label) = s.strip_prefix('^') {
+        let (n, args) = label
+            .split_once('(')
+            .map_or((label, None), |(n, args)| (n, Some(args)));
+        if name(n) {
+            if let Some(args) = args {
+                list(&format!("({args}"))?;
+            }
+            return Ok(());
+        }
+    }
+    if let Some((base, index)) = s.split_once('[') {
+        if name(base)
+            && index
+                .strip_suffix(']')
+                .is_some_and(|s| integer(s) && !s.starts_with('-'))
+        {
+            return Ok(());
+        }
+    }
+    if s.contains(['.', 'e', 'E']) && matches!(s.as_bytes().first(), Some(b'0'..=b'9' | b'-')) {
+        let value = Json::parse(s)?;
+        if let Json::Number(number) = value {
+            let mut canonical = if s.starts_with('-') && s.parse::<f64>() == Ok(0.0) {
+                "-0".into()
+            } else {
+                number
+            };
+            if !canonical.contains(['.', 'e']) {
+                canonical.push_str(".0");
+            }
+            if canonical == s {
+                return Ok(());
+            }
+        }
+    }
+    err("§16.1", format!("invalid or noncanonical operand {s}"))
 }
 pub(crate) fn list(s: &str) -> Result<Vec<String>> {
     let s = s
@@ -496,6 +590,15 @@ fn instruction(lines: &[(usize, &str)], pos: &mut usize) -> Result<Instruction> 
     let ts = tokens(rhs)?;
     if ts.is_empty() {
         return err("§16.2", "empty instruction");
+    }
+    if !name(&ts[0]) {
+        return err("§16.1", "invalid opcode token");
+    }
+    for (index, operand) in ts.iter().enumerate().skip(1) {
+        if operand == "{" && index + 1 == ts.len() {
+            continue;
+        }
+        operand_lexical(operand)?;
     }
     let mut ins = Instruction {
         lhs,
@@ -1453,11 +1556,16 @@ pub(crate) fn is_div(op: &str) -> bool {
     ["udiv", "urem", "sdiv", "srem"].contains(&op)
 }
 pub(crate) fn parse_bits(s: &str, width: u16) -> Result<u128> {
+    if !integer(s) {
+        return err("§16.1", "invalid integer literal");
+    }
     let negative = s.starts_with('-');
     let magnitude = s
         .trim_start_matches('-')
-        .parse::<u128>()
-        .map_err(|_| Error("§16.1: integer exceeds 128 bits".into()))?;
+        .bytes()
+        .fold(0u128, |value, digit| {
+            value.wrapping_mul(10).wrapping_add((digit - b'0') as u128)
+        });
     let n = if negative {
         0u128.wrapping_sub(magnitude)
     } else {

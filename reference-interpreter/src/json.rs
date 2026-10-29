@@ -82,8 +82,15 @@ impl Json {
             Self::Number(s) | Self::String(s) => s,
             _ => return err("§9.1", "expected unsigned integer"),
         };
-        s.parse()
-            .map_err(|_| crate::Error(format!("§9.1: invalid unsigned integer {s}")))
+        if !crate::object::integer(s) || s.starts_with('-') {
+            return err("§9.1",format!("invalid canonical unsigned integer {s}"));
+        }
+        let value=s.parse::<u128>()
+            .map_err(|_| crate::Error(format!("§9.1: invalid unsigned integer {s}")))?;
+        if matches!(self,Self::Number(_))&&value>9_007_199_254_740_991 {
+            return err("§9.1","integers outside the exact JSON range require decimal strings");
+        }
+        Ok(value)
     }
     pub fn fields(&self, required: &[&str], optional: &[&str]) -> Result<()> {
         let obj = self.object()?;

@@ -64,15 +64,21 @@ impl Environment {
     }
 }
 impl Object {
-    pub(crate) fn permutation_action_values(
+    pub(crate) fn permutation_action_values(&self,name:&str,mutables:&[u128],inputs:&[u128],regions:&BTreeMap<String,Vec<u8>>,args:&[Argument],adjoint:bool)->Result<Vec<u128>> {
+        let f=&self.functions[name];
+        let convert=|values:&[u128],params:&[crate::Param]|->Result<Vec<crate::BitVector>>{values.iter().zip(params).map(|(v,p)|crate::BitVector::from_u128(p.ty.width(self.ptr_width)? as usize,*v)).collect()};
+        let mutables=convert(mutables,&f.params[0])?;let inputs=convert(inputs,&f.params[1])?;
+        self.permutation_action_vectors(name,&mutables,&inputs,regions,args,adjoint)?.iter().map(crate::BitVector::to_u128).collect()
+    }
+    pub(crate) fn permutation_action_vectors(
         &self,
         name: &str,
-        mutables: &[u128],
-        inputs: &[u128],
+        mutables: &[crate::BitVector],
+        inputs: &[crate::BitVector],
         regions: &BTreeMap<String, Vec<u8>>,
         args: &[Argument],
         adjoint: bool,
-    ) -> Result<Vec<u128>> {
+    ) -> Result<Vec<crate::BitVector>> {
         let f = &self.functions[name];
         if f.kind != "perm_action"
             || mutables.len() != f.params[0].len()
@@ -87,7 +93,7 @@ impl Object {
             for (v, p) in values.iter().zip(ps) {
                 let wires = q.allocate(p.ty.width(self.ptr_width)? as usize)?;
                 for (i, w) in wires.iter().enumerate() {
-                    if i < 128 && v & (1u128 << i) != 0 {
+                    if v.bit(i)? {
                         q.gate("x", &[*w], None, &[])?;
                     }
                 }
@@ -132,7 +138,7 @@ impl Object {
         q.release(&idle)?;
         f.params[0]
             .iter()
-            .map(|p| q.read_basis(&b.bundles[&p.name]))
+            .map(|p| {let wires=&b.bundles[&p.name];let mut value=crate::BitVector::zero(wires.len())?;for (i,wire)in wires.iter().enumerate(){value.set(i,q.read_basis(&[*wire])?!=0)?;}Ok(value)})
             .collect()
     }
     fn borrow_capacity(&self, root: &str) -> Result<usize> {
@@ -199,6 +205,7 @@ impl Object {
         adjoint: bool,
         controls: &[(Wire, bool)],
     ) -> Result<()> {
+        let entry_next_wire = q.next_wire_id();
         let f = self
             .functions
             .get(name)
@@ -324,6 +331,9 @@ impl Object {
             }
             q.release(&wires)?;
         }
+        // Region-local identities cannot escape through caller-owned interfaces.
+        // Reclaim them once all local factors have been explicitly cleaned.
+        q.restore_next_wire_id(entry_next_wire)?;
         Ok(())
     }
     fn action_sequence(

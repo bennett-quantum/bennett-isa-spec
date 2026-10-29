@@ -168,6 +168,8 @@ fn every_committed_fixture_has_valid_identity() {
         "actions",
         "mutual",
         "registers",
+        "tiny_memory",
+        "control_flow",
     ] {
         let path = format!("{}/tests/fixtures/{name}.bisa", env!("CARGO_MANIFEST_DIR"));
         let text = std::fs::read_to_string(path).unwrap();

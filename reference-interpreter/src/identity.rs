@@ -283,7 +283,7 @@ impl Object {
                 }
                 if i.op == "hostcall" {
                     if let Some(service) = i.operands.first() {
-                        used.insert(("services", service.clone()));
+                        used.insert(("services", crate::object::literal_name(service)?));
                     }
                 }
             }
