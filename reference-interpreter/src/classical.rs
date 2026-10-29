@@ -58,13 +58,23 @@ struct Activation {
     segment: Option<usize>,
 }
 type Key = (u64, String);
+/// One §7.3 effect-tape entry: `(dev, op, args)` and the byte string the
+/// operation transferred (console output, clock bytes, entropy bytes, or a
+/// 512-byte sector), recorded as the effect executed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TapeEntry {
+    pub dev: String,
+    pub op: String,
+    pub args: Vec<u128>,
+    pub bytes: Vec<u8>,
+}
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 struct Devices {
     console: Vec<u8>,
     clock: u64,
     entropy_position: usize,
     blocks: BTreeMap<u128, Vec<u8>>,
-    tape: Vec<(String, String, Vec<u128>)>,
+    tape: Vec<TapeEntry>,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClassicalSnapshot {
@@ -77,6 +87,189 @@ pub struct ClassicalSnapshot {
     finished: Option<Vec<ClassicalValue>>,
     pending: Option<HostRequest>,
     quantum: QuantumRegisters,
+}
+/// One changed dynamic instance between two snapshots: the top instance of
+/// `(activation, name)` before and after (either side absent when the
+/// instance does not exist there, §7.4).
+#[derive(Clone, Debug, PartialEq)]
+pub struct RegisterDelta {
+    pub activation: u64,
+    pub name: String,
+    pub pre: Option<ClassicalValue>,
+    pub post: Option<ClassicalValue>,
+}
+/// The register and memory-byte changes between two snapshots; allocation,
+/// device and handle changes are reported by `first_difference`, not here.
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct SnapshotDelta {
+    pub registers: Vec<RegisterDelta>,
+    /// (address, before, after) for every byte whose value changed.
+    pub memory: Vec<(u128, u8, u8)>,
+}
+impl ClassicalSnapshot {
+    /// SHA-256 (hex) of the complete §7.1 memory: allocation table, heap
+    /// bump and every nonzero byte, in sorted order.
+    pub fn memory_digest(&self) -> String {
+        let m = &self.memory;
+        let mut bytes = format!(
+            "heap_base={};heap_used={};table_capacity={:?};",
+            m.heap_base, m.heap_used, m.table_capacity
+        )
+        .into_bytes();
+        for (name, base) in &m.addresses {
+            bytes.extend(format!("address {name}={base};").bytes());
+        }
+        for a in &m.allocations {
+            bytes.extend(
+                format!(
+                    "alloc base={} size={} live={} pinned={};",
+                    a.base, a.size, a.live, a.pinned
+                )
+                .bytes(),
+            );
+        }
+        for (address, byte) in &m.bytes {
+            bytes.extend(format!("byte {address}={byte};").bytes());
+        }
+        crate::sha256_hex(&bytes)
+    }
+    /// True iff the §7.1 memory components (bytes, allocations, heap bump)
+    /// of the two snapshots are identical.
+    pub fn memory_equals(&self, other: &Self) -> bool {
+        self.memory == other.memory
+    }
+    /// The changes from `self` to `after`: every instance stack that differs
+    /// and every memory byte that differs, in sorted order.
+    pub fn delta(&self, after: &Self) -> SnapshotDelta {
+        let mut registers = Vec::new();
+        let keys: std::collections::BTreeSet<&Key> = self
+            .instances
+            .keys()
+            .chain(after.instances.keys())
+            .collect();
+        for key in keys {
+            let (pre_stack, post_stack) = (self.instances.get(key), after.instances.get(key));
+            if pre_stack != post_stack {
+                registers.push(RegisterDelta {
+                    activation: key.0,
+                    name: key.1.clone(),
+                    pre: pre_stack.and_then(|s| s.last()).cloned(),
+                    post: post_stack.and_then(|s| s.last()).cloned(),
+                });
+            }
+        }
+        let mut memory = Vec::new();
+        let addresses: std::collections::BTreeSet<u128> = self
+            .memory
+            .bytes
+            .keys()
+            .chain(after.memory.bytes.keys())
+            .copied()
+            .collect();
+        for address in addresses {
+            let (pre, post) = (self.memory.byte(address), after.memory.byte(address));
+            if pre != post {
+                memory.push((address, pre, post));
+            }
+        }
+        SnapshotDelta { registers, memory }
+    }
+    /// A description of the first component in which `other` differs from
+    /// `self`, or None when the snapshots are equal. Components are compared
+    /// in §3.2 order: instances, memory, devices, control, fault/finished,
+    /// pending request, quantum registers.
+    pub fn first_difference(&self, other: &Self) -> Option<String> {
+        let keys: std::collections::BTreeSet<&Key> = self
+            .instances
+            .keys()
+            .chain(other.instances.keys())
+            .collect();
+        for key in keys {
+            if self.instances.get(key) != other.instances.get(key) {
+                return Some(format!(
+                    "instances of ({}, {:?}): {:?} differs from {:?}",
+                    key.0,
+                    key.1,
+                    self.instances.get(key).and_then(|s| s.last()),
+                    other.instances.get(key).and_then(|s| s.last())
+                ));
+            }
+        }
+        if self.memory != other.memory {
+            let (a, b) = (&self.memory, &other.memory);
+            let addresses: std::collections::BTreeSet<u128> =
+                a.bytes.keys().chain(b.bytes.keys()).copied().collect();
+            for address in addresses {
+                if a.byte(address) != b.byte(address) {
+                    return Some(format!(
+                        "memory byte at address {address}: {} differs from {}",
+                        a.byte(address),
+                        b.byte(address)
+                    ));
+                }
+            }
+            return Some(format!(
+                "memory allocation state: heap_used {} / {} allocations differs from heap_used {} / {} allocations",
+                a.heap_used,
+                a.allocations.len(),
+                b.heap_used,
+                b.allocations.len()
+            ));
+        }
+        if self.devices != other.devices {
+            let (a, b) = (&self.devices, &other.devices);
+            return Some(if a.console != b.console {
+                format!(
+                    "device console: {} bytes differs from {} bytes",
+                    a.console.len(),
+                    b.console.len()
+                )
+            } else if a.clock != b.clock {
+                format!("device clock: {} differs from {}", a.clock, b.clock)
+            } else if a.entropy_position != b.entropy_position {
+                format!(
+                    "device entropy position: {} differs from {}",
+                    a.entropy_position, b.entropy_position
+                )
+            } else if a.tape != b.tape {
+                format!(
+                    "effect tape: {} entries differs from {} entries",
+                    a.tape.len(),
+                    b.tape.len()
+                )
+            } else {
+                "device block sectors differ".to_string()
+            });
+        }
+        if self.control != other.control || self.next_id != other.next_id {
+            return Some(format!(
+                "control: {} activations / next_id {} differs from {} activations / next_id {}",
+                self.control.len(),
+                self.next_id,
+                other.control.len(),
+                other.next_id
+            ));
+        }
+        if self.fault != other.fault {
+            return Some(format!(
+                "fault: {:?} differs from {:?}",
+                self.fault, other.fault
+            ));
+        }
+        if self.finished != other.finished {
+            return Some("finished results differ".to_string());
+        }
+        if self.pending != other.pending {
+            return Some("pending host request differs".to_string());
+        }
+        if self.quantum != other.quantum {
+            return Some(format!(
+                "quantum registers: {} live wires differ",
+                self.quantum.quantum_state().wire_count()
+            ));
+        }
+        None
+    }
 }
 #[derive(Clone, Debug)]
 struct Undo {
@@ -144,6 +337,15 @@ pub struct HostRequest {
     pub capacity: u128,
     result_name: String,
 }
+/// The program point of one executed instruction: function, block, its
+/// index within the block, and the instruction itself (§3.4, §9.2).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StepPoint {
+    pub function: String,
+    pub block: String,
+    pub index: usize,
+    pub instruction: Instruction,
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HostExchange {
     pub request: HostRequest,
@@ -168,7 +370,7 @@ impl<'a> ClassicalMachine<'a> {
         args: &[ClassicalValue],
         entropy: &[u8],
     ) -> Result<Self> {
-        Self::construct(object, entry, args, entropy, QuantumRegisters::new())
+        Self::construct(object, entry, args, entropy, QuantumRegisters::new(), &[])
     }
     fn construct(
         object: &'a Object,
@@ -176,6 +378,7 @@ impl<'a> ClassicalMachine<'a> {
         args: &[ClassicalValue],
         entropy: &[u8],
         registers: QuantumRegisters,
+        globals: &[(String, Vec<u8>)],
     ) -> Result<Self> {
         object.ensure_linked()?;
         let f = object
@@ -215,9 +418,44 @@ impl<'a> ClassicalMachine<'a> {
                 }
             }
         }
+        let mut memory = Memory::initial(object, f, &BTreeMap::new())?;
+        // Caller-seeded global images (§7.1 entry state): each named global's
+        // bytes replace its layout image, at exactly its declared size. The
+        // seeded state is the run's entry state for reversal.
+        let mut seeded = std::collections::BTreeSet::new();
+        for (name, bytes) in globals {
+            if !seeded.insert(name) {
+                return err("§7.1", format!("global {name} seeded twice"));
+            }
+            let layout = object
+                .section("layout")
+                .ok_or_else(|| Error("§7.1: seeded globals require a layout".into()))?;
+            let global = layout
+                .get("globals")?
+                .object()?
+                .get(name)
+                .ok_or_else(|| Error(format!("§7.1: unknown global {name}")))?;
+            let base = global.get("base")?.uint()?;
+            let size = global.get("size")?.uint()?;
+            if size != bytes.len() as u128 {
+                return err(
+                    "§7.1",
+                    format!(
+                        "global {name} has size {size}, seeded with {} bytes",
+                        bytes.len()
+                    ),
+                );
+            }
+            for (i, b) in bytes.iter().enumerate() {
+                let address = base
+                    .checked_add(i as u128)
+                    .ok_or_else(|| Error("§7.1: global address overflow".into()))?;
+                memory.set_byte(address, *b);
+            }
+        }
         let state = ClassicalSnapshot {
             instances,
-            memory: Memory::initial(object, f, &BTreeMap::new())?,
+            memory,
             devices,
             control: vec![Activation {
                 id: 0,
@@ -252,7 +490,19 @@ impl<'a> ClassicalMachine<'a> {
         entropy: &[u8],
         registers: QuantumRegisters,
     ) -> Result<Self> {
-        Self::construct(object, entry, args, entropy, registers)
+        Self::construct(object, entry, args, entropy, registers, &[])
+    }
+    /// Like `with_quantum_registers`, with §7.1 global images seeded by the
+    /// caller (name, exact bytes) as part of the entry state.
+    pub fn with_quantum_registers_and_globals(
+        object: &'a Object,
+        entry: &str,
+        args: &[ClassicalValue],
+        entropy: &[u8],
+        registers: QuantumRegisters,
+        globals: &[(String, Vec<u8>)],
+    ) -> Result<Self> {
+        Self::construct(object, entry, args, entropy, registers, globals)
     }
     pub fn quantum_registers(&self) -> &QuantumRegisters {
         &self.state.quantum
@@ -311,6 +561,64 @@ impl<'a> ClassicalMachine<'a> {
     }
     pub fn effect_tape_len(&self) -> usize {
         self.state.devices.tape.len()
+    }
+    /// The §7.3 effect tape in execution order.
+    pub fn effect_tape(&self) -> &[TapeEntry] {
+        &self.state.devices.tape
+    }
+    /// SHA-256 (hex) of the current §7.1 memory (see
+    /// `ClassicalSnapshot::memory_digest`).
+    pub fn memory_digest(&self) -> String {
+        self.state.memory_digest()
+    }
+    /// True while another instruction can execute: no fault record, no
+    /// finished results and no unanswered host request (§10 run states).
+    pub fn is_running(&self) -> bool {
+        self.state.fault.is_none()
+            && self.state.finished.is_none()
+            && self.state.pending.is_none()
+            && !self.state.control.is_empty()
+    }
+    /// The outcome so far: finished values, the fault record if any, the
+    /// pending host request if any, and the executed-instruction count
+    /// (one retained history frame per step, §7.4).
+    pub fn outcome(&self) -> ClassicalOutcome {
+        ClassicalOutcome {
+            values: self.state.finished.clone().unwrap_or_default(),
+            fault: self.state.fault,
+            trapped: self.state.fault.is_some()
+                && self
+                    .state
+                    .control
+                    .last()
+                    .is_some_and(|a| self.object.functions[&a.function].kind == "cc"),
+            steps: self.history.len() as u64,
+            request: self.state.pending.clone(),
+        }
+    }
+    /// Executes one instruction (§3.4) and returns the point it occupied,
+    /// or None when the machine is not running (faulted, finished, or
+    /// suspended at a host request).
+    pub fn step_once(&mut self) -> Result<Option<StepPoint>> {
+        if !self.is_running() {
+            return Ok(None);
+        }
+        let current = self.state.control.last().expect("running control").clone();
+        let function = &self.object.functions[&current.function];
+        let block = &function.blocks[current.block];
+        let instruction = block
+            .instructions
+            .get(current.ip)
+            .ok_or_else(|| Error("§3.4: fell off classical block".into()))?
+            .clone();
+        let point = StepPoint {
+            function: current.function.clone(),
+            block: block.name.clone(),
+            index: current.ip,
+            instruction,
+        };
+        self.step()?;
+        Ok(Some(point))
     }
     pub fn memory_bytes(&self, address: u128, len: usize) -> Result<Vec<u8>> {
         if !self.state.memory.valid(address, len as u128) {
@@ -742,13 +1050,14 @@ impl<'a> ClassicalMachine<'a> {
         {
             return Ok(Some(10));
         }
-        match (dev, operation) {
+        let transferred = match (dev, operation) {
             ("console", "write") => {
                 undo.device = Some(DeviceUndo::Console(self.state.devices.console.len()));
                 let bytes: Vec<_> = (0..len)
                     .map(|i| self.state.memory.byte(p + i as u128))
                     .collect();
-                self.state.devices.console.extend(bytes);
+                self.state.devices.console.extend(bytes.iter().copied());
+                bytes
             }
             ("clock", "read") => {
                 self.save_bytes(p, 8, undo);
@@ -756,6 +1065,7 @@ impl<'a> ClassicalMachine<'a> {
                 undo.device = Some(DeviceUndo::Clock(c));
                 self.state.memory.store_u128(p, 64, c as u128)?;
                 self.state.devices.clock = c.wrapping_add(1);
+                c.to_le_bytes().to_vec()
             }
             ("entropy", "read") => {
                 self.save_bytes(p, len, undo);
@@ -767,6 +1077,7 @@ impl<'a> ClassicalMachine<'a> {
                         .set_byte(p + n as u128, self.entropy[start + n]);
                 }
                 self.state.devices.entropy_position += len;
+                self.entropy[start..start + len].to_vec()
             }
             ("block", "read") => {
                 self.save_bytes(p, 512, undo);
@@ -777,16 +1088,18 @@ impl<'a> ClassicalMachine<'a> {
                     .get(&values[0])
                     .cloned()
                     .unwrap_or_else(|| vec![0; 512]);
-                for (n, b) in bytes.into_iter().enumerate() {
-                    self.state.memory.set_byte(p + n as u128, b);
+                for (n, b) in bytes.iter().enumerate() {
+                    self.state.memory.set_byte(p + n as u128, *b);
                 }
+                bytes
             }
             ("block", "write") => {
                 let sector = values[0];
                 let old = self.state.devices.blocks.get(&sector).cloned();
                 undo.device = Some(DeviceUndo::Block(sector, old));
-                let bytes = (0..512).map(|n| self.state.memory.byte(p + n)).collect();
-                self.state.devices.blocks.insert(sector, bytes);
+                let bytes: Vec<_> = (0..512).map(|n| self.state.memory.byte(p + n)).collect();
+                self.state.devices.blocks.insert(sector, bytes.clone());
+                bytes
             }
             _ => {
                 return err(
@@ -794,11 +1107,13 @@ impl<'a> ClassicalMachine<'a> {
                     format!("unknown device operation {dev}.{operation}"),
                 )
             }
-        }
-        self.state
-            .devices
-            .tape
-            .push((dev.into(), operation.into(), values));
+        };
+        self.state.devices.tape.push(TapeEntry {
+            dev: dev.into(),
+            op: operation.into(),
+            args: values,
+            bytes: transferred,
+        });
         undo.tape = true;
         Ok(None)
     }

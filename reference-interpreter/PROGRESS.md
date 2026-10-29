@@ -6,6 +6,21 @@ under `reference-interpreter/`; commit own paths
 (`git add -A -- reference-interpreter && git commit -- reference-interpreter`),
 never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
+## CLI commands (xam)
+
+Bead `b-isa-spec-xam` (brief `docs/briefs/2026-10-29-isa-ref-cli-xam.md`):
+four commands for the dialect 0.2 pre-flight checker, exposing the existing
+library machinery. Tests are `tests/cli_xam.rs` against the existing fixtures
+(`classical`, `actions`, `registers`, `inc8`), every expected value
+hand-derived in the test comments.
+
+| Command | Status | Test | Commit |
+|---|---|---|---|
+| `run-cc` | done | `tests/cli_xam.rs` | — |
+| `reverse` | in progress | `tests/cli_xam.rs` | — |
+| `run-action` | pending | `tests/cli_xam.rs` | — |
+| `run-program` | pending | `tests/cli_xam.rs` | — |
+
 ## Session 2026-10-29 (Opus, council fix loop): milestone 1 reached
 
 All 30 round-1 blocking issues are resolved, declined with a spec quote, or
