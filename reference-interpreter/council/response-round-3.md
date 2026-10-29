@@ -73,3 +73,20 @@ two-step completion, full reversal; also six-step definition-after-use-in-text
 positive using select). RED: exact i8 witness accepted. GREEN: 10 parser tests
 and the typed execution/reversal pin pass. No SPEC-QUESTIONS entry: §§3.3,
 4.7 and 4.8 fix the operand type and disjointness requirement.
+
+## SOL-R3-B05 — resolved
+
+`borrow.rs::Compiler::compile` includes the entire effective control context
+(normalized ctl plus inherited predicates), mut/in interface bundles and every
+passed region cell in a non-permutation action call's `Node::Other` touch set.
+Pin: `r1_borrow::r3_nonpermutation_calls_touch_all_effective_controls` rejects
+the exact ctl-H witness, its inherited-qpred form and direct controlled-H,
+all through parser and CLI hash/check (§5.6, exit 1, empty stdout). A perm_action
+X child invoked twice under the borrowed control remains accepted and exactly
+preserves every t,d basis input plus a superposed input, forward/adjoint.
+RED: exact ctl witness accepted. GREEN: all 6 active r1_borrow tests pass.
+No SPEC-QUESTIONS entry: §§4.7, 5.6 and 14.2 explicitly include controls.
+
+All five received blocker IDs are resolved; no declines or partials. Pending
+astra/codex and muse reviews are a subsequent pass. Deliverables 8–11 remain
+staged as documented in PROGRESS.md, outside this round's received blockers.

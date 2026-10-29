@@ -476,11 +476,17 @@ impl Compiler<'_> {
                         }
                         out.extend(body);
                     } else {
-                        let mut touched = Vec::new();
+                        let mut touched: Vec<String> = c.iter().map(|(w, _)| w.clone()).collect();
                         for group in [1, 2] {
                             for n in list(&ca[group])? {
                                 touched.extend(self.bundle(&n)?);
                             }
+                        }
+                        for n in list(&ca[3])? {
+                            let (_, cells) = self.regions.get(&n).ok_or_else(|| {
+                                Error("§4.7: action mem operand is not a live region".into())
+                            })?;
+                            touched.extend(cells.iter().flatten().cloned());
                         }
                         out.push(Node::Other(touched));
                     }

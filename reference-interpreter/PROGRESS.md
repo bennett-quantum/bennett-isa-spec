@@ -20,7 +20,11 @@ changing-input/nested generated loops pass their independent parity checks.
 SPEC-QUESTIONS 20 now precisely describes the opaque symbolic proof route.
 B04 resolved: normalized CC controls are typed qreg[1] through rd and checked
 for effective-target aliases; five negative variants and basis/forward-type-
-inference execution/reversal positives pass. Bead b-isa-spec-zq2.
+inference execution/reversal positives pass. B05 resolved: non-permutation
+call touch sets include effective controls and passed cells. Direct/ctl/qpred
+borrowed-H negatives reject; paired borrowed-controlled X calls preserve all
+basis inputs and a superposition. All five received blockers resolved, no
+declines or partials; final whole-suite verification follows. Bead b-isa-spec-zq2.
 
 ## Council round 2: sol/codex implementation (2026-10-29)
 

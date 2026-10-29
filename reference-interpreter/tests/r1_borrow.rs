@@ -226,3 +226,54 @@ fn r3_opaque_loop_composition_substitutes_inside_applications() {
         }
     }
 }
+
+#[test]
+fn r3_nonpermutation_calls_touch_all_effective_controls() {
+    let ac = r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
+    let build = |sig: &str, child: &str, body: &str| {
+        support::object(&[("child",sig,child),("a",ac,&format!("action @a (t:wire mut) () () () ()\n^entry():\nd = qborrow any 1\n{body}\nqreturn d"))],"{}", "")
+    };
+    let child = "action @child (t:wire mut) () () () ()\n^entry():\nh t";
+    for (tag, body) in [
+        ("ctl", "ctl d action_call @child (t) () () ()"),
+        (
+            "inherited",
+            "qpred d\naction_call @child (t) () () ()\nqunpred d",
+        ),
+        ("direct", "qpred d\nh t\nqunpred d"),
+    ] {
+        support::reject_cli(
+            &build(ac, child, body),
+            "§5.6",
+            &format!("borrow-control-{tag}"),
+        );
+    }
+    let pc = ac.replace("action", "perm_action");
+    let child = "perm_action @child (t:wire mut) () () () ()\n^entry():\nx t";
+    let o = Object::parse(&build(
+        &pc,
+        child,
+        "ctl d action_call @child (t) () () ()\nctl d action_call @child (t) () () ()",
+    ))
+    .unwrap();
+    // Controlled X twice is identity, including arbitrary borrowed states.
+    for input in 0..5u32 {
+        let mut q = QuantumState::new();
+        let w = q.allocate(2).unwrap();
+        for (bit, wire) in w.iter().enumerate() {
+            if input == 4 {
+                q.gate("h", &[*wire], None, &[]).unwrap();
+            } else if input >> bit & 1 == 1 {
+                q.gate("x", &[*wire], None, &[]).unwrap();
+            }
+        }
+        let before = q.clone();
+        let mut b = QuantumBindings::default();
+        b.bundles.insert("t".into(), vec![w[0]]);
+        b.borrowed.push(vec![w[1]]);
+        o.execute_action("a", &mut q, &b, false, &[]).unwrap();
+        assert_eq!(q, before);
+        o.execute_action("a", &mut q, &b, true, &[]).unwrap();
+        assert_eq!(q, before);
+    }
+}
