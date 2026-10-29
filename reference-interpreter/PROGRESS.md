@@ -34,7 +34,34 @@ swap/qexch/qexchm plus 80 generated borrow frames with differing classical
 bindings. It found additional unsound exchange/polarity accepts, now pinned by
 named red-green regressions in the response. No Python seed or spec changes.
 
-Final headless gate results and sweep counts are recorded below when complete.
+### Final round-2 verification
+
+All commands ran headlessly with `DISPLAY`, `WAYLAND_DISPLAY`,
+`DBUS_SESSION_BUS_ADDRESS`, and `BROWSER` unset,
+`TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/.tmp`,
+and the absolute `--manifest-path
+/home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/Cargo.toml`.
+
+| Command | Result |
+|---|---|
+| `cargo test --offline` | **202 passed**, 0 failed, 5 ignored (201 integration + 1 unit; 0 doctests) |
+| `cargo test --offline -- --ignored` | **5 passed**, 0 failed; `--nocapture` retained the sweep counts |
+| `cargo clippy --offline --all-targets -- -D warnings` | clean |
+| `cargo fmt -- --check` | clean |
+| `python3 /home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/isa_check.py` | unchanged seed passes |
+
+| Ignored sweep | Cases | Reported time |
+|---|---|---|
+| u8 division/remainder | 262,144 (a,b) pairs × 4 operations | 2.39 s |
+| 17-wire borrow-frame execution | 2^17 basis entries | 11.83 s |
+| checked borrow-frame certificate | 2^18 claim elements, both programs | 82.92 s |
+| extended §6 differential generator | 200,000 programs: **64,717 accepted, all exactly clean**, 135,283 rejected | 259.39 s |
+| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 12.90 s |
+
+The accepted differential programs run on all eight interface basis inputs and
+one superposed input, forward and adjoint. The sweep includes the new exchange
+operations. No runtime width, iteration, precision, or program-size cap was added.
+Specification and Python seed diffs against dc46d07 are empty. No push.
 
 ## CLI commands (xam)
 
