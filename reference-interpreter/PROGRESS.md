@@ -6,6 +6,43 @@ repository-wide worklog rule, so this file also serves as this job's worklog.
 
 ## Session 2026-10-29
 
+### Current continuation: suite F, borrow frames, full-domain reversal
+
+The current baseline passes 61 normal tests (two ignored sweeps). Commands:
+`cargo test --manifest-path reference-interpreter/Cargo.toml --offline` passed
+2026-10-29 after the loop fix. Latest strict Clippy found one collapsible if;
+fixed it, final rerun still required. Beads b-isa-spec-zq2 remains in_progress.
+
+New red-green milestones since the quantum-handle entry below:
+
+- `--test discipline`: inherited diagonal targets, effective-control release,
+  angle/interface types, matched nested oracle calls, lproc fault width, and
+  H/H and rotation/adjoint cleanup. Each regression failed before its fix.
+- `--test step_machine full_small_domain`: missing explicit commit API failed;
+  now enumerates the full 14-bit tiny_memory interface domain for B=0..9,
+  including all memory bytes and target/fault entries (163,840 commits).
+  Hand check: x=0 reaches DIV0 at row4, x=1 returns db's low bit at row8;
+  smaller B has fault1, B=9 includes an idle step. Every prefix reverses.
+- `--test borrow`: translation lemma checks its four required negatives,
+  exhaustive small-frame factorization, a borrowed Bell half and its external
+  reference, designated idle CC qregs, and lifted action borrowed workspace.
+  Missing CC idle binding / lifted pool first failed, now all five tests pass.
+  Hand check: V=CX x,b; W=CX b,t repeated as V,W,V,W gives t XOR x, independent
+  of b, and restores b. Certificate/library borrow claims remain unfinished.
+- `--test quantum wide_structured`: wire[256] was rejected as an iN width;
+  now basis execution copies bit255 correctly and adjoint restores it. Regs
+  and scalar oracle containers remain limited to128; larger descriptors need
+  a complete audit and implementation, not a claim of full-width support.
+- `--test discipline loop_cleanup`: first failed by applying X once; now
+  exact repeated transfer plus cycle skipping accepts X^(2^40), nested clean
+  allocation reuse and zero-trip loops, rejecting odd dirty loops. Bounds
+  are collected lexically, including bodies with zero iterations.
+
+Next active work: complete §6 dependency/provenance checks (entangling reads,
+controls and region-cell versions), then deep metadata and certificate schemas.
+All seven deliverables remain partial pending the full obligations. No user
+choice is needed. Historical entries below describe earlier checkpoints.
+
 ### Continuation: imports and linking (current)
 
 Tracking: Beads issue b-isa-spec-zq2, already in_progress. Read beads skill and
@@ -61,11 +98,11 @@ The existing crate contains only a version function and a skeleton test.
 | Deliverable | Status | Verification |
 | --- | --- | --- |
 | 1. Canonical parser and well-formedness | Partial: lexical/structural parser, types, lifted row schemas/scope, signatures, layout validation | 4 integration tests green |
-| 2. SHA-256, envelopes, SCC identity | Core implemented, including mutual SCCs and CC/R closures; imports/linking still incomplete | 7 identity tests green |
+| 2. SHA-256, envelopes, SCC identity | Core implemented, including mutual SCCs and CC/R closures; import resolution/pins/conflicts implemented; certificate composition unfinished | 7 identity + 5 linking tests green |
 | 3. Sequential reference interpreter, every lifted row | Every row has an implementation, including lift.perm_call; broader adversarial verification and unbounded bundle widths remain | 5 oracle tests plus Q lifted-call test green; full division sweep passed |
 | 4. Literal reversible step machine and exhaustive comparisons | Slot/exchange machine, C1–C5/R1–R5 and inverses, all rows implemented; full obligations not yet met | 4 normal tests and ignored recursive sweep passed |
-| 5. CC/R interpreter, tapes, history, uncall | Classical rows, dynamic SSA, memory, four device models, tapes, host request/reply, segment/whole reversal; qreg/Q integration pending | 4 classical tests green |
-| 6. Q simulator and static cleanup discipline | Basis/vector simulation and instruction paths implemented; borrow proofs and complete §6 checker remain | 5 Q tests green |
+| 5. CC/R interpreter, tapes, history, uncall | Classical rows, dynamic SSA, memory, four device models, tapes, host request/reply, segment/whole reversal; qreg/Q integration implemented; broader interprocedural validation pending | 4 classical + 5 register tests green |
+| 6. Q simulator and static cleanup discipline | Basis/vector simulation and instruction paths implemented; small/structural borrow checks implemented; certificate proofs and complete §6 remain | 6 Q + 5 borrow tests green |
 | 7. CLI and documentation | Required commands plus hash implemented/documented; check depends on incomplete validator | 2 CLI tests green |
 
 ### Milestone: canonical core and identity
@@ -235,42 +272,31 @@ for zero-byte images. Leading-zero type widths are now rejected.
 No user decision is required. Do not mark the job complete; no deliverable has
 its full verification obligation met yet. The entire ISA remains the scope.
 
-1. Finish suite F and identity/linking: imported callees currently fail operand
-   validation; implement resolution by signature, pinned closures, dedup and
-   conflicts. Deep schedule/certificate/coverage schemas and bindings, effective
-   inherited control checks, exact matched oracle_uncall discipline, frame
-   live ranges, handle lifetimes and borrow-frame proofs remain incomplete.
-   The current simple symbolic cleanup checker can reject valid adjoint
-   cleanup (e.g. H;H on allocated scratch) and is not the full §6 transfer.
-   It tracks loops only once statically and does not fully model cell versions.
-2. Type::parse currently limits wire/reg/region cell widths to 128 as well as
-   iN; the spec only explicitly bounds iN. Generalize bundle handling and
-   audit wider locations before declaring full-width support. JSON/JCS shortest
-   number corner cases and all integer spellings need expanded vectors.
-3. CC quantum integration: qreg.new/free/slice/concat, measurement and region
-   calls currently explicitly error in classical.rs. Implement handle states,
-   exclusive views, retained-history inverses, Born outcome selection, segment
-   prohibition on measure, whole-run reverse eligibility, and tests. Q kernels
-   and action/oracle execution already exist and should be reused, with inverse
-   region operations exactly once per history frame.
-4. Complete Q verification: borrowed systems plus an entangled reference,
-   translation-lemma positives and four required negatives, qinplace pair
-   certificates/full domain, qif, while loops, inherited controls, nested region
-   calls, local-image restoration and full cell-version cleanup obligations.
-   permutation_action_values currently does not supply a borrowed idle pool;
-   handle that according to the ABI once borrow validity is established.
-5. Strengthen machine verification at genuinely small interface widths over
-   complete D, including varied interface memory, nonzero target/fault values,
-   explicit commit gates, call/ret special cases and every first-fault boundary.
-   BasisConfiguration includes every internal mutable field; inverse code uses
-   no snapshot restoration. Machine logical counters use u128 containers;
-   audit their derived bit widths and generalized frame-slot sizing.
-6. Audit the rest of §8–§13 referenced schemas and interpreter-facing contracts;
-   do not assume the current shallow field checks implement target evaluation,
-   schedules, certificate checking or linking. Keep scope aligned with the job.
-7. Expand fixtures so every instruction/path (not just every opcode) and fault
-   has a hand-derived expected result, run all ignored sweeps after substantive
-   changes, complete README and only then mark deliverables done.
+1. Complete §6 provenance/window analysis. Loops now apply exact repeated
+   transfer, but the version-log checker still lacks complete transitive
+   dependencies, entangling-read restrictions, predicate-version pins and
+   precise region-cell tracking. Matched oracle_uncall rejects all intervening
+   stores/calls conservatively; implement precise transitive memory effects.
+2. Deep schedule/certificate/coverage schemas and bindings, certificate claim
+   verification/composition, frame live ranges and borrowed library claims.
+   Imports resolve by signature and pin, including data; linking is tested.
+3. Generalize lifted reg widths and oracle bitvectors beyond128. Structured
+   wire bundles and Q basis execution support256 in tests; descriptors remain
+   u16. Audit JSON/JCS number corner cases and all integer spellings.
+4. Complete Q verification: qinplace certificates/full domain, qif, coherent
+   while dependencies, nested controlled calls, local-image and cell cleanup.
+   CC qreg handles/measurement/region inverse history are now implemented;
+   audit cross-call aliasing and run eligibility. Idle pools now reach lifted
+   actions and designated CC registers.
+5. Expand complete-D machine verification across call/ret special cases and
+   every first-fault boundary. tiny_memory now covers all interface memory,
+   target/fault entries and explicit commit; prior suites cover every opcode.
+   Audit concrete counter widths/generalized frame sizing.
+6. Audit remaining §8–§13 interpreter-facing schemas/contracts. Current shallow
+   checks are not full target evaluation, schedules or certificate verification.
+7. Persist new discipline/borrow objects as canonical fixtures with hand
+   expectations; cover every path/fault. Rerun ignored sweeps, strict Clippy,
+   fmt, unchanged Python seed and documented CLI after substantive changes.
 
 Current source files: lib.rs, json.rs, object.rs, validation.rs, sha256.rs,
 identity.rs, oracle.rs (independent dynamic activations), machine.rs (literal

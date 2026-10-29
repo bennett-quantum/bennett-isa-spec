@@ -257,7 +257,21 @@ impl<'a> ClassicalMachine<'a> {
     pub fn quantum_registers(&self) -> &QuantumRegisters {
         &self.state.quantum
     }
-    pub fn designate_idle_registers(&mut self,ids:&[u64])->Result<()>{if !self.history.is_empty(){return err("§9.4","idle set must be designated before execution");}let mut wires=std::collections::BTreeSet::new();for id in ids{for wire in self.state.quantum.idle_bundle(*id)?{if !wires.insert(*wire){return err("§9.4","designated idle registers overlap");}}}self.idle_registers=ids.to_vec();Ok(())}
+    pub fn designate_idle_registers(&mut self, ids: &[u64]) -> Result<()> {
+        if !self.history.is_empty() {
+            return err("§9.4", "idle set must be designated before execution");
+        }
+        let mut wires = std::collections::BTreeSet::new();
+        for id in ids {
+            for wire in self.state.quantum.idle_bundle(*id)? {
+                if !wires.insert(*wire) {
+                    return err("§9.4", "designated idle registers overlap");
+                }
+            }
+        }
+        self.idle_registers = ids.to_vec();
+        Ok(())
+    }
     pub fn push_measurement_draw(&mut self, draw: f64) -> Result<()> {
         if !(0.0..1.0).contains(&draw) {
             return err("§14.2", "measurement draw must be finite in [0,1)");
@@ -503,8 +517,24 @@ impl<'a> ClassicalMachine<'a> {
             };
             bindings.args.insert(p.name.clone(), arg);
         }
-        let used=ids.iter().map(|id|self.state.quantum.bundle(*id)).collect::<Result<Vec<_>>>()?.into_iter().flatten().copied().collect::<std::collections::BTreeSet<_>>();
-        for id in &self.idle_registers{let wires=self.state.quantum.idle_bundle(*id)?.to_vec();if wires.iter().any(|w|used.contains(w)){return err("§9.4","designated idle wires overlap the region interface or control");}bindings.borrowed.push(wires);}
+        let used = ids
+            .iter()
+            .map(|id| self.state.quantum.bundle(*id))
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .flatten()
+            .copied()
+            .collect::<std::collections::BTreeSet<_>>();
+        for id in &self.idle_registers {
+            let wires = self.state.quantum.idle_bundle(*id)?.to_vec();
+            if wires.iter().any(|w| used.contains(w)) {
+                return err(
+                    "§9.4",
+                    "designated idle wires overlap the region interface or control",
+                );
+            }
+            bindings.borrowed.push(wires);
+        }
         Ok((
             RegionRecord {
                 name: name.into(),

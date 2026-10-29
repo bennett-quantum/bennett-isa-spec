@@ -197,14 +197,24 @@ impl<'a> OracleMachine<'a> {
     }
     /// §5.2 commit, with caller-owned target/fault entry values. These writes
     /// persist while all internal state is subsequently prefix-reversed.
-    pub fn commit(&self,mut target:u128,mut fault:u128)->Result<(u128,u128)>{
-        let root=&self.object.functions[&self.root];let tw=root.params[1][0].ty.width(self.object.ptr_width)?;let fw=root.params[2][0].ty.width(self.object.ptr_width)?;
-        if target&!mask(tw)!=0||fault&!mask(fw)!=0{return err("§3.3","commit interface value exceeds declared width");}
-        let at_halt=self.state.pc==self.program.halt;
-        if at_halt&&!self.state.faulted{target^=self.state.result_val;}
-        if self.state.faulted{fault^=self.state.code;}
-        if !at_halt{fault^=1;}
-        Ok((target,fault))
+    pub fn commit(&self, mut target: u128, mut fault: u128) -> Result<(u128, u128)> {
+        let root = &self.object.functions[&self.root];
+        let tw = root.params[1][0].ty.width(self.object.ptr_width)?;
+        let fw = root.params[2][0].ty.width(self.object.ptr_width)?;
+        if target & !mask(tw) != 0 || fault & !mask(fw) != 0 {
+            return err("§3.3", "commit interface value exceeds declared width");
+        }
+        let at_halt = self.state.pc == self.program.halt;
+        if at_halt && !self.state.faulted {
+            target ^= self.state.result_val;
+        }
+        if self.state.faulted {
+            fault ^= self.state.code;
+        }
+        if !at_halt {
+            fault ^= 1;
+        }
+        Ok((target, fault))
     }
     pub fn outcome(&self) -> OracleOutcome {
         let code = if self.state.faulted {

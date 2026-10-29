@@ -85,15 +85,12 @@ impl Object {
                             let actuals = [list(&a[1])?, list(&a[2])?];
                             let targets = self.interface_targets(callee, active)?;
                             for (param, index) in targets {
-                                for (group,actual) in actuals.iter().enumerate() {
+                                for (group, actual) in actuals.iter().enumerate() {
                                     if let Some(position) = declaration.params[group]
                                         .iter()
                                         .position(|p| p.name == param)
                                     {
-                                        add(
-                                            &mut out,
-                                            &format!("{}[{index}]", actual[position]),
-                                        )?;
+                                        add(&mut out, &format!("{}[{index}]", actual[position]))?;
                                     }
                                 }
                             }
@@ -121,7 +118,7 @@ impl Object {
         let actuals = [list(&a[1])?, list(&a[2])?];
         let targets = self.interface_targets(name, &mut BTreeSet::new())?;
         for (param, index) in targets {
-            for (group,actual) in actuals.iter().enumerate() {
+            for (group, actual) in actuals.iter().enumerate() {
                 if let Some(position) = f.params[group].iter().position(|p| p.name == param) {
                     let actual = &actual[position];
                     if !matches!(types.get(actual), Some(Type::Wire(_))) {

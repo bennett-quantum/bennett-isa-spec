@@ -2,18 +2,21 @@
 mod action;
 mod borrow;
 mod call_discipline;
+mod certificate;
 mod classical;
 mod handle_validation;
 mod identity;
 pub mod json;
 mod linking;
 mod machine;
+mod metadata;
 mod object;
 mod oracle;
 mod quantum;
 mod registers;
 mod sha256;
 mod validation;
+pub use borrow::validate_translation_lemma;
 pub use classical::{ClassicalMachine, ClassicalOutcome, ClassicalSnapshot, ClassicalValue};
 pub use classical::{HostExchange, HostRequest};
 pub use identity::Identity;
@@ -22,7 +25,6 @@ pub use object::*;
 pub use oracle::{Argument, Budget, OracleInput, OracleOutcome};
 pub use quantum::{Complex, MeasurementBranch, QuantumBindings, QuantumRegion, QuantumState};
 pub use registers::QuantumRegisters;
-pub use borrow::validate_translation_lemma;
 pub use sha256::{sha256, sha256_hex};
 
 /// A diagnostic always names the normative rule that was violated.

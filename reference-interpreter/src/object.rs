@@ -38,7 +38,18 @@ impl Type {
             }
             Ok(n)
         };
-        let bundle_width=|s:&str|->Result<u16>{if !integer(s)||s.starts_with('-'){return err("§3.3","bundle width requires canonical positive INT");}let n=s.parse::<u16>().map_err(|_|Error("§3.3: bundle width exceeds host descriptor range".into()))?;if n==0{return err("§3.3","bundle width must be positive");}Ok(n)};
+        let bundle_width = |s: &str| -> Result<u16> {
+            if !integer(s) || s.starts_with('-') {
+                return err("§3.3", "bundle width requires canonical positive INT");
+            }
+            let n = s
+                .parse::<u16>()
+                .map_err(|_| Error("§3.3: bundle width exceeds host descriptor range".into()))?;
+            if n == 0 {
+                return err("§3.3", "bundle width must be positive");
+            }
+            Ok(n)
+        };
         Ok(match s {
             "ptr" => Self::Ptr,
             "f64" => Self::F64,
@@ -528,12 +539,35 @@ impl Object {
             .ok_or_else(|| Error(format!("§9.3: undefined symbol @{name}")))?;
         Function::from_signature(name, import.get("signature")?)
     }
-    pub(crate) fn data_size(&self,name:&str)->Result<u128>{
-        if let Some(bytes)=self.data.get(name){return Ok(bytes.len()as u128);}
-        let import=self.section("imports").and_then(|v|v.object().ok()).and_then(|v|v.get(name)).ok_or_else(||Error(format!("§9.3: unknown data symbol @{name}")))?;
-        let sig=import.get("signature")?;if sig.get("kind")?.string()?!="data"{return err("§4.6","qregion image reference must have data kind");}sig.get("size")?.uint()
+    pub(crate) fn data_size(&self, name: &str) -> Result<u128> {
+        if let Some(bytes) = self.data.get(name) {
+            return Ok(bytes.len() as u128);
+        }
+        let import = self
+            .section("imports")
+            .and_then(|v| v.object().ok())
+            .and_then(|v| v.get(name))
+            .ok_or_else(|| Error(format!("§9.3: unknown data symbol @{name}")))?;
+        let sig = import.get("signature")?;
+        if sig.get("kind")?.string()? != "data" {
+            return err("§4.6", "qregion image reference must have data kind");
+        }
+        sig.get("size")?.uint()
     }
-    pub(crate) fn ensure_linked(&self)->Result<()>{if self.section("imports").map(|s|s.object().map(|s|!s.is_empty())).transpose()?.unwrap_or(false){return err("§9.3","object has unresolved imports; link before execution");}Ok(())}
+    pub(crate) fn ensure_linked(&self) -> Result<()> {
+        if self
+            .section("imports")
+            .map(|s| s.object().map(|s| !s.is_empty()))
+            .transpose()?
+            .unwrap_or(false)
+        {
+            return err(
+                "§9.3",
+                "object has unresolved imports; link before execution",
+            );
+        }
+        Ok(())
+    }
     pub fn parse(text: &str) -> Result<Self> {
         if !text.ends_with('\n') || text.contains('\r') || text.contains('\t') {
             return err(
@@ -963,14 +997,33 @@ impl Object {
         }
         Ok(maximum)
     }
-    fn fault_width(&self,containing:&Function)->Result<u16>{
-        if containing.kind=="oracle"{return containing.params[2][0].ty.width(self.ptr_width);}
-        let mut width=128;
-        for oracle in self.functions.values().filter(|f|f.kind=="oracle"){
-            let mut pending=vec![oracle.name.clone()];let mut seen=BTreeSet::new();
-            while let Some(name)=pending.pop(){if !seen.insert(name.clone()){continue;}let f=self.declaration(&name)?;for call in f.instructions().filter(|i|i.op=="lift.call"){let target=call.operands.first().and_then(|s|s.strip_prefix('@')).ok_or_else(||Error("§4.8: malformed lift.call".into()))?;pending.push(target.into());}}
-            if seen.contains(&containing.name){width=width.min(oracle.params[2][0].ty.width(self.ptr_width)?);}
-        }Ok(width)
+    fn fault_width(&self, containing: &Function) -> Result<u16> {
+        if containing.kind == "oracle" {
+            return containing.params[2][0].ty.width(self.ptr_width);
+        }
+        let mut width = 128;
+        for oracle in self.functions.values().filter(|f| f.kind == "oracle") {
+            let mut pending = vec![oracle.name.clone()];
+            let mut seen = BTreeSet::new();
+            while let Some(name) = pending.pop() {
+                if !seen.insert(name.clone()) {
+                    continue;
+                }
+                let f = self.declaration(&name)?;
+                for call in f.instructions().filter(|i| i.op == "lift.call") {
+                    let target = call
+                        .operands
+                        .first()
+                        .and_then(|s| s.strip_prefix('@'))
+                        .ok_or_else(|| Error("§4.8: malformed lift.call".into()))?;
+                    pending.push(target.into());
+                }
+            }
+            if seen.contains(&containing.name) {
+                width = width.min(oracle.params[2][0].ty.width(self.ptr_width)?);
+            }
+        }
+        Ok(width)
     }
     fn validate_row(
         &self,
@@ -1434,10 +1487,10 @@ fn validate_header(f: &Function) -> Result<()> {
             Ok(())
         }
     };
-    let classical=|t:&Type|matches!(t,Type::Int(_)|Type::Ptr|Type::F64|Type::Token);
+    let classical = |t: &Type| matches!(t, Type::Int(_) | Type::Ptr | Type::F64 | Type::Token);
     match f.kind.as_str() {
         "oracle" => {
-            all(&f.params[4],classical)?;
+            all(&f.params[4], classical)?;
             if f.params[1].len() != 1 || f.params[2].len() != 1 {
                 return err("§5.1", "oracle needs one target and one fault slot");
             }
@@ -1465,15 +1518,36 @@ fn validate_header(f: &Function) -> Result<()> {
             all(&f.params[1], |t| matches!(t, Type::Reg(_)))?;
         }
         "action" | "perm_action" => {
-            all(&f.params[3],classical)?;
+            all(&f.params[3], classical)?;
             empty(&[4])?;
             for j in 0..2 {
                 all(&f.params[j], |t| matches!(t, Type::Wire(_)))?;
             }
             all(&f.params[2], |t| matches!(t, Type::Region(..)))?;
-            if f.params[2].iter().any(|p|!matches!(p.role.as_deref(),Some("in"|"mut"))){return err("§5.1","action regions need in or mut roles");}
+            if f.params[2]
+                .iter()
+                .any(|p| !matches!(p.role.as_deref(), Some("in" | "mut")))
+            {
+                return err("§5.1", "action regions need in or mut roles");
+            }
         }
-        _ => {empty(&[2,3,4])?;for group in 0..2{all(&f.params[group],|t|matches!(t,Type::Int(_)|Type::Ptr|Type::F64|Type::Token|Type::Qreg(_)))?;}if !f.regs.is_empty()||!f.bounds.is_empty(){return err("§3.3","classical functions use SSA definitions, not a mutable regs file");}}
+        _ => {
+            empty(&[2, 3, 4])?;
+            for group in 0..2 {
+                all(&f.params[group], |t| {
+                    matches!(
+                        t,
+                        Type::Int(_) | Type::Ptr | Type::F64 | Type::Token | Type::Qreg(_)
+                    )
+                })?;
+            }
+            if !f.regs.is_empty() || !f.bounds.is_empty() {
+                return err(
+                    "§3.3",
+                    "classical functions use SSA definitions, not a mutable regs file",
+                );
+            }
+        }
     }
     if matches!(f.kind.as_str(), "oracle" | "lproc") {
         all(&f.regs, |t| matches!(t, Type::Reg(_)))?;

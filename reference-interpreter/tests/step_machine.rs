@@ -119,16 +119,46 @@ fn exhaustive_recursive_prefixes() {
 }
 
 #[test]
-fn full_small_domain_includes_memory_and_nonzero_target_and_fault(){
-    let o=Object::parse(include_str!("fixtures/tiny_memory.bisa")).unwrap();let mut covered=0;
-    for x in 0..=1{for byte in 0..=255u128{for steps in 0..=9{
-        let mut input=OracleInput::bits(&[x]);input.regions.insert("db".into(),vec![byte as u8]);let budget=Budget::steps(steps);
-        let expected=if x==0&&steps>=4{(0,5)}else if x==1&&steps>=8{(byte&1,0)}else{(0,1)};
-        let result=o.run_oracle("tiny",&input,budget).unwrap();assert_eq!((result.payload,result.code),expected);
-        let mut machine=OracleMachine::new(&o,"tiny",&input,budget).unwrap();let initial=machine.snapshot();for _ in 0..steps{machine.forward_step().unwrap();}
-        assert_eq!(machine.outcome(),result);
-        for target in 0..=1{for fault in 0..16{assert_eq!(machine.commit(target,fault).unwrap(),(target^expected.0,fault^expected.1));covered+=1;}}
-        for _ in 0..steps{machine.inverse_step().unwrap();}assert_eq!(machine.snapshot(),initial);assert!(machine.frames_clean());
-    }}}
-    assert_eq!(covered,10*(1<<14));
+fn full_small_domain_includes_memory_and_nonzero_target_and_fault() {
+    let o = Object::parse(include_str!("fixtures/tiny_memory.bisa")).unwrap();
+    let mut covered = 0;
+    for x in 0..=1 {
+        for byte in 0..=255u128 {
+            for steps in 0..=9 {
+                let mut input = OracleInput::bits(&[x]);
+                input.regions.insert("db".into(), vec![byte as u8]);
+                let budget = Budget::steps(steps);
+                let expected = if x == 0 && steps >= 4 {
+                    (0, 5)
+                } else if x == 1 && steps >= 8 {
+                    (byte & 1, 0)
+                } else {
+                    (0, 1)
+                };
+                let result = o.run_oracle("tiny", &input, budget).unwrap();
+                assert_eq!((result.payload, result.code), expected);
+                let mut machine = OracleMachine::new(&o, "tiny", &input, budget).unwrap();
+                let initial = machine.snapshot();
+                for _ in 0..steps {
+                    machine.forward_step().unwrap();
+                }
+                assert_eq!(machine.outcome(), result);
+                for target in 0..=1 {
+                    for fault in 0..16 {
+                        assert_eq!(
+                            machine.commit(target, fault).unwrap(),
+                            (target ^ expected.0, fault ^ expected.1)
+                        );
+                        covered += 1;
+                    }
+                }
+                for _ in 0..steps {
+                    machine.inverse_step().unwrap();
+                }
+                assert_eq!(machine.snapshot(), initial);
+                assert!(machine.frames_clean());
+            }
+        }
+    }
+    assert_eq!(covered, 10 * (1 << 14));
 }

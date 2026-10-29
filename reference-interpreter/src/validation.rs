@@ -18,6 +18,31 @@ impl Object {
             return self.validate_classical(f, types, labels);
         }
         let mut state = Discipline::new(f, types.clone());
+        fn bounds(seq: &[Instruction], out: &mut Vec<u64>) -> Result<()> {
+            for i in seq {
+                if i.op == "qloop" {
+                    out.push(
+                        i.operands
+                            .first()
+                            .and_then(|s| s.parse().ok())
+                            .ok_or_else(|| {
+                                Error("§4.8: loop count must be nonnegative literal".into())
+                            })?,
+                    );
+                }
+                for body in &i.bodies {
+                    bounds(body, out)?;
+                }
+            }
+            Ok(())
+        }
+        let mut declared_bounds = Vec::new();
+        for b in &f.blocks {
+            bounds(&b.instructions, &mut declared_bounds)?;
+        }
+        if declared_bounds != f.bounds {
+            return err("§5.3", "declared bounds do not equal loops in text order");
+        }
         for b in &f.blocks {
             if !b.params.is_empty() {
                 return err("§5.1", "action blocks cannot have classical parameters");
@@ -36,8 +61,16 @@ impl Object {
                 ),
             );
         }
-        if state.bounds != f.bounds {
-            return err("§5.3", "declared bounds do not equal loops in text order");
+        if state.local_regions.iter().any(|r| {
+            !state
+                .versions
+                .get(&format!("{r}[*]"))
+                .is_none_or(Vec::is_empty)
+        }) {
+            return err(
+                "§5.1",
+                "local region has not been explicitly restored to its image",
+            );
         }
         self.validate_borrow_frames(f)?;
         Ok(())
@@ -76,10 +109,15 @@ impl Object {
                         return err("§4.8", "qif needs two arms");
                     }
                     s.predicates.push(a[0].clone());
-                    for body in &i.bodies {
+                    for (arm, body) in i.bodies.iter().enumerate() {
+                        *s.predicates.last_mut().expect("qif predicate") = if arm == 0 {
+                            a[0].clone()
+                        } else {
+                            format!("!{}", a[0])
+                        };
                         self.validate_action_sequence(f, body, s)?;
                     }
-                    if s.predicates.pop().as_deref() != Some(&a[0]) {
+                    if s.predicates.pop().as_deref() != Some(&format!("!{}", a[0])) {
                         return err("§3.5", "qif body altered predicate stack");
                     }
                 }
@@ -90,16 +128,61 @@ impl Object {
                     let n = a[0].parse::<u64>().map_err(|_| {
                         Error("§4.8: loop count must be nonnegative literal".into())
                     })?;
-                    s.bounds.push(n);
-                    if a.len() == 3 {
-                        if a[1] != "while" || s.wires(&a[2])?.len() as u64 != n {
-                            return err("§4.6", "qloop selector width mismatch");
-                        }
-                        s.predicates.push(a[2].clone());
+                    if a.len() == 3 && (a[1] != "while" || s.wires(&a[2])?.len() as u64 != n) {
+                        return err("§4.6", "qloop selector width mismatch");
                     }
-                    self.validate_action_sequence(f, &i.bodies[0], s)?;
-                    if a.len() == 3 && s.predicates.pop().as_deref() != Some(&a[2]) {
-                        return err("§3.5", "loop predicate stack mismatch");
+                    if n == 0 {
+                        self.validate_action_sequence(f, &i.bodies[0], &mut s.clone())?;
+                        continue;
+                    }
+                    let initial_predicates = s.predicates.clone();
+                    let selectors = if a.len() == 3 {
+                        s.wires(&a[2])?
+                    } else {
+                        Vec::new()
+                    };
+                    let selector_versions = s.snapshot(&selectors);
+                    let selector_dependencies = s.dependencies(&selectors);
+                    if a.len() == 3 && s.is_other(&a[2])? {
+                        return err("§4.6", "while selectors require permutation provenance");
+                    }
+                    let mut seen: Vec<(u64, Discipline)> = Vec::new();
+                    let mut iteration = 0;
+                    while iteration < n {
+                        if selectors.is_empty() {
+                            if let Some((prior, _)) = seen.iter().find(|(_, prior)| prior == s) {
+                                let period = iteration - prior;
+                                let skip = (n - iteration) / period * period;
+                                if skip != 0 {
+                                    iteration += skip;
+                                    continue;
+                                }
+                            }
+                            seen.push((iteration, s.clone()));
+                        } else {
+                            s.predicates
+                                .extend((0..=iteration).map(|k| format!("{}[{k}]", a[2])));
+                        }
+                        let prior_modified = std::mem::take(&mut s.modified);
+                        self.validate_action_sequence(f, &i.bodies[0], s)?;
+                        if !s.modified.is_disjoint(&selector_dependencies) {
+                            return err("§4.6", "while body writes selector dependencies");
+                        }
+                        s.modified.extend(prior_modified);
+                        let mut expected = initial_predicates.clone();
+                        if !selectors.is_empty() {
+                            expected.extend((0..=iteration).map(|k| format!("{}[{k}]", a[2])));
+                        }
+                        if s.predicates != expected {
+                            return err("§3.5", "loop body altered predicate stack");
+                        }
+                        s.predicates = initial_predicates.clone();
+                        if s.snapshot(&selectors) != selector_versions
+                            || selectors.iter().any(|w| s.closed.contains(w))
+                        {
+                            return err("§4.6", "while body modifies selector dependencies");
+                        }
+                        iteration += 1;
                     }
                 }
                 "qpred" => {
@@ -160,7 +243,7 @@ impl Object {
                     let c = Creation {
                         kind: op.into(),
                         sources: vec![a[0].clone()],
-                        versions: s.snapshot(&wires),
+                        versions: s.read_snapshot(&wires)?,
                         controls: s.predicates.clone(),
                     };
                     s.produce(&i.lhs[0], Type::Wire(wires.len() as u16), c)?;
@@ -175,12 +258,12 @@ impl Object {
                         .ok_or_else(|| Error("§6.2: unmatched quncopy".into()))?;
                     if c.kind != "qcopy"
                         || c.sources != vec![a[0].clone()]
-                        || c.versions != s.snapshot(&s.wires(&a[0])?)
+                        || c.versions != s.read_snapshot(&s.wires(&a[0])?)?
                         || c.controls != s.predicates
                         || s.wires(&a[1])?
                             .iter()
                             .any(|w| !s.versions.get(w).is_none_or(Vec::is_empty))
-                        || s.wires(&a[0])?.iter().any(|w| s.closed.contains(w))
+                        || c.versions.iter().any(|(w, _)| s.closed.contains(w))
                     {
                         return err("§6.2", "quncopy outside its computing window");
                     }
@@ -203,7 +286,7 @@ impl Object {
                         let img = a[3]
                             .strip_prefix('@')
                             .ok_or_else(|| Error("§4.6: unknown qregion image".into()))?;
-                        let size=self.data_size(img)?;
+                        let size = self.data_size(img)?;
                         let bits = (1u128 << aw)
                             .checked_mul(w as u128)
                             .ok_or_else(|| Error("§4.6: image size overflow".into()))?;
@@ -214,6 +297,7 @@ impl Object {
                     if s.types.insert(a[0].clone(), Type::Region(aw, w)).is_some() {
                         return err("§3.3", "region name already defined");
                     }
+                    s.local_regions.insert(a[0].clone());
                 }
                 "qload" | "qunload" | "qstore" | "qexchm" => {
                     let load = op == "qload";
@@ -234,7 +318,7 @@ impl Object {
                             Creation {
                                 kind: op.into(),
                                 sources: a.clone(),
-                                versions: s.snapshot(&deps),
+                                versions: s.read_snapshot(&deps)?,
                                 controls: s.predicates.clone(),
                             },
                         )?;
@@ -254,7 +338,11 @@ impl Object {
                             if c.kind != "qload"
                                 || c.sources != a[..2]
                                 || c.controls != s.predicates
-                                || c.versions != s.snapshot(&deps)
+                                || c.versions != s.read_snapshot(&deps)?
+                                || s.wires(&a[2])?
+                                    .iter()
+                                    .any(|w| !s.versions.get(w).is_none_or(Vec::is_empty))
+                                || c.versions.iter().any(|(w, _)| s.closed.contains(w))
                             {
                                 return err("§6.2", "qunload outside computing window");
                             }
@@ -263,12 +351,17 @@ impl Object {
                             if s.inputs.contains(&a[0]) {
                                 return err("§5.1", "in region cannot be modified by action");
                             }
-                            s.versions
-                                .entry(format!("{}[*]", a[0]))
-                                .or_default()
-                                .push(format!("{}:{}", op, i.line));
+                            let mut reads = s.wires(&a[1])?;
+                            if op == "qstore" {
+                                reads.extend(s.wires(&a[2])?);
+                            }
+                            let version =
+                                format!("{op}:{}:{:?}", a.join(" "), s.read_snapshot(&reads)?);
+                            s.note_reads(&version, &reads)?;
+                            s.update_log(&format!("{}[*]", a[0]), &version, false);
+                            *s.cell_epochs.entry(format!("{}[*]", a[0])).or_default() += 1;
                             if op == "qexchm" {
-                                s.change(&a[2], format!("{op}:{}", a.join(" ")), false)?;
+                                s.change(&a[2], version, false)?;
                             }
                         }
                     }
@@ -320,26 +413,72 @@ impl Object {
                     } else {
                         list(&ca[1])?
                     };
+                    let other = callee.kind == "action";
+                    let inputs = list(&ca[2])?;
+                    let mut reads = inputs
+                        .iter()
+                        .map(|n| s.wires(n))
+                        .collect::<Result<Vec<_>>>()?
+                        .concat();
+                    let mem_index = if call.instruction.op == "oracle_call" {
+                        5
+                    } else {
+                        3
+                    };
+                    let mems = list(&ca[mem_index])?;
+                    let mem_params = &callee.params[if call.instruction.op == "oracle_call" {
+                        3
+                    } else {
+                        2
+                    }];
+                    for (mem, param) in mems.iter().zip(mem_params) {
+                        if param.role.as_deref() == Some("in") {
+                            reads.push(format!("{mem}[*]"));
+                        }
+                    }
+                    let version = if call.instruction.op == "oracle_call" {
+                        format!(
+                            "oracle_call:{}:{:?}:{:?}",
+                            ca.join(" "),
+                            s.read_snapshot(&reads)?,
+                            s.predicates
+                        )
+                    } else {
+                        format!(
+                            "call_{}_{}:{}:{:?}:{:?}",
+                            if other { "other" } else { "perm" },
+                            if call.adjoint { "adj" } else { "fwd" },
+                            ca.join(" "),
+                            s.read_snapshot(&reads)?,
+                            s.predicates
+                        )
+                    };
+                    s.note_reads(&version, &reads)?;
                     for target in targets {
-                        let other = callee.kind == "action";
-                        s.change(
-                            &target,
-                            format!(
-                                "call_{}_{}:{}:{:?}",
-                                if other { "other" } else { "perm" },
-                                if call.adjoint { "adj" } else { "fwd" },
-                                ca.join(" "),
-                                s.predicates
-                            ),
-                            other,
-                        )?;
+                        s.change(&target, version.clone(), other)?;
+                    }
+                    for (mem, param) in mems.iter().zip(mem_params) {
+                        if param.role.as_deref() == Some("mut") {
+                            let cell = format!("{mem}[*]");
+                            s.update_log(&cell, &version, false);
+                            s.modified.insert(cell.clone());
+                            *s.cell_epochs.entry(cell.clone()).or_default() += 1;
+                            if other {
+                                s.closed.insert(cell);
+                            }
+                        }
                     }
                     if call.control.is_some() {
                         s.predicates.pop();
                     }
                 }
                 _ if gate(op) => {
-                    if matches!(op,"rx"|"ry"|"rz")&&a.first().is_some_and(|angle|angle.parse::<f64>().is_err())&&s.types.get(&a[0])!=Some(&Type::F64){return err("§3.3","gate angle must be a classical f64 argument");}
+                    if matches!(op, "rx" | "ry" | "rz")
+                        && a.first().is_some_and(|angle| angle.parse::<f64>().is_err())
+                        && s.types.get(&a[0]) != Some(&Type::F64)
+                    {
+                        return err("§3.3", "gate angle must be a classical f64 argument");
+                    }
                     let (controls, targets, diagonal, other) = gate_operands(i)?;
                     if f.kind == "perm_action" && (diagonal || other) {
                         return err("§5.3", "permutation action contains non-permutation gate");
@@ -370,6 +509,12 @@ impl Object {
                         ),
                         s.predicates
                     );
+                    let reads = controls
+                        .iter()
+                        .map(|w| s.wires(w))
+                        .collect::<Result<Vec<_>>>()?
+                        .concat();
+                    s.note_reads(&version, &reads)?;
                     for t in targets {
                         s.check_target(&t, diagonal)?;
                         if !diagonal {
@@ -389,9 +534,22 @@ impl Object {
                     let version = format!(
                         "{op}:{}:{:?}:{:?}",
                         a.join(" "),
-                        s.snapshot(&s.wires(&a[0])?),
+                        if op == "qxor" {
+                            s.read_snapshot(&s.wires(&a[0])?)?
+                        } else {
+                            s.read_snapshot(&[])?
+                        },
                         s.predicates
                     );
+                    let reads = if op == "qxor" {
+                        s.wires(&a[0])?
+                    } else {
+                        Vec::new()
+                    };
+                    s.note_reads(&version, &reads)?;
+                    if s.is_other(&a[0])? || (op == "qexch" && s.is_other(&a[1])?) {
+                        s.other_versions.insert(version.clone());
+                    }
                     s.change(&a[1], version.clone(), false)?;
                     if op == "qexch" {
                         s.check_target(&a[0], false)?;
@@ -477,15 +635,10 @@ impl Object {
                     return err("§3.3", "region interface operands alias");
                 }
                 if let Type::Region(..) = ty {
-                    let caller = f
-                        .params
-                        .iter()
-                        .flatten()
-                        .find(|p| &p.name == v)
-                        .ok_or_else(|| {
-                            Error("§3.3: memory call operand is not caller interface".into())
-                        })?;
-                    if p.role.as_deref() == Some("mut") && caller.role.as_deref() == Some("in") {
+                    let caller = f.params.iter().flatten().find(|p| &p.name == v);
+                    if p.role.as_deref() == Some("mut")
+                        && caller.is_some_and(|p| p.role.as_deref() == Some("in"))
+                    {
                         return err("§3.3", "in region passed to mut slot");
                     }
                 }
@@ -900,8 +1053,8 @@ impl Object {
                 {
                     return err("§13", "unknown coverage classification");
                 }
-                e.get("count")?.uint()?;
             }
+            self.validate_coverage_details(c)?;
         }
         if let Some(s) = self.section("schedule") {
             s.fields(&["bindings", "entries"], &[])?;
@@ -955,6 +1108,7 @@ impl Object {
                     p.fields(&["symbol", "point", "iteration"], &[])?;
                 }
             }
+            self.validate_schedule_details(s)?;
         }
         if let Some(c) = self.section("certificate") {
             c.fields(
@@ -1008,18 +1162,20 @@ impl Object {
                     &[],
                 )?;
             }
+            self.validate_certificate_details(c)?;
         }
         Ok(())
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct Creation {
     kind: String,
     sources: Vec<String>,
     versions: Vec<(String, Vec<String>)>,
     controls: Vec<String>,
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct Discipline {
     types: BTreeMap<String, Type>,
     inputs: BTreeSet<String>,
@@ -1027,7 +1183,11 @@ struct Discipline {
     created: BTreeMap<String, Creation>,
     versions: BTreeMap<String, Vec<String>>,
     closed: BTreeSet<String>,
-    bounds: Vec<u64>,
+    reads: BTreeMap<String, Vec<(String, Vec<String>)>>,
+    other_versions: BTreeSet<String>,
+    local_regions: BTreeSet<String>,
+    cell_epochs: BTreeMap<String, u128>,
+    modified: BTreeSet<String>,
 }
 impl Discipline {
     fn new(f: &Function, types: BTreeMap<String, Type>) -> Self {
@@ -1046,10 +1206,15 @@ impl Discipline {
             created: BTreeMap::new(),
             versions: BTreeMap::new(),
             closed: BTreeSet::new(),
-            bounds: Vec::new(),
+            reads: BTreeMap::new(),
+            other_versions: BTreeSet::new(),
+            local_regions: BTreeSet::new(),
+            cell_epochs: BTreeMap::new(),
+            modified: BTreeSet::new(),
         }
     }
     fn wires(&self, n: &str) -> Result<Vec<String>> {
+        let n = n.strip_prefix('!').unwrap_or(n);
         let (base, index) = if let Some((base, index)) = n.split_once('[') {
             let index = index
                 .strip_suffix(']')
@@ -1086,8 +1251,46 @@ impl Discipline {
     fn snapshot(&self, wires: &[String]) -> Vec<(String, Vec<String>)> {
         wires
             .iter()
-            .map(|w| (w.clone(), self.versions.get(w).cloned().unwrap_or_default()))
+            .map(|w| {
+                let mut log = self.versions.get(w).cloned().unwrap_or_default();
+                if let Some(epoch) = self.cell_epochs.get(w) {
+                    log.push(format!("cell_version:{epoch}"));
+                }
+                (w.clone(), log)
+            })
             .collect()
+    }
+    fn read_snapshot(&self, wires: &[String]) -> Result<Vec<(String, Vec<String>)>> {
+        let mut reads = wires.to_vec();
+        for p in &self.predicates {
+            reads.extend(self.wires(p)?);
+        }
+        reads.sort();
+        reads.dedup();
+        Ok(self.snapshot(&reads))
+    }
+    fn dependencies(&self, wires: &[String]) -> BTreeSet<String> {
+        let mut out = BTreeSet::new();
+        let mut pending = wires.to_vec();
+        while let Some(wire) = pending.pop() {
+            if !out.insert(wire.clone()) {
+                continue;
+            }
+            if let Some(c) = self.created.get(wire.split('[').next().expect("wire name")) {
+                pending.extend(c.versions.iter().map(|(w, _)| w.clone()));
+            }
+            for v in self.versions.get(&wire).into_iter().flatten() {
+                if let Some(reads) = self.reads.get(v) {
+                    pending.extend(reads.iter().map(|(w, _)| w.clone()));
+                }
+            }
+        }
+        out
+    }
+    fn note_reads(&mut self, version: &str, wires: &[String]) -> Result<()> {
+        self.reads
+            .insert(version.into(), self.read_snapshot(wires)?);
+        Ok(())
     }
     fn produce(&mut self, n: &str, ty: Type, c: Creation) -> Result<()> {
         if self.types.contains_key(n) {
@@ -1098,7 +1301,11 @@ impl Discipline {
         Ok(())
     }
     fn consume(&mut self, n: &str) -> Result<()> {
-        self.wires(n)?;
+        for wire in self.wires(n)? {
+            self.versions.remove(&wire);
+            self.closed.remove(&wire);
+            self.modified.remove(&wire);
+        }
         self.types.remove(n);
         self.created.remove(n);
         Ok(())
@@ -1118,29 +1325,64 @@ impl Discipline {
     }
     fn change(&mut self, n: &str, version: String, other: bool) -> Result<()> {
         self.check_target(n, false)?;
+        let context = self.read_snapshot(&[])?;
+        let version = format!("{version}:context{context:?}");
+        // Keep the dependency metadata under the complete operation identity.
+        let original = version
+            .rsplit_once(":context")
+            .expect("operation context")
+            .0;
+        let reads = self.reads.get(original).cloned().unwrap_or(context);
+        self.reads.insert(version.clone(), reads);
+        if self.other_versions.contains(original) {
+            self.other_versions.insert(version.clone());
+        }
+        let needs_adjoint = other || self.is_other(n)?;
         for w in self.wires(n)? {
             if other {
                 self.closed.insert(w.clone());
             }
-            let log = self.versions.entry(w).or_default();
-            if log
-                .last()
-                .is_some_and(|prior| operation_inverse(prior).as_deref() == Some(version.as_str()))
-            {
-                log.pop();
-            } else {
-                log.push(version.clone());
-            }
+            let blocked = needs_adjoint
+                && (self.versions.iter().any(|(target, log)| {
+                    target != &w
+                        && log.iter().any(|v| {
+                            self.reads
+                                .get(v)
+                                .is_some_and(|reads| reads.iter().any(|(source, _)| source == &w))
+                        })
+                }) || self
+                    .created
+                    .values()
+                    .any(|c| c.versions.iter().any(|(source, _)| source == &w)));
+            self.update_log(&w, &version, blocked);
         }
         Ok(())
+    }
+    fn update_log(&mut self, wire: &str, version: &str, blocked: bool) {
+        self.modified.insert(wire.into());
+        let log = self.versions.entry(wire.into()).or_default();
+        if !blocked
+            && log
+                .last()
+                .is_some_and(|prior| operation_inverse(prior).as_deref() == Some(version))
+        {
+            log.pop();
+        } else {
+            log.push(version.into());
+        }
+        if log.is_empty() {
+            self.versions.remove(wire);
+        }
     }
     fn is_other(&self, n: &str) -> Result<bool> {
         Ok(self.wires(n)?.iter().any(|w| {
             self.versions.get(w).is_some_and(|log| {
                 log.iter().any(|v| {
-                    ["h:", "rx:", "ry:", "call_other_"]
-                        .iter()
-                        .any(|p| v.starts_with(p))
+                    self.other_versions.contains(v) || {
+                        ["h:", "rx:", "ry:", "call_other_"]
+                            .iter()
+                            .any(|p| v.starts_with(p))
+                    }
                 })
             })
         }))
@@ -1171,7 +1413,8 @@ fn operation_inverse(version: &str) -> Option<String> {
         "call_other_adj" => "call_other_fwd",
         "call_perm_fwd" => "call_perm_adj",
         "call_perm_adj" => "call_perm_fwd",
-        "x" | "cx" | "ccx" | "mcx" | "swap" | "h" | "qxor" | "qexch" | "qexchm" => op,
+        "x" | "cx" | "ccx" | "mcx" | "swap" | "h" | "cz" | "qxor" | "qexch" | "qexchm"
+        | "qstore" | "oracle_call" => op,
         "rx" | "ry" | "rz" => {
             let (angle, tail) = rest.split_once(' ')?;
             let bits = u64::from_str_radix(angle.strip_prefix('#')?, 16).ok()?;
