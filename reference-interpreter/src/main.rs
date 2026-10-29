@@ -1,11 +1,12 @@
 use bennett_isa_ref::{
-    json::Json, Argument, BitVector, Budget, ClassicalMachine, ClassicalValue, Error, Function,
-    Object, OracleInput, OracleVectorInput, OracleVectorMachine, QuantumRegisters, Result,
-    SnapshotDelta, StepPoint, Type, Xoshiro256,
+    json::Json, Argument, BitVector, Budget, ClassicalMachine, ClassicalValue, Complex, Error,
+    Function, Object, OracleInput, OracleVectorInput, OracleVectorMachine, QuantumBindings,
+    QuantumRegion, QuantumRegisters, QuantumState, Result, SnapshotDelta, StepPoint, Type,
+    Xoshiro256,
 };
 use std::collections::VecDeque;
 
-const USAGE:&str="bennett-isa-ref check <object>\nbennett-isa-ref hash <object>\nbennett-isa-ref run-oracle <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref step-check <object> <oracle> (--exhaustive [--max-bits N] | --suite | --samples N) [--seed a,b,c,d] [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref run-cc <object> <entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex]";
+const USAGE:&str="bennett-isa-ref check <object>\nbennett-isa-ref hash <object>\nbennett-isa-ref run-oracle <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref step-check <object> <oracle> (--exhaustive [--max-bits N] | --suite | --samples N) [--seed a,b,c,d] [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref run-cc <object> <entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex]\nbennett-isa-ref reverse <object> <entry> [run-cc options] [--steps N]\nbennett-isa-ref reverse <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--steps N] [--mem name=hex] [--arg value]\nbennett-isa-ref reverse <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]>] [--adjoint]";
 fn fail(message: impl std::fmt::Display) -> Error {
     Error(message.to_string())
 }
@@ -723,6 +724,732 @@ fn run_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> {
         ("trace".into(), Json::Array(trace)),
     ]))
 }
+/// Options for executing one Q action (`run-action`, and `reverse` on an
+/// action). The interface bit order for `--basis`, `--state` and the output
+/// state is: mut bundles then in bundles in declared order, then mem
+/// regions in declared order with cells in order; within any bundle or
+/// cell wire 0 comes first (bundles are little-endian, §14.2).
+struct ActionOptions {
+    muts: Option<Vec<String>>,
+    ins: Option<Vec<String>>,
+    basis: Option<String>,
+    state: Option<String>,
+    mem: Vec<(String, Vec<u8>)>,
+    args: Vec<String>,
+    adjoint: bool,
+}
+fn parse_action_options(args: &[String], start: usize) -> Result<ActionOptions> {
+    let mut options = ActionOptions {
+        muts: None,
+        ins: None,
+        basis: None,
+        state: None,
+        mem: Vec::new(),
+        args: Vec::new(),
+        adjoint: false,
+    };
+    let mut list_form = false;
+    let mut single_form = false;
+    let split = |value: &str| -> Vec<String> {
+        if value.is_empty() {
+            Vec::new()
+        } else {
+            value.split(',').map(str::to_string).collect()
+        }
+    };
+    let mut pos = start;
+    while pos < args.len() {
+        let option = args[pos].as_str();
+        pos += 1;
+        if option == "--adjoint" {
+            if options.adjoint {
+                return Err(fail("--adjoint given twice"));
+            }
+            options.adjoint = true;
+            continue;
+        }
+        let value = args
+            .get(pos)
+            .ok_or_else(|| fail(format!("missing value for {option}")))?;
+        pos += 1;
+        match option {
+            "--mut" => {
+                if options.muts.is_some() {
+                    return Err(fail("--mut given twice"));
+                }
+                options.muts = Some(split(value));
+            }
+            "--in" => {
+                if options.ins.is_some() {
+                    return Err(fail("--in given twice"));
+                }
+                options.ins = Some(split(value));
+            }
+            "--basis" => {
+                if options.basis.is_some() {
+                    return Err(fail("--basis given twice"));
+                }
+                options.basis = Some(value.clone());
+            }
+            "--state" => {
+                if options.state.is_some() {
+                    return Err(fail("--state given twice"));
+                }
+                options.state = Some(value.clone());
+            }
+            "--mem" => {
+                let (name, hex) = value
+                    .split_once('=')
+                    .ok_or_else(|| fail("--mem requires name=hex"))?;
+                if options.mem.iter().any(|(n, _)| n == name) {
+                    return Err(fail(format!("duplicate --mem {name}")));
+                }
+                options.mem.push((name.into(), parse_hex(hex)?));
+            }
+            "--args" => {
+                if list_form || single_form {
+                    return Err(fail(
+                        "--args/--arg: pass the classical arguments exactly once, in one form",
+                    ));
+                }
+                list_form = true;
+                options.args = split(value);
+            }
+            "--arg" => {
+                if list_form {
+                    return Err(fail(
+                        "--args/--arg: pass the classical arguments exactly once, in one form",
+                    ));
+                }
+                single_form = true;
+                options.args.push(value.clone());
+            }
+            _ => return Err(fail(format!("unknown option {option}"))),
+        }
+    }
+    Ok(options)
+}
+struct ActionRun {
+    state: QuantumState,
+    bindings: QuantumBindings,
+    /// Interface wires in the documented order (mut, in, mem cells).
+    interface_wires: Vec<u64>,
+    mut_bundles: Vec<Vec<u64>>,
+    in_bundles: Vec<Vec<u64>>,
+    /// (region name, its cells' wires) in declared order.
+    regions: Vec<(String, Vec<Vec<u64>>)>,
+    borrowed: Vec<u64>,
+}
+/// Builds the §5.3 interface bindings for one action execution on a basis
+/// state (`--mut`/`--in`/`--mem`, `--basis`) or a sparse state vector
+/// (`--state bits=re[,im];...`). Borrowed pool wires start in |0> and are
+/// verified restored before any state is reported (§5.6).
+fn build_action_state(
+    program: &Object,
+    f: &Function,
+    options: &ActionOptions,
+) -> Result<ActionRun> {
+    let modes = [
+        options.muts.is_some(),
+        options.basis.is_some(),
+        options.state.is_some(),
+    ]
+    .iter()
+    .filter(|m| **m)
+    .count();
+    if modes != 1 {
+        return Err(fail(
+            "§5.3: an action run needs exactly one of --mut, --basis, --state",
+        ));
+    }
+    if options.ins.is_some() && options.muts.is_none() {
+        return Err(fail("§5.3: --in accompanies --mut only"));
+    }
+    if !options.mem.is_empty() && options.muts.is_none() {
+        return Err(fail(
+            "§5.3: --mem accompanies --mut only; --basis/--state bits already cover the mem cells",
+        ));
+    }
+    let width = |p: &bennett_isa_ref::Param| p.ty.bits(program.ptr_width);
+    let mut q = QuantumState::new();
+    let mut bindings = QuantumBindings::default();
+    let mut interface_wires: Vec<u64> = Vec::new();
+    let mut mut_bundles = Vec::new();
+    let mut in_bundles = Vec::new();
+    for (group, bundles) in [(0usize, &mut mut_bundles), (1, &mut in_bundles)] {
+        for p in &f.params[group] {
+            let wires = q.allocate(width(p)?)?;
+            bindings.bundles.insert(p.name.clone(), wires.clone());
+            interface_wires.extend(&wires);
+            bundles.push(wires);
+        }
+    }
+    let mut regions = Vec::new();
+    let mut region_cell_values: Vec<Vec<u128>> = Vec::new();
+    for p in &f.params[2] {
+        let Type::Region(a, w) = p.ty else {
+            return Err(fail("§5.1: mem slot requires region type"));
+        };
+        let cells = (a < 63)
+            .then(|| 1usize.checked_shl(a as u32))
+            .flatten()
+            .ok_or_else(|| fail("host limit: interface region exceeds host memory"))?;
+        let cell_bytes = (w as usize).div_ceil(8);
+        let mut values = vec![0u128; cells];
+        if let Some((_, bytes)) = options.mem.iter().find(|(n, _)| *n == p.name) {
+            if bytes.len() != cells * cell_bytes {
+                return Err(fail(format!(
+                    "§5.1: region {} needs {} bytes ({} cells of {}), --mem gave {}",
+                    p.name,
+                    cells * cell_bytes,
+                    cells,
+                    cell_bytes,
+                    bytes.len()
+                )));
+            }
+            for (i, chunk) in bytes.chunks_exact(cell_bytes).enumerate() {
+                values[i] = chunk
+                    .iter()
+                    .enumerate()
+                    .fold(0u128, |v, (j, b)| v | ((*b as u128) << (8 * j)));
+                if w < 128 && values[i] >> w != 0 {
+                    return Err(fail(format!(
+                        "§5.1: --mem cell {i} of region {} does not fit wire[{w}]",
+                        p.name
+                    )));
+                }
+            }
+        }
+        let mut all = Vec::new();
+        for _ in 0..cells {
+            let cell = q.allocate(
+                usize::try_from(w)
+                    .map_err(|_| fail("host limit: cell width exceeds host storage"))?,
+            )?;
+            interface_wires.extend(&cell);
+            all.push(cell);
+        }
+        bindings.regions.insert(
+            p.name.clone(),
+            QuantumRegion {
+                address_width: a,
+                cell_width: w,
+                cells: all.clone(),
+            },
+        );
+        regions.push((p.name.clone(), all));
+        region_cell_values.push(values);
+    }
+    for (name, _) in &options.mem {
+        if !f.params[2].iter().any(|p| &p.name == name) {
+            return Err(fail(format!(
+                "§5.1: action @{} has no mem region {name}",
+                f.name
+            )));
+        }
+    }
+    if options.args.len() != f.params[3].len() {
+        return Err(fail(format!(
+            "§5.1: action @{} takes {} classical arguments, {} given",
+            f.name,
+            f.params[3].len(),
+            options.args.len()
+        )));
+    }
+    let defaults = program.default_budget(1_000_000)?;
+    for (p, raw) in f.params[3].iter().zip(&options.args) {
+        let arg = if let Some(s) = raw.strip_prefix("token:") {
+            Argument::Token(budget(s, defaults)?)
+        } else if let Some(s) = raw.strip_prefix("f64:") {
+            Argument::Float(s.parse().map_err(fail)?)
+        } else {
+            Argument::Bits(uint(raw)?)
+        };
+        bindings.args.insert(p.name.clone(), arg);
+    }
+    let borrowed = q.allocate(program.borrow_capacity(&f.name)?)?;
+    if !borrowed.is_empty() {
+        bindings.borrowed.push(borrowed.clone());
+    }
+    let total = interface_wires.len();
+    if let Some(muts) = &options.muts {
+        if muts.len() != f.params[0].len() {
+            return Err(fail(format!(
+                "§5.1: --mut needs {} values for @{}, {} given",
+                f.params[0].len(),
+                f.name,
+                muts.len()
+            )));
+        }
+        let empty: Vec<String> = Vec::new();
+        let ins = options.ins.as_ref().unwrap_or(&empty);
+        if options.ins.is_some() && ins.len() != f.params[1].len() {
+            return Err(fail(format!(
+                "§5.1: --in needs {} values for @{}, {} given",
+                f.params[1].len(),
+                f.name,
+                ins.len()
+            )));
+        }
+        let prepare = |q: &mut QuantumState, wires: &[u64], value: &BitVector| -> Result<()> {
+            for (i, w) in wires.iter().enumerate() {
+                if value.bit(i)? {
+                    q.gate("x", &[*w], None, &[])?;
+                }
+            }
+            Ok(())
+        };
+        for (raw, p) in muts.iter().zip(&f.params[0]) {
+            let value = vector_input(width(p)?, raw)?;
+            prepare(&mut q, &bindings.bundles[&p.name].clone(), &value)?;
+        }
+        for (raw, p) in ins.iter().zip(&f.params[1]) {
+            let value = vector_input(width(p)?, raw)?;
+            prepare(&mut q, &bindings.bundles[&p.name].clone(), &value)?;
+        }
+        for ((_, cells), values) in regions.iter().zip(&region_cell_values) {
+            for (cell, value) in cells.iter().zip(values) {
+                let bits = BitVector::from_u128(cell.len(), *value)?;
+                prepare(&mut q, &cell.clone(), &bits)?;
+            }
+        }
+    } else {
+        let components: Vec<(Vec<bool>, Complex)> = if let Some(basis) = &options.basis {
+            vec![(parse_bits(basis, total)?, Complex::ONE)]
+        } else {
+            parse_state_spec(options.state.as_deref().expect("mode"), total)?
+        };
+        let full: Vec<(Vec<bool>, Complex)> = components
+            .into_iter()
+            .map(|(mut bits, amp)| {
+                bits.resize(total + borrowed.len(), false);
+                (bits, amp)
+            })
+            .collect();
+        q.set_state_vector(&full)?;
+    }
+    Ok(ActionRun {
+        state: q,
+        bindings,
+        interface_wires,
+        mut_bundles,
+        in_bundles,
+        regions,
+        borrowed,
+    })
+}
+fn parse_bits(text: &str, total: usize) -> Result<Vec<bool>> {
+    if text.len() != total || !text.bytes().all(|b| matches!(b, b'0' | b'1')) {
+        return Err(fail(format!(
+            "§14.2: bit string needs exactly {total} characters of 0/1, got {text:?}"
+        )));
+    }
+    Ok(text.bytes().map(|b| b == b'1').collect())
+}
+fn parse_state_spec(text: &str, total: usize) -> Result<Vec<(Vec<bool>, Complex)>> {
+    let mut components = Vec::new();
+    for entry in text.split(';') {
+        let (bits, amp) = entry.split_once('=').ok_or_else(|| {
+            fail(format!(
+                "§14.2: state component {entry:?} needs bits=re[,im]"
+            ))
+        })?;
+        let mut parts = amp.split(',');
+        let re: f64 = parts
+            .next()
+            .expect("split")
+            .parse()
+            .map_err(|_| fail(format!("§14.2: invalid amplitude in {entry:?}")))?;
+        let im: f64 = match parts.next() {
+            Some(s) => s
+                .parse()
+                .map_err(|_| fail(format!("§14.2: invalid amplitude in {entry:?}")))?,
+            None => 0.0,
+        };
+        if parts.next().is_some() || !re.is_finite() || !im.is_finite() {
+            return Err(fail(format!("§14.2: invalid amplitude in {entry:?}")));
+        }
+        components.push((parse_bits(bits, total)?, Complex::new(re, im)));
+    }
+    if components.is_empty() {
+        return Err(fail("§14.2: --state needs at least one component"));
+    }
+    Ok(components)
+}
+/// The final state over the interface wires as `{bits: [re, im]}`, one
+/// entry per exactly nonzero component, amplitudes the binary64 values of
+/// the exact shadow. Borrowed pool wires must be back in |0> on every
+/// component (§5.6) or the run is an error, never a partial state.
+fn action_state_json(run: &ActionRun) -> Result<Json> {
+    let total = run.interface_wires.len();
+    if run.state.wire_count() != total + run.borrowed.len() {
+        return Err(fail(
+            "§5.3: action left wires beyond its interface and borrow pool",
+        ));
+    }
+    let mut entries = Vec::new();
+    for (bits, (re, im)) in run.state.exact_support() {
+        if bits[total..].iter().any(|b| *b) {
+            return Err(fail(
+                "§5.6: borrowed wires were not returned to their entry state",
+            ));
+        }
+        let key: String = bits[..total]
+            .iter()
+            .map(|b| if *b { '1' } else { '0' })
+            .collect();
+        entries.push((key, Json::Array(vec![float_json(re)?, float_json(im)?])));
+    }
+    Ok(object(entries))
+}
+/// The definite basis value of one bundle, bit by bit, or None when some
+/// wire is not in a basis state on every component.
+fn bundle_value(state: &QuantumState, wires: &[u64]) -> Option<BitVector> {
+    let mut value = BitVector::zero(wires.len()).ok()?;
+    for (i, w) in wires.iter().enumerate() {
+        value.set(i, state.read_basis(&[*w]).ok()? != 0).ok()?;
+    }
+    Some(value)
+}
+fn bundles_json(state: &QuantumState, bundles: &[Vec<u64>]) -> Json {
+    Json::Array(
+        bundles
+            .iter()
+            .map(|wires| {
+                bundle_value(state, wires)
+                    .as_ref()
+                    .map(vector_number)
+                    .unwrap_or(Json::Null)
+            })
+            .collect(),
+    )
+}
+fn first_state_difference(a: &QuantumState, b: &QuantumState, total: usize) -> Option<String> {
+    let support = |s: &QuantumState| {
+        s.exact_support()
+            .into_iter()
+            .map(|(bits, amp)| {
+                (
+                    bits[..bits.len().min(total)]
+                        .iter()
+                        .map(|b| if *b { '1' } else { '0' })
+                        .collect::<String>(),
+                    amp,
+                )
+            })
+            .collect::<std::collections::BTreeMap<_, _>>()
+    };
+    let (sa, sb) = (support(a), support(b));
+    for key in sa
+        .keys()
+        .chain(sb.keys())
+        .collect::<std::collections::BTreeSet<_>>()
+    {
+        match (sa.get(key), sb.get(key)) {
+            (Some(x), Some(y)) if x == y => {}
+            _ => {
+                return Some(format!(
+                    "state component |{key}>: {:?} differs from {:?}",
+                    sa.get(key),
+                    sb.get(key)
+                ))
+            }
+        }
+    }
+    None
+}
+fn reverse_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> {
+    let mut replies = load_replies(options.replies.as_deref())?;
+    let mut machine = classical_machine(program, name, &options)?;
+    let entry = machine.snapshot();
+    let entry_digest = machine.memory_digest();
+    let steps = drive(
+        &mut machine,
+        &mut replies,
+        options.fuel,
+        options.steps,
+        None,
+    )?;
+    check_replies_consumed(&replies)?;
+    let forward = machine.outcome();
+    let forward_tape = tape_json(&machine);
+    let forward_requests = host_requests_json(&machine);
+    // §10 reverse eligibility is enforced by the machine (measurement in
+    // history is E_NOT_REVERSIBLE; a pending request never reaches here).
+    machine.reverse()?;
+    let after = machine.snapshot();
+    let equals = after == entry;
+    Ok(object([
+        ("clock".into(), number(machine.clock() as u128)),
+        ("console".into(), console_json(&machine)),
+        ("console_hex".into(), string(hex(machine.console()))),
+        (
+            "effect_tape_length".into(),
+            number(machine.effect_tape_len() as u128),
+        ),
+        ("entry".into(), string(name)),
+        ("entry_memory_digest".into(), string(entry_digest)),
+        ("equals_entry".into(), Json::Bool(equals)),
+        (
+            "fault".into(),
+            forward.fault.map(number).unwrap_or(Json::Null),
+        ),
+        ("faults".into(), faults_json(forward.fault)),
+        (
+            "first_difference".into(),
+            entry
+                .first_difference(&after)
+                .map(string)
+                .unwrap_or(Json::Null),
+        ),
+        ("host_requests".into(), forward_requests),
+        ("memory_digest".into(), string(machine.memory_digest())),
+        (
+            "memory_equals_entry".into(),
+            Json::Bool(entry.memory_equals(&after)),
+        ),
+        ("results".into(), values_json(&forward.values)?),
+        (
+            "status".into(),
+            string(if equals { "REVERSED" } else { "FAILED" }),
+        ),
+        ("steps".into(), number(steps as u128)),
+        ("tape".into(), forward_tape),
+    ]))
+}
+/// The run-oracle-shaped options for `reverse` on an oracle.
+struct OracleOptions {
+    input: OracleVectorInput,
+    limits: Budget,
+    steps: Option<u64>,
+}
+fn parse_oracle_options(
+    program: &Object,
+    name: &str,
+    args: &[String],
+    start: usize,
+) -> Result<OracleOptions> {
+    let oracle = program
+        .functions
+        .get(name)
+        .filter(|f| f.kind == "oracle")
+        .ok_or_else(|| fail(format!("§5.2: unknown oracle @{name}")))?;
+    let mut limits = program.default_budget(1_000_000)?;
+    let mut vectors: Vec<BitVector> = Vec::new();
+    let mut input_seen = false;
+    let mut regions: std::collections::BTreeMap<String, Vec<u8>> = Default::default();
+    let mut arguments: Vec<Argument> = Vec::new();
+    let mut steps = None;
+    let mut pos = start;
+    while pos < args.len() {
+        let option = args[pos].as_str();
+        pos += 1;
+        let value = args
+            .get(pos)
+            .ok_or_else(|| fail(format!("missing value for {option}")))?;
+        pos += 1;
+        match option {
+            "--input" => {
+                if input_seen {
+                    return Err(fail("--input given twice"));
+                }
+                input_seen = true;
+                let values: Vec<&str> = if value.is_empty() {
+                    Vec::new()
+                } else {
+                    value.split(',').collect()
+                };
+                if values.len() != oracle.params[0].len() {
+                    return Err(fail("§5.1: oracle input count differs from signature"));
+                }
+                vectors = values
+                    .iter()
+                    .zip(&oracle.params[0])
+                    .map(|(raw, p)| vector_input(p.ty.width(program.ptr_width)? as usize, raw))
+                    .collect::<Result<_>>()?;
+            }
+            "--budget" => limits = budget(value, limits)?,
+            "--steps" => {
+                steps = Some(uint(value).and_then(|n| u64::try_from(n).map_err(fail))?);
+            }
+            "--mem" => {
+                let (region, hex) = value
+                    .split_once('=')
+                    .ok_or_else(|| fail("--mem requires name=hex"))?;
+                if regions.insert(region.into(), parse_hex(hex)?).is_some() {
+                    return Err(fail("duplicate --mem region"));
+                }
+            }
+            "--arg" => {
+                let arg = if let Some(s) = value.strip_prefix("token:") {
+                    Argument::Token(budget(s, limits)?)
+                } else if let Some(s) = value.strip_prefix("f64:") {
+                    Argument::Float(s.parse().map_err(fail)?)
+                } else {
+                    Argument::Bits(uint(value)?)
+                };
+                arguments.push(arg);
+            }
+            _ => return Err(fail(format!("unknown option {option}"))),
+        }
+    }
+    if !input_seen && !oracle.params[0].is_empty() {
+        return Err(fail("§5.1: oracle input count differs from signature"));
+    }
+    for p in &oracle.params[3] {
+        if !regions.contains_key(&p.name) {
+            let Type::Region(a, _) = p.ty else {
+                return Err(fail("§5.1: mem slot requires region type"));
+            };
+            let n = (a < 64)
+                .then(|| 1usize.checked_shl(a as u32))
+                .flatten()
+                .ok_or_else(|| fail("host limit: interface region exceeds host memory"))?;
+            let mut zero = Vec::new();
+            zero.try_reserve_exact(n).map_err(fail)?;
+            zero.resize(n, 0);
+            regions.insert(p.name.clone(), zero);
+        }
+    }
+    Ok(OracleOptions {
+        input: OracleVectorInput {
+            ins: vectors,
+            args: arguments,
+            regions,
+        },
+        limits,
+        steps,
+    })
+}
+fn reverse_oracle(program: &Object, name: &str, options: OracleOptions) -> Result<Json> {
+    let limits = options.limits;
+    let prefix = options.steps.unwrap_or(limits.steps);
+    if prefix > limits.steps {
+        return Err(fail(format!(
+            "§5.4: reverse prefix of {prefix} steps exceeds budget B={} (the machine retains B frames, §3.6)",
+            limits.steps
+        )));
+    }
+    let mut machine = OracleVectorMachine::new(program, name, &options.input, limits)?;
+    let entry = machine.snapshot();
+    for _ in 0..prefix {
+        machine.forward_step()?;
+    }
+    let outcome = machine.outcome()?;
+    for _ in 0..prefix {
+        machine.inverse_step()?;
+    }
+    let after = machine.snapshot();
+    let equals = after == entry;
+    let locations = object(
+        after
+            .locations()
+            .into_iter()
+            .map(|((f, n), v)| (format!("{f}.{n}"), vector_number(&v))),
+    );
+    let state = object([
+        (
+            "counters".into(),
+            Json::Array(after.counter_values().iter().map(vector_number).collect()),
+        ),
+        ("faulted".into(), Json::Bool(after.faulted)),
+        ("locations".into(), locations),
+        ("pc".into(), number(after.pc as u128)),
+        ("pc_prime".into(), number(after.pc_prime as u128)),
+    ]);
+    Ok(object([
+        (
+            "budget".into(),
+            object([
+                ("depth".into(), number(limits.depth)),
+                ("heap".into(), number(limits.heap)),
+                ("stack".into(), number(limits.stack)),
+                ("steps".into(), number(limits.steps as u128)),
+            ]),
+        ),
+        ("code".into(), vector_number(&outcome.code)),
+        ("equals_entry".into(), Json::Bool(equals)),
+        (
+            "first_difference".into(),
+            entry
+                .first_difference(&after)
+                .map(string)
+                .unwrap_or(Json::Null),
+        ),
+        ("forward_steps".into(), number(prefix as u128)),
+        ("frames_clean".into(), Json::Bool(machine.frames_clean())),
+        ("oracle".into(), string(name)),
+        ("payload".into(), vector_number(&outcome.payload)),
+        ("reverse_steps".into(), number(prefix as u128)),
+        ("state_after_reversal".into(), state),
+        (
+            "status".into(),
+            string(if equals { "REVERSED" } else { "FAILED" }),
+        ),
+        ("steps".into(), number(outcome.steps as u128)),
+    ]))
+}
+fn reverse_action(program: &Object, name: &str, options: ActionOptions) -> Result<Json> {
+    let f = program
+        .functions
+        .get(name)
+        .filter(|f| matches!(f.kind.as_str(), "action" | "perm_action"))
+        .ok_or_else(|| fail(format!("§5.3: unknown action @{name}")))?;
+    let mut run = build_action_state(program, f, &options)?;
+    let entry_state = run.state.clone();
+    program.execute_action(name, &mut run.state, &run.bindings, options.adjoint, &[])?;
+    let forward_state = action_state_json(&run)?;
+    program.execute_action(name, &mut run.state, &run.bindings, !options.adjoint, &[])?;
+    let state = action_state_json(&run)?;
+    let equals = run.state == entry_state;
+    Ok(object([
+        ("action".into(), string(name)),
+        ("adjoint".into(), Json::Bool(options.adjoint)),
+        ("equals_entry".into(), Json::Bool(equals)),
+        (
+            "first_difference".into(),
+            if equals {
+                Json::Null
+            } else {
+                first_state_difference(&entry_state, &run.state, run.interface_wires.len())
+                    .map(string)
+                    .unwrap_or(Json::Null)
+            },
+        ),
+        ("forward_state".into(), forward_state),
+        ("in".into(), bundles_json(&run.state, &run.in_bundles)),
+        ("mut".into(), bundles_json(&run.state, &run.mut_bundles)),
+        ("state".into(), state),
+        (
+            "status".into(),
+            string(if equals { "REVERSED" } else { "FAILED" }),
+        ),
+        ("wires".into(), number(run.interface_wires.len() as u128)),
+    ]))
+}
+fn reverse(program: &Object, name: &str, args: &[String]) -> Result<Json> {
+    let f = program
+        .functions
+        .get(name)
+        .ok_or_else(|| fail(format!("§5.1: unknown symbol @{name}")))?;
+    match f.kind.as_str() {
+        "cc" | "r" => {
+            let options = parse_cc_options(program, "reverse", args, 3)?;
+            reverse_cc(program, name, options)
+        }
+        "oracle" => {
+            let options = parse_oracle_options(program, name, args, 3)?;
+            reverse_oracle(program, name, options)
+        }
+        "action" | "perm_action" => {
+            let options = parse_action_options(args, 3)?;
+            reverse_action(program, name, options)
+        }
+        other => Err(fail(format!(
+            "§5.1: reverse does not apply to {other} symbol @{name}"
+        ))),
+    }
+}
 fn main() {
     if let Err(e) = run() {
         eprintln!("{e}");
@@ -739,7 +1466,16 @@ fn run() -> Result<()> {
         return Ok(());
     }
     let command = args[0].as_str();
-    if !["check", "hash", "run-oracle", "step-check", "run-cc"].contains(&command) {
+    if ![
+        "check",
+        "hash",
+        "run-oracle",
+        "step-check",
+        "run-cc",
+        "reverse",
+    ]
+    .contains(&command)
+    {
         return Err(fail(format!("unknown subcommand {}\n{USAGE}", args[0])));
     }
     let path = args.get(1).ok_or_else(|| fail(USAGE))?;
@@ -788,6 +1524,15 @@ fn run() -> Result<()> {
             ])
             .canonical()
         );
+        return Ok(());
+    }
+    if command == "reverse" {
+        let name = args
+            .get(2)
+            .ok_or_else(|| fail(USAGE))?
+            .trim_start_matches('@');
+        program.check_hashes()?;
+        println!("{}", reverse(&program, name, &args)?.canonical());
         return Ok(());
     }
     if command == "run-cc" {

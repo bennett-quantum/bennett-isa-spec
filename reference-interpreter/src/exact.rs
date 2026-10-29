@@ -405,6 +405,46 @@ impl Amplitude {
     }
 }
 
+/// A finite binary64 as the dyadic rational it denotes exactly.
+fn dyadic_from_f64(v: f64) -> Option<Dyadic> {
+    if !v.is_finite() {
+        return None;
+    }
+    if v == 0.0 {
+        return Some(Dyadic::default());
+    }
+    let bits = v.to_bits();
+    let negative = bits >> 63 == 1;
+    let exponent = ((bits >> 52) & 0x7ff) as i64;
+    let fraction = (bits & ((1u64 << 52) - 1)) as i128;
+    // v = mantissa * 2^e with e >= -1074 (subnormals have no implicit bit).
+    let (mantissa, e) = if exponent == 0 {
+        (fraction, -1074i64)
+    } else {
+        (fraction | (1i128 << 52), exponent - 1075)
+    };
+    let n = BigInt::from_i128(if negative { -mantissa } else { mantissa });
+    Some(if e >= 0 {
+        Dyadic {
+            n: n.shl(e as u64),
+            k: 0,
+        }
+        .normalize()
+    } else {
+        Dyadic { n, k: (-e) as u64 }.normalize()
+    })
+}
+/// The exact amplitude of a pair of finite binary64 values (each denotes a
+/// dyadic rational, held exactly; the pair is zero iff both are zero).
+pub fn amplitude_from_f64(re: f64, im: f64) -> Option<Amplitude> {
+    Some(Amplitude::constant(Coefficient::new(
+        dyadic_from_f64(re)?,
+        Dyadic::default(),
+        dyadic_from_f64(im)?,
+        Dyadic::default(),
+    )))
+}
+
 /// Exact entries of the §4.4 gates. `m` is theta * 2^1074 (theta/2 in units
 /// of 2^-1075) for the rotations.
 pub fn rotation_exponent(theta: f64) -> Option<BigInt> {

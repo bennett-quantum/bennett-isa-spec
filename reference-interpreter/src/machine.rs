@@ -182,6 +182,121 @@ pub struct BasisVectorConfiguration {
 }
 pub type BasisConfiguration = BasisVectorConfiguration;
 impl BasisVectorConfiguration {
+    /// The five §3.7 counters (heap_used, atop, sp, fp, depth) at their
+    /// derived widths, without a u128 narrowing.
+    pub fn counter_values(&self) -> [BitVector; 5] {
+        [
+            self.heap_used.clone(),
+            self.atop.clone(),
+            self.sp.clone(),
+            self.fp.clone(),
+            self.depth.clone(),
+        ]
+    }
+    /// Every location of the tuple, keyed (function, name), in sorted order.
+    pub fn locations(&self) -> Vec<((String, String), BitVector)> {
+        self.locations
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
+    }
+    /// A description of the first component in which `other` differs from
+    /// `self` (locations, stack, step state, counters, memory, frames), or
+    /// None when the complete §3.2 tuples are equal.
+    pub fn first_difference(&self, other: &Self) -> Option<String> {
+        let keys: std::collections::BTreeSet<&(String, String)> = self
+            .locations
+            .keys()
+            .chain(other.locations.keys())
+            .collect();
+        for key in keys {
+            if self.locations.get(key) != other.locations.get(key) {
+                return Some(format!(
+                    "location {}.{}: {} differs from {}",
+                    key.0,
+                    key.1,
+                    self.locations
+                        .get(key)
+                        .map(BitVector::to_decimal)
+                        .unwrap_or_else(|| "<absent>".into()),
+                    other
+                        .locations
+                        .get(key)
+                        .map(BitVector::to_decimal)
+                        .unwrap_or_else(|| "<absent>".into())
+                ));
+            }
+        }
+        let cells: std::collections::BTreeSet<u128> = self
+            .stack
+            .keys()
+            .chain(other.stack.keys())
+            .copied()
+            .collect();
+        for cell in cells {
+            if self.stack.get(&cell) != other.stack.get(&cell) {
+                return Some(format!("stack cell {cell} differs"));
+            }
+        }
+        if self.pc != other.pc || self.pc_prime != other.pc_prime || self.faulted != other.faulted {
+            return Some(format!(
+                "step state: pc {} / pc' {} / faulted {} differs from pc {} / pc' {} / faulted {}",
+                self.pc, self.pc_prime, self.faulted, other.pc, other.pc_prime, other.faulted
+            ));
+        }
+        for (name, a, b) in [
+            ("code", &self.code, &other.code),
+            ("result_val", &self.result_val, &other.result_val),
+            ("heap_used", &self.heap_used, &other.heap_used),
+            ("atop", &self.atop, &other.atop),
+            ("sp", &self.sp, &other.sp),
+            ("fp", &self.fp, &other.fp),
+            ("depth", &self.depth, &other.depth),
+        ] {
+            if a != b {
+                return Some(format!(
+                    "counter {name}: {} differs from {}",
+                    a.to_decimal(),
+                    b.to_decimal()
+                ));
+            }
+        }
+        if self.memory != other.memory {
+            let addresses: std::collections::BTreeSet<u128> = self
+                .memory
+                .bytes
+                .keys()
+                .chain(other.memory.bytes.keys())
+                .copied()
+                .collect();
+            for address in addresses {
+                if self.memory.byte(address) != other.memory.byte(address) {
+                    return Some(format!(
+                        "memory byte at address {address}: {} differs from {}",
+                        self.memory.byte(address),
+                        other.memory.byte(address)
+                    ));
+                }
+            }
+            return Some("memory allocation state differs".to_string());
+        }
+        for (i, (a, b)) in self.frames.iter().zip(&other.frames).enumerate() {
+            if a != b {
+                return Some(format!(
+                    "frame {i}: old_pc {} / flag {} / succ {} differs from old_pc {} / flag {} / succ {}",
+                    a.old_pc, a.flag, a.succ, b.old_pc, b.flag, b.succ
+                ));
+            }
+        }
+        if self.frames.len() != other.frames.len() {
+            return Some(format!(
+                "frame count: {} differs from {}",
+                self.frames.len(),
+                other.frames.len()
+            ));
+        }
+        None
+    }
     pub fn counters(&self) -> Result<[u128; 5]> {
         Ok([
             self.heap_used.to_u128()?,

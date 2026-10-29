@@ -142,7 +142,9 @@ impl Object {
             })
             .collect()
     }
-    fn borrow_capacity(&self, root: &str) -> Result<usize> {
+    /// The number of borrowed wires an action body's `qborrow` rows can
+    /// draw from its caller's idle pool (§5.6), summed over the call closure.
+    pub fn borrow_capacity(&self, root: &str) -> Result<usize> {
         fn scan(seq: &[Instruction], count: &mut usize, children: &mut Vec<String>) -> Result<()> {
             for i in seq {
                 if i.op == "qborrow" {

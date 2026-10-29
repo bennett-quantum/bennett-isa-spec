@@ -339,6 +339,50 @@ impl QuantumState {
         }
         Ok(out)
     }
+    /// Replaces the state over the currently allocated wires with the
+    /// given sparse superposition (bit i is wire position i, allocation
+    /// order). Every binary64 amplitude is held exactly as its dyadic
+    /// value in the shadow. An empty list, a zero amplitude, a duplicate
+    /// component or a wrong bit count is an error (§14.2); normalisation
+    /// is the caller's to provide and is never imposed silently.
+    pub fn set_state_vector(&mut self, components: &[(Vec<bool>, Complex)]) -> Result<()> {
+        if components.is_empty() {
+            return err("§14.2", "a state vector needs at least one component");
+        }
+        let mut amplitudes: BTreeMap<Key, (Complex, Amplitude)> = BTreeMap::new();
+        for (bits, amp) in components {
+            if bits.len() != self.ids.len() {
+                return err(
+                    "§14.2",
+                    format!(
+                        "state component has {} bits for {} wires",
+                        bits.len(),
+                        self.ids.len()
+                    ),
+                );
+            }
+            let exact = exact::amplitude_from_f64(amp.re, amp.im)
+                .ok_or_else(|| Error("§14.2: non-finite amplitude".into()))?;
+            if exact.is_zero() {
+                return err("§14.2", "state component with zero amplitude");
+            }
+            if amplitudes.insert(key_of(bits), (*amp, exact)).is_some() {
+                return err("§14.2", "duplicate state component");
+            }
+        }
+        if amplitudes.len() == 1 {
+            let (bits, amp) = &components[0];
+            let (_, exact) = amplitudes.into_values().next().expect("one component");
+            self.state = State::Basis {
+                bits: bits.clone(),
+                phase: *amp,
+                exact,
+            };
+        } else {
+            self.state = State::Vector { amplitudes };
+        }
+        Ok(())
+    }
     /// The exact support as (basis bits, approximate amplitude), for diagnostics.
     pub fn exact_support(&self) -> Vec<(Vec<bool>, (f64, f64))> {
         let n = self.ids.len();

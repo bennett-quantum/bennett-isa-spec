@@ -265,3 +265,216 @@ fn run_cc_rejects_bad_entries_and_arguments_loudly() {
         "--args",
     );
 }
+
+#[test]
+fn reverse_cc_restores_the_entry_state_after_effects() {
+    // Whole-run reversal (§7.4 LIFO history traversal, §10 bennett_reverse,
+    // T4): the effects run of 11 instructions (const, alloc, const, the
+    // sector const and 5 effects, load, ret) is undone frame by frame, so
+    // the console is empty again, the clock returns to 0, the formerly
+    // absent block sector is absent again, and the whole snapshot equals
+    // the entry snapshot.
+    let v = ok(&[
+        "reverse",
+        &fixture("classical"),
+        "effects",
+        "--args",
+        "",
+        "--entropy",
+        "0b1621",
+    ]);
+    assert_eq!(text(&v, "status"), "REVERSED");
+    assert_eq!(uint(&v, "steps"), 11);
+    assert_eq!(
+        array(&v, "results").iter().map(result).collect::<Vec<_>>(),
+        [("i64".to_string(), "0".to_string())]
+    );
+    assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
+    assert_eq!(field(&v, "memory_equals_entry"), &Json::Bool(true));
+    assert_eq!(field(&v, "first_difference"), &Json::Null);
+    assert_eq!(text(&v, "console"), "");
+    assert_eq!(text(&v, "console_hex"), "");
+    assert_eq!(uint(&v, "clock"), 0);
+    assert_eq!(uint(&v, "effect_tape_length"), 0);
+    assert_eq!(text(&v, "memory_digest"), text(&v, "entry_memory_digest"));
+    // The forward run's memory digest differs from the entry digest, so the
+    // equality above is a restoration, not an untouched run.
+    let forward = ok(&[
+        "run-cc",
+        &fixture("classical"),
+        "effects",
+        "--args",
+        "",
+        "--entropy",
+        "0b1621",
+    ]);
+    assert_ne!(text(&forward, "memory_digest"), text(&v, "memory_digest"));
+}
+
+#[test]
+fn reverse_cc_prefix_stops_and_reverses_mid_run() {
+    // --steps 5 runs the first five instructions of @sum(3) (const, const,
+    // br, icmp, br -- still inside the loop), then reverses that prefix.
+    let v = ok(&[
+        "reverse",
+        &fixture("classical"),
+        "sum",
+        "--args",
+        "3",
+        "--steps",
+        "5",
+    ]);
+    assert_eq!(text(&v, "status"), "REVERSED");
+    assert_eq!(uint(&v, "steps"), 5);
+    assert_eq!(array(&v, "results").len(), 0);
+    assert_eq!(field(&v, "fault"), &Json::Null);
+    assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
+}
+
+#[test]
+fn reverse_cc_measurement_is_not_reversible() {
+    // registers.bisa @measurement measures a Bell pair; §10 reverse
+    // eligibility excludes any run containing measure (E_NOT_REVERSIBLE).
+    fails(
+        &[
+            "reverse",
+            &fixture("registers"),
+            "measurement",
+            "--args",
+            "",
+            "--draws",
+            "0.1",
+        ],
+        "E_NOT_REVERSIBLE",
+    );
+}
+
+#[test]
+fn reverse_oracle_prefix_reversal_restores_the_basis_tuple() {
+    // §14.1/§3.6 prefix reversal of inc8 at B = 3: three forward steps give
+    // F_3(8) = 9, code 0; three inverse steps restore the complete entry
+    // tuple (pc 0, all §3.7 counters 0, x = 8, regs one = r = 0) with every
+    // frame clean (T2).
+    let v = ok(&[
+        "reverse",
+        &fixture("inc8"),
+        "inc8",
+        "--input",
+        "8",
+        "--budget",
+        "3",
+    ]);
+    assert_eq!(text(&v, "status"), "REVERSED");
+    assert_eq!(uint(&v, "payload"), 9);
+    assert_eq!(uint(&v, "code"), 0);
+    assert_eq!(uint(&v, "steps"), 3);
+    assert_eq!(uint(&v, "reverse_steps"), 3);
+    assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
+    assert_eq!(field(&v, "frames_clean"), &Json::Bool(true));
+    assert_eq!(field(&v, "first_difference"), &Json::Null);
+    let state = field(&v, "state_after_reversal");
+    assert_eq!(uint(state, "pc"), 0);
+    assert_eq!(field(state, "faulted"), &Json::Bool(false));
+    assert_eq!(
+        array(state, "counters")
+            .iter()
+            .map(|c| c.uint().unwrap())
+            .collect::<Vec<_>>(),
+        [0, 0, 0, 0, 0]
+    );
+    let locations = field(state, "locations");
+    assert_eq!(locations.get("inc8.x").unwrap().uint().unwrap(), 8);
+    assert_eq!(locations.get("inc8.one").unwrap().uint().unwrap(), 0);
+    assert_eq!(locations.get("inc8.r").unwrap().uint().unwrap(), 0);
+    // At prefix 2 of the same budget the commit is not at HALT, so the code
+    // is FAULT_BUDGET_STEPS (1) with payload 0, as run-oracle reports for
+    // F_2; the two inverse steps still restore the entry tuple.
+    let prefix = ok(&[
+        "reverse",
+        &fixture("inc8"),
+        "inc8",
+        "--input",
+        "8",
+        "--budget",
+        "3",
+        "--steps",
+        "2",
+    ]);
+    assert_eq!(uint(&prefix, "payload"), 0);
+    assert_eq!(uint(&prefix, "code"), 1);
+    assert_eq!(uint(&prefix, "steps"), 2);
+    assert_eq!(uint(&prefix, "reverse_steps"), 2);
+    assert_eq!(field(&prefix, "equals_entry"), &Json::Bool(true));
+}
+
+#[test]
+fn reverse_action_adjoint_returns_to_the_entry_state() {
+    // actions.bisa @bell applies h t[0]; cx t[0] t[1] to the mut bundle t
+    // (in bundle p untouched). From |0000> over the interface order
+    // (t0, t1, p0, p1) the forward state is (|0000> + |1100>)/sqrt(2); the
+    // adjoint then restores |0000> exactly (§10: top-level Q calls reverse
+    // by adjoint).
+    let v = ok(&[
+        "reverse",
+        &fixture("actions"),
+        "bell",
+        "--mut",
+        "0",
+        "--in",
+        "0",
+    ]);
+    assert_eq!(text(&v, "status"), "REVERSED");
+    assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
+    assert_eq!(field(&v, "first_difference"), &Json::Null);
+    let forward = field(&v, "forward_state").object().unwrap();
+    assert_eq!(forward.len(), 2);
+    for key in ["0000", "1100"] {
+        let amp = forward[key].array().unwrap();
+        let re: f64 = amp[0].canonical().parse().unwrap();
+        assert!(
+            (re - std::f64::consts::FRAC_1_SQRT_2).abs() < 1e-12,
+            "{key}: {re}"
+        );
+    }
+    let state = field(&v, "state").object().unwrap();
+    assert_eq!(state.len(), 1);
+    let amp = state["0000"].array().unwrap();
+    assert_eq!(amp[0].canonical(), "1");
+    assert_eq!(amp[1].canonical(), "0");
+}
+
+#[test]
+fn reverse_rejects_unknown_symbols_and_bad_prefixes() {
+    fails(
+        &["reverse", &fixture("classical"), "missing", "--args", ""],
+        "§",
+    );
+    // A prefix longer than the oracle budget cannot run (B frames, §3.6).
+    fails(
+        &[
+            "reverse",
+            &fixture("inc8"),
+            "inc8",
+            "--input",
+            "8",
+            "--budget",
+            "2",
+            "--steps",
+            "3",
+        ],
+        "§5.4",
+    );
+    // run-cc does not take --steps.
+    fails(
+        &[
+            "run-cc",
+            &fixture("classical"),
+            "sum",
+            "--args",
+            "3",
+            "--steps",
+            "2",
+        ],
+        "--steps is a reverse option",
+    );
+}
