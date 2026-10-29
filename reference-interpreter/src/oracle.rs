@@ -215,9 +215,16 @@ impl<'a> Program<'a> {
         if !closure.is_empty() {
             let identity = object.identity()?;
             closure.sort_by(|a, b| {
-                identity.closure_hashes[a]
-                    .cmp(&identity.closure_hashes[b])
-                    .then(a.cmp(b))
+                let key = |n: &String| {
+                    if identity.scc_members[n].len() > 1 {
+                        identity.scc_hashes[n].as_str()
+                    } else {
+                        identity.closure_hashes[n]
+                            .as_deref()
+                            .expect("defined lproc closure")
+                    }
+                };
+                key(a).cmp(key(b)).then(a.cmp(b))
             });
         }
         let order = std::iter::once(&oracle.name).chain(closure.iter());

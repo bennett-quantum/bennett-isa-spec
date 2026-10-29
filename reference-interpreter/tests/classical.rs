@@ -60,3 +60,25 @@ fn faults_are_atomic_terminal_and_reversible() {
         assert_eq!(m.snapshot(), before, "{name}");
     }
 }
+
+#[test]
+fn host_request_reply_records_full_length_and_reverses_bytes() {
+    let o = Object::parse(include_str!("fixtures/classical.bisa")).unwrap();
+    let mut m = ClassicalMachine::new(&o, "host", &[], &[]).unwrap();
+    let before = m.snapshot();
+    let waiting = m.run(100).unwrap();
+    let request = waiting.request.unwrap();
+    assert_eq!(request.service, "org.bennett.test");
+    assert_eq!(request.payload, [165, 0, 0]);
+    m.reply(&[17, 34, 51, 68, 85]).unwrap();
+    assert_eq!(m.memory_bytes(request.address, 3).unwrap(), [17, 34, 51]);
+    let result = m.run(100).unwrap();
+    assert_eq!(result.values, vec![ClassicalValue::int(16, 5).unwrap()]);
+    m.reverse().unwrap();
+    assert_eq!(m.snapshot(), before);
+    assert!(m.reply(&[]).is_err());
+    let mut invalid = ClassicalMachine::new(&o, "host_invalid", &[], &[]).unwrap();
+    let result = invalid.run(100).unwrap();
+    assert_eq!(result.fault, Some(7));
+    assert!(result.request.is_none());
+}

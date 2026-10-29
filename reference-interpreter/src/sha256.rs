@@ -42,8 +42,8 @@ pub fn sha256(input: &[u8]) -> [u8; 32] {
             bytes[56..].copy_from_slice(&length.to_be_bytes());
         }
         let mut w = [0u32; 64];
-        for (i, chunk) in bytes.chunks_exact(4).enumerate() {
-            w[i] = u32::from_be_bytes(chunk.try_into().expect("four bytes"));
+        for (i, chunk) in bytes.as_chunks::<4>().0.iter().enumerate() {
+            w[i] = u32::from_be_bytes(*chunk);
         }
         for t in 16..64 {
             let s0 = w[t - 15].rotate_right(7) ^ w[t - 15].rotate_right(18) ^ (w[t - 15] >> 3);
@@ -79,7 +79,7 @@ pub fn sha256(input: &[u8]) -> [u8; 32] {
         }
     }
     let mut out = [0; 32];
-    for (bytes, n) in out.chunks_exact_mut(4).zip(h) {
+    for (bytes, n) in out.as_chunks_mut::<4>().0.iter_mut().zip(h) {
         bytes.copy_from_slice(&n.to_be_bytes());
     }
     out

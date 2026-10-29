@@ -112,3 +112,73 @@ fn reference_order_and_self_scc_are_observable() {
         shifted.interface_hashes["zero"]
     );
 }
+
+#[test]
+fn unmodelled_effect_is_hashable_and_keeps_its_fault_semantics() {
+    let o = Object::parse(include_str!("fixtures/classical.bisa")).unwrap();
+    let identity = o.identity().unwrap();
+    assert!(identity.envelopes["g"].contains("device clock {\"version\":\"0.8\"}\n"));
+    assert!(!identity.envelopes["unknown_effect"].contains("device missing"));
+}
+
+#[test]
+fn mutual_scc_hashing_and_canonical_lproc_member_order() {
+    use bennett_isa_ref::{Budget, OracleInput};
+    let o = Object::parse(include_str!("fixtures/mutual.bisa")).unwrap();
+    let id = o.identity().unwrap();
+    assert!(
+        id.interface_hashes["f"] > id.interface_hashes["g"],
+        "fixture must expose sorting by member hashes"
+    );
+    let digest = sha256_hex(format!("{}{}", id.envelopes["f"], id.envelopes["g"]).as_bytes());
+    assert_eq!(
+        id.interface_hashes["f"],
+        sha256_hex(format!("{digest}:0").as_bytes())
+    );
+    assert_eq!(
+        id.interface_hashes["g"],
+        sha256_hex(format!("{digest}:1").as_bytes())
+    );
+    assert!(id.envelopes["f"].contains("lift.call @$1"));
+    assert!(id.envelopes["g"].contains("lift.call @$0"));
+    let r = o
+        .run_oracle(
+            "main",
+            &OracleInput::bits(&[]),
+            Budget {
+                steps: 20,
+                heap: 0,
+                stack: 32,
+                depth: 8,
+            },
+        )
+        .unwrap();
+    assert_eq!((r.payload, r.code), (4, 0));
+}
+
+#[test]
+fn every_committed_fixture_has_valid_identity() {
+    for name in [
+        "inc8",
+        "sum_db",
+        "arithmetic",
+        "heap",
+        "nested",
+        "classical",
+        "actions",
+        "mutual",
+    ] {
+        let path = format!("{}/tests/fixtures/{name}.bisa", env!("CARGO_MANIFEST_DIR"));
+        let text = std::fs::read_to_string(path).unwrap();
+        Object::parse(&text)
+            .unwrap()
+            .check_hashes()
+            .unwrap_or_else(|e| panic!("{name}: {e}"));
+    }
+    // Independently hand-assembled device/layout envelope, checked by Python hashlib.
+    let o = Object::parse(include_str!("fixtures/classical.bisa")).unwrap();
+    assert_eq!(
+        o.identity().unwrap().interface_hashes["g"],
+        "e8a3dc5429049b16559aa6a4262779e3dcd37a758967def4e08c371a5b765fff"
+    );
+}

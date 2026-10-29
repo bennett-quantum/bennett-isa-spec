@@ -10,6 +10,7 @@ mod quantum;
 mod sha256;
 mod validation;
 pub use classical::{ClassicalMachine, ClassicalOutcome, ClassicalSnapshot, ClassicalValue};
+pub use classical::{HostExchange, HostRequest};
 pub use identity::Identity;
 pub use machine::{BasisConfiguration, OracleMachine};
 pub use object::*;

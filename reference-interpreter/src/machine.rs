@@ -112,9 +112,9 @@ impl<'a> OracleMachine<'a> {
         for (f, _) in &program.rows {
             for p in f.locations() {
                 let key = (f.name.clone(), p.name.clone());
-                if !locations.contains_key(&key) {
-                    ids.push(key.clone());
-                    locations.insert(key, 0);
+                if let std::collections::btree_map::Entry::Vacant(entry) = locations.entry(key) {
+                    ids.push(entry.key().clone());
+                    entry.insert(0);
                 }
             }
         }

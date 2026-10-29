@@ -72,6 +72,7 @@ pub struct ClassicalSnapshot {
     next_id: u64,
     fault: Option<u128>,
     finished: Option<Vec<ClassicalValue>>,
+    pending: Option<HostRequest>,
 }
 #[derive(Clone, Debug)]
 struct Undo {
@@ -85,6 +86,7 @@ struct Undo {
     tape: bool,
     fault: Option<u128>,
     finished: Option<Vec<ClassicalValue>>,
+    pending: Option<HostRequest>,
 }
 #[derive(Clone, Debug)]
 enum DeviceUndo {
@@ -100,6 +102,7 @@ struct HistoryFrame {
     marker: bool,
     pure: bool,
     irreversible: bool,
+    host: Option<HostExchange>,
 }
 #[derive(Clone, Debug)]
 struct Segment {
@@ -115,6 +118,20 @@ pub struct ClassicalOutcome {
     pub fault: Option<u128>,
     pub trapped: bool,
     pub steps: u64,
+    pub request: Option<HostRequest>,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HostRequest {
+    pub service: String,
+    pub payload: Vec<u8>,
+    pub address: u128,
+    pub capacity: u128,
+    result_name: String,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HostExchange {
+    pub request: HostRequest,
+    pub reply: Vec<u8>,
 }
 pub struct ClassicalMachine<'a> {
     object: &'a Object,
@@ -154,11 +171,11 @@ impl<'a> ClassicalMachine<'a> {
         if let Some(l) = object.section("layout") {
             if let Some(image) = l.object()?.get("block_image") {
                 let data = &object.data[image.string()?];
-                if data.len() % 512 != 0 {
+                if !data.len().is_multiple_of(512) {
                     return err("§7.3", "block image must have complete 512-byte sectors");
                 }
-                for (i, sector) in data.chunks_exact(512).enumerate() {
-                    devices.blocks.insert(i as u128, sector.into());
+                for (i, sector) in data.as_chunks::<512>().0.iter().enumerate() {
+                    devices.blocks.insert(i as u128, sector.to_vec());
                 }
             }
         }
@@ -177,6 +194,7 @@ impl<'a> ClassicalMachine<'a> {
             next_id: 1,
             fault: None,
             finished: None,
+            pending: None,
         };
         Ok(Self {
             object,
@@ -199,9 +217,58 @@ impl<'a> ClassicalMachine<'a> {
     pub fn effect_tape_len(&self) -> usize {
         self.state.devices.tape.len()
     }
+    pub fn memory_bytes(&self, address: u128, len: usize) -> Result<Vec<u8>> {
+        if !self.state.memory.valid(address, len as u128) {
+            return err("§7.1", "memory query outside live allocation");
+        }
+        Ok((0..len)
+            .map(|n| self.state.memory.byte(address + n as u128))
+            .collect())
+    }
+    pub fn host_transcript(&self) -> Vec<HostExchange> {
+        self.history.iter().filter_map(|h| h.host.clone()).collect()
+    }
+    pub fn reply(&mut self, payload: &[u8]) -> Result<()> {
+        let request = self
+            .state
+            .pending
+            .clone()
+            .ok_or_else(|| Error("§10: E_INVALID_STATE: no host request".into()))?;
+        if payload.len() as u128 & !mask(self.object.ptr_width) != 0 {
+            return err("§10", "E_ARG: reply length exceeds ptr_width");
+        }
+        let count = (payload.len() as u128).min(request.capacity) as usize;
+        let mut undo = self
+            .history
+            .last()
+            .ok_or_else(|| Error("§10: missing host frame".into()))?
+            .undo
+            .clone();
+        self.save_bytes(request.address, count, &mut undo);
+        for (n, b) in payload[..count].iter().enumerate() {
+            self.state.memory.set_byte(request.address + n as u128, *b);
+        }
+        self.define(
+            &request.result_name,
+            ClassicalValue::Int(self.object.ptr_width, payload.len() as u128),
+            &mut undo,
+        )?;
+        let frame = self.history.last_mut().expect("retained host frame");
+        frame.undo = undo;
+        frame
+            .host
+            .as_mut()
+            .ok_or_else(|| Error("§10: missing retained host request".into()))?
+            .reply = payload.to_vec();
+        self.state.pending = None;
+        Ok(())
+    }
     pub fn run(&mut self, max_steps: u64) -> Result<ClassicalOutcome> {
         let mut steps = 0;
-        while self.state.fault.is_none() && self.state.finished.is_none() {
+        while self.state.fault.is_none()
+            && self.state.finished.is_none()
+            && self.state.pending.is_none()
+        {
             if steps == max_steps {
                 return err(
                     "§3.4",
@@ -221,9 +288,13 @@ impl<'a> ClassicalMachine<'a> {
                     .last()
                     .is_some_and(|a| self.object.functions[&a.function].kind == "cc"),
             steps,
+            request: self.state.pending.clone(),
         })
     }
     pub fn reverse(&mut self) -> Result<()> {
+        if self.state.pending.is_some() {
+            return err("§10", "E_INVALID_STATE: host request is pending");
+        }
         if self.history.iter().any(|f| f.irreversible) {
             return err(
                 "§10",
@@ -330,6 +401,7 @@ impl<'a> ClassicalMachine<'a> {
         self.state.next_id = undo.next_id;
         self.state.fault = undo.fault;
         self.state.finished = undo.finished;
+        self.state.pending = undo.pending;
         Ok(())
     }
     fn undo_frame(&mut self, n: usize) -> Result<()> {
@@ -459,6 +531,7 @@ impl<'a> ClassicalMachine<'a> {
             tape: false,
             fault: self.state.fault,
             finished: self.state.finished.clone(),
+            pending: self.state.pending.clone(),
         };
         self.state.control.last_mut().expect("activation").ip += 1;
         let mut fault = None;
@@ -698,7 +771,23 @@ impl<'a> ClassicalMachine<'a> {
                     "effect" => fault = self.effect(&a[0], &a[1..], &mut undo)?,
                     "trap" => fault = Some(4),
                     "hostcall" => {
-                        return err("§10", "HOST_REQUEST/reply execution is not implemented yet")
+                        let address = self.bits(&a[1])?;
+                        let capacity = self.bits(&a[2])?;
+                        if !self.state.memory.valid(address, capacity) {
+                            fault = Some(7);
+                        } else {
+                            let count = usize::try_from(capacity).map_err(|_| {
+                                Error("§10: request exceeds host address space".into())
+                            })?;
+                            let payload = self.memory_bytes(address, count)?;
+                            self.state.pending = Some(HostRequest {
+                                service: a[0].clone(),
+                                payload,
+                                address,
+                                capacity,
+                                result_name: i.lhs[0].clone(),
+                            });
+                        }
                     }
                     "qreg.new" | "qreg.free" | "qreg.slice" | "qreg.concat" | "measure"
                     | "oracle_call" | "action_call" | "adj" | "ctl" => {
@@ -731,6 +820,10 @@ impl<'a> ClassicalMachine<'a> {
             marker,
             pure: pure && fault.is_none(),
             irreversible: false,
+            host: self.state.pending.clone().map(|request| HostExchange {
+                request,
+                reply: Vec::new(),
+            }),
         });
         Ok(())
     }

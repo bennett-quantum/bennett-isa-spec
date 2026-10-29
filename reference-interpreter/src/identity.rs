@@ -8,6 +8,8 @@ pub struct Identity {
     pub closure_hashes: BTreeMap<String, Option<String>>,
     pub envelopes: BTreeMap<String, String>,
     pub object_hash: String,
+    pub scc_members: BTreeMap<String, Vec<String>>,
+    pub scc_hashes: BTreeMap<String, String>,
 }
 
 /// Symbol reference tokens only: @ inside a quoted string is ordinary text.
@@ -88,6 +90,8 @@ impl Object {
         let mut hashes = BTreeMap::new();
         let mut closure = BTreeMap::new();
         let mut envelopes = BTreeMap::new();
+        let mut scc_members = BTreeMap::new();
+        let mut scc_hashes = BTreeMap::new();
         for (n, im) in &imports {
             let mut seed = n.as_bytes().to_vec();
             seed.push(0);
@@ -110,6 +114,8 @@ impl Object {
             let recursive = comp.len() > 1 || graph[&comp[0]].contains(&comp[0]);
             let scc = sha256_hex(envs.concat().as_bytes());
             for (i, n) in comp.iter().enumerate() {
+                scc_members.insert(n.clone(), comp.clone());
+                scc_hashes.insert(n.clone(), scc.clone());
                 let hash = if recursive {
                     sha256_hex(format!("{scc}:{i}").as_bytes())
                 } else {
@@ -148,6 +154,8 @@ impl Object {
             closure_hashes: closure,
             envelopes,
             object_hash: sha256_hex(canonical.as_bytes()),
+            scc_members,
+            scc_hashes,
         })
     }
     pub fn check_hashes(&self) -> Result<()> {
@@ -282,11 +290,17 @@ impl Object {
             let devices = self.section("devices");
             let mut entries = BTreeMap::new();
             for (group, key) in used {
-                let v = devices
-                    .ok_or_else(|| Error("§9.1: missing devices section".into()))?
-                    .get(group)?
-                    .get(&key)?;
-                entries.insert(key, v);
+                let entry = devices
+                    .map(|d| d.get(group).and_then(Json::object))
+                    .transpose()?
+                    .and_then(|entries| entries.get(&key));
+                if let Some(value) = entry {
+                    entries.insert(key, value);
+                } else if group == "services"
+                    || ["console", "clock", "entropy", "block"].contains(&key.as_str())
+                {
+                    return err("§9.1", format!("missing declared {group} entry {key}"));
+                }
             }
             for (key, v) in entries {
                 lines.push(format!("device {key} {}", v.canonical()));

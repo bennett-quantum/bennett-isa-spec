@@ -98,3 +98,29 @@ fn json_is_strict_and_canonical() {
         "{\"😀\":1,\"\u{e000}\":0}"
     );
 }
+
+#[test]
+fn empty_hex_data_and_canonical_type_widths() {
+    let data=format!("bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=32\n\nsection symbols\n{{\"0\":{{\"interface_hash\":\"{}\",\"kind\":\"data\",\"name\":\"empty\",\"signature\":{{\"abi\":\"0.8\",\"kind\":\"data\",\"size\":0,\"tier\":\"-\"}}}}}}\n\nsection data\nempty \n","0".repeat(64));
+    assert!(Object::parse(&data).unwrap().data["empty"].is_empty());
+    rejects(&INC.replace("reg[8]", "reg[08]"), "§3.3");
+}
+
+#[test]
+fn label_width_uses_reachable_closure_not_unrelated_functions() {
+    let raw = include_str!("fixtures/arithmetic.bisa");
+    let narrow = raw.replace(
+        "z:reg[8], p:reg[1], idx:reg[32], r:reg[8]",
+        "z:reg[8], p:reg[1], idx:reg[4], r:reg[8]",
+    );
+    // jump has ten rows, so 2^4 > 10, regardless of other independent oracles.
+    let object = Object::parse(&narrow).unwrap();
+    let result = object
+        .run_oracle(
+            "jump",
+            &bennett_isa_ref::OracleInput::bits(&[0, 0]),
+            bennett_isa_ref::Budget::steps(10),
+        )
+        .unwrap();
+    assert_eq!((result.payload, result.code), (42, 0));
+}

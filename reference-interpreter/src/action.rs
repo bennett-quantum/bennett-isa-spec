@@ -262,7 +262,7 @@ impl Object {
             .iter()
             .flat_map(|b| b.instructions.iter().cloned())
             .collect();
-        self.action_sequence(f, &instructions, q, &mut env, adjoint, controls)?;
+        self.action_sequence(&instructions, q, &mut env, adjoint, controls)?;
         if !env.predicates.is_empty() || !env.borrowed.is_empty() {
             return err("§5.1", "action exited with unclosed predicate/borrow frame");
         }
@@ -282,7 +282,6 @@ impl Object {
     }
     fn action_sequence(
         &self,
-        f: &Function,
         sequence: &[Instruction],
         q: &mut QuantumState,
         e: &mut Environment,
@@ -351,10 +350,10 @@ impl Object {
                     let w = e.scalar(&a[0])?;
                     let mut yes = context.clone();
                     yes.push((w, true));
-                    self.action_sequence(f, &i.bodies[0], q, e, adjoint, &yes)?;
+                    self.action_sequence(&i.bodies[0], q, e, adjoint, &yes)?;
                     let mut no = context.clone();
                     no.push((w, false));
-                    self.action_sequence(f, &i.bodies[1], q, e, adjoint, &no)?;
+                    self.action_sequence(&i.bodies[1], q, e, adjoint, &no)?;
                 }
                 "qloop" => {
                     let n = a[0]
@@ -362,7 +361,7 @@ impl Object {
                         .map_err(|_| Error("§4.6: loop bound exceeds host index space".into()))?;
                     if a.len() == 1 {
                         for _ in 0..n {
-                            self.action_sequence(f, &i.bodies[0], q, e, adjoint, &context)?;
+                            self.action_sequence(&i.bodies[0], q, e, adjoint, &context)?;
                         }
                     } else {
                         let condition = e.bundle(&a[2])?;
@@ -384,7 +383,7 @@ impl Object {
                             for j in (0..n).rev() {
                                 let mut c = context.clone();
                                 c.push((flags[j], true));
-                                self.action_sequence(f, &i.bodies[0], q, e, true, &c)?;
+                                self.action_sequence(&i.bodies[0], q, e, true, &c)?;
                             }
                         } else {
                             for j in 0..n {
@@ -401,7 +400,7 @@ impl Object {
                                 )?;
                                 let mut c = context.clone();
                                 c.push((flags[j], true));
-                                self.action_sequence(f, &i.bodies[0], q, e, false, &c)?;
+                                self.action_sequence(&i.bodies[0], q, e, false, &c)?;
                             }
                         }
                         for j in (0..n).rev() {
@@ -620,7 +619,7 @@ impl Object {
                     self.oracle_quantum(
                         gf,
                         q,
-                        &[x.clone()],
+                        std::slice::from_ref(&x),
                         &t,
                         &fault,
                         &BTreeMap::new(),

@@ -238,7 +238,7 @@ impl QuantumState {
             "x" | "h" | "s" | "sdg" | "t" | "tdg" | "rx" | "ry" | "rz" => 1,
             "cx" | "swap" | "cz" => 2,
             "ccx" => 3,
-            "mcx" if wires.len() >= 1 => wires.len(),
+            "mcx" if !wires.is_empty() => wires.len(),
             _ => return err("§4.4", format!("unknown gate {op}")),
         };
         if wires.len() != expected {

@@ -14,12 +14,12 @@ The existing crate contains only a version function and a skeleton test.
 | Deliverable | Status | Verification |
 | --- | --- | --- |
 | 1. Canonical parser and well-formedness | Partial: lexical/structural parser, types, lifted row schemas/scope, signatures, layout validation | 4 integration tests green |
-| 2. SHA-256, envelopes, SCC identity | Core implemented: four published hashes and both envelopes exact; broader SCC/import/link tests still needed | 4 integration tests green |
-| 3. Sequential reference interpreter, every lifted row | Partial: all arithmetic/control/memory/procedure rows and nested oracle calls execute; lift.perm_call awaits Q engine | 5 oracle tests green; full division sweep added |
-| 4. Literal reversible step machine and exhaustive comparisons | Partial: slot/exchange machine, C1–C5/R1–R5 and their inverses, ordinary rows and nested oracle engine implemented | 4 tests green, recursive sweep added |
-| 5. CC/R interpreter, tapes, history, uncall | Partial: classical rows, dynamic SSA, memory, four device models, tapes, segment/whole reversal | 3 tests green; hostcall/qreg/Q integration pending |
-| 6. Q simulator and static cleanup discipline | Pending | Pending |
-| 7. CLI and documentation | Pending | Pending |
+| 2. SHA-256, envelopes, SCC identity | Core implemented, including mutual SCCs and CC/R closures; imports/linking still incomplete | 7 identity tests green |
+| 3. Sequential reference interpreter, every lifted row | Every row has an implementation, including lift.perm_call; broader adversarial verification and unbounded bundle widths remain | 5 oracle tests plus Q lifted-call test green; full division sweep passed |
+| 4. Literal reversible step machine and exhaustive comparisons | Slot/exchange machine, C1–C5/R1–R5 and inverses, all rows implemented; full obligations not yet met | 4 normal tests and ignored recursive sweep passed |
+| 5. CC/R interpreter, tapes, history, uncall | Classical rows, dynamic SSA, memory, four device models, tapes, host request/reply, segment/whole reversal; qreg/Q integration pending | 4 classical tests green |
+| 6. Q simulator and static cleanup discipline | Basis/vector simulation and instruction paths implemented; borrow proofs and complete §6 checker remain | 5 Q tests green |
+| 7. CLI and documentation | Required commands plus hash implemented/documented; check depends on incomplete validator | 2 CLI tests green |
 
 ### Milestone: canonical core and identity
 
@@ -130,6 +130,135 @@ the clock's initial zero, and reverses to an absent sector map and empty tape.
 Next: Q basis/state-vector kernels and action execution, then CC hostcall and
 qreg/measurement integration; complete suite F, SCC/linking, CLI/docs. All
 seven statuses remain partial/pending until exhaustive obligations are met.
+
+### Milestone: Q execution and CLI
+
+Red: `cargo test --manifest-path reference-interpreter/Cargo.toml --offline
+--test quantum` failed before QuantumState/execute_action existed. Implemented
+src/quantum.rs and action.rs: complex amplitudes, allocation, controlled gates,
+copy/XOR/exchange, quantum memory and local images, predicate stacks, qif,
+bounded loops, coherent while flags, region calls/adjoints, qinplace expansion,
+borrow-pool binding and measurement branches. Some paths lack required tests,
+particularly borrow validity, qinplace certificates, nested controlled actions
+and coherent while loops. Do not interpret implemented paths as verified.
+
+Green: 5 Q tests pass for Bell/Born outcomes, every primitive gate/inverse,
+controlled global phase, >64-wire permutation fast path, clean release,
+action adjoints, copy/memory cleanup, loops, and lifted permutation calls.
+The lifted-call test first failed on the explicit missing-engine error; both
+sequential and reversible engines now execute it, with the adjoint on reversal.
+
+Red: `cargo test --manifest-path reference-interpreter/Cargo.toml --offline
+--test cli` failed before a binary existed. Green: check, hash, run-oracle and
+step-check now have passing process tests and README documentation. Full
+input/memory enumeration is capped (default 16 bits, configurable to 24) and
+never silently sampled; fixed regions are reported. Target/fault entry values
+are handled via their XOR-delivery law, not enumerated in this command.
+
+Hand check: Bell from |00> has amplitudes 1/sqrt(2) at indices 0 and 3 and
+Born probabilities 1/2 each. Controlled Rz(2*pi) contributes -1 on the enabled
+branch; H-control interference therefore yields control=1, explicitly tested.
+
+### Milestone: host requests, mutual SCCs, and fixture identities
+
+Host request test first failed with missing request/reply APIs. It now passes:
+request payload a5 00 00, reply 11 22 33 44 55, three-byte write 11 22 33,
+rlen=5, and complete prefix reversal. Null request pointers fault before any
+request. The transcript is retained. Reply-length overflow reading is question 8.
+
+Mutual SCC test first returned label 2 instead of hand-derived 4. Fixed canonical
+lproc order to keep SCC members in name/index order, with scc_hash group keys.
+The test independently derives both member hashes from concatenated envelopes.
+Both interpreters share Program's canonical layout; the hand-derived check is
+therefore essential and independent of their agreement.
+
+Unknown effects initially could execute fault 8 but could not hash. Regression
+failed with missing model entry; fixed per §17 (question 6). Independently
+assembled g's complete device/layout envelope in Python, checked SHA-256
+e8a3dc5429049b16559aa6a4262779e3dcd37a758967def4e08c371a5b765fff against Rust.
+Regenerated classical fixture hashes including new host procedures. A new test
+checks hashes of all eight fixture objects; no placeholder hashes remain.
+
+The empty-HEX regression first failed the global trailing-space rule. Resolved
+the grammar contradiction as question 9, accepting NAME SP LF only inside data
+for zero-byte images. Leading-zero type widths are now rejected.
+
+## Resume here: outstanding work, in priority order
+
+No user decision is required. Do not mark the job complete; no deliverable has
+its full verification obligation met yet. The entire ISA remains the scope.
+
+1. Finish suite F and identity/linking: imported callees currently fail operand
+   validation; implement resolution by signature, pinned closures, dedup and
+   conflicts. Deep schedule/certificate/coverage schemas and bindings, effective
+   inherited control checks, exact matched oracle_uncall discipline, frame
+   live ranges, handle lifetimes and borrow-frame proofs remain incomplete.
+   The current simple symbolic cleanup checker can reject valid adjoint
+   cleanup (e.g. H;H on allocated scratch) and is not the full §6 transfer.
+   It tracks loops only once statically and does not fully model cell versions.
+2. Type::parse currently limits wire/reg/region cell widths to 128 as well as
+   iN; the spec only explicitly bounds iN. Generalize bundle handling and
+   audit wider locations before declaring full-width support. JSON/JCS shortest
+   number corner cases and all integer spellings need expanded vectors.
+3. CC quantum integration: qreg.new/free/slice/concat, measurement and region
+   calls currently explicitly error in classical.rs. Implement handle states,
+   exclusive views, retained-history inverses, Born outcome selection, segment
+   prohibition on measure, whole-run reverse eligibility, and tests. Q kernels
+   and action/oracle execution already exist and should be reused, with inverse
+   region operations exactly once per history frame.
+4. Complete Q verification: borrowed systems plus an entangled reference,
+   translation-lemma positives and four required negatives, qinplace pair
+   certificates/full domain, qif, while loops, inherited controls, nested region
+   calls, local-image restoration and full cell-version cleanup obligations.
+   permutation_action_values currently does not supply a borrowed idle pool;
+   handle that according to the ABI once borrow validity is established.
+5. Strengthen machine verification at genuinely small interface widths over
+   complete D, including varied interface memory, nonzero target/fault values,
+   explicit commit gates, call/ret special cases and every first-fault boundary.
+   BasisConfiguration includes every internal mutable field; inverse code uses
+   no snapshot restoration. Machine logical counters use u128 containers;
+   audit their derived bit widths and generalized frame-slot sizing.
+6. Audit the rest of §8–§13 referenced schemas and interpreter-facing contracts;
+   do not assume the current shallow field checks implement target evaluation,
+   schedules, certificate checking or linking. Keep scope aligned with the job.
+7. Expand fixtures so every instruction/path (not just every opcode) and fault
+   has a hand-derived expected result, run all ignored sweeps after substantive
+   changes, complete README and only then mark deliverables done.
+
+Current source files: lib.rs, json.rs, object.rs, validation.rs, sha256.rs,
+identity.rs, oracle.rs (independent dynamic activations), machine.rs (literal
+slots and inverse steps), classical.rs (delta history), quantum.rs, action.rs,
+main.rs. Tests are integration tests in tests/*.rs. No dependencies were added.
+No git commands were run; spec/ and isa_check.py were not edited.
+
+### Latest regression and verification
+
+Added a failing narrow-label test: an independent jump oracle has ten rows and
+legally uses a 4-bit label location, despite many unrelated functions in the
+same object. It previously failed width validation. Fixed validation to count
+each reachable oracle/lproc closure (the largest applicable closure for a
+shared lproc), rather than all object functions. The test now passes and
+independently returns 42 on the zero branch.
+
+Before this last regression: complete `cargo test` passed 36 normal tests, no
+warnings; both ignored tests passed again (u8 divisions 2.08 sec, recursive
+prefixes 8.78 sec). `cargo clippy --manifest-path
+reference-interpreter/Cargo.toml --offline --all-targets -- -D warnings` and
+`cargo fmt --manifest-path reference-interpreter/Cargo.toml -- --check` passed.
+The unchanged Python seed passed. Final rerun results follow below.
+
+Final rerun after the label fix: `cargo test --manifest-path
+reference-interpreter/Cargo.toml --offline` PASSED, 37 normal integration tests,
+2 deliberately ignored sweeps, no warnings. `cargo test --manifest-path
+reference-interpreter/Cargo.toml --offline -- --ignored` PASSED both sweeps:
+262,144 u8 division cases in 1.45 sec; all recursive n/prefix cases in 6.76 sec.
+Clippy with `--offline --all-targets -- -D warnings` PASSED; fmt `-- --check`
+PASSED; unchanged Python seed PASSED. Direct documented CLI invocation of
+sum_db(3), db=1..16, B=1000/heap=4080/stack=512/depth=64 printed exactly
+`{"code":0,"payload":6,"steps":52}`, matching the hand derivation.
+
+This session is a verified intermediate implementation, not JOB-COMPLETE and
+not blocked on a user decision. Continue from the outstanding-work list above.
 
 Open specification readings are recorded in SPEC-QUESTIONS.md. No decision from
 the maintainer is currently required. In particular the printed 0.8 HALT idle

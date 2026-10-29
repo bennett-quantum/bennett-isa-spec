@@ -27,6 +27,9 @@ pub enum Type {
 impl Type {
     pub fn parse(s: &str) -> Result<Self> {
         let width = |s: &str| -> Result<u16> {
+            if !integer(s) || s.starts_with('-') {
+                return err("§3.3", "width must use canonical unsigned INT");
+            }
             let n = s
                 .parse::<u16>()
                 .map_err(|_| Error(format!("§3.3: invalid width {s}")))?;
@@ -387,15 +390,20 @@ fn instruction(lines: &[(usize, &str)], pos: &mut usize) -> Result<Instruction> 
 
 impl Object {
     pub fn parse(text: &str) -> Result<Self> {
-        if !text.ends_with('\n')
-            || text.contains('\r')
-            || text.contains('\t')
-            || text.lines().any(|s| s.ends_with(' '))
-        {
+        if !text.ends_with('\n') || text.contains('\r') || text.contains('\t') {
             return err(
                 "§16.1",
                 "object requires LF lines, no tabs or trailing spaces, and final LF",
             );
+        }
+        let mut data_section = false;
+        for line in text.lines() {
+            if let Some(section) = line.strip_prefix("section ") {
+                data_section = section == "data";
+            }
+            if line.ends_with(' ') && !(data_section && line.strip_suffix(' ').is_some_and(name)) {
+                return err("§16.1", "trailing space outside an empty HEX data line");
+            }
         }
         let lines: Vec<_> = text.lines().collect();
         let header = tokens(lines.first().copied().unwrap_or(""))?;
@@ -430,7 +438,9 @@ impl Object {
         let mut pos = 1;
         let mut previous = None;
         while pos < lines.len() {
-            if lines[pos] != "" || pos + 1 >= lines.len() || !lines[pos + 1].starts_with("section ")
+            if !lines[pos].is_empty()
+                || pos + 1 >= lines.len()
+                || !lines[pos + 1].starts_with("section ")
             {
                 return err(
                     "§16.1",
@@ -467,7 +477,11 @@ impl Object {
                 "functions" => obj.parse_functions(&lines[start..pos], start + 1)?,
                 "data" => {
                     for line in &lines[start..pos] {
-                        let t = tokens(line)?;
+                        let t = if let Some(n) = line.strip_suffix(' ').filter(|n| name(n)) {
+                            vec![n.to_string(), String::new()]
+                        } else {
+                            tokens(line)?
+                        };
                         // Empty data images have an empty HEX token, represented by NAME SP.
                         if t.len() != 2
                             || !name(&t[0])
@@ -764,6 +778,36 @@ impl Object {
         }
         Ok(())
     }
+    fn index_space_size(&self, containing: &Function) -> Result<u128> {
+        let mut maximum = containing.instructions().count() as u128;
+        for oracle in self.functions.values().filter(|f| f.kind == "oracle") {
+            let mut pending = vec![oracle.name.clone()];
+            let mut seen = BTreeSet::new();
+            let mut count = 0u128;
+            while let Some(name) = pending.pop() {
+                if !seen.insert(name.clone()) {
+                    continue;
+                }
+                let function = self
+                    .functions
+                    .get(&name)
+                    .ok_or_else(|| Error(format!("§3.7: unknown lproc @{name}")))?;
+                count += function.instructions().count() as u128;
+                for call in function.instructions().filter(|i| i.op == "lift.call") {
+                    let target = call
+                        .operands
+                        .first()
+                        .and_then(|n| n.strip_prefix('@'))
+                        .ok_or_else(|| Error("§4.8: malformed lift.call".into()))?;
+                    pending.push(target.to_string());
+                }
+            }
+            if seen.contains(&containing.name) {
+                maximum = maximum.max(count);
+            }
+        }
+        Ok(maximum)
+    }
     fn validate_row(
         &self,
         f: &Function,
@@ -926,14 +970,7 @@ impl Object {
                     arity(1, 1)?;
                     label(&args[0])?;
                     let w = dest(&i.lhs[0])?;
-                    if w < 128
-                        && (1u128 << w)
-                            <= self
-                                .functions
-                                .values()
-                                .map(|f| f.instructions().count() as u128)
-                                .sum()
-                    {
+                    if w < 128 && (1u128 << w) <= self.index_space_size(f)? {
                         return err("§3.3", "label location cannot represent index space");
                     }
                 }
@@ -1012,14 +1049,7 @@ impl Object {
                 "qjumpr" => {
                     arity(1, 0)?;
                     let w = rd(&args[0])?;
-                    if w < 128
-                        && (1u128 << w)
-                            <= self
-                                .functions
-                                .values()
-                                .map(|f| f.instructions().count() as u128)
-                                .sum()
-                    {
+                    if w < 128 && (1u128 << w) <= self.index_space_size(f)? {
                         return err("§3.3", "qjumpr width cannot represent index space");
                     }
                 }
