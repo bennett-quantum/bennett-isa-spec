@@ -120,3 +120,66 @@ fn external_register_binding_oracle_xor_and_history_inverse() {
         assert_eq!(m.snapshot(), before);
     }
 }
+
+#[test]
+fn r3_typed_cc_controlled_calls_execute_and_restore_history() {
+    let ac = r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
+    let cc = r#"{"abi":"0.8","kind":"cc","params":["qreg[1]","qreg[1]"],"results":[],"tier":"cc"}"#;
+    for forward_reference in [false, true] {
+        let body = if forward_reference {
+            "fn cc @p (input:qreg[1], q:qreg[1]) () () () ()\n^entry():\nbr ^def()\n^use():\nctl c action_call @a (q) () () ()\nret\n^def():\nyes = const.i1 1\nc = select yes input input\nbr ^use()"
+        } else {
+            "fn cc @p (c:qreg[1], q:qreg[1]) () () () ()\n^entry():\nctl c action_call @a (q) () () ()\nret"
+        };
+        let o = rehash(&object(
+            &[
+                (
+                    "a",
+                    ac,
+                    "action @a (t:wire mut) () () () ()\n^entry():\nx t",
+                ),
+                ("p", cc, body),
+            ],
+            "{}",
+            "",
+        ));
+        for c in 0..2 {
+            for t in 0..2 {
+                let mut regs = QuantumRegisters::new();
+                let control = regs.allocate(1).unwrap();
+                let target = regs.allocate(1).unwrap();
+                regs.prepare(control, &[c == 1]).unwrap();
+                regs.prepare(target, &[t == 1]).unwrap();
+                let mut m = ClassicalMachine::with_quantum_registers(
+                    &o,
+                    "p",
+                    &[ClassicalValue::Qreg(control), ClassicalValue::Qreg(target)],
+                    &[],
+                    regs,
+                )
+                .unwrap();
+                let entry = m.snapshot();
+                let outcome = m.run(10).unwrap();
+                assert_eq!(
+                    (outcome.fault, outcome.steps),
+                    (None, if forward_reference { 6 } else { 2 })
+                );
+                let regs = m.quantum_registers();
+                assert_eq!(
+                    regs.quantum_state()
+                        .read_basis(regs.bundle(target).unwrap())
+                        .unwrap(),
+                    t ^ c
+                );
+                assert_eq!(
+                    regs.quantum_state()
+                        .read_basis(regs.bundle(control).unwrap())
+                        .unwrap(),
+                    c
+                );
+                m.reverse().unwrap();
+                assert_eq!(m.snapshot(), entry);
+            }
+        }
+    }
+}

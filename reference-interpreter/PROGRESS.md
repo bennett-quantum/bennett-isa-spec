@@ -18,7 +18,9 @@ B03 resolved: opaque applications retain recursively substituted inputs during
 loop squaring. Exact loop/unrolled negatives reject; invariant inputs and 32
 changing-input/nested generated loops pass their independent parity checks.
 SPEC-QUESTIONS 20 now precisely describes the opaque symbolic proof route.
-Bead b-isa-spec-zq2.
+B04 resolved: normalized CC controls are typed qreg[1] through rd and checked
+for effective-target aliases; five negative variants and basis/forward-type-
+inference execution/reversal positives pass. Bead b-isa-spec-zq2.
 
 ## Council round 2: sol/codex implementation (2026-10-29)
 

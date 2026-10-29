@@ -191,3 +191,22 @@ fn metadata_integers_preserve_exactness_and_canonical_decimal_strings() {
         assert!(Json::parse(bad).unwrap().uint().is_err(), "accepted {bad}");
     }
 }
+
+mod support;
+#[test]
+fn r3_normalized_cc_controls_are_typed_and_disjoint_at_load() {
+    let ac = r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
+    for (tag, ty, control) in [
+        ("integer", "i8", "c"),
+        ("token", "token", "c"),
+        ("unknown", "qreg[1]", "missing"),
+        ("multiwire", "qreg[2]", "c"),
+        ("alias", "qreg[1]", "q"),
+    ] {
+        let cc = format!(
+            r#"{{"abi":"0.8","kind":"cc","params":["{ty}","qreg[1]"],"results":[],"tier":"cc"}}"#
+        );
+        let text = support::object(&[("a",ac,"action @a (t:wire mut) () () () ()\n^entry():\nx t"),("p",&cc,&format!("fn cc @p (c:{ty}, q:qreg[1]) () () () ()\n^entry():\nctl {control} action_call @a (q) () () ()\nret"))],"{}", "");
+        support::reject_cli(&text, "§3.3", &format!("cc-ctl-{tag}"));
+    }
+}

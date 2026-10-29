@@ -1145,7 +1145,35 @@ impl Object {
                 }
                 "oracle_call" | "action_call" | "adj" | "ctl" => {
                     let call = normalize_call(i)?;
+                    if let Some(control) = &call.control {
+                        if rd(control)? != Type::Qreg(1) {
+                            return err("§3.3", "ctl requires a qreg[1] control (§4.7/§4.8)");
+                        }
+                    }
                     self.validate_region_call(f, &call.instruction, types)?;
+                    if let Some(control) = &call.control {
+                        let ca = &call.instruction.operands;
+                        if call.instruction.op == "oracle_call" {
+                            if [&ca[3], &ca[4]].contains(&control) {
+                                return err(
+                                    "§3.3",
+                                    "effective control aliases oracle target/fault",
+                                );
+                            }
+                        } else {
+                            self.validate_inherited_targets(
+                                &call.instruction,
+                                &[format!("{control}[0]")],
+                                types,
+                            )?;
+                            let callee = self.declaration(ca[0].trim_start_matches('@'))?;
+                            for (actual, param) in list(&ca[3])?.iter().zip(&callee.params[2]) {
+                                if actual == control && param.role.as_deref() == Some("mut") {
+                                    return err("§3.3", "effective control aliases mutable region");
+                                }
+                            }
+                        }
+                    }
                 }
                 _ => return err("§4.8", format!("unknown classical opcode {op}")),
             }

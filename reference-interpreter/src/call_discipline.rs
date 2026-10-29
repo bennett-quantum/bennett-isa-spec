@@ -144,8 +144,11 @@ impl Object {
             for (group, actual) in actuals.iter().enumerate() {
                 if let Some(position) = f.params[group].iter().position(|p| p.name == param) {
                     let actual = &actual[position];
-                    if !matches!(types.get(actual), Some(Type::Wire(_))) {
-                        return err("§3.3", "controlled region operand must be a wire bundle");
+                    if !matches!(types.get(actual), Some(Type::Wire(_) | Type::Qreg(_))) {
+                        return err(
+                            "§3.3",
+                            "controlled region operand must be a wire bundle or qreg",
+                        );
                     }
                     if context.contains(&format!("{actual}[{index}]")) {
                         return err(

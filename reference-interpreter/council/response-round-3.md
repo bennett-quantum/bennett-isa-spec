@@ -56,3 +56,20 @@ new generator pass. SPEC-QUESTIONS 20 and module prose now distinguish exact
 Boolean decisions from sound opaque-function symbolic proofs; unresolved
 function-specific identities retain the verified certificate path. This corrects
 the existing reading's description, with no new ambiguity or scope restriction.
+
+## SOL-R3-B04 — resolved
+
+`validation.rs::classical_instruction` resolves a normalized call's ctl operand
+through `rd` and requires `qreg[1]` before region-call validation. It checks
+oracle target/fault aliases and action inherited targets (including through
+child calls) plus mutable-region aliases. `call_discipline.rs::validate_inherited_targets`
+now also accepts qreg bindings, applying the same bit-for-bit target analysis
+as structured calls. Forward type inference remains iterative.
+Pins: `parser::r3_normalized_cc_controls_are_typed_and_disjoint_at_load`
+(exact i8 witness, token, unknown, qreg[2], target alias; parser and hash/check
+exit 1, empty stdout, §3.3); `registers::r3_typed_cc_controlled_calls_execute_and_restore_history`
+(distinct qreg[1] control/target, all four basis pairs, exact t XOR c,
+two-step completion, full reversal; also six-step definition-after-use-in-text
+positive using select). RED: exact i8 witness accepted. GREEN: 10 parser tests
+and the typed execution/reversal pin pass. No SPEC-QUESTIONS entry: §§3.3,
+4.7 and 4.8 fix the operand type and disjointness requirement.
