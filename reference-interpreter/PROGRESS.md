@@ -24,7 +24,8 @@ check the complete named V;W;reverse(V);W circuit, actual borrowed identities,
 inherited controls, syntactic side conditions and omitted adjacent touches.
 Three new tests exercise verify_claim and verify_certificate independently of
 borrow_frames admission, including full/nested positives and endpoint, changed-W,
-fake-B and omitted-gate negatives. The full suite remains green; no spec question.
+fake-B and omitted-gate negatives. Full suite: **229 passed, 0 failed, 5 ignored**;
+strict Clippy clean. No spec question.
 
 SOL-R4-B03 resolved: claim domains retain ABI group/slot and region cell index,
 so expected programs receive the corresponding inputs under any local renaming.
@@ -35,7 +36,46 @@ crossed local names and multiple same-width slots, while single-X, wrong-slot
 and memory-only mismatches reject. Partial domains remain evidence.
 Normal suite: **232 passed, 0 failed, 5 ignored**. No new ambiguity; reading 21
 is unchanged. All SOL blockers resolved; muse response remains appendable.
-Blocker commits so far: **3ba7154** (SOL-B01), **21da2cc** (SOL-B02).
+Blocker commits: **3ba7154** (SOL-B01), **21da2cc** (SOL-B02),
+**d7a14fd** (SOL-B03).
+
+### Final round-4 sol-pass verification
+
+Rebuilt offline, then ran the exact standalone conformance command documented
+in conformance/PROGRESS.md against the absolute reference binary. Harness
+result: **445 pass, 0 fail, 45 unavailable / 490**, exit **2** for the existing
+staged deliverables 8–11. No conformance/include source or header was edited;
+CARGO_TARGET_DIR redirected harness build artifacts into the interpreter's
+ignored `.tmp/conformance-target`.
+
+Then ran the required gates, with absolute `--manifest-path
+/home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/Cargo.toml`:
+
+| Command | Result |
+|---|---|
+| `cargo test --offline` | **232 passed**, 0 failed, 5 ignored (231 integration + 1 unit; 0 doctests; 5.55 s summed runner time) |
+| `cargo test --offline -- --ignored --nocapture` | **5 passed**, 0 failed; 336.09 s summed runner time |
+| `cargo clippy --offline --all-targets -- -D warnings` | clean |
+| `cargo fmt -- --check` | clean |
+| unchanged Python seed `isa_check.py` | passes; diff against 2f167cc empty |
+| `git diff --check` | clean |
+
+| Ignored sweep | Cases | Runner time |
+|---|---|---|
+| u8 division/remainder | 65,536 operand pairs × 4 operations = 262,144 executions | 2.80 s |
+| 17-wire borrow execution | 2^17 basis entries | 15.28 s |
+| checked borrow-frame certificate | 2^18 claim elements, both programs | 76.68 s |
+| extended §6 differential | 200,000 programs: **64,717 accepted, all exactly clean**, 135,283 rejected | 220.24 s |
+| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 21.09 s |
+
+Every validation command ran headlessly with DISPLAY, WAYLAND_DISPLAY,
+DBUS_SESSION_BUS_ADDRESS and BROWSER unset, and
+TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/.tmp.
+Logs: `.tmp/r4-sol-{tests,ignored,clippy,conformance,python}.log`.
+No source changes followed these gates. No dependencies, changed seeds,
+spec edits, declines, partial SOL resolutions or pushes. All committed edits
+are under reference-interpreter; bd notes track this pass on b-isa-spec-zq2.
+The full-ISA bead remains open for staged work; muse's response may follow.
 
 ## Council round 4, codex first pass (2026-10-29)
 

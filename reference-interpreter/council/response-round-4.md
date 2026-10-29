@@ -161,7 +161,8 @@ and rejects a four-gate slice omitting adjacent borrowed touches. The negative
 objects themselves remain valid full circuits, so the claim checker is tested
 independently of parse-time factorisation. README documents the complete check.
 
-GREEN: all 3 new structural regressions pass; whole normal suite is green.
+GREEN: all 3 new structural regressions pass; whole normal suite: **229 passed,
+0 failed, 5 ignored**; strict Clippy clean.
 No SPEC-QUESTIONS entry: §§5.6, 9.2 and 12.1 specify the checks directly.
 
 ## SOL-R4-B03 — resolved
@@ -195,3 +196,26 @@ GREEN: full normal suite **232 passed, 0 failed, 5 ignored**. No new ambiguity:
 §§5.1, 9.4 and 12.1, consistently with SPEC-QUESTIONS 21, determine the ABI
 and tuple correspondence. All three SOL blockers are resolved; no declines,
 partials, dependencies, Python/random seed changes or spec edits.
+
+
+## Final verification of the SOL second pass
+
+Separate blocker commits: **3ba7154** (SOL-R4-B01), **21da2cc**
+(SOL-R4-B02), **d7a14fd** (SOL-R4-B03). All three resolved, no declines or
+partials. The response remains appendable for muse's pending review.
+
+Rebuilt the binary offline, then ran the exact standalone conformance command
+from conformance/PROGRESS.md, keeping conformance/include read-only and build
+artifacts in the interpreter's ignored `.tmp/conformance-target`:
+**445 passed, 0 failed, 45 unavailable / 490**, exit **2** for existing staging.
+
+Final normal suite: **232 passed, 0 failed, 5 ignored**, 5.55 s summed runner
+time. Ignored suite: **5 passed, 0 failed**, 336.09 s summed runner time,
+including 2^18 checked certificate elements and the 200,000-program discipline
+sweep (**64,717 accepted, all exactly clean / 135,283 rejected**). Strict
+all-target Clippy, formatting, unchanged Python seed and diff checks pass.
+PROGRESS.md records individual sweep counts/times and retained log names.
+
+All validation used absolute manifest/binary paths, the specified local
+TMPDIR, and DISPLAY/WAYLAND_DISPLAY/DBUS_SESSION_BUS_ADDRESS/BROWSER unset.
+No dependencies, spec/conformance/header edits, seed changes or pushes.
