@@ -6,6 +6,14 @@ under `reference-interpreter/`; commit own paths
 (`git add -A -- reference-interpreter && git commit -- reference-interpreter`),
 never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
+## Council round 3, codex second pass (2026-10-29)
+
+R3-B01 is resolved-by c2d97f8 (SOL-R3-B01): the exact six-row codex witness
+and fault-to-input variant reject at load and CLI hash/check (§5.5). New pin
+`codex_r3_b01_exact_implicit_delivery_witnesses` also verifies the exact
+five-row positive (0,0,5) and full prefix reversal. All 17 r1_rules tests pass.
+No source change needed for this blocker; no spec/Python seed edits.
+
 ## Council round 3 (2026-10-29)
 
 Received SOL-R3-B01..B05 on snapshot 2e61144; response-round-3.md is appendable

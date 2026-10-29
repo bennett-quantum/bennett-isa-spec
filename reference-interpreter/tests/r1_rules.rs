@@ -479,3 +479,41 @@ fn r3_nested_oracle_deliveries_invalidate_outstanding_inputs() {
     // move + call + uncall + retval: (1+1) XOR (1+1) = 0.
     assert_eq!(check(&o, "p", &input, Budget::steps(4)), (0, 0, 4));
 }
+
+#[test]
+fn codex_r3_b01_exact_implicit_delivery_witnesses() {
+    let si =
+        r#"{"abi":"0.8","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}"#;
+    let so = si
+        .replace("\"args\":[]", "\"args\":[\"token\"]")
+        .replace("\"in\":[8]", "\"in\":[]");
+    let inner = "oracle @i (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()\n^entry():\nlift.retval x";
+    let outer = "oracle @o () (t:wire[8]) (f:wire[4]) () (tk:token)\nregs { a:reg[8], b:reg[8], r:reg[8], fr:reg[4], fr2:reg[4] }\n^entry():\na = lift.const.i8 1\nb = lift.const.i8 2\nlift.oracle_call @i tk (a) r fr () ()\nlift.oracle_call @i tk (b) a fr2 () ()\nlift.oracle_uncall @i tk (a) r fr () ()\nlift.retval r";
+    let build = |outer: &str| object(&[("i", si, inner), ("o", &so, outer)], "{}", "");
+    // Hand trace of the invalid six-row body: r=1, a=1 XOR 2=3,
+    // r=1 XOR 3=2. It must reject before hashing or execution (§5.5).
+    support::reject_cli(&build(outer), "§5.5", "codex-implicit-target");
+    // The same outstanding input can instead be overwritten by fault delivery.
+    let s4 = si.replace("\"in\":[8]", "\"in\":[4]");
+    let i4 = "oracle @i4 (x:wire[4] in) (t:wire[8]) (f:wire[4]) () ()\nregs { r:reg[8] }\n^entry():\nr = lift.zext.i8 x\nlift.retval r";
+    let fault = outer
+        .replace("a:reg[8]", "a:reg[4]")
+        .replace("a = lift.const.i8", "a = lift.const.i4")
+        .replace("@i tk (a)", "@i4 tk (a)")
+        .replace("(b) a fr2", "(b) r a");
+    support::reject_cli(
+        &object(
+            &[("i", si, inner), ("i4", &s4, i4), ("o", &so, &fault)],
+            "{}",
+            "",
+        ),
+        "§5.5",
+        "codex-implicit-fault",
+    );
+    let good = outer.replace("lift.oracle_call @i tk (b) a fr2 () ()\n", "");
+    let o = rehash(&build(&good));
+    let mut input = OracleInput::bits(&[]);
+    input.args.push(Argument::Token(Budget::steps(1)));
+    // Two constants, identical one-row calls, retval: 1 XOR 1 = 0.
+    assert_eq!(check(&o, "o", &input, Budget::steps(5)), (0, 0, 5));
+}

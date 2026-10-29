@@ -107,3 +107,17 @@ Conformance command: `cargo run --offline --manifest-path
 --bin /home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/target/debug/bennett-isa-ref`.
 Result: **445 pass, 0 fail, 45 unavailable, 490 total**, exit **2** for explicit
 staging (same as baseline). No conformance/include/spec/docs edits or pushes.
+
+## Codex R3-B01 — resolved-by c2d97f8 (SOL-R3-B01)
+
+Re-ran the exact six-row identity-oracle witness against HEAD 788a5e0:
+parser and CLI hash/check reject with §5.5, exit 1 and empty stdout. No new
+semantic fix needed. `r1_rules::codex_r3_b01_exact_implicit_delivery_witnesses`
+pins that object and a four-bit input overwritten by another call's fault
+delivery. The five-row no-middle control, outer B=5 and token B=1, yields
+(payload,code,steps)=(0,0,5), agrees with the step machine, and reverses to the
+complete entry snapshot. Existing two-call/two-uncall multiplicity positive
+also passes. All **17 r1_rules tests pass**. No new development RED claimed:
+the earlier SOL fix already handles these witnesses; its RED is recorded above.
+Re-read §§4.2 and 5.5 and SPEC-QUESTIONS: implicit deliveries explicitly write
+both destinations, and unchanged ins are mandatory. No ambiguity or decline.
