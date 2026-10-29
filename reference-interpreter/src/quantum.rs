@@ -111,6 +111,8 @@ enum State {
         amplitudes: BTreeMap<Key, (Complex, Amplitude)>,
     },
 }
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Content(Vec<Wire>, Vec<(Key, Amplitude)>);
 #[derive(Clone, Debug)]
 pub struct QuantumState {
     ids: Vec<Wire>,
@@ -248,6 +250,19 @@ impl QuantumState {
                 exact: Amplitude::one(),
             },
         }
+    }
+    /// The exact state without its wire-identity counter (loop periods).
+    pub(crate) fn content(&self) -> Content {
+        Content(
+            self.ids.clone(),
+            match &self.state {
+                State::Basis { bits, exact, .. } => vec![(key_of(bits), exact.clone())],
+                State::Vector { amplitudes } => amplitudes
+                    .iter()
+                    .map(|(k, (_, e))| (k.clone(), e.clone()))
+                    .collect(),
+            },
+        )
     }
     pub fn wire_count(&self) -> usize {
         self.ids.len()

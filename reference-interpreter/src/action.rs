@@ -416,8 +416,17 @@ impl Object {
                         .parse::<usize>()
                         .map_err(|_| Error("§4.6: loop bound exceeds host index space".into()))?;
                     if a.len() == 1 {
-                        for _ in 0..n {
+                        // body n times (§4.6). The iterated state is exact, so once
+                        // it returns to its loop-entry value the remaining iterations
+                        // are whole periods and are skipped (X^(2^40) needs 2).
+                        let entry = (q.content(), e.bindings.bundles.clone());
+                        let mut done = 0usize;
+                        while done < n {
                             self.action_sequence(&i.bodies[0], q, e, adjoint, &context)?;
+                            done += 1;
+                            if done < n && (q.content(), e.bindings.bundles.clone()) == entry {
+                                done += (n - done) / done * done;
+                            }
                         }
                     } else {
                         let condition = e.bundle(&a[2])?;
