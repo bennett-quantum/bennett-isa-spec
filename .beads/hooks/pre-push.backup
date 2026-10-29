@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Local quality gate (no CI): run cargo test in every Rust crate dir.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+found=0
+while IFS= read -r toml; do
+  d=$(dirname "$toml"); found=1
+  echo "== cargo test in $d"; (cd "$d" && cargo test)
+done < <(find . -name Cargo.toml -not -path './target/*' -not -path '*/target/*')
+[ "$found" = 1 ] || echo 'no Rust crates; nothing to test'
+exit 0
