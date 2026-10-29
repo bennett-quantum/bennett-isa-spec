@@ -431,7 +431,11 @@ impl<'a> ClassicalMachine<'a> {
             .get(&(id, name.into()))
             .and_then(|v| v.last())
             .cloned()
-            .ok_or_else(|| Error(format!("§7.4: instance {name} no longer exists")))
+            .ok_or_else(|| {
+                trap(Error(format!(
+                    "§7.4: instance {name} does not exist (uncalled or not yet defined)"
+                )))
+            })
     }
     fn bits(&self, name: &str) -> Result<u128> {
         self.read(name)?.bits()
@@ -439,7 +443,8 @@ impl<'a> ClassicalMachine<'a> {
     fn qreg(&self, name: &str) -> Result<u64> {
         match self.read(name)? {
             ClassicalValue::Qreg(id) => {
-                self.state.quantum.bundle(id)?;
+                // §3.3: a handle precondition that fails is a CC trap.
+                self.state.quantum.bundle(id).map_err(trap)?;
                 Ok(id)
             }
             _ => err("§3.3", "region operand is not a qreg"),
@@ -1086,7 +1091,8 @@ impl<'a> ClassicalMachine<'a> {
                     }
                     "qreg.free" => {
                         let id = self.qreg(&a[0])?;
-                        undo.registers.push(self.state.quantum.free_recorded(id)?);
+                        undo.registers
+                            .push(self.state.quantum.free_recorded(id).map_err(trap)?);
                     }
                     "qreg.slice" => {
                         let id = self.qreg(&a[0])?;
@@ -1096,21 +1102,26 @@ impl<'a> ClassicalMachine<'a> {
                         let len = a[2]
                             .parse::<usize>()
                             .map_err(|_| Error("§3.3: slice length exceeds host storage".into()))?;
-                        let (id, record) = self.state.quantum.slice_recorded(id, lo, len)?;
+                        let (id, record) = self
+                            .state
+                            .quantum
+                            .slice_recorded(id, lo, len)
+                            .map_err(trap)?;
                         undo.registers.push(record);
                         output = Some(ClassicalValue::Qreg(id));
                     }
                     "qreg.concat" => {
                         let a = self.qreg(&a[0])?;
                         let b = self.qreg(&i.operands[1])?;
-                        let (id, record) = self.state.quantum.concat_recorded(a, b)?;
+                        let (id, record) =
+                            self.state.quantum.concat_recorded(a, b).map_err(trap)?;
                         undo.registers.push(record);
                         output = Some(ClassicalValue::Qreg(id));
                     }
                     "measure" => {
                         let id = self.qreg(&a[0])?;
                         let draw = self.measurement_draw();
-                        let bits = self.state.quantum.measure(id, draw)?;
+                        let bits = self.state.quantum.measure(id, draw).map_err(trap)?;
                         let value = bits
                             .iter()
                             .enumerate()
@@ -1121,7 +1132,7 @@ impl<'a> ClassicalMachine<'a> {
                     "oracle_call" | "action_call" | "adj" | "ctl" => {
                         let (record, ids) = self.region_record(&i)?;
                         let mut trial = self.state.quantum.clone();
-                        trial.complete_call(&ids)?;
+                        trial.complete_call(&ids).map_err(trap)?;
                         self.execute_region(&record, false)?;
                         undo.registers
                             .push(self.state.quantum.complete_call_recorded(&ids)?);
@@ -1133,10 +1144,10 @@ impl<'a> ClassicalMachine<'a> {
             Ok(())
         })();
         if let Err(e) = execute {
-            if e.0.starts_with("§7.4: instance")
-                || e.0.starts_with("§3.3:")
-                || e.0.contains("E_QREG_NOT_CLEAN")
-            {
+            // Only conditions the specification makes a CC trap / R fault
+            // FAULT_UB_TRAP are marked by `trap`; every other error is an
+            // internal failure and propagates (fail loud, fable C5).
+            if e.0.starts_with(TRAP) {
                 fault = Some(4);
             } else {
                 self.undo_record(undo)?;
@@ -1220,4 +1231,11 @@ pub(crate) fn compare(pred: &str, a: u128, b: u128, w: u16) -> Result<bool> {
         "sle" => signed(a, w) <= signed(b, w),
         _ => return err("§4.8", format!("unknown comparison {pred}")),
     })
+}
+
+/// Marks an error as the CC trap / R fault FAULT_UB_TRAP the specification
+/// defines for it (§3.3 handle preconditions, §7.4 dead instances).
+const TRAP: &str = "trap ";
+fn trap(e: Error) -> Error {
+    Error(format!("{TRAP}{}", e.0))
 }
