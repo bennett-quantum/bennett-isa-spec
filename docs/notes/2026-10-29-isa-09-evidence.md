@@ -232,7 +232,7 @@ br ^done
 ret out m
 ```
 
-Write an arbitrary joint input as |0⟩|e_0⟩+|1⟩|e_1⟩. Outcome m has probability ||e_m||² and post-state |m⟩|e_m⟩ after normalisation. Destructive measurement followed by fresh |0⟩ and conditional X gives **the same instrument on data and reference**, not just the same marginal probabilities. Replace the dialect handle's id with out; any handle table must update that root consistently (BLK-1 for general dynamic tables). This costs one measurement, one clean wire and at most one X, plus 5 instructions on outcome 0, 7 on outcome 1. General n≤128 uses a fixed preparation action with m's bits materialised from args; arbitrary-width partial observation uses a one-bit CNOT copy into a declared output register, then measurement, leaving the source collapsed. That output is not private workspace freed by the copying action.
+Write an arbitrary joint input as |0⟩|e_0⟩+|1⟩|e_1⟩. Outcome m has probability ||e_m||² and post-state |m⟩|e_m⟩ after normalisation. Destructive measurement followed by fresh |0⟩ and conditional X gives **the same instrument on data and reference**, not just the same marginal probabilities. Replace the dialect handle's id with out; any handle table must update that root consistently (BLK-1 for general dynamic tables). This costs one measurement, one clean wire and at most one X, with 4 instructions on outcome 0 and 6 on outcome 1. General n≤128 uses a fixed preparation action with m's bits materialised from args; arbitrary-width partial observation uses a one-bit CNOT copy into a declared output register, then measurement, leaving the source collapsed. That output is not private workspace freed by the copying action.
 
 Neither construction enables reversal across measurement: §7.4 and §10 still exclude it. No new opcode, frame, fault code, identity change, or normative measurement rule is needed. A/G test outcome 0/1 and consumption; D tests an entangled reference state, with the conditional reference states above as expectations. No particular demo requires retaining a measured qreg.
 
@@ -458,3 +458,419 @@ Interrupt delivery is a classical poll at a defined materialised point, reading 
 The outline ratifies rewindable frames plus polling, so old beads “blocks rung 6 unless accepted” is now stale as a scope statement. The xv6/Linux platform inventory, assembly shims and independent QEMU comparison are still **unverified implementation work**, not an ISA blocker. A tests ping-pong current/resume records and reversal; A/G tests clock/effect state at poll entry; conformance for actual kernels remains the platform spike. No native fiber/interrupt opcode is proposed for 0.9, and no new frame/fault/hash rule is needed.
 
 **Verdict: efficiency — explicit continuations and defined polling preserve the kernel/runtime capability; 5/6/7 need the transform, not an ISA fiber opcode.**
+
+## I1: checkpointed and pebbled oracle realisations
+
+NS §4.2: “a checkpoint of a coherent region is a point from which it is recomputed”; §5: “The compiler chooses adders, pebbling … under a space budget.” ISA §5.2 explicitly allocates “B frames”; §5.7 permits transformations producing “the same final interface tuple”; §9.4 nevertheless describes retained history as “B × frame width.” §11 binds a versioned expansion library and permits removing only operations that library marks removable. A new replay policy must therefore publish an operation set and account for every replay; final-tuple agreement alone is not a cost specification.
+
+**Construction/proof, without a complexity slogan.** Let F be a total classical step on an S-bit configuration, stuttering at its terminal state. Let P_0(a,b) perform b⊕=F(a), preserving a and cleaning its private scratch. Define
+
+`P_{j+1}(a,b) = P_j(a,c); P_j(c,b); P_j(a,c)`, c initially zero.
+
+After the first call c=F^(2^j)(a), the second XORs F^(2^(j+1))(a) into b, and the third clears c. The first and third are the identical XOR oracle, not a copy of an unknown quantum state. On a superposition the configuration copies are entangled CNOT copies of basis encodings; the final uncompute removes that entanglement. With k=ceil(log2 B), pad F to 2^k terminal-stuttering transitions. Base-call count obeys T(k)=3T(k−1), T(0)=1, so T=3^k=O(B^(log2 3)), **not** B times a polylogarithm from this derivation. There are at most k temporary S-bit checkpoints plus the root/output, and base scratch. A compute/copy-result/uncompute implementation doubles that count. S itself may grow with the program/budget (for example the monotonic stack); O(S log B) is not O(log B) qubits.
+
+A canonical two-step instance with F=inc8, one token bound to the total B≥3 oracle, and two caller-owned fault registers is:
+
+```text
+perm_action @inc_twice (b:wire[8], f0:wire[4], f1:wire[4]) (a:wire[8] in) () (tk:token) ()
+^entry():
+c = qalloc any 8
+oracle_call @inc8 tk (a) c f0 () ()
+oracle_call @inc8 tk (c) b f1 () ()
+oracle_call @inc8 tk (a) c f0 () ()
+qfree c
+```
+
+No intermediate call touches a or f0, so the first/third are a matched exact cleanup of c. For arbitrary b and fault seeds, b⊕=a+2 modulo 256, both fault registers unchanged, c=0. Each base call has 3 forward+3 inverse machine steps; three calls have 18 such steps, not “two constant-cost operations.” General checkpointing uses the full step function and its resource cost, not inc8's cost.
+
+**Smallest exact 0.9 proposal** (§5.7, §9.4, §11, §14.3, §17.7):
+
+> An expansion library MAY specify a checkpoint/replay or pebbled realisation of §5.2. It MUST name every generated allocation, copy, forward evaluation, inverse evaluation and release in a deterministic order, including every repeated evaluation, with distinct generated ordinals and scratch identities. The schedule binds that library's version and hash; all replay events are executed and charged. The reference body, F_B and budget unit are unchanged. The library MUST supply an exact permutation equivalence argument with clean private scratch on the full domain D; interfaces and borrowed correlations obey §5.2/5.6.
+>
+> The frame descriptor reports the realised retained history and checkpoint wires from the bound expansion; B×frame_width describes the full-history reference expansion. The default remains the full-history ref library. T2 applies to that reference expansion; a checkpointed expansion establishes the same postcondition by its checked equivalence and its compute/uncompute construction.
+
+This uses the existing expansion binding rather than inventing an unrelated schedule kind. §11's preservation rule continues to apply to each bound library's own operation set. No new instruction/fault/frame semantics; checkpoint live intervals and all replay leaves enter §8.2. C exhausts a toy two-bit increment P_1 (b⊕=a+2 mod4), arbitrary b/fault seeds; E/H require three evaluations, one temporary and its full live interval, and reject an omitted replay charge or unknown expansion hash. The recurrence proves only the stated tradeoff. The beads claim “polylog time” for O(log B) checkpoints is **not verified** and is not adopted. Hash impact V if the transformation/schema wording becomes normative 0.9; original reference_program_hash body remains unchanged apart from versioning.
+
+**Verdict: efficiency — explicit reversible pebbling exists; publish its exact expansion and cost binding, not an unsupported polylog-time rule; 4(c)/7(c) space only.**
+
+## I2: recovering bounded data-dependent loops
+
+NS §4.2 calls structured loops “optimisations … where the CFG is structured”; §4.3 warns a step machine costs “the budget times the block count unless the specialiser recovers structure.” ISA §5.7 explicitly names “structure recovery,” while §4.6 requires the while conditions be “computed before the loop from wires the body does not modify.” A Collatz exit computed from its evolving state is not such a while selector. Nor can an active `still_running` wire be updated under its own predicate: §3.3 makes controls distinct from targets.
+
+There are legal constructions. Unroll K candidate iterations, compute each selector c_i as a function of the **immutable initial inputs** (by a total prefix oracle), run that iteration under c_i, then re-run the selector oracle to clean it. If a prefix evaluation costs at most r·i rows, selectors cost O(rΣ_i i)=O(rK²) rows in total, with no dispatch over unrelated program rows. This proves expressibility, not an efficient universal loop recovery. A better transform retains per-iteration predecessor/condition history and proves its later reversal, or recognises a structure-specific loop invariant. The selector must be pushed only while it stays unchanged. A final oracle embedding still reproduces **the original** row-budget fault boundary, including partial-loop exhaustion.
+
+Concrete immutable-selector fragment, costing one controlled CX per iteration and no private history:
+
+```text
+perm_action @repeat3 (t:wire) (c:wire in, s:wire in) () () ()
+regs { } bounds { 3 }
+^entry():
+qloop 3 {
+qpred c
+cx s t
+qunpred c
+}
+```
+
+Each CX has c as effective control; there are three CCX-equivalent controlled flips, so t⊕=3cs mod2=t⊕cs. There are **three gates** total; push/pop carry no independent unitary. This example pins predication legality; the general prefix-oracle construction explains evolving conditions. Dispatch-free cost is Σ_i gate_cost(body_i+condition_i), whereas literal dispatch includes every static row expansion at every B step. There is no target-independent numeric reduction ratio.
+
+**Exact explanatory addition** (§5.7, no new opcode): “Bounded loop recovery may replace reference dispatch by structured predication and retained condition/predecessor history. Every active selector remains unchanged until its pop; cleanup restores its dependencies. The transformed construction MUST preserve the original reference-row budget boundary, first fault, arbitrary target/fault XOR behavior and full-domain cleanup.” C compares K=0,1,2 and budget cuts inside the loop with the literal machine; F rejects flipping a pushed selector. This is an existing T6 obligation stated concretely, with no identity/fault/history-format changes.
+
+Rung 4(a)/(b) can execute the reference by branch enumeration. Rung 4(c) can report an enormous but honest reference estimate; usefulness of a smaller estimate depends on implementation work and proof, not a new ISA loop. The SQLite report's observed invariance is evidence at measured inputs, not a universal static bound.
+
+**Verdict: efficiency — structured recovery is permitted; immutable selectors or retained history are required; 4(c) cost depends on the implementation.**
+
+## I3: provenance of B and bounded wrappers
+
+NS §3.1: “No per-loop source annotation is ever required”; §9.4 calls for “out-of-band budget tables; scalar-evolution refinement.” ISA §5.4 says “B is enforced by running exactly B steps”; §10 already mints host tokens. Compiler-inferred, table-supplied and host-supplied bounds all supply the same tuple. The origin of a value is not an extra quantum semantic rule. Device-computed values are BLK-2.
+
+Concrete bounded wrapper fragment (K:i32 classical arg, target width 32):
+
+```text
+oracle @bounded_counter () (t:wire[32]) (f:wire[4]) () (K:i32)
+regs { i:reg[32], one:reg[32], c:reg[1] }
+^entry():
+i = lift.const.i32 0
+one = lift.const.i32 1
+qjump ^test
+^test():
+c = lift.icmp.ult i K
+qbranch c ^body ^done
+^body():
+i = lift.add i one
+qjump ^test
+^done():
+lift.retval i
+```
+
+There are 3 entry rows, K successful tests (2 rows), K body/backedge pairs (2 rows), one unsuccessful test (2), one retval: **4K+6**. i never increments above K, so even K=2^32−1 does not wrap; the uint64 B API can represent 4K+6. For B≥4K+6, F_B=(K,0); for smaller B, no successful halt and F_B=(0,1). Registers total 65 location bits; n=8 rows, HALT=8, P=4; there are B frames of width 2P+max_assignment_slot+1=8+32+1=41 bits under the reference per-slot convention, with no flag/succ allocation elision asserted. Stack/heap/depth limits are zero because it is memoryless. The result_val has 32 bits in addition to the locations; do not count it as a third scalar location or forget it.
+
+For a kernel, replace the body with K units of modelled work and return a panic flag; **K is the program's bounded-work parameter, B bounds the complete wrapper trace**. A wrapper reaching its return at B is success, not budget exhaustion. Changing B while leaving K fixed changes only operational F_B; changing K changes the bound/parameterised function semantics and its parameter binding. No inferred bound may omit prologue, calls, boundschecks or output delivery rows. C/B test K=0 (B=6 succeeds, B=5 faults) and K=2 (B=14 succeeds, B=13 faults). No new ISA sentences beyond referring the dialect to these existing obligations; no hash change.
+
+**Verdict: already-realised — budget provenance belongs in dialect/driver documentation; rungs 2/4/7/8 need complete bounds, not a new ISA value.**
+
+## I4: logical run history versus checkpoint/replay storage
+
+NS §4.2 names “history layers, checkpointing and pebbling policy”; ISA §3.2 and §7.4 say “one frame per executed instruction” and “dynamic instances … retained in the run history until reversal.” The logical model is clear; requiring an executor to allocate one physical record per logical frame would contradict the explicit policy freedom. This is distinct from quantum oracle pebbling (I1).
+
+Construction: take a classical checkpoint every c instructions, retain deterministic input/effect replies and logical segment/instance identifiers, and reconstruct the next ≤c logical frames by replay before reversing that block. Over a straight trace of L instructions and state size S, naïve full checkpoints cost ceil(L/c)·S plus at most c·d bytes of reconstructed deltas, where d bounds a logical frame. Replaying each block once costs at most L extra forward instructions before the ordinary L reversals. This is one concrete policy, not a claim that every control/effect trace costs exactly 2L. Effects are **replayed from the tape**, not observed again; host requests are not reissued to reconstruct old bytes. Quantum frames retain their register ids/inverses: reconstruction must not duplicate a quantum state or execute an extra physical Q call merely to recover its classical metadata.
+
+Canonical trace fragment:
+
+```text
+r = call @f (a)
+kept = xor r zero
+uncall @f (a) (r)
+```
+
+The xor frame is pure, so it may keep r's value while f's segment is cancelled. Reconstructed history must retain that cancellation state: doing f again during whole reversal would duplicate its clock or quantum effects. **Exact editorial addition** (§7.4): “Frames and dynamic instances specify logical history. An executor MAY store them by checkpoints, deltas or deterministic replay, provided it reconstructs the same logical instances, cancellation markers and reversal order without repeating external effects or copying quantum state, and satisfies T4.” Add the active/audit distinction from I7. A tests a checkpoint spanning call/copy/uncall with one clock read and requires c=0 after full reversal, not −1 or 1. No new instructions, faults, identity bytes, or physical checkpoint wire rule. Rungs 3/5/6 need exact reversal; this changes only their storage policy.
+
+**Verdict: wording-only — logical history permits a verified checkpoint/replay representation; no new rung capability.**
+
+## I5: done-invariant idle steps
+
+NS §4.2 requires prefix reversal and synchronised halt; it does not require a lower variable-time algorithm bound. ISA §3.6 step 3 explicitly says “Under at_HALT: XOR HALT into pc'” and step 4 performs both exchanges. Starting from pc=HALT=n, pc'=old_pc=0, it leaves old_pc=n, so an idle step is **not** the identity on a clean frame. Existing T2 still holds because the inverse clears that record. This independently confirms the budget note's correction and disproves its earlier broad idle-frame-zero sentence.
+
+Merely removing the HALT successor and controlling both exchanges is insufficient: an active step from pc=0 to HALT could leave old_pc=0, indistinguishable from an idle frame. This loses the inverse's selector. One extra retained active bit would fix that, but is unnecessary. Existing P-bit history has a spare code because 2^P>n. Encode an **active old index** k<n as `k XOR HALT`; this is nonzero, while an idle frame stays zero. This reuses the same width and works even when n is a power of two; XOR is a bijection and k≠HALT.
+
+**Exact 0.9 replacement rule** (§3.6, §11 reference expansion, §14.3 new T7):
+
+> At forward-step entry compute a=(pc≠HALT) into clean scratch and dispatch only k<n. Run rows as before. The successor XORs for k<n and both pc commit exchanges run under a; there is no HALT successor XOR. After the exchanges, XOR HALT into frame.old_pc under a. Clean dispatch by comparing frame.old_pc XOR HALT to k, controlled on a. Clear a by recomputing (frame.old_pc≠0). Thus old_pc is zero for an idle step and otherwise encodes the old pc XOR HALT.
+>
+> For the inverse, compute a=(frame.old_pc≠0). Recompute dispatch under a from frame.old_pc XOR HALT. XOR HALT into frame.old_pc under a, then perform the two inverse commit exchanges under a. Undo the k<n successor XORs and rows in the existing inverse order. Clean dispatch from restored pc under a, and clear a from (pc≠HALT). No HALT comparator is reconstructed from an idle zero frame.
+>
+> T7: On the subspace pc=HALT with a fresh zero frame and scratch, a forward step is the identity on all quantum machine and interface state and leaves that frame and scratch zero. The external classical step counter still advances. The inverse obeys the same identity on that subspace.
+
+**Proof.** Idle gives a=0 and all row selectors zero, so no write occurs. Active k yields old_pc=k⊕n≠0; inverse recovers a=1 and k, decodes before exchanging, restores pc=k and clears pc' and old_pc exactly as the old inverse did. Row flag/succ uncomputes use the restored old state as before. Finally pc≠HALT clears a. This is a permutation with its printed inverse, satisfying T2; reference row count, first faults and commit F_B are unchanged. The done projector is Π_done=|HALT⟩⟨HALT|_pc⊗I; T7 establishes U_tΠ_done=Π_done on the fresh-frame domain. No new fault, frame bits, register-width inequality or budget formula is introduced. Expanded compare/XOR controls change resource counts and must be in the versioned ref expansion.
+
+B tests idle at n=1,2,3,4, active pc=0→HALT and a fault→HALT, every old frame becoming clean on inverse. For n=1, active pc=0 writes encoded old_pc=1; idle pc=1 writes 0. Include a coherent superposition of these branches; amplitude comparison must agree, with no implicit relative phase. C compares all target/fault seeds and F_B to 0.8. Hash impact V if adopted (new reference realisation even with equal final F_B). An optimiser could already use this as a §5.7 transformation; making it the reference is an efficiency/readiness choice, not a rung blocker.
+
+**Verdict: efficiency — a correct identity-idle reference variant exists with no added history width; no demo rung requires T7.**
+
+## I6: step-granular access and variable-time search claims
+
+NS §5.1 promises “Grover, amplitude estimation and friends … state-vector simulation at small instance size”; NS §9.4 leaves control/budget mechanics open. ISA §4.7 exposes whole region calls and §5.2 runs exactly B steps per oracle call; there is no public start/advance/finish state handle. That prevents directly invoking an **internal** prefix as a reusable instruction, but not algorithms assembled from total bounded oracles.
+
+Concrete ladder source has T(0)=3,T(1)=4:
+
+```text
+oracle @ladder_source (x:wire in) (t:wire) (f:wire[4]) () ()
+regs { z:reg[1] }
+^entry():
+z = lift.const.i1 0
+qbranch x ^slow ^fast
+^fast():
+lift.retval z
+^slow():
+qjump ^last
+^last():
+lift.retval x
+```
+
+At B=3: x=0 gives payload 0,code0; x=1 gives payload0,code1. At B=4: payload=x,code0. An action can call these with host-minted tokens and distinct declared fault outputs, then their inverses:
+
+```text
+perm_action @ladder (t:wire, early:wire[4], full:wire[4]) (x:wire in) () (a:token, b:token) ()
+^entry():
+oracle_call @ladder_source a (x) t early () ()
+oracle_call @ladder_source b (x) t full () ()
+oracle_call @ladder_source b (x) t full () ()
+oracle_call @ladder_source a (x) t early () ()
+```
+
+Between the middle calls an algorithm may apply phase/amplification operations while respecting cleanup windows. The printed round trip is identity on arbitrary interface seeds. Its call budgets sum to 3+4+4+3=14, so **28 forward/inverse machine steps**, plus four commit/initialisation sequences. A ladder with multiplicities m_j costs Σ_j m_j·C(B_j), not Σ_i T_i² by fiat. Here sqrt(3²+4²)=5 is a reference running-time norm, not the circuit's derived cost. No multiplicities realising an Ambainis bound have been established by this toy example.
+
+The budget note's claim that token ladders automatically reproduce the general ℓ2 bound, and its “no circuit … less work than the slowest input” as a universal circuit lower bound, are **unverified and not adopted**. Algorithm-specific structure/partial evaluation can defeat such a blanket lower bound. A paper citation or token ladder alone supplies neither an implemented amplitude-amplification schedule nor its proof. Automatic loop composition and a reusable step-state ABI are deferred mechanics, not a capability removed from any rung. No new ISA instruction is proposed without its state ownership, controlled inverse, halt and finish-commit contract. C/H can already test this ladder, exact thresholds and charges. Existing published hashes are unaffected; these would be new fixtures.
+
+**Verdict: efficiency — whole-oracle budget ladders are expressible; step API and claimed general ℓ2 construction remain unverified; no rung dependency.**
+
+## I7: the sixteen council round-8 suggestions
+
+NS §4.4 promises public “certificate schema,” “serialisation and versioning rules, and the conformance suite”; §5.1 requires proof versus evidence. These are cross-rung contract hygiene, not new program capabilities. Read each `bd show b-isa-spec-zsw.N`; no suggestion is treated as proof of its own correctness. Decisions: **11 accept, 1 reject, 4 defer**. The exact proposed edits for accepted suggestions follow. None changes function envelopes locally; a later semantic full-version bump changes every republished example as explained above.
+
+| Bead suffix | Decision | One-line derivation |
+|---|---|---|
+| .1 | accept | §4.1 omits restrictions already normative in §7.4; use one authoritative traversal. |
+| .2 | accept | §11 defaults create invocations with no explicit schedule entry; contexts must enumerate actual invocations. |
+| .3 | accept | §7.4 retains marked frames, so T4 cannot restore the physical audit array to its old length. |
+| .4 | defer | A complete controlled target/schedule/certificate fixture needs bound expansion bytes; the small rigorous witness below is ready but does not supply that whole fixture. |
+| .5 | defer | Bibliographic verification of the proposed 2013 §3.2 reference was not performed; no unverified citation is promoted to normative text. |
+| .6 | accept | Exact positive definiteness alone need not give strictly positive interval pivots at finite precision. |
+| .7 | accept | Same context defect as .2; sorting only explicit entry paths can omit default-covered calls. |
+| .8 | accept | §10 excludes measurements; T4's unqualified “every finite valid CC/R trace” does not. |
+| .9 | accept | Same missing summary restrictions as .1, including unverified frees. |
+| .10 | accept | A marker is always skipped; “retired” must not imply re-executing its cancelled call. |
+| .11 | reject | Acyclic wrapper hashing gives inc8=5f3e…8ee8, contradicting published 8ce5…be93. |
+| .12 | accept with correction | Use certified residual margins and actual interval pivots; 2^−precision_bits is not a universal error bound. |
+| .13 | accept | State the input-first trace convention; transposition ranges over the same density matrices. |
+| .14 | defer | ref needs a complete published, hashed operation/ordinal library; the current prose is not that artefact. |
+| .15 | accept | A four-CX dirty frame computes t⊕x and restores b on every basis input, including under inherited control. |
+| .16 | defer | §8.3 has no topology schema and §9.1 rejects unknown fields; routing cannot acquire a default from an undeclared field. |
+
+**.1/.9 exact §4.1 replacement for the uncall summary:**
+
+> Segment uncall is legal exactly under §7.4, including equal boundary arguments/results, a pure suffix, no measure at any nesting depth, and no unverified qreg.free in the segment. It uses §7.4's cancellation-aware history traversal; already reversed frames and uncall markers are skipped. Otherwise it traps/faults with FAULT_UB_TRAP and no state change beyond the fault record.
+
+The last phrase harmonises the old “no state change” with its required fault record, not with partial undo. A tests measured nested segments, unverified frees, impure suffixes and nested cancelled clock reads.
+
+**.2/.7 exact §12.1 replacement for context enumeration:**
+
+> Invocation contexts are enumerated from the root realisation's complete invocation tree, including invocations selected only by defaults, not from schedule entries. A context key is its concrete outermost-first invocation chain with resolved loop iteration and oracle-step indices and classical arguments. Enumerate distinct keys in bytewise order of their JCS encodings. A subject claim checks every matching context; its bound is their common upper bound. Wildcard selectors are resolved before this enumeration.
+
+This also disambiguates repeat invocations at one point. D/H fixture: an action calls A twice, one explicitly scheduled and one defaults-only; a claim with a witness for only the explicit call rejects. Two complete witnesses accept only when both bounds pass. No invocation is silently omitted.
+
+**.3/.8 exact §7.4 and T4 edits:**
+
+> Active history consists of unreversed semantic frames; reversed frames and uncall markers may remain as immutable audit records. Undoing a defining frame removes its dynamic instance from the active environment, even if its audit record is retained.
+>
+> T4: For every finite CC/R prefix eligible for reversal under §10, containing no measure and no unverified quantum release, traversal per §7.4 restores the active environment, memory, allocation table, device-model state and active history to their entry values. Retained marked audit records need not be deleted. Observed external events are not retracted.
+
+The prefix formulation includes ISA-8's eligible failed traces. It does not claim that uncall markers are reversible effects or that failure after measurement can be undone.
+
+**.10 exact §7.4 replacement for the parenthesis using retired:**
+
+> An uncall marker remains a skipped audit record; retiring its segment removes no active effects a second time and never re-executes or redoes the segment.
+
+A's nested f/g clock fixture must leave c=0 after uncall f and after subsequent whole reversal. Audit records may grow; active state must not.
+
+**.6/.12 exact §12.1 addition:**
+
+> The stated δ perturbation assumes an exactly feasible witness. For an approximate witness, first certify lower bounds −η_+, −η_− and −η_s on Y−J, Y+J and μI−Tr_outY. Choose δ>max(η_+,η_−,η_s), set Y′=Y+δI and μ′=μ+(d+1)δ, and require μ′≤bound. These inequalities establish exact positive margins, not an interval-factorisation pass. At the declared precision every actual pivot enclosure MUST still have a strictly positive lower endpoint; otherwise the checker rejects. There is no universal additive 2^−precision_bits allowance.
+
+Derivation: Y′±J≥(δ−η_±)I; Tr_out(δI_d²)=δdI_d, so μ′I−Tr_outY′≥(δ−η_s)I. Interval pivot error depends on conditioning, dimension and actual rounded operations; a single ulp does not bound it. Rigorous ready-to-add D witness: d=2, identical channels so J=0, Y=I_4/8, μ=bound=3/8. Both Y±J have exact LDL† pivots 1/8; Tr_outY=I_2/4, leaving slack I_2/8. All entries are binary rationals; interval LDL† is conclusive with exact representable arithmetic. A witness with Y=0, μ=0 is rejected by the mandated strict-pivot test even though the exact channels agree. This is a test expectation, not a claim that a checker was implemented here.
+
+**.13 exact non-normative §12.1 sentence:**
+
+> With the input-first Choi convention, Tr_out traces the second tensor factor: Tr[(ρ⊗I)Y]=Tr[ρ Tr_outY]. If a primal convention labels this input factor ρᵀ, it ranges over the same set of positive trace-one matrices, so the scalar upper bound is unchanged.
+
+**.15 exact new §16.3 function fragment and result statement** (add to a complete object with its signature and new computed hash):
+
+```text
+perm_action @borrow_demo (t:wire) (x:wire in) () () ()
+regs { } bounds { 1 }
+^entry():
+b = qborrow any 1
+qloop 1 {
+cx x b[0]
+cx b[0] t
+cx x b[0]
+cx b[0] t
+}
+qreturn b
+```
+
+> The action has one loop bound, 1. On every x,t,b∈{0,1}, it maps (x,t,b) to (x,t⊕x,b). V targets only borrowed b with control x; W targets only t with one borrowed control, so the translation lemma applies. Under inherited control w the result is (x,t⊕wx,b). Its adjoint has the same full permutation.
+
+C checks all eight configurations and all sixteen controlled configurations, with an entangled borrowed reference in D; F checks bounds `[1]` and the V/W side conditions. This adds a new vector without changing any existing body/hash. No new fault/history/instruction semantics are introduced by these accepted suggestions.
+
+Deferred .4/.14 remain concrete work: publish ref's exact bytes/ordinals and hash, then attach the full controlled-action fixture bound to them and add it to the precheck before council grading. No claimed target-independent “one step” charge substitutes for that library. Deferred .16 retains the stated logical all-to-all model until a topology contract is designed; no topology-related capability is deleted. The north star names target resource extensions, not an already specified physical routing ABI.
+
+**Verdict: wording-only — 11 accepted exact edits, .11 rejected, .4/.5/.14/.16 deferred; cross-rung contract hygiene, no capability narrowing.**
+
+## I8: blocks versus rows in the index space
+
+NS §4.2 promises an arbitrary-CFG step machine and a reference-interpreter budget unit. ISA §3.6 calls I[0..n) “the oracle's blocks in text order, each contiguous,” but §4.2 says “Every row is one budget step; k is its own index.” `inc8` has one block with three rows and needs B≥3; treating that block as one index cannot produce k+1 fallthrough or that result. §3.7 records return index k+1. This is an editorial inconsistency with a uniquely pinned row interpretation.
+
+**Exact edits** (§3.6/4.2): “I[0..n) is the oracle's rows in block text order, then the rows of its lproc closure. Each function occupies a contiguous range of row indices; a block label denotes its first row.” In qjumpr's flag definition, replace “indices of the containing function's blocks” by “row indices of the containing function”; label values still come from labels, not arbitrary cross-function control. Keep HALT=n and 2^P>n. No row count, frame width, instruction semantics, fault code or hash changes locally.
+
+Concrete §16.3 inc8: const index0, add index1, retval index2, HALT3, minimum P=2. I3's wrapper has indices 0,1,2 at entry, 3,4 at test, 5,6 at body, 7 at done, HALT8 and P=4. F tests multi-row blocks and lift.label preserving these values; B checks B=2/3 inc8 boundaries. The separate cyclic-SCC ordering defect below must also be specified so linked label values are reproducible.
+
+**Verdict: wording-only — one index per row and labels at block entry; every lifted rung depends on this already-pinned reading.**
+
+## SQLite E1: uniform location-stack cells
+
+NS §4.3 promises honest qubit-time and “coherent allocation … padded to its bound”; rung 4(c) requires “a resource estimate … reporting the budget and the padded cost.” ISA §3.7 defines `R_f=3+m′` cells and `W_cell=max(P,Sc,Did,W_max)`; “The stack is monotonic (sp only grows; records are history).” Recursive return does not reclaim those quantum history cells. Those rules already realise SQLite, but may cost much more than peak live native stack.
+
+The concrete published sum_db example has m′=13, R_sum=16; input n makes n+1 calls. Stack cells=16(n+1), so n=16 needs 272, not 256, and depth≥17. Its lproc base case executes 6 rows and each non-base level adds 14, so total oracle rows=14n+10=234 at n=16 (provided all memory checks pass). The current published test already pins the stack boundary.
+
+For a call record whose padding is proved unused, the occupied payload bits could be `P+Sc+Did+Σ_{ℓ∈L_f}width(ℓ)` instead of `(3+m′)W_cell`. This is a representation transformation, not a change in the logical R_f stack budget. Example dimensions P=4,Sc=4,Did=2,W_cell=8,m′=2 with two one-bit locations: padded record 5·8=40 bits, packed payload 4+4+2+1+1=12. A physical implementation still needs addressing/control scratch, and on a superposition must reserve enough for **every reachable call shape**, not the native trace's average. It must decode to the same logical stack for forward and inverse delivery.
+
+The report's 1,214,248 cells×128 = **155,423,744 bits**, before its 10% margin. A 128-bit W_cell follows **if** the mapped closure actually contains a 128-bit location and P,Sc,Did≤128. No emitted full SQLite ISA object or per-function width histogram was available to verify the proposed “3–4×” saving, so that factor is **unverified**. All seven deliverables of the other interpreter job are outside this job's edit scope; no Rust tests were changed.
+
+No new 0.9 stack semantics are proposed. A bound expansion can pack proved padding under §5.7/T6, with I1's realised-frame reporting if adopted. B/C compare logical snapshots and single-step inverses of differently sized recursive callees; E charges actual bits/live intervals, while reference stack exhaustion remains at R_f sums. No new fault code; `FAULT_BUDGET_DEPTH` still occurs on `sp+R_f>stack_limit`, not on packed-byte occupancy. Existing example hashes unchanged.
+
+**Verdict: efficiency — heterogeneous physical packing may reduce 4(c) space; logical stack semantics already realise SQLite; measured saving unverified.**
+
+## SQLite E2: uniform per-step history frames
+
+NS §4.3: “Garbage carries an occupancy cost per qubit-second.” ISA §3.6 fixes `(old_pc, disp_1..disp_kmax, flag, succ)` per oracle. Its reference frame width is
+
+`W_frame = 2P + 1 + Σ_j W_j`,
+
+where W_j is the maximum width of slot j across the full closure's row uses. Example inc8 has P=2, one assignment slot of width8, hence W_frame=4+1+8=13 bits; result_val=8 and locations=16 bits are separate allocations. At B=3 it retains 39 frame bits; B=2 retains 26, even though the latter call faults. These are directly derived from the printed model, independent of any gate library.
+
+With the report's assumed width 740 and profiled estimated B=289,590, the product is **214,296,600 bits**. At ceil(1.10B)=318,549, it is **235,726,260 bits**, explaining its approximate 235M claim. The 740-bit width itself is **unverified** until the mapped reference body's complete slot maxima are known; 13 arguments totalling 608 bits are not by themselves a derivation of it. At n≈324,000 rows P=19 because 2^18<n<2^19; slot sizing must include every call capture, allocator slot and parallel move, including fault-only paths.
+
+Rows can share physical fields if their complete live ranges are disjoint; after each inverse its frame is zero. Across quantum-superposed row choices at a fixed step, narrower storage requires a reversible tagged/encoded representation, not observing which row ran. Statically proven reachable-row sets can reduce a step's maxima; observed classical traces cannot. General space reduction is I1 checkpointing. Neither changes the original row budget or fault boundary. No new row/frame schema is necessary; a named expansion must enumerate the actual representation and resource charge. B/C compare full decoded tuples and faults at B=0, the exact halt boundary, and early HALT; E/H compare live-interval occupancy. Hash impact none unless the separate I1/I5 proposal is adopted.
+
+**Verdict: efficiency — frame representation is costly but correct; 4(c) may benefit, and no new capability is needed.**
+
+## SQLite E3: indirect-call row
+
+NS §0: “If it compiles with clang, you can put it under a qubit”; §3.2 requires function addresses equal the comparison link's layout. This matters for SQLite VFS/SQL callbacks and rung 5 dispatch and rung 6/7 operation tables. ISA §4.2 has static `lift.call`; `qjumpr` is constrained to the containing function. The latter forbids using a cross-function return address as an indirect call; it does not forbid finite dispatch.
+
+Concrete canonical oracle fragment, with fp:wire[32] and x:wire[8] inputs, target8 and fault4; a,b:reg[32], p:reg[1], r:reg[8]:
+
+```text
+a = lift.const.i32 256
+b = lift.const.i32 512
+p = lift.icmp.eq fp a
+qbranch p ^fa ^testb
+^testb():
+p = lift.icmp.eq fp b
+qbranch p ^fb ^bad
+^fa():
+r = lift.call @add1 (x)
+qjump ^done
+^fb():
+r = lift.call @sub1 (x)
+qjump ^done
+^bad():
+fault 4
+^done():
+lift.retval r
+```
+
+Addresses 256/512 are the concrete comparison-link values of the two candidates. Each lproc has param x:reg[8], result r:reg[8], one:reg[8]; its body const1, add/sub, lift.ret r has three rows and R_f=3+3=6 cells. Totals: candidate add1 executes 4+1+3+1+1=**10 rows**; sub1 executes 4+2+1+3+1+1=**12**; no match executes 4+2+1=**7** and code4. With sufficient budget, x=255 gives 0 for fp=256, 254 for fp=512, and payload0,code4 for any unmatched pointer. One call depth and six cells suffice for either candidate, in addition to any caller closure history.
+
+A balanced tree over K known addresses has O(log K) comparisons and branches on a chosen path, plus equality/no-match handling, the static call/return and **constant initialisation**. The report's `2ceil(log2 K)+1` is an approximation, not an exact universal row formula; e.g. it omits these two constants and an unmatched leaf. All candidate bodies enlarge n, and the literal step machine pays for the enlarged closure at each B step. Type-based candidate soundness across every LLVM ABI is **not proved here**; the report's counts are a concrete inventory, and the dialect's independent validator must establish candidate completeness for its materialised program.
+
+No `lift.callr` is needed for 0.9 capability. A new indirect row would have to define function-address mapping, validated homogeneous signatures, no-match code, SCC closure references, canonical indices and an ordered capture/push/bind/delivery inverse list. That is larger than a claim that `qjumpr` can call. Keep compare trees; add B/C/F tests of both candidates, no match, caller-local target preservation and exact B=9/10 and 11/12 boundaries. No new faults/hash rules.
+
+**Verdict: efficiency — compare-and-branch plus static lift.call already realises indirect calls; rungs 4/5/6/7 depend on that lowering, not a new row.**
+
+## SQLite E4: block copy
+
+NS §3.1 explicitly includes “The ordinary loads and stores of lifted classical code (all of SQLite's)”; rung 2 has byte memory and rung 4's memdb copies pages. ISA §4.2 provides `lift.load`, `lift.store`, arithmetic and branches, with inherent bounds checks. Lack of one block-copy row is not lack of memcpy.
+
+Concrete canonical lproc, ptr_width=32, copying n bytes between **non-overlapping** live allocations:
+
+```text
+lproc @copy_bytes (d:reg[32], s:reg[32], n:reg[32]) (r:reg[32]) () () ()
+regs { one:reg[32], i:reg[32], c:reg[1], sa:reg[32], da:reg[32], v:reg[8] }
+^entry():
+one = lift.const.i32 1
+i = lift.const.i32 0
+qjump ^test
+^test():
+c = lift.icmp.ult i n
+qbranch c ^body ^done
+^body():
+sa = lift.add s i
+da = lift.add d i
+v = lift.load.i8 sa
+lift.store.i8 da v
+i = lift.add i one
+qjump ^test
+^done():
+lift.ret i
+```
+
+It has m′=3 params+1 result+6 regs=10, R_f=13 cells. For n=M bytes, 3 initial rows, 2(M+1) test rows, 6M body rows and one return give **8M+6** callee rows, plus one caller lift.call. The largest M=2^32−1 still increments only to n, without wrap. The valid-allocation premise guarantees address addition does not wrap within the accessed range. With explicit dialect boundschecks add 2M. Each store records its displaced byte and prefix reversal restores destination, source, locals and call record even if a later access faults. Copy is not quantum cloning of an arbitrary state: this is the lifted classical assignment embedded in an oracle whose workspace memory is later reversed.
+
+For source [1,2,3,4], destination [9,8,7,6], n=4, forward local destination=[1,2,3,4], r=4 after 38 callee rows; the complete oracle preserves caller `in` regions and only returns its declared output. Inverse restores [9,8,7,6] byte-for-byte. n=0 uses 6 rows and makes no access. `memmove` needs direction selection or a temporary: d=s+1 with source bytes [1,2,3] must produce [1,1,2,3], whereas naïve forward copy produces [1,1,1,1]. A two-pass temporary-buffer implementation is O(M) rows plus M temporary bytes and allocation metadata; it still fits 0.8. No atomic block-copy row or inferred constant gate charge is proposed.
+
+B/C test zero length, non-overlap, overlap both directions via memmove, range failure after a prefix, and inverse displaced-byte restoration. F checks parameter and access widths; E charges all dispatch/table scans from the bound expansion. No new frame/fault/hash rule. The report's 49KB of copy activity is a profile measurement, not a new row count.
+
+**Verdict: efficiency — byte/word copy lprocs already realise memcpy/memmove; optional 4(c) cost optimisation only.**
+
+## SQLite E5: a classical-content hint for input regions
+
+NS §8 rung 4 fixes the database “classically before entry”; §4.3 says quantum-addressed memory costs O(N) gates “unless the target provides QRAM.” ISA §5.2 nevertheless defines D as “every cell of every in region”; §4.6 qload XORs the selected cell and §5.7 allows extensionally equal specialisation. A hint must not silently replace arbitrary region contents by a classical ROM or exclude part of D.
+
+For known four-byte image [0x12,0,0x80,0x03], address a:wire[2], the QROM construction computes e_j=(a==j), XORs the known byte into target under e_j, and uncomputes e_j, j=0..3. E.g. the j=0 fragment after its equality flag e0 is computed is:
+
+```text
+cx e0 t[1]
+cx e0 t[4]
+```
+
+j=2 flips t[7]; j=3 flips t[0],t[1]; j=1 flips nothing. Thus 5 controlled data flips plus four equality computations and their inverses produce t⊕image[a], for every a,t. The general data-flip count is Σ_j popcount(image[j]); equality cost is the actual expansion of two-bit or A-bit comparisons, not a target-independent Toffoli number. To use this as qload's value d, allocate d clean and uncompute by the same circuit before freeing it. A schedule can choose the known-byte implementation only when entry preparation and exclusive ownership establish those exact bytes. If a region may be modified coherently, use an overlay or the general memory circuit. No nondestructive runtime “is classical?” measurement is available.
+
+The hint can be non-semantic metadata or executor provenance; it must leave a valid general path for every other allowed input, with no new fault or rejected source program. The object schema's unknown-field rejection means a producer cannot invent a new normative hint field in a 0.8 object; it can specialise an ordinary data-image object or retain executor-side facts from `bennett_qreg_prepare`. The exact bytes and dynamic preparation/parameter binding must be reproducible in the certificate used for that estimate. No optional new field is proposed here until its binding schema is supplied.
+
+**Report correction, independent of E5.** A `region[25,8]` has 2^25 bytes=2^28 wires. The measured file size 33,492,992 padded to 33,554,432 leaves **61,440 zero bytes**. §7.2 requires its base plus 2^25 within [0,2^H), disjoint from a positive null region, globals and heap. Therefore **H≥26**, not the report's H=18; a positive base prevents fitting in H=25 too. A conformant shape could put null/globals low, a bounded heap below 2^25, and db at base2^25, ending at2^26. Literal mem then has 2^26 byte cells (before any proved optimisation), not 2^18. Hc≥H+2 is at least28. Consequently the report's 1.3e19 literal gate estimate and its 6.9e8-qubit table do not describe a valid §7.2 object. Their recomputed conformant costs are **unverified**; no replacement total is invented.
+
+The report's profiled row weights (FP=150, switch=3, indirect call=9, etc.) and sampled 2^20 maximum are also **not proved ISA budgets**. Its 4e7 structure-recovered estimate uses observed address sets/invariance; full-domain static proofs and a named concrete target/expansion remain outstanding. These limitations do not refute the feasible route-A construction: interface image, ordinary lifted SQLite and a sufficiently large validated tuple already exist in 0.8. They prevent treating a spike estimate as a conformance certificate or a demonstrated zero-fault budget for all 2^20 inputs.
+
+C/D compare the QROM tuple and phases to general qload, including superposed addresses; F/B check H=18 rejection and a valid H=26 mapping. E/H require every comparator/data flip and live interval to be charged. No new ISA semantics, fault code, frame or existing hash change.
+
+**Verdict: efficiency — verified classical-data specialisation is permitted; 4(c) needs sound bindings and corrected layout/cost evidence, not a capability restriction.**
+
+## Additional ISA 0.8 defects found during the review
+
+Only these two new issues were created; I8, ISA-10, I7's context/history defects and ISA-7/8 already have issues. Both new issues carry `isa-0.9-candidate`. These are text proposals, not repairs made to accepted 0.8.
+
+**b-isa-spec-was — SCC ordering (§3.6).** Exact text says “lprocs ordered by closure hash with SCC members in SCC index order.” SHA-256 member digests are not ordered by member index, so sorting every member's closure hash can conflict with keeping its SCC in index order. Proposed exact clarification: “Partition the lproc closure into SCC groups. An acyclic singleton group's order key is its closure hash; a cyclic group's order key is its scc_hash. Sort groups by those keys, then emit each group's members in SCC index order. Within each function concatenate rows in block text order.” §9.2's name ordering determines the SCC member indices. No new frame/fault/width. F fixture: mutual f,g, member-hash order opposite name order; canonical f-before-g within that group and stable lift.label values, independent of load/link order. No existing example has a multi-member SCC; all four 0.8 vectors remain unchanged. NS §4.4's public linking contract and all recursive lifted programs depend on deterministic labels. Verdict: wording-only; no extra rung blocker.
+
+**b-isa-spec-oim — empty data (§16.1/16.2).** HEX is `([0-9a-f]{2})*`, allowing empty; dataline is `NAME SP HEX NL`; §16.1 forbids trailing spaces. A size-zero image therefore requires and forbids its separator space. Proposed exact sentence: “The mandatory separator space in a data line with empty HEX is the sole exception to the no-trailing-spaces rule.” Keep the existing dataline grammar; do not disallow zero-sized data to escape the inconsistency. F accepts exactly NAME, one space, LF for size0; rejects two spaces and size/image mismatch. The hash includes the mandatory space. No instruction/frame/fault changes or existing example changes. NS §0's unrestricted programs and §4.4 serialisation apply; no rung specifically needs an empty image. Verdict: wording-only.
+
+## Proposed ISA 0.9 change list
+
+**Order by rung dependency.** There is no proved missing ISA capability blocking the fixed-shape demo ladder. The implementations and proof obligations supporting rungs 1–8 are given above; this does not assert that their plugin, platform or executors are implemented. First address shared correctness/contracts used by early rungs (row indices, acyclic hashing, SCC ordering, call/uncall history and complete certificate contexts). Next prioritise rung-4/7 cost work **outside normative edits**: corrected layout and full mapped budgets, structure recovery (I2), QROM bindings (E5), physical stack/frame accounting (E1/E2), and optional pebbled expansion (I1). Rungs 5/6 require the platform/continuation transform and independent native tests; G-16 is optional efficiency. Runtime-snapshot efficiency (G-12) follows for 7(c). None of E1–E5 warrants inventing a new ISA numerical rule.
+
+**Fewest council rounds: one combined 0.9 proposal**, after dialect acceptance. Group the dependency-ordered contents in that single dossier:
+
+1. Editorial repairs with unchanged local semantics: I8, ISA-10's direct/cyclic distinction, SCC ordering, empty data, I4, accepted I7 wording and its positive borrow vector; call/ret/branch qreg threading and literal/runtime slice-offset wording. New vectors and their expected values must enter the precheck before grading, per spec/README. Include entropy code10's clarified use.
+2. Small capability contracts, independent of demo feasibility: BLK-1 dynamic handle type/id ledger and concrete schedule binding; BLK-4 R allocation using the same ledger and cleanliness inverse; BLK-2 device minting with immutable per-invocation tuples; BLK-3 parameterised certified inverse pairs plus provenance/cleanup exception. Follow with ISA-7's cause mapping/explicit fault and ISA-8's reversible failed prefixes, using the shared T4 eligibility wording. Their exact sentences and suites are in their item sections. No new numerical fault codes, no LLVM changes, no weakening of any NS clause.
+3. Optional efficiency semantics in the **same** dossier if their expansion fixtures are ready: I5's encoded old_pc reference variant and I1's realisation/resource bindings. They are not prerequisites to sending the mandatory capability/wording proposals. Default remains full history until a checked alternative is bound. Publish ref's actual operation set/hash and run each changed/new vector before acceptance; a prose declaration of its existence does not discharge that work.
+
+Use a full 0.9 version consistently and recompute all four republished example hashes; retain 0.8 vectors unchanged. This note deliberately proposes no callr, copy row, overlay, dynamic-base field, CC borrow ABI, fiber ABI or native-memory mapping until evidence establishes the efficiency case and their full cross-repository contracts. Every associated software capability is retained by a construction, with unverified generalisations marked explicitly. Four deferred round-8 suggestions stay open; they are not deleted or relabelled as implemented.
+
+## Verification record and remaining evidentiary limits
+
+Read-only baseline: headless `python3 -B reference-interpreter/isa_check.py` passed: two complete published objects parse/hash and execute, both printed envelopes verified. Inline `python3 -B`/hashlib independently checked the direct/wrapped envelope distinction, arithmetic and the constructions listed below. These checks are evidence for this note, not a claim that proposed 0.9 syntax passes the unchanged 0.8 checker. No LLVM command, Rust build, git command, spec edit or interpreter edit was performed by this job.
+
+Source fingerprints at reading (SHA-256):
+
+```text
+ISA 0.8                 90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e
+budget note             ff076c63a2a2f1d8f25ee66c57f877ab57f838a42a3bf671596a7fee86cb9119
+dialect outline         bdcad1ac8ff141f75300f532328c6f04c27465a197fadd0851976801d4eb689c
+SQLite REPORT           0daae7a070058f7c0a12614764840e6438727423026340c4c28119ab41e52871
+narrowing audit         ee6b60b351f0068e4e75d8c4b3f6b1995d2249822a182f3951ad965d31292a34
+north star              48d41e6a0094f6710fca5f01b5601f1a9f721bdcac2612211fb7511712019799
+plan                    faa2fbd2eb4523f240fd549120947d8331dfb196a93a34fae9ead0895672f86c
+```
+
+Not reproduced here: SQLite source builds/profiles and complete mapped ISA closure, real target gate counts, the generic static taint/control/ABI completeness proofs, an Ambainis amplification schedule, approximate witness acceptance at arbitrary precision, or the 2013 bibliographic attribution. Each numerical rule used in a proposal is derived in its section. Beads notes carry verdicts, not closure claims about the later spec implementation. See the paired progress file for the final verification commands and issue-note audit.
