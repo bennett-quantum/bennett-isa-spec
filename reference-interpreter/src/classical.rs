@@ -176,6 +176,7 @@ impl<'a> ClassicalMachine<'a> {
         entropy: &[u8],
         registers: QuantumRegisters,
     ) -> Result<Self> {
+        object.ensure_linked()?;
         let f = object
             .functions
             .get(entry)

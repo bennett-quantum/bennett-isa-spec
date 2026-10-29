@@ -527,6 +527,12 @@ impl Object {
             .ok_or_else(|| Error(format!("§9.3: undefined symbol @{name}")))?;
         Function::from_signature(name, import.get("signature")?)
     }
+    pub(crate) fn data_size(&self,name:&str)->Result<u128>{
+        if let Some(bytes)=self.data.get(name){return Ok(bytes.len()as u128);}
+        let import=self.section("imports").and_then(|v|v.object().ok()).and_then(|v|v.get(name)).ok_or_else(||Error(format!("§9.3: unknown data symbol @{name}")))?;
+        let sig=import.get("signature")?;if sig.get("kind")?.string()?!="data"{return err("§4.6","qregion image reference must have data kind");}sig.get("size")?.uint()
+    }
+    pub(crate) fn ensure_linked(&self)->Result<()>{if self.section("imports").map(|s|s.object().map(|s|!s.is_empty())).transpose()?.unwrap_or(false){return err("§9.3","object has unresolved imports; link before execution");}Ok(())}
     pub fn parse(text: &str) -> Result<Self> {
         if !text.ends_with('\n') || text.contains('\r') || text.contains('\t') {
             return err(
@@ -923,6 +929,7 @@ impl Object {
                     self.validate_row(f, ins, &types, &labels)?;
                 }
             }
+            self.validate_matched_oracle_calls(f)?;
         } else {
             self.validate_structured(f, &mut types, &labels)?;
         }

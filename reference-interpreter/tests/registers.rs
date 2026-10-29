@@ -1,7 +1,9 @@
 mod support;
 use bennett_isa_ref::{ClassicalMachine, ClassicalValue, Object, QuantumRegisters};
 use support::{object, rehash};
-fn program() -> Object { Object::parse(include_str!("fixtures/registers.bisa")).unwrap() }
+fn program() -> Object {
+    Object::parse(include_str!("fixtures/registers.bisa")).unwrap()
+}
 
 #[test]
 fn register_handles_enforce_views_consumption_and_cleanliness() {

@@ -137,6 +137,7 @@ impl Object {
         adjoint: bool,
         controls: &[Wire],
     ) -> Result<()> {
+        self.ensure_linked()?;
         self.action_internal(
             name,
             q,

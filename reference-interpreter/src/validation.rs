@@ -39,6 +39,7 @@ impl Object {
         if state.bounds != f.bounds {
             return err("§5.3", "declared bounds do not equal loops in text order");
         }
+        self.validate_borrow_frames(f)?;
         Ok(())
     }
     fn validate_action_sequence(
@@ -136,6 +137,7 @@ impl Object {
                 }
                 "qfree" | "qreturn" => {
                     arity(1, 0)?;
+                    s.check_target(&a[0], false)?;
                     let c = s
                         .created
                         .get(&a[0])
@@ -165,6 +167,7 @@ impl Object {
                 }
                 "quncopy" => {
                     arity(2, 0)?;
+                    s.check_target(&a[1], false)?;
                     s.disjoint(&[&a[0], &a[1]])?;
                     let c = s
                         .created
@@ -199,12 +202,12 @@ impl Object {
                     if a.len() == 4 {
                         let img = a[3]
                             .strip_prefix('@')
-                            .and_then(|n| self.data.get(n))
                             .ok_or_else(|| Error("§4.6: unknown qregion image".into()))?;
+                        let size=self.data_size(img)?;
                         let bits = (1u128 << aw)
                             .checked_mul(w as u128)
                             .ok_or_else(|| Error("§4.6: image size overflow".into()))?;
-                        if bits % 8 != 0 || bits / 8 != img.len() as u128 {
+                        if bits % 8 != 0 || bits / 8 != size {
                             return err("§4.6", "image size mismatch");
                         }
                     }
@@ -241,6 +244,7 @@ impl Object {
                         }
                         s.disjoint(&[&a[1], &a[2]])?;
                         if op == "qunload" {
+                            s.check_target(&a[2], false)?;
                             let c = s
                                 .created
                                 .get(&a[2])
@@ -298,6 +302,13 @@ impl Object {
                         s.predicates.push(control.clone());
                     }
                     self.validate_region_call(f, &call.instruction, &s.types)?;
+                    let context = s
+                        .predicates
+                        .iter()
+                        .map(|p| s.wires(p))
+                        .collect::<Result<Vec<_>>>()?
+                        .concat();
+                    self.validate_inherited_targets(&call.instruction, &context, &s.types)?;
                     let callee =
                         self.declaration(call.instruction.operands[0].trim_start_matches('@'))?;
                     if f.kind == "perm_action" && callee.kind == "action" {
@@ -313,7 +324,13 @@ impl Object {
                         let other = callee.kind == "action";
                         s.change(
                             &target,
-                            format!("call:{}:{}:{}", call.adjoint, ca.join(" "), i.line),
+                            format!(
+                                "call_{}_{}:{}:{:?}",
+                                if other { "other" } else { "perm" },
+                                if call.adjoint { "adj" } else { "fwd" },
+                                ca.join(" "),
+                                s.predicates
+                            ),
                             other,
                         )?;
                     }
@@ -335,9 +352,15 @@ impl Object {
                         scalar(s, w)?;
                     }
                     s.disjoint(&all)?;
+                    let mut normalized = a.clone();
+                    if matches!(op, "rx" | "ry" | "rz") {
+                        if let Ok(angle) = a[0].parse::<f64>() {
+                            normalized[0] = format!("#{:016x}", angle.to_bits());
+                        }
+                    }
                     let version = format!(
                         "{op}:{}:{:?}:{:?}",
-                        a.join(" "),
+                        normalized.join(" "),
                         s.snapshot(
                             &controls
                                 .iter()
@@ -350,6 +373,8 @@ impl Object {
                         s.check_target(&t, diagonal)?;
                         if !diagonal {
                             s.change(&t, version.clone(), other)?;
+                        } else if s.is_other(&t)? {
+                            s.record_change(&t, version.clone())?;
                         }
                     }
                 }
@@ -1097,7 +1122,10 @@ impl Discipline {
                 self.closed.insert(w.clone());
             }
             let log = self.versions.entry(w).or_default();
-            if !other && log.last() == Some(&version) {
+            if log
+                .last()
+                .is_some_and(|prior| operation_inverse(prior).as_deref() == Some(version.as_str()))
+            {
                 log.pop();
             } else {
                 log.push(version.clone());
@@ -1105,6 +1133,52 @@ impl Discipline {
         }
         Ok(())
     }
+    fn is_other(&self, n: &str) -> Result<bool> {
+        Ok(self.wires(n)?.iter().any(|w| {
+            self.versions.get(w).is_some_and(|log| {
+                log.iter().any(|v| {
+                    ["h:", "rx:", "ry:", "call_other_"]
+                        .iter()
+                        .any(|p| v.starts_with(p))
+                })
+            })
+        }))
+    }
+    fn record_change(&mut self, n: &str, version: String) -> Result<()> {
+        for wire in self.wires(n)? {
+            let log = self.versions.entry(wire).or_default();
+            if log
+                .last()
+                .is_some_and(|p| operation_inverse(p).as_deref() == Some(&version))
+            {
+                log.pop();
+            } else {
+                log.push(version.clone());
+            }
+        }
+        Ok(())
+    }
+}
+fn operation_inverse(version: &str) -> Option<String> {
+    let (op, rest) = version.split_once(':')?;
+    let inverse = match op {
+        "s" => "sdg",
+        "sdg" => "s",
+        "t" => "tdg",
+        "tdg" => "t",
+        "call_other_fwd" => "call_other_adj",
+        "call_other_adj" => "call_other_fwd",
+        "call_perm_fwd" => "call_perm_adj",
+        "call_perm_adj" => "call_perm_fwd",
+        "x" | "cx" | "ccx" | "mcx" | "swap" | "h" | "qxor" | "qexch" | "qexchm" => op,
+        "rx" | "ry" | "rz" => {
+            let (angle, tail) = rest.split_once(' ')?;
+            let bits = u64::from_str_radix(angle.strip_prefix('#')?, 16).ok()?;
+            return Some(format!("{op}:#{:016x} {tail}", bits ^ (1u64 << 63)));
+        }
+        _ => return None,
+    };
+    Some(format!("{inverse}:{rest}"))
 }
 pub(crate) fn gate(op: &str) -> bool {
     [

@@ -105,3 +105,13 @@ fn classical_and_region_import_signatures_are_validated() {
     let malformed = raw.replace("\"mut\":[8]", "\"mut\":[0]");
     assert!(Object::parse(&malformed).is_err());
 }
+
+#[test]
+fn imported_quantum_region_image_resolves_by_data_signature(){
+    let signature=r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}"#;
+    let imports=r#"{"image":{"signature":{"abi":"0.8","kind":"data","size":1,"tier":"-"}}}"#;
+    let caller=rehash(&object(&[("a",signature,"perm_action @a (t:wire mut) () () () ()\n^entry():\nqregion r 0 8 @image")],imports,""));
+    let text=format!("bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=32\n\nsection symbols\n{{\"0\":{{\"interface_hash\":\"{}\",\"kind\":\"data\",\"name\":\"image\",\"signature\":{{\"abi\":\"0.8\",\"kind\":\"data\",\"size\":1,\"tier\":\"-\"}}}}}}\n\nsection data\nimage ff\n","0".repeat(64));
+    let linked=Object::link(&[caller,rehash(&text)]).unwrap();linked.check_hashes().unwrap();
+    let mut q=bennett_isa_ref::QuantumState::new();let t=q.allocate(1).unwrap();let mut binding=bennett_isa_ref::QuantumBindings::default();binding.bundles.insert("t".into(),t.clone());linked.execute_action("a",&mut q,&binding,false,&[]).unwrap();assert_eq!(q.read_basis(&t).unwrap(),0);
+}

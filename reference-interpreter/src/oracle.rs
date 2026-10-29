@@ -193,6 +193,7 @@ pub(crate) struct Program<'a> {
 }
 impl<'a> Program<'a> {
     pub fn new(object: &'a Object, root: &str) -> Result<Self> {
+        object.ensure_linked()?;
         let oracle = object
             .functions
             .get(root)

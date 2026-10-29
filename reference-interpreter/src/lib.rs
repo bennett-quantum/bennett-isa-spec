@@ -1,5 +1,7 @@
 //! Executable reference semantics for the Bennett ISA, version 0.8.
 mod action;
+mod borrow;
+mod call_discipline;
 mod classical;
 mod handle_validation;
 mod identity;
@@ -20,6 +22,7 @@ pub use object::*;
 pub use oracle::{Argument, Budget, OracleInput, OracleOutcome};
 pub use quantum::{Complex, MeasurementBranch, QuantumBindings, QuantumRegion, QuantumState};
 pub use registers::QuantumRegisters;
+pub use borrow::validate_translation_lemma;
 pub use sha256::{sha256, sha256_hex};
 
 /// A diagnostic always names the normative rule that was violated.
