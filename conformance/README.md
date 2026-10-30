@@ -50,6 +50,7 @@ plus the fixture files it references (shared object texts live in
 | `expect.stdout_empty`, `expect.stderr_contains` | for diagnostics (exit 1, rule cited on stderr) |
 | `scenario`, `expected_outcome` | structured inputs and hand-derived semantic outcomes for staged cases; these are not a claim that a missing CLI has executed them |
 | `unavailable` | `{"deliverable": N, "reason": ...}` for suites served by staged deliverables 8–11 |
+| `unavailable.expect` | optional explicit staged refusal alternative to a precise primary error; scoped to this unavailable probe only |
 
 ### Unavailable cases
 
@@ -59,8 +60,20 @@ consumer, 11 §12.1 rigorous checker — `reference-interpreter/
 PROGRESS.md`), the case still exists with its derived expectation in
 `expected_outcome` and the explanation in `derivation`, and the harness reports
 `UNAVAILABLE <id>: unavailable: deliverable N`. When the case has a `command`, it
-is a **probe**: the harness runs it and requires the loud staged
-refusal the `expect` block describes. A binary that silently accepts
+is a **probe**: the harness runs it and requires the explicit
+refusal the `expect` block describes. The E/H probes also allow
+`unavailable.expect` to name the missing deliverable. Both alternatives
+require exit 1 and empty stdout; the staged alternative must contain
+`staged deliverable N` for that case's deliverable. Unrelated errors,
+wrong exits and empty alternatives fail. Either accepted refusal still
+counts as UNAVAILABLE, so the standalone harness exits 2.
+
+This alternative covers staged implementation mechanics only. It does
+not relax the spec-defined `expected_outcome`: noncanonical target
+bytes reject, exact entries cannot reference `eps` or `log2inv_eps`,
+and an unavailable bound library requires `E_SCHEDULE_INFEASIBLE`.
+Removing `unavailable` on promotion removes the alternative; the precise
+primary expectation must then hold. A binary that silently accepts
 a probe fails the case — that is the signal to promote it to a
 runnable case.
 
@@ -76,6 +89,10 @@ runnable case.
   test; fails if any available case fails.
 - `tests/headers.rs` — compiles `include/bennett_launch.h` and
   `include/bennett_sched.h` with `cc -std=c11 -Wall -Werror`.
+- `tests/target_fixtures.rs` — independently checks canonical fixture
+  bytes, their hash, and separate valid/forbidden exact-entry witnesses.
+- `tests/draft_contracts.rs` / `draft_witnesses.py` — checks the printed
+  0.9 witnesses and the unchanged 0.8 fingerprint; no 0.9 executor claim.
 
 The Rust tests check the harness, case integrity, C compilation and all available
 reference cases. Their success does not certify staged suites; the standalone

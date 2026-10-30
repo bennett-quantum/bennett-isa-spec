@@ -6,7 +6,7 @@
  "object": "../../objects/control_flow.bisa",
  "unavailable": {
   "deliverable": 11,
-  "reason": "epsilon > 0 realisations need target descriptions (deliverable 9), the schedule consumer (10) and the rigorous checker (11); none has a reference-CLI surface"
+  "reason": "epsilon > 0 realisations need target descriptions (deliverable 9), the schedule consumer (10) and the rigorous checker (11); none has a reference-CLI surface; ref@0.8 publication blocked by b-isa-spec-8r4 (bennett-vm-47t); no library hash/ordinals are claimed"
  },
  "scenario": {
   "template_errors": [

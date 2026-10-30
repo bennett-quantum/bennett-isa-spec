@@ -6,7 +6,7 @@
  "object": "../../objects/registers.bisa",
  "unavailable": {
   "deliverable": 11,
-  "reason": "the rigorous interval certificate checker (§12.1, interval Cholesky) is staged deliverable 11; no reference-CLI command checks channel claims"
+  "reason": "the rigorous interval certificate checker (§12.1, interval Cholesky) is staged deliverable 11; no reference-CLI command checks channel claims; ref@0.8 publication blocked by b-isa-spec-8r4 (bennett-vm-47t); no library hash/ordinals are claimed"
  },
  "scenario": {
   "claim_file": "claim.json",

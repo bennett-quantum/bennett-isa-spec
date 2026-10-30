@@ -1,7 +1,7 @@
 {
  "id": "E-mbu-must-be-false",
  "suite": "E",
- "spec": "§15 suite E; §6.4: the target capability mbu is reserved and MUST be false (measurement-based cleanup is not admitted in sched/cert 0.8)",
+ "spec": "§15 suite E; §6.4: the target capability mbu is reserved and MUST be false (measurement-based cleanup is not admitted in sched/cert 0.8); §8.1: \"A target is a JSON document in RFC 8785 canonical form\" (fixture bytes have no trailing LF)",
  "derivation": "A target document with capabilities.mbu true is invalid at load: measurement-based cleanup has no certificate kind in cert 0.8 and the capability must read false (the valid target.json in E-target-staged-probe has it false).",
  "unavailable": {
   "deliverable": 9,

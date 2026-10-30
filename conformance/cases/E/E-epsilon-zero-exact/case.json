@@ -1,0 +1,26 @@
+{
+ "id": "E-epsilon-zero-exact",
+ "suite": "E",
+ "spec": "§8.1: \"an entry with epsilon 0 is exact and matches every eps\"; \"an entry with epsilon 0 MUST NOT reference eps or log2inv_eps\".",
+ "derivation": "The cx entry has epsilon 0 and cost.time 1, with no eps/log2inv_eps reference. Thus it loads and matches cx with c=1 on fast wires for every requested epsilon_share, including zero; time is exactly 1.",
+ "unavailable": {
+  "deliverable": 9,
+  "reason": "§8 target evaluation has no CLI outcome surface in the reference binary"
+ },
+ "scenario": {
+  "target_file": "target.json",
+  "op": "cx",
+  "c": 1,
+  "epsilon_shares": [
+   "0",
+   "0.001",
+   "1"
+  ]
+ },
+ "expected_outcome": {
+  "load": "accept",
+  "epsilon": 0,
+  "time": 1,
+  "matches_every_eps": true
+ }
+}

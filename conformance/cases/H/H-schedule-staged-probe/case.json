@@ -2,7 +2,7 @@
  "id": "H-schedule-staged-probe",
  "suite": "H",
  "spec": "§15 suite H; §11: a consumer validates every binding and executes verbatim or rejects (E_SCHEDULE_INFEASIBLE)",
- "derivation": "Probe only: an object carrying a well-formed §11 schedule section (sched_inc8.bisa; the schedule's own bindings name inc8's closure hash from §16.3) must be refused loudly as staged deliverable 10, never executed unscheduled (reference README, run-program). The semantic expectations are the other suite-H cases.",
+ "derivation": "The schedule explicitly binds ref@0.8, which is unpublished (b-isa-spec-8r4, VM bennett-vm-47t). §11 requires a consumer not implementing the bound library to reject E_SCHEDULE_INFEASIBLE, never execute unscheduled. Only while schedule consumption is staged may the explicit deliverable-10 refusal substitute for this precise rejection. Placeholder bindings do not demonstrate a valid executable schedule.",
  "object": "../../objects/sched_inc8.bisa",
  "command": [
   "run-program",
@@ -15,18 +15,27 @@
   "exit": 1,
   "stdout_empty": true,
   "stderr_contains": [
-   "staged deliverable 10",
+   "E_SCHEDULE_INFEASIBLE",
    "§11"
   ]
  },
  "unavailable": {
   "deliverable": 10,
-  "reason": "the §11 schedule consumer is staged deliverable 10"
+  "reason": "the §11 schedule consumer is staged deliverable 10; ref@0.8 publication blocked by b-isa-spec-8r4 (bennett-vm-47t); no library hash/ordinals are claimed",
+  "expect": {
+   "exit": 1,
+   "stdout_empty": true,
+   "stderr_contains": [
+    "staged deliverable 10",
+    "§11"
+   ]
+  }
  },
  "scenario": {
   "object": "../../objects/sched_inc8.bisa"
  },
  "expected_outcome": {
-  "diagnostic": "staged deliverable 10"
+  "consumer": "E_SCHEDULE_INFEASIBLE",
+  "reason": "bound ref@0.8 unavailable"
  }
 }

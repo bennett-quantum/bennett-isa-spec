@@ -89,3 +89,16 @@ Contract gaps filed as bugs with label `isa-0.9` (the accepted spec is unchanged
 
 These gaps require specification decisions; this rendering neither adopts
 VM conventions nor removes the associated capabilities from project scope.
+
+VM milestone 4 contract follow-up (0.9 draft only): **b-isa-spec-8r4**
+(bennett-vm-47t, ISA-REF-LIB) needs a maintainer decision on the
+decomposition set and hash rule. Draft §11.1 proposes serialization,
+an LF envelope, ordinals, scratch and decompositions with a witness;
+there is no published `ref@0.8` artifact or usable full-library hash.
+Library-dependent conformance cases remain unavailable and cite that
+bead. §11's unavailable-library rejection remains
+`E_SCHEDULE_INFEASIBLE`; the scheduling declarations above are unchanged.
+The same draft adds `eps_decade` (§8.1, b-isa-spec-f31 / VM cxg) and
+complete-sector `block_image` encoding (§7.3, b-isa-spec-0d0 / VM 47i).
+The fixture correction b-isa-spec-1pl / VM clh follows the existing
+§8.1 canonical-byte and exact-entry rules, without revising them.

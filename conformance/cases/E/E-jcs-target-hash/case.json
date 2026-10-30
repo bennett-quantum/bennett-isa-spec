@@ -2,7 +2,7 @@
  "id": "E-jcs-target-hash",
  "suite": "E",
  "spec": "§15 suite E (JCS parsing); §8.1: a target is a JSON document in RFC 8785 canonical form; target_hash = SHA-256 of those bytes",
- "derivation": "target.json in this directory is written in canonical form (sorted keys, no insignificant whitespace, integer literals). Its SHA-256, computed with an independent SHA-256 over the file bytes, is 71e1973c642abe3ea4ae5b4c7211fd4e2b2b7817894ca958d138c992cc321596; a target loader must report exactly that as target_hash.",
+ "derivation": "§8.1: \"A target is a JSON document in RFC 8785 canonical form; target_hash = SHA-256 of those bytes\". target.json contains sorted ASCII keys and integers, no insignificant whitespace and no trailing LF. Independent SHA-256 of precisely those bytes is 71e1973c642abe3ea4ae5b4c7211fd4e2b2b7817894ca958d138c992cc321596.",
  "unavailable": {
   "deliverable": 9,
   "reason": "target descriptions (§8) are staged deliverable 9; no reference-CLI command loads a target"

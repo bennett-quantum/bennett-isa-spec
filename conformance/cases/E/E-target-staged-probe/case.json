@@ -1,8 +1,8 @@
 {
  "id": "E-target-staged-probe",
  "suite": "E",
- "spec": "§15 suite E; §8 target descriptions; §10 bennett_load takes target_jcs",
- "derivation": "Probe only: supplying any target document to a launch must be refused loudly as staged deliverable 9 (§8), never silently ignored (reference README, run-program). The semantic expectations for the document itself are in the other suite-E cases.",
+ "spec": "§8.1: \"A target is a JSON document in RFC 8785 canonical form; target_hash = SHA-256 of those bytes\"; §10 bennett_load takes target_jcs",
+ "derivation": "noncanonical.json deliberately appends LF to target.json canonical bytes. §8.1 requires canonical input, hence the semantic outcome is rejection for noncanonical JCS, not execution. Only while the target CLI surface is unavailable may the explicit deliverable-9 refusal stand in for that check.",
  "object": "../../objects/registers.bisa",
  "command": [
   "run-program",
@@ -11,25 +11,34 @@
   "--args",
   "",
   "--target",
-  "{dir}/target.json"
+  "{dir}/noncanonical.json"
  ],
  "expect": {
   "exit": 1,
   "stdout_empty": true,
   "stderr_contains": [
-   "staged deliverable 9",
-   "§8"
+   "§8.1",
+   "canonical"
   ]
  },
  "unavailable": {
   "deliverable": 9,
-  "reason": "target descriptions (§8) are staged deliverable 9"
+  "reason": "target descriptions (§8) are staged deliverable 9",
+  "expect": {
+   "exit": 1,
+   "stdout_empty": true,
+   "stderr_contains": [
+    "staged deliverable 9",
+    "§8"
+   ]
+  }
  },
  "scenario": {
-  "target_file": "target.json",
+  "target_file": "noncanonical.json",
   "entry": "views"
  },
  "expected_outcome": {
-  "diagnostic": "staged deliverable 9"
+  "load": "reject",
+  "reason": "noncanonical target bytes (§8.1)"
  }
 }

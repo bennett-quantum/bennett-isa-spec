@@ -13,6 +13,6 @@
  },
  "unavailable": {
   "deliverable": 10,
-  "reason": "§11 scheduling is staged deliverable 10"
+  "reason": "§11 scheduling is staged deliverable 10; ref@0.8 publication blocked by b-isa-spec-8r4 (bennett-vm-47t); no library hash/ordinals are claimed"
  }
 }

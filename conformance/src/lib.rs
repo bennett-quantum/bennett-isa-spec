@@ -11,7 +11,7 @@
 //! Cases for staged deliverables (spec §15 suites served by
 //! reference-interpreter deliverables 8-11) carry an `unavailable`
 //! block. They are never skipped: where a CLI probe exists the
-//! harness runs it and requires a loud staged diagnostic; the case
+//! harness runs it and requires an explicit refusal; the case
 //! then reports `UNAVAILABLE: deliverable N`. Where no probe exists
 //! the case still reports UNAVAILABLE. A probe that the binary
 //! silently accepts is a FAIL.
@@ -49,6 +49,8 @@ pub fn default_bin() -> PathBuf {
 pub struct Unavailable {
     pub deliverable: u32,
     pub reason: String,
+    /// Explicit refusal alternative, used only while this case is staged.
+    pub expect: Option<Expect>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -87,7 +89,7 @@ pub enum Outcome {
         deliverable: u32,
         reason: String,
         /// `true` when a probe command ran and confirmed the loud
-        /// staged refusal the case expects.
+        /// refusal the case expects (precise error or explicit staging).
         probe_confirmed: bool,
     },
 }
@@ -174,9 +176,32 @@ fn load_case(file: &Path) -> Result<Case, String> {
                 .and_then(Json::as_str)
                 .ok_or_else(|| format!("{id}: unavailable.reason is required"))?
                 .to_string();
+            let staged_expect = u
+                .get("expect")
+                .map(|v| parse_expect(&id, Some(v)))
+                .transpose()?;
+            if let Some(ref staged) = staged_expect {
+                // An alternative is permission to report missing mechanics,
+                // never permission to accept success or an arbitrary error.
+                let marker = format!("staged deliverable {deliverable}");
+                if command.is_none()
+                    || expect.exit != Some(1)
+                    || !expect.stdout_empty
+                    || expect.stderr_contains.is_empty()
+                    || staged.exit != Some(1)
+                    || !staged.stdout_empty
+                    || staged.stdout_json.is_some()
+                    || !staged.stderr_contains.contains(&marker)
+                {
+                    return Err(format!(
+                        "{id}: unavailable.expect requires an explicit {marker:?} refusal (exit 1, empty stdout) and a precise primary error"
+                    ));
+                }
+            }
             Some(Unavailable {
                 deliverable,
                 reason,
+                expect: staged_expect,
             })
         }
     };
@@ -307,8 +332,19 @@ pub fn run_case(bin: &Path, case: &Case, tmpdir: &Path) -> Outcome {
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
     let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
     let exit = output.status.code().unwrap_or(-1);
-    if let Err(msg) = check_expect(case, exit, &stdout, &stderr) {
-        return Outcome::Fail(format!("{}: {msg}", case.id));
+    if let Err(msg) = check_expect(&case.expect, exit, &stdout, &stderr) {
+        let staged = case.unavailable.as_ref().and_then(|u| u.expect.as_ref());
+        match staged {
+            Some(expect) => {
+                if let Err(refusal) = check_expect(expect, exit, &stdout, &stderr) {
+                    return Outcome::Fail(format!(
+                        "{}: {msg}; staged alternative: {refusal}",
+                        case.id
+                    ));
+                }
+            }
+            None => return Outcome::Fail(format!("{}: {msg}", case.id)),
+        }
     }
     match &case.unavailable {
         Some(u) => Outcome::Unavailable {
@@ -320,8 +356,7 @@ pub fn run_case(bin: &Path, case: &Case, tmpdir: &Path) -> Outcome {
     }
 }
 
-fn check_expect(case: &Case, exit: i32, stdout: &str, stderr: &str) -> Result<(), String> {
-    let exp = &case.expect;
+fn check_expect(exp: &Expect, exit: i32, stdout: &str, stderr: &str) -> Result<(), String> {
     if let Some(want) = exp.exit {
         if exit != want {
             return Err(format!(
@@ -435,7 +470,7 @@ pub fn run_all(bin: &Path, cases: &[Case], tmpdir: &Path) -> Report {
                     deliverable,
                     reason,
                     if probe_confirmed {
-                        " (probe confirmed loud staged refusal)"
+                        " (probe confirmed explicit refusal)"
                     } else {
                         " (no CLI probe exists)"
                     }

@@ -6,7 +6,7 @@
  "object": "../../objects/t3_domains.bisa",
  "unavailable": {
   "deliverable": 11,
-  "reason": "certificate claim checking has no reference-CLI command; the rigorous checker of §12.1 is staged deliverable 11"
+  "reason": "certificate claim checking has no reference-CLI command; the rigorous checker of §12.1 is staged deliverable 11; ref@0.8 publication blocked by b-isa-spec-8r4 (bennett-vm-47t); no library hash/ordinals are claimed"
  },
  "scenario": {
   "oracle": "inc2",

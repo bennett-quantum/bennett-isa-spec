@@ -118,9 +118,9 @@ fn contract(section: u8, header: &str, counts: (usize, usize, usize)) -> String 
     let (mut functions, mut types, mut constants) = (0, 0, 0);
     let mut prototypes = String::new();
     for decl in declarations(section) {
-        if decl.starts_with("typedef enum {") {
+        if let Some(enum_decl) = decl.strip_prefix("typedef enum {") {
             types += 1;
-            let (entries, name) = decl["typedef enum {".len()..].split_once('}').unwrap();
+            let (entries, name) = enum_decl.split_once('}').unwrap();
             let name = name.trim();
             source.push_str(&format!("CHECK(sizeof({name}) > 0, \"{name}\");\n"));
             let mut next_value = 0;

@@ -96,3 +96,95 @@ fn fake_bin_pass_fail_and_unavailable_probe() {
         other => panic!("silently-accepting fake must fail the probe, got {other:?}"),
     }
 }
+
+#[test]
+fn precise_probe_errors_and_staging_are_scoped() {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".tmp/probe-errors");
+    fs::create_dir_all(&dir).unwrap();
+    let cases = load_cases(&bennett_isa_conformance::cases_dir()).unwrap();
+    for (id, precise, staged) in [
+        (
+            "E-target-staged-probe",
+            "§8.1: target must be canonical JCS",
+            "§8: staged deliverable 9",
+        ),
+        (
+            "H-schedule-staged-probe",
+            "§11: E_SCHEDULE_INFEASIBLE: ref@0.8 unavailable",
+            "§11: staged deliverable 10",
+        ),
+    ] {
+        let case = cases.iter().find(|c| c.id == id).unwrap();
+        for msg in [precise, staged] {
+            let bin = write_fake(
+                &dir,
+                "refusal",
+                &format!("#!/bin/sh\nprintf '%s\\n' '{msg}' >&2\nexit 1\n"),
+            );
+            assert!(
+                matches!(
+                    run_case(&bin, case, &dir),
+                    Outcome::Unavailable {
+                        probe_confirmed: true,
+                        ..
+                    }
+                ),
+                "{id}: {msg}"
+            );
+        }
+        for body in [
+            "#!/bin/sh\necho 'unrelated failure' >&2\nexit 1\n",
+            "#!/bin/sh\nexit 0\n",
+            "#!/bin/sh\necho '§11: E_SCHEDULE_INFEASIBLE' >&2\nexit 2\n",
+        ] {
+            let bin = write_fake(&dir, "bad", body);
+            assert!(
+                matches!(run_case(&bin, case, &dir), Outcome::Fail(_)),
+                "{id}: unrelated/silent/wrong exit"
+            );
+        }
+        let bin = write_fake(
+            &dir,
+            "staged",
+            &format!("#!/bin/sh\necho '{staged}' >&2\nexit 1\n"),
+        );
+        let mut runnable = case.clone();
+        runnable.unavailable = None;
+        assert!(
+            matches!(run_case(&bin, &runnable, &dir), Outcome::Fail(_)),
+            "no staging alternative on runnable case"
+        );
+        let precise_bin = write_fake(
+            &dir,
+            "precise",
+            &format!("#!/bin/sh\necho '{precise}' >&2\nexit 1\n"),
+        );
+        assert!(
+            matches!(run_case(&precise_bin, &runnable, &dir), Outcome::Pass),
+            "spec-defined rejection still required on promotion"
+        );
+    }
+}
+
+#[test]
+fn staged_alternative_must_be_an_explicit_refusal() {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".tmp/refusal-schema");
+    fs::create_dir_all(&dir).unwrap();
+    for alternative in [
+        "{}",
+        r#"{"exit":0,"stdout_empty":true,"stderr_contains":["staged deliverable 9"]}"#,
+        r#"{"exit":1,"stdout_empty":true,"stderr_contains":["unrelated error"]}"#,
+        r#"{"exit":1,"stdout_empty":true,"stderr_contains":["staged deliverable 10"]}"#,
+        r#"{"exit":1,"stderr_contains":["staged deliverable 9"]}"#,
+    ] {
+        let case = UNAVAILABLE.replace(
+            r#""reason": "target descriptions are staged""#,
+            &format!(r#""reason": "target descriptions are staged", "expect": {alternative}"#),
+        );
+        write_case(&dir, &case);
+        assert!(
+            load_cases(&dir).is_err(),
+            "unsafe staged alternative accepted: {alternative}"
+        );
+    }
+}

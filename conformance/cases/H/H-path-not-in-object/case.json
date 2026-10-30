@@ -6,7 +6,7 @@
  "object": "../../objects/sched_inc8.bisa",
  "unavailable": {
   "deliverable": 10,
-  "reason": "the §11 schedule consumer is staged deliverable 10; no reference-CLI command consumes or validates a schedule for execution"
+  "reason": "the §11 schedule consumer is staged deliverable 10; no reference-CLI command consumes or validates a schedule for execution; ref@0.8 publication blocked by b-isa-spec-8r4 (bennett-vm-47t); no library hash/ordinals are claimed"
  },
  "scenario": {
   "schedule_file": "schedule.json",

@@ -1,5 +1,64 @@
 # ISA 0.9 draft — progress file (resumable)
 
+## VM milestone 4 follow-up — 2026-10-30
+
+Resumed the uncommitted implementation after the infrastructure outage.
+Source context: read-only `bennett-vm/docs/PROGRESS.md`, `HANDOFF.md`, and
+`bd show bennett-vm-47t bennett-vm-cxg bennett-vm-clh bennett-vm-47i` from
+that repository. No VM or reference-interpreter source was edited.
+
+Draft additions, all recorded in §0.2:
+
+- **K9 / EPS-DECADE**, §8.1, mirror **b-isa-spec-f31** (VM cxg, open):
+  zero-based min{j ≥ 0: eps·10^j ≥ 1}, exact rational comparisons,
+  requested share, domain (0,1], unbound/out-of-array errors, and the
+  exact-entry prohibition. The six printed boundary cases give indices
+  0,1,1,2,3,4. This is a proposed 0.9 definition, not a guessed 0.8 rule.
+- **K10 / BLOCK-IMAGE**, §7.3, mirror **b-isa-spec-0d0** (VM 47i, open):
+  decode the named data symbol's hex in textual order into contiguous
+  complete 512-byte sectors, with partial images rejected at device
+  initialization before execution; empty/absent images, present zero
+  sectors and absent-sector reversal are explicit. The 1024-byte witness
+  distinguishes present zero, present ff and absent sectors.
+- **K11 / ISA-REF-LIB**, §11.1, mirror **b-isa-spec-8r4** (VM 47t, open):
+  **maintainer decision required: decomposition set and hash rule**.
+  Proposed JCS serialization, ISA/library-versioned LF envelope, full-payload
+  SHA-256 rule, expansion order, ordinals, scratch identities, removable
+  subset and decomposition families cite their motivating 0.8 sentences.
+  The single two-bit qxor recipe is only a witness: its four-line envelope
+  hash is `299510fd67cc626fdcbcc10adcd40730f9af294ba596d86fb25fd31be08a5c7f`.
+  No complete catalog, full-library hash, `ref/` directory or 0.8 artifact
+  is published. Publication waits for the maintainer decisions and accepted
+  0.9; implementation/catalog correctness and full-domain T3 remain required.
+
+**b-isa-spec-1pl** mirrors VM clh and is closed after fixture verification.
+It corrects conformance data under existing 0.8 §8.1, not the rule: canonical
+target bytes have no trailing LF; the invalid exact entry now actually
+references eps, and a separate constant-cost exact entry must accept every
+share. The expected hash already described the no-LF bytes: the old file
+hashed to `52cd3dcd6ca4634f311f4ba0b15806c52763e70504f1220ef5c2d64d10676ecb`,
+while the corrected file hashes to the existing expected
+`71e1973c642abe3ea4ae5b4c7211fd4e2b2b7817894ca958d138c992cc321596`.
+The VM report's claim that the expected hash included LF was not reproduced.
+All four mirrors are bugs labeled `isa-0.9`; only clh is closed.
+
+Verification: the added fixture, precise-probe and witness tests failed
+against a copy of committed baseline files under `conformance/.tmp/resume-red/`.
+The inherited parser also accepted an empty alternative; a new regression
+failed before validation was added. Green: all **25** conformance Rust tests,
+including independent exact-rational/sector/witness-hash and 16 forward/reverse
+qxor tuple checks. No 0.9 executor conformance is claimed. Full reference run:
+**445 pass, 0 fail, 46 unavailable (491 total), exit 2**. Library-dependent
+cases retain unavailable reasons naming b-isa-spec-8r4. Exact headless commands,
+reference binary fingerprint, staging limits and per-suite counts are in
+`conformance/PROGRESS.md`. `include/README.md` records the library gate;
+no ABI declarations were changed.
+
+Accepted 0.8 SHA-256 remains
+`90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e`.
+The older progress entries below are historical; the separate tracked
+`spec/isa-0.8-to-0.9.diff` is outside this task's owned paths and is not regenerated.
+
 Job: bead `b-isa-spec-so1` (claimed). Brief: `docs/briefs/2026-10-29-isa-09-draft.md`.
 Owned paths: `spec/Bennett-ISA-Spec-0.9-draft.md`, `spec/isa-0.8-to-0.9.diff`, this file, bd notes/creates
 (label `isa-0.9-candidate`). Never touch `spec/Bennett-ISA-Spec.md`, `spec/README.md`, `reference-interpreter/`,

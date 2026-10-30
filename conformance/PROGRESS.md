@@ -1,3 +1,119 @@
+# VM milestone 4 follow-up verification — 2026-10-30
+
+Resumed the inherited uncommitted work after the infrastructure outage.
+Owned paths only: `conformance/`, the 0.9 draft/progress, `include/README.md`
+and the Beads export. No reference-interpreter or VM source, accepted 0.8,
+header declarations or worklog was edited. No push or Dolt remote sync.
+
+## Current reference results
+
+Binary: `/home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/target/debug/bennett-isa-ref`.
+Offline build confirmed current; latest reference source commit `8fa5d98`.
+Binary SHA-256:
+`679de84f8c016ac2626a2eca2c262129d204ae9f7723cec00a92cead0f4beff5`.
+
+| Suite | Cases | Pass | Fail | Unavailable |
+|---|---:|---:|---:|---:|
+| A | 21 | 21 | 0 | 0 |
+| B | 35 | 35 | 0 | 0 |
+| C | 339 | 339 | 0 | 0 |
+| D | 12 | 7 | 0 | 5 |
+| E | 16 | 0 | 0 | 16 |
+| F | 35 | 33 | 0 | 2 |
+| G | 23 | 10 | 0 | 13 |
+| H | 10 | 0 | 0 | 10 |
+| **Total** | **491** | **445** | **0** | **46** |
+
+Standalone exit **2**: unavailable cases are counted and printed, never
+skipped or counted as passes. The extra case is the separate valid exact
+entry witness. `cargo test --offline`: **25 passed, 0 failed, 0 ignored**;
+strict all-target Clippy and formatting checks pass. The current compiler
+flagged a pre-existing `manual_strip` in `tests/headers.rs`; using
+`strip_prefix` fixed it, and all five header tests passed again. This changes
+no declaration or inventory check.
+
+## Re-derived fixture corrections and staging policy
+
+0.8 §8.1 says: **"A target is a JSON document in RFC 8785 canonical form;
+target_hash = SHA-256 of those bytes"**. Removed the trailing LF from all five
+E `target.json` files (hash, exact-entry negative, matching, mbu and probe).
+The old hash fixture bytes hashed to
+`52cd3dcd6ca4634f311f4ba0b15806c52763e70504f1220ef5c2d64d10676ecb`;
+canonical bytes hash to
+`71e1973c642abe3ea4ae5b4c7211fd4e2b2b7817894ca958d138c992cc321596`.
+The existing expected hash was already the latter; no expected hash was
+changed to match a binary. Contrary to the VM report, it did not include LF.
+The E probe uses a separate `noncanonical.json`, exactly canonical bytes
+plus LF, and its primary expected outcome is the §8.1 rejection.
+
+0.8 §8.1 also says: **"an entry with epsilon 0 MUST NOT reference eps or
+log2inv_eps"**, and **"an entry with epsilon 0 is exact and matches every
+eps"**. `E-epsilon-zero-entry` now actually references `eps` in `cost.time`
+and must reject. New `E-epsilon-zero-exact` retains constant cost 1, literal
+epsilon 0, and must load/match at shares 0, 0.001 and 1. The accepted rules
+and precise semantic `expected_outcome` data are unchanged.
+
+Only the two explicit staged E/H probes have `unavailable.expect`: the
+precise §8.1 canonical-byte error / §11 `E_SCHEDULE_INFEASIBLE` is the primary
+expectation, and a named staged-deliverable refusal is the alternative while
+mechanics are unavailable. Both require exit 1 and empty stdout. An empty
+alternative, wrong deliverable, unrelated error, success or wrong exit fails.
+On promotion (remove `unavailable`), the alternative disappears and the
+precise spec-defined outcome is required. Either accepted probe refusal still
+reports UNAVAILABLE and retains exit 2. This is not permission to substitute
+an arbitrary outcome for a rule the spec already defines.
+
+The §11 library-dependent D/H cases remain unavailable, with the reason
+naming **b-isa-spec-8r4** / VM **bennett-vm-47t**. No full library hash or
+ordinals are claimed. The `sched_inc8.bisa` bindings remain placeholders for
+a refusal probe, not a valid executable schedule. Target-only aggregation
+and scheme-expansion witnesses do not acquire a spurious library dependency.
+
+## Red-green evidence and draft contract work
+
+Preserved new tests and copied committed baseline sources/fixtures into
+`conformance/.tmp/resume-red/`, without changing the live checkout or touching
+the interpreter crate. Running the fixture, fake-binary and draft test targets
+with `--no-fail-fast` reproduced failures for trailing LF, the missing forbidden
+eps reference, precise E error versus obsolete staging prose, and absent draft
+witnesses. Log: `conformance/.tmp/resume-red.log`. Against the inherited parser,
+`staged_alternative_must_be_an_explicit_refusal` also failed at `{}` before
+the alternative validation was implemented; all corresponding tests are green.
+
+The 0.9 additions are §8.1 **K9 EPS-DECADE**, §7.3 **K10 BLOCK-IMAGE**, and
+§11.1 **K11 ISA-REF-LIB**, each logged in §0.2 and `spec/isa-0.9.PROGRESS.md`.
+Independent Python checks verify the printed rational boundary indices, sector
+witness, all 16 qxor tuples and their reversals, ordinals and the witness-only
+four-line envelope SHA-256. These are draft witness checks, not 0.9 executor
+conformance. **maintainer decision required: decomposition set and hash rule**;
+no `ref/` artifact or retroactive 0.8 contract was published.
+
+Mirrors created by the previous attempt were recovered from the Beads DB
+instead of duplicated: bugs labeled `isa-0.9`, **b-isa-spec-8r4** (47t),
+**b-isa-spec-f31** (cxg), **b-isa-spec-0d0** (47i), and **b-isa-spec-1pl**
+(clh). Only 1pl is closed; the other three remain open 0.9 items. Exported
+with `bd export -o /home/tobias/Projects/bennett-workspace/bennett-isa-spec/.beads/issues.jsonl`.
+
+Accepted 0.8 SHA-256 remains
+`90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e`;
+the draft SHA-256 is
+`e8299a4c41231f85097a70691c86db382a9ab2efb46a1ffb81c2efa322d80855`.
+
+## Exact final verification commands
+
+```sh
+env -u DISPLAY -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u BROWSER TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/.tmp cargo build --offline --manifest-path /home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/Cargo.toml
+env -u DISPLAY -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u BROWSER TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/.tmp cargo test --offline --manifest-path /home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/Cargo.toml > /home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/.tmp/resume-tests.log 2>&1
+env -u DISPLAY -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u BROWSER TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/.tmp cargo run --offline --manifest-path /home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/Cargo.toml -- --bin /home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/target/debug/bennett-isa-ref > /home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/.tmp/resume-suite.log 2>&1
+env -u DISPLAY -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u BROWSER TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/.tmp cargo test --offline --manifest-path /home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/Cargo.toml --test headers
+env -u DISPLAY -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u BROWSER TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/.tmp cargo clippy --offline --manifest-path /home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/Cargo.toml --all-targets -- -D warnings
+env -u DISPLAY -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u BROWSER TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/.tmp cargo fmt --manifest-path /home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/Cargo.toml -- --check
+git -C /home/tobias/Projects/bennett-workspace/bennett-isa-spec diff --check
+```
+
+Build/tests/Clippy/fmt/diff checks exit 0; standalone harness exits 2.
+The following 2026-10-29 verification record is historical.
+
 # Conformance crate verification — 2026-10-29
 
 Resumed implementation bead **b-isa-spec-t8i** after commit `81cd4ba`.

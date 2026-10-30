@@ -120,6 +120,9 @@ north star §3.1 requires).
 | K6 | §7.4, §10, §14.3 | **Reversible failed runs**: R faults are terminal; `FAILED → REVERSED` under the shared eligibility (no `measure`, no unverified free, ownership); reversal undoes the record, then the rest including open activations (an `effect`'s undo also removes its tape entry); T4 covers `FAILED` runs, the ledger entries of the registers a run created or touched and token validity, and states the exactness hypothesis for quantum state (exact when every undo is the exact inverse of its realisation, else within the declared bounds) | EN ISA-8; DL ISA-8 (terminal reading, DL §17.6); bd 0b9 | S | – |
 | K7 | §3.3, §17 item 14 | 0.8's §17 item 14 default (a `FAILED` record for a condition hardware cannot test) contradicted §7.4's unverified frees: non-verifying executors release unverified and exclude `uncall` and reversal; a verifying executor records `FAULT_UB_TRAP` (host calls: `E_QREG_NOT_CLEAN`) | found while drafting; bd exc | S | – |
 | K8 | §16.3, §15 | Examples 4–9 (one per new family, hand-derived results) and the suite rows for every new instruction and fault | brief | E | new |
+| K9 | §8.1 | **EPS-DECADE**: exact zero-based decimal accuracy bucket, domain and exact-entry prohibition; boundary witness | bennett-vm-cxg; b-isa-spec-f31 | S | – |
+| K10 | §7.3 | **BLOCK-IMAGE**: contiguous complete 512-byte sectors, byte order, partial-image rejection at device initialisation; witness | bennett-vm-47i; b-isa-spec-0d0 | S | – |
+| K11 | §11.1, §17 item 7 | **ISA-REF-LIB (from bennett-vm-47t): maintainer decision required**. Proposed serialization, envelope hash, ordinals, scratch/removable rules and decomposition set; witness only, publication gated on accepted 0.9 | bennett-vm-47t; b-isa-spec-8r4 (open) | S | new |
 
 **Applied Q14 (2026-10-29, b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -1312,6 +1315,35 @@ fault record with no partial delta.
 | `entropy` | position `p` (0) into the entropy tape (§10) | `read(ptr, len)`: copies tape[p..p+len) to ptr; p += len | p + len > length: fault `FAULT_ENTROPY_EXHAUSTED` | overwritten bytes; p −= len |
 | `block` | sector map from the `block_image` (else empty), 512-byte sectors; absent sectors read as zero | `read(sector, ptr)`; `write(sector, ptr)` | – | read: overwritten 512 bytes; write: the old sector contents **and a presence bit** (absent sectors are removed again on reversal) |
 
+**BLOCK-IMAGE** (K10; source: bennett-vm-47i). `layout.block_image`
+names a data symbol (§9.1, §16.1). Decode each successive pair of its
+lowercase hex digits to one byte, in textual order. Its decoded length
+L MUST be a multiple of 512, including L = 0. At block-device
+initialisation, before executing any instruction or changing device
+state, reject an image of any other length; never pad or truncate it.
+For 0 ≤ s < L/512, sector number s is present and its byte at offset b
+(0 ≤ b < 512) is image[512s + b]. There is no sector header, length
+prefix, sector-number field or reversal of bytes within a sector. An
+all-zero sector in the image is present. Every other sector is absent
+and reads as 512 zero bytes; no image and an empty image give an empty
+map. This specifies the initial map only; the §7.3 write/reversal
+presence-bit rule remains in force. Motivation (0.8 §7.3): "sector map
+from the `block_image` (else empty), 512-byte sectors; absent sectors
+read as zero"; §9.1: "`data` lines are `NAME SP HEX`". The contiguous
+encoding and partial-sector policy are additions, not a claimed 0.8
+loader requirement.
+
+**BLOCK-IMAGE witness**
+
+```json
+{"length":1024,"present_sectors":[0,1],"sector_first_bytes":[[0,0],[1,255]],"absent_sector":2,"partial_lengths_rejected":[1,511,513,1023]}
+```
+
+The image is 512 bytes 00 followed by 512 bytes ff (2048 hex digits).
+Sector 0 is present although zero; sector 1 is ff throughout; sector 2
+is absent and reads zero. Writing sector 2 then reversing removes it;
+writing sector 0 then reversing restores a present zero sector.
+
 Each `effect` appends `(dev, op, args)` to the effect tape.
 
 ### 7.4 Run history and the dynamic SSA model (CC, R)
@@ -1413,6 +1445,30 @@ eps ≤ 1; eps outside (0, 1] is a load-time error; an entry with
 `epsilon` 0 MUST NOT reference `eps` or `log2inv_eps`. Division by zero
 and a table index outside the array are load-time errors. Costs MUST be
 nonnegative and finite.
+
+**EPS-DECADE** (K9; source: bennett-vm-cxg). A table expression with
+`index: "eps_decade"` evaluates its zero-based array index as the exact
+integer min{ j ≥ 0 : eps · 10^j ≥ 1 }. It requires a context binding
+`eps` and 0 < eps ≤ 1; otherwise it is a load-time error. Thus it uses
+the requested `epsilon_share`, not the entry's achieved `epsilon`.
+Evaluation uses exact rational comparisons, never a floating-point
+logarithm. The existing out-of-array rule applies to this integer. An
+entry with `epsilon` 0 MUST NOT use `eps_decade`, including through a
+table lookup. This extends the exact-entry prohibition above; it does
+not assign an index to eps = 0. Motivation (0.8 §8.1): the grammar names
+`"index": "k" | "eps_decade"`, and "Division by zero and a table index
+outside the array are load-time errors"; 0.8 defines no decimal index.
+
+**EPS-DECADE witness**
+
+```json
+[{"eps":"1","index":0},{"eps":"0.1","index":1},{"eps":"0.1001","index":1},{"eps":"0.0999","index":2},{"eps":"0.001","index":3},{"eps":"0.000999","index":4}]
+```
+
+For eps = 999/10000, eps·10 = 999/1000 < 1 and eps·100 = 999/100 ≥ 1,
+so the index is 2. A two-entry table rejects this index, a three-entry
+table selects element 2. eps = 0, eps > 1 and an unbound eps reject;
+no clamping, padding or fallback entry is admitted.
 
 **Variable binding** by evaluation context; referencing a variable that
 the context does not bind is a load-time error:
@@ -1869,6 +1925,141 @@ capacity; report every resource; be reproducible from the request plus
 scheduler version. A consumer validates every binding and every path
 against the object and executes verbatim or rejects (`E_SCHEDULE_
 INFEASIBLE`).
+
+### 11.1 Proposed reference-library contract (K11)
+
+**ISA-REF-LIB (from bennett-vm-47t): maintainer decision required**
+(b-isa-spec-8r4). This subsection proposes the missing contract for 0.9;
+it is not a published library or a retroactive definition for 0.8.
+The maintainer must approve the decomposition set and hash rule below
+before publication, and 0.9 must be accepted before the `ref/` directory
+is created. Until then, consumers lacking the bound library continue
+to reject as §11 requires; staged conformance cases remain unavailable
+and cite b-isa-spec-8r4. No ordinal count or full-library hash is claimed.
+
+**Serialization and identity (proposal).** Publish `ref/README.md` and
+`ref/ref-0.9.json` after that gate. The JSON file is RFC 8785 canonical
+UTF-8, with no trailing LF, containing exactly `isa`, `name`, `version`
+and `recipes`. The first three are strings `0.9`, `ref`, `0.9`.
+`recipes` is an array in bytewise `kind` order, then increasing parameter
+tuple order. Each instantiated recipe has `kind`, its integer width or
+other named integer parameters, `operations`, `scratch`, `removable`
+and `source` (the motivating ISA sentence). A parameterised recipe
+uses `parameters` (an ordered array of names) and `body` instead of the
+instance's `operations`; its body uses the closed constructors below.
+Recipes cover every §4 instruction/row, the §3.6 step, §3.7 activation
+operations and §5.2 construction, with no implementation-private leaf.
+Classical instructions/effects remain classical leaf events (§8.2),
+not invented quantum gates. The README documents schema, parameters,
+coverage and witnesses; it is not hashed and cannot alter operations.
+
+The library hash is SHA-256 of this UTF-8 envelope (every line ends LF,
+including the last); the fourth line is the **entire** canonical library
+JSON, including all recipes, sources and versions, without an embedded
+hash field:
+
+```
+isa=0.9
+expansion=ref
+version=0.9
+<JCS library document>
+```
+
+`bindings.expansion` names `ref`, version `0.9`, and this 64-lowercase-hex
+hash. This adopts §9.2's version-prefixed, LF-terminated **envelope
+convention**, with explicit expansion-domain and library-version lines;
+it is a new library rule, not §9.2's symbol signature/SCC envelope.
+Motivation (0.8 §11): "a versioned document, identified in the schedule's
+`bindings.expansion` as { name, version, hash }"; 0.8 §9.2: "Semantic
+envelope ... every part ends with LF". A changed recipe, source, scratch
+name or ordering changes the library hash; no schedule/certificate can
+silently inherit that change (§12.1's realised-subject binding).
+
+**Expansion and ordinals (proposal).** Recipe bodies are ordered arrays
+of constructors: a gate (`gate`, ordered `wires`, optional `params`), an
+allocation (`alloc`, `width`, `class`, `state`), release (`release`),
+classical event (`classical`, `point`), counted loop (`for`, `from`,
+`to`, `body`), named recipe expansion (`invoke`, ordered `args`), or
+inverse (`inverse`, `body`). Constructor objects have exactly those
+keys. Fully instantiated `operations` contain only emitted leaves, each
+also carrying its computed `ordinal`; unexpanded `body` constructors
+carry no ordinal. Scalars are integer literals, parameter names, or prefix arrays
+`[op, operands…]` for `+ - * div mod`; div is floor division with a
+positive divisor. Wires are declaration names with integer-expression
+subscripts. Loops enumerate [from,to) in increasing order; expansion is
+depth first, array order, and recipe dependencies are acyclic. An
+inverse reverses its fully expanded body and adjoints each leaf by
+§5.3, interchanging allocation/release. The complete serialized catalog
+must encode the algorithms below in these constructors before release;
+this draft does not claim that prose alone is an interchangeable file.
+
+Number every emitted leaf (including allocation/release and classical
+leaves) 0,1,… within the containing row/instruction, after instantiating
+widths and static loop counts, before any §5.7 transformation or target
+scheme expansion. Calls have their own invocation-path element and
+callee ordinal space; `step` and `phase` select the invocation's oracle
+step as in §11. The inverse of a row visits the forward ordinals in
+reverse order, retaining each ordinal under `phase: rev`; it does not
+renumber them. Scratch identity is `(invocation chain, step, recipe
+expansion path, allocation ordinal, bit index)`; allocations in repeated
+bodies have their expanded occurrence path. All library scratch is
+clean, allocated unconditionally and released in reverse allocation
+order after uncomputation; borrowed user operands remain borrowed.
+`removable` is an explicit array of leaf ordinals, empty by default;
+the proposed initial set is empty for every recipe. No transformation
+may infer extra permission from a zero-valued basis input. Motivation
+(0.8 §11): "MUST keep the ordinals of the operations they keep and MAY
+remove only operations the library marks removable"; §17 item 7:
+"clean scratch released in reverse order".
+
+**Decomposition set (proposal, not an assertion of 0.8 choices).** Bit
+loops below increase from the least-significant bit. To make Boolean
+recipes deterministic, use no common-subexpression elimination: visit
+every Boolean expression tree in left-to-right postorder, giving each
+internal node a fresh clean scratch bit. NOT(a) uses X d; CX a d,
+XOR(a,b) uses CX a d; CX b d, AND(a,b) uses CCX a b d. OR(a,b) is the
+ordered tree XOR(XOR(a,b),AND(a,b)); repeated operands are separate tree
+occurrences (coincident AND operands reduce to a single CX so the gate
+has distinct operands). XOR the root into the destination, then reverse
+all compute gates and release scratch in reverse allocation order.
+Constants are zero or X of a clean bit. All formulas use old source
+values captured before an assignment/exchange. External effective
+controls apply to the resulting semantic gates, not allocations; scratch
+computations may be unconditional provided their compute/uncompute pair
+is balanced when the external control is false (§3.5, §4.3).
+
+| Family | Proposed ordered expansion | Motivating 0.8 sentence |
+|---|---|---|
+| Copy, XOR, exchange; native gates | `qxor`: CX s[i] t[i]; `qcopy`: allocate then the same; `quncopy`: the same then release; `qexch`: SWAP a[i] b[i]. Keep each §4.4 gate as a leaf; target schemes expand later. | §4.5: "`cx s[i] t[i]`" and "`swap a[i] b[i]`"; §8.3: "Every template gate MUST itself match a gates entry". |
+| Ripple add/sub and comparisons | c[0]=0; p[i]=a[i] XOR b[i]; sum[i]=p[i] XOR c[i]; c[i+1]=(a[i] AND b[i]) XOR (p[i] AND c[i]); compute each bit in this order, XOR sums out, reverse scratch. Subtraction adds bitwise NOT b with c[0]=1. Unsigned a<b is NOT the final subtraction carry; equality is the AND of NOT(a[i] XOR b[i]) in increasing-bit left-associated order. `ule` is OR(ult,eq); signed comparison selects sign(a) if signs differ, else ult. | §17 item 7: "ripple-carry adders and comparators"; §4.1: "wrap"; §3.7: prospective sums use "no wrap" (retain the extra carry for those). |
+| Other arithmetic, casts, select | AND/XOR/OR use the Boolean trees above; select emits ((NOT p) AND b[i]) XOR (p AND a[i]). Multiply folds shifted partial products in increasing multiplier-bit order through ripple add modulo 2^N. Shifts scan shift amounts j=0..N−1, equality-selecting the corresponding source bit; ≥N produces zero. Sign-extend replicates the high source bit, zero-extend supplies zero, truncate drops high bits. Division uses restoring unsigned long division, scanning dividend bits from N−1 to 0: append that bit to an N+1-bit remainder, compare with the zero-extended divisor, subtract iff ≥, and emit that predicate as quotient bit. Signed forms conditionally negate operands, divide magnitudes, negate quotient iff signs differ and remainder iff dividend negative; row fault predicates precede these outputs. | §4.2: "w (under ¬flag)" and the div fault predicates; §4.1 wrap/shift rules and signed MIN/−1 fault; §3.3 equal operand widths. |
+| Linear inrange and flags | For table entries i=0..2^A_tab−1 compute `(i<atop) AND live_i AND (base_i≤p) AND (p+n≤base_i+size_i)` in that parenthesisation at §4.2's widened width; left-fold OR from false, then uncompute entry scratch. `free` and allocator/call fault trees use their explicit §4.2/§3.7 formula and slot order (including 0.9's E17.13 correction). | §4.2: "inrange(p,n) = ∃ i < atop ..." and "no wrap"; §17 item 7: "linear inrange scans". |
+| Address dispatch and multiplexers | Scan every address i in increasing numeric order; compute equality to i, copy/exchange cell bits in increasing order under that bit, uncompute equality before the next i. Lifted memory chooses the §7.2 mapped region in address order and scans its cells in increasing address order; captures use old addresses before exchanged counters. | §4.6: "for each cell i: under a == i"; §17 item 7: "one-hot address dispatch"; §3.7 C1–C5/R1–R5. |
+| Row, oracle and structure | Compose these recipes in the printed §3.6 step order, §4.2 slot order, §3.7 activation order, §5.2 allocate/forward/commit/reverse/release order. `qif`, loops, local-region image X gates and `qinplace` use the literal sequences of §4.5–§4.6, incorporating 0.9's explicit parameters. Cleanup `reverse` adjoints that sequence; `recompute` follows §6.4. | §11: "Above gate level the order is fixed by §3.6, §4.2, §4.5–§4.6 and §5.2"; §5.2: "run the inverse step for t = B..1, then release (1)". |
+
+These algorithms propose exact permutation circuits, preserving every
+input and cleaning scratch; circuit correctness must still be checked
+against full-domain T3 witnesses and §5.7, not inferred from costs or
+names. The full catalog and its hash remain uncomputed until the two
+maintainer decisions and acceptance gate above. In particular this is
+not permission to publish a partial library that omits division, stack,
+coherent control, memory or any instruction.
+
+**ISA-REF-LIB witness**
+
+```json
+{"isa":"0.9","name":"ref","recipes":[{"kind":"qxor","operations":[{"gate":"cx","ordinal":0,"wires":["s[0]","t[0]"]},{"gate":"cx","ordinal":1,"wires":["s[1]","t[1]"]}],"removable":[],"scratch":[],"source":"0.8 §4.5","width":2}],"version":"0.9"}
+```
+
+This is a single instantiated recipe witness, **not** a complete
+library document for binding a schedule. Its envelope is the four-line
+envelope above with this entire JSON as line four. It has two ordinals,
+0 and 1, no scratch and no removable operations. For every two-bit s,t
+(16 tuples), the result is `(s, t XOR s)`; reversing visits ordinal 1
+then 0 and restores the entry tuple. Its hash identifies only these
+witness bytes, not `ref@0.9` as a whole.
+
+Witness envelope SHA-256: `299510fd67cc626fdcbcc10adcd40730f9af294ba596d86fb25fd31be08a5c7f`.
 
 ## 12. Certificate (cert 0.9; JCS)
 
