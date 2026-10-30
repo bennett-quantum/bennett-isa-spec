@@ -17,8 +17,10 @@
 //! silently accepts is a FAIL.
 
 pub mod json;
+pub mod ref_amplitudes;
 pub mod ref_catalog;
 pub mod ref_hash;
+pub mod ref_language;
 
 use json::Json;
 use std::collections::BTreeMap;

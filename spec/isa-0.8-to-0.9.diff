@@ -1,6 +1,6 @@
 --- /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/Bennett-ISA-Spec.md	2026-10-28 15:10:07.903399463 +0100
-+++ /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/Bennett-ISA-Spec-0.9-draft.md	2026-10-30 11:26:54.607127110 +0100
-@@ -1,25 +1,188 @@
++++ /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/Bennett-ISA-Spec-0.9-draft.md	2026-10-30 12:00:37.102321903 +0100
+@@ -1,25 +1,190 @@
 -# Bennett Virtual ISA — Specification, draft 0.8
 +# Bennett Virtual ISA — Specification, draft 0.9
  
@@ -144,6 +144,8 @@
 +| K16 | §9.1, §9.4, §12.3 | **Frame JSON (ratified B5)**: identified slots and typed scratch/history/borrow/ancilla records, c-only width expressions, disjoint shared lifetimes | b-isa-spec-2c9; circuits 4fa; SQ 11 | S | – |
 +| K17 | §4.1 | **Draw ordering (ratified A5)**: FIFO draws; wire-first lexicographic outcomes, strict cumulative threshold; reference CLI witness | b-isa-spec-bas; SQ 29 | S | – |
 +| K18 | §0, §3.7, §4.2, §4.9, §5.4, §7.3, §8.1 | **Confirmations (ratified A4/A5)**: Q14 explicit forwarding; EPS-DECADE, BLOCK-IMAGE, ISA-7 and Q1–Q13 confirmed as applied | b-isa-spec-7u6; b-isa-spec-f31; b-isa-spec-0d0; b-isa-spec-221; b-isa-spec-2c9 | E | – |
++| K19 | §11.1 | **REF-BINDING**. Typed integer/wire/body/symbol/environment bindings, lexical substitution, invocation-local ordinals and validation witnesses | b-isa-spec-cbk | S | new |
++| K20 | §11.1 | **REF-QUANTUM**. Binary64 angle bits, variadic wires and full-basis matrix witnesses | b-isa-spec-8sc | S | new |
 +
 +**Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 +token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -200,7 +202,7 @@
  ## 1. Scope and conformance
  
  ### 1.1 What the ISA is
-@@ -35,7 +198,7 @@
+@@ -35,7 +200,7 @@
  
  | Class | Who | Obligation |
  |---|---|---|
@@ -209,7 +211,7 @@
  | Producer | plugin, library compilers | well-formed objects (§9, §16) and regions (§5, §6); suite F |
  | Scheduler | `bennett-sched` and competitors | §11; only schedules valid under §6; suite H |
  | Checker | `bennett-conformance` | validates certificates (§12) without trusting producers |
-@@ -47,7 +210,7 @@
+@@ -47,7 +212,7 @@
  §14; device models beyond §7.3; the gate-name registry process; the
  memory layout of the opaque C objects of §10–§11 (every constructor,
  accessor and destructor is listed). **Minimality claims** (north star
@@ -218,7 +220,7 @@
  Decisions deferred to implementation, each with its default, are listed
  in §17.
  
-@@ -56,7 +219,8 @@
+@@ -56,7 +221,8 @@
  - **Tier.** CC, R, Q. **Wire**, **bundle** `wire[N]` (little-endian).
  - **Location** `reg[N]`: a named mutable cell of an oracle or lproc
    register file. **Pseudo-location**: an oracle interface input or
@@ -228,7 +230,7 @@
  - **Region**: a Q function with a declared interface: **lifted oracle**
    (§5.2) or **quantum action** (§5.3); **permutation action** (§5.3).
  - **lproc**: a lifted procedure with its own params and locations; it
-@@ -67,6 +231,11 @@
+@@ -67,6 +233,11 @@
  - **Basis configuration**: classical values on every component of D.
  - **Gate classes.** Permutation: `x cx ccx mcx swap`. Diagonal: `s sdg t
    tdg cz rz`. Non-diagonal: `h rx ry`.
@@ -240,7 +242,7 @@
  - **Effective control context** at a point: the set of wires on the
    active predicate stack plus the inherited control context (the control
    wires of every enclosing `ctl` and predicate stack of every enclosing
-@@ -88,15 +257,29 @@
+@@ -88,15 +259,29 @@
  except through predication (§3.5). Gate angles are finite `f64` literals
  or classical arguments fixed at region entry.
  
@@ -272,7 +274,7 @@
  | quantum memory | Q | regions of `wire[W]` cells: local (§4.6) or interface (§5.1) |
  | register file | Q | locations of the active oracle and its lproc closure (§3.7) |
  | predicate stack | Q | wires; the active predicate is their conjunction |
-@@ -106,11 +289,19 @@
+@@ -106,11 +291,19 @@
  ### 3.3 Types, ownership, operand schema
  
  ```
@@ -293,7 +295,7 @@
  **Linear SSA with implicit versioning** (structured code and CC region
  calls): a `wire`/`wire[N]` value is produced once and consumed once;
  mode `in` consumes and re-produces a successor of the same name;
-@@ -134,7 +325,11 @@
+@@ -134,7 +327,11 @@
  a`). Width rules: `binop`/`icmp` operands equal width; `select` arms equal
  width; `zext`/`sext` strictly widen, `trunc` strictly narrows; `load.iN`
  and `lift.load.iN` require N ∈ {8, 16, …, 128}; `measure` of `qreg[n]`
@@ -306,7 +308,7 @@
  
  **Lifted width rules** (suite F; a mismatch is ill-formed, never a
  truncation or an extension). Every address operand (`a` of `lift.load`/
-@@ -144,37 +339,94 @@
+@@ -144,37 +341,94 @@
  literal in [0, 2^ptr_width); `inrange` and every prospective sum are
  computed at width max(widths of the operands involved) + 1 with no wrap.
  The destination of `lift.label` and the operand of `qjumpr` have any
@@ -421,7 +423,7 @@
  
  ### 3.4 Execution in CC and R
  
-@@ -182,6 +434,16 @@
+@@ -182,6 +436,16 @@
  parameters instead of phi nodes, dynamic control flow and allocation;
  every executed instruction pushes a run-history frame (§7.4).
  
@@ -438,7 +440,7 @@
  ### 3.5 Predication
  
  Every Q instruction with unitary semantics executes controlled on the
-@@ -193,15 +455,24 @@
+@@ -193,15 +457,24 @@
  
  ### 3.6 The predicated step machine
  
@@ -469,7 +471,7 @@
  ret lift.retval fault`; every block ends in one; no label names HALT;
  **only `lift.retval` reaches HALT with success**.
  
-@@ -220,7 +491,9 @@
+@@ -220,7 +493,9 @@
  a **flag** compute it into `frame.flag` from the old state before any
  effect; rows with a data-dependent successor compute it into `frame.
  succ` before any effect; conditional-fault rows perform `faulted ^=
@@ -480,7 +482,7 @@
  
  **Frame layout** (fixed per oracle): `(old_pc : wire[P], disp_1..disp_
  {k_max}, flag : wire, succ : wire[P])`, `k_max` and widths `W_j` from the
-@@ -245,6 +518,11 @@
+@@ -245,6 +520,11 @@
  5. **Clean dispatch.** Uncompute every `at_k` from `frame_t.old_pc`.
  6. Decrement the classical step counter.
  
@@ -492,7 +494,7 @@
  **Inverse machine step** (prefix reversal runs it for t = B..1), in
  this order:
  
-@@ -255,7 +533,7 @@
+@@ -255,7 +535,7 @@
     using `frame_t.flag` / `frame_t.succ`; under `at_HALT`: XOR `HALT` into
     `pc'` (`pc'` is now clean).
  4. For each k < n in **reverse index order** under `at_k`: undo the fault
@@ -501,7 +503,7 @@
     effects. **D row**: its sub-operations in reverse order, each by its
     own inverse (`lift.perm_call` by the callee's adjoint; XORs,
     controlled flips and exchanges by themselves). **A row**: exchange
-@@ -292,14 +570,71 @@
+@@ -292,14 +572,71 @@
  **Name resolution.** A read operand of a lifted row in an **oracle body**
  is a location of the oracle or a pseudo-location (an interface input or
  a classical argument). A read operand in an **lproc** is a param or
@@ -579,7 +581,7 @@
  
  **Counters and sizes.** Size exponents: `mem` 2^H byte cells, `alloctab`
  2^A_tab entries, stack 2^S_cells cells. Counter widths: `heap_used :
-@@ -307,7 +642,15 @@
+@@ -307,7 +644,15 @@
  wire[Sc]`, Sc ≥ S_cells + 1; `depth : wire[Dc]`, Dc ≥ ⌈log₂(depth_limit +
  2)⌉. Every prospective sum (`heap_used + max(n,1)`, `sp + R_f`, `depth +
  1`) is computed at width max(operand widths) + 1 before comparison, with
@@ -596,7 +598,7 @@
  
  **Initial allocator state** (oracle entry): `heap_used = 0`, bump =
  `heap_base`, `atop` = number of pre-entries, `sp = fp = 0`, `depth = 0`,
-@@ -316,18 +659,21 @@
+@@ -316,18 +661,21 @@
  regions` order, storage of `mem` all zero except global images.
  
  **Locations and the result name.** Locations of a function are numbered
@@ -627,7 +629,7 @@
  (sp + R_f > stack_limit), C = `FAULT_BUDGET_DEPTH`, computed first into
  `frame.flag`; the elementary sub-operations C1–C5, in this order, run
  under ¬flag:
-@@ -345,7 +691,7 @@
+@@ -345,7 +693,7 @@
     then `qexch disp_{m+1} fp`, `qexch disp_{m+2} sp`, `qexch disp_{m+3}
     depth` (now `fp` = old `sp`; the slots hold the old `fp`, `sp`, `depth`).
  
@@ -636,7 +638,7 @@
  fault-write undo): C5⁻¹ `qexch disp_{m+3} depth; qexch disp_{m+2} sp;
  qexch disp_{m+1} fp` (the old counters are back), then `disp_{m+3} ^=
  depth + 1; disp_{m+2} ^= sp + R_f; disp_{m+1} ^= sp` (slots clean); C4⁻¹
-@@ -380,7 +726,12 @@
+@@ -380,7 +728,12 @@
  
  The stack is monotonic (`sp` only grows; records are history). Callee
  rows are charged to the caller's budget; `lift.call` and `lift.ret` are
@@ -650,7 +652,7 @@
  forward `lift.call` step and one forward `lift.ret` step of a recursive
  call, each followed by its inverse, and asserts that the complete
  pre-step tuple is restored and every frame field is clean.
-@@ -393,22 +744,47 @@
+@@ -393,22 +746,47 @@
  |---|---|---|
  | `const` | `r = const.iN c` | |
  | `add sub mul and or xor shl lshr ashr` | `r = op a b` | wrap; shift ≥ N → 0 |
@@ -705,7 +707,7 @@
  ### 4.2 Lifted rows (oracle bodies and lprocs)
  
  Columns: **Class**, **Reads**, **Writes / slots** (A: displaced values in
-@@ -431,9 +807,9 @@
+@@ -431,9 +809,9 @@
  | `lift.load` | `w = lift.load.iN a` | A | the N/8 cells at a.. (§7.2) | w (under ¬flag) | flag = ¬inrange(a, N/8); C = `FAULT_UB_MEMFAULT` | ¬flag: k+1; flag: HALT |
  | `lift.store` | `lift.store.iN a v` | A | v | the N/8 cells at a.. (under ¬flag; one slot of N bits) | flag = ¬inrange(a, N/8); C = `FAULT_UB_MEMFAULT` | ¬flag: k+1; flag: HALT |
  | `lift.alloc` | `w = lift.alloc n` | A | n, heap_used, atop | under ¬flag, slots in this order: w ← heap_base + heap_used; alloctab[atop] ← (heap_base + heap_used, n, 1, 0); heap_used ← heap_used + max(n,1); atop ← atop + 1 (4 slots, all computed from the old state, then exchanged in this order, `alloctab[atop]` at the old `atop`). **Inverse exchanges**: atop, heap_used, alloctab[atop] (at the restored `atop`), w; then clear the four slots | flag = (heap_used + max(n,1) > heap_limit) ∨ (atop ≥ 2^A_tab); C = `FAULT_BUDGET_HEAP` | ¬flag: k+1; flag: HALT |
@@ -718,7 +720,7 @@
  | `lift.ret` | `lift.ret v` | A+D | §3.7 | §3.7 (slots: the delivery slot `disp_1`, then assignment slots for fp, depth) | flag = (depth = 0); C = `FAULT_UB_TRAP` | ¬flag: `succ`; flag: HALT |
  | `lift.retval` | `lift.retval v` | D | v | result_val ^= v | – | HALT |
  | `lift.oracle_call` | `lift.oracle_call @o tk (ins..) tgt fr (mem..) (args..)` | D | ins, tgt, fr, mem | tgt ^= payload; fr ^= code (callee contract) | – | k+1 |
-@@ -441,8 +817,8 @@
+@@ -441,8 +819,8 @@
  | `lift.perm_call` | `lift.perm_call @a (mut..) (ins..) (mem..) (args..)` | D | ins, mut, mem | mut ← P(mut, ins, mem); inverse = `adj` of @a | – | k+1 |
  | `qjump` | `qjump ^b` | D | – | – | – | ^b |
  | `qbranch` | `qbranch p ^b1 ^b2` | D | p | – | – | p: ^b1; ¬p: ^b2 |
@@ -729,7 +731,7 @@
  
  **`inrange(p, n)`** = ∃ i < atop: live_i ∧ base_i ≤ p ∧ p + n ≤ base_i +
  size_i, every comparison computed at width max(ptr_width, width(n)) + 1
-@@ -452,16 +828,29 @@
+@@ -452,16 +830,29 @@
  explicit assertion row the dialect emits before each access (after it
  the access's own flag is never set, so dialect-produced bodies' step
  counts are unchanged). Rules: `lift.retval` is ill-formed in an lproc;
@@ -766,7 +768,7 @@
  
  **Reference body and binding.** Every oracle carries its **reference
  body**: the stream the dialect's versioned mapping produced from the
-@@ -505,7 +894,7 @@
+@@ -505,7 +896,7 @@
  | `quncopy` | `quncopy s d` | `cx s[i] d[i]` under the predicate; `qfree d` |
  | `qxor` | `qxor s t` | `cx s[i] t[i]` |
  | `qexch` | `qexch a b` | `swap a[i] b[i]` |
@@ -775,7 +777,7 @@
  
  ### 4.6 Quantum memory, predication, structure
  
-@@ -528,7 +917,20 @@
+@@ -528,7 +919,20 @@
  …` ≡ `oracle_call …`; `ctl w <call>` ≡ the call under `qpred w`. In CC
  and R, wire and region slots are filled by `qreg` operands per §3.3
  (§3.1: R functions call Q regions exactly as CC does; the call is one
@@ -797,7 +799,7 @@
  
  ### 4.8 Opcode table (tier, operands, result)
  
-@@ -540,14 +942,68 @@
+@@ -540,14 +944,68 @@
  | `ptrtoint.iM`, `inttoptr` | CC R | ptr / integer | iM / ptr |
  | `load.iN store.iN` | CC R | ptr [, value] | iN / – |
  | `alloc free` | CC R | iN / ptr | ptr / – |
@@ -869,7 +871,7 @@
  ## 5. Regions
  
  ### 5.1 Interfaces and common well-formedness
-@@ -555,16 +1011,30 @@
+@@ -555,16 +1013,30 @@
  Signatures list roles: `oracle @o (in a: wire[8]) (tgt t: wire[8]) (fault
  f: wire[4]) (mem db: region[10,8] in) (args n: i64)`. **Interface
  regions** are caller-owned, passed by name, role `in` (returned to entry
@@ -905,7 +907,7 @@
  
  ### 5.2 Lifted oracle
  
-@@ -606,6 +1076,9 @@
+@@ -606,6 +1078,9 @@
  **Body**: gates; `qcopy quncopy qxor qexch qinplace`; `qload qunload
  qstore qexchm`; `qpred qunpred qif qloop`; `oracle_call action_call`;
  `qalloc qborrow qfree qreturn`; `qregion`.
@@ -915,7 +917,7 @@
  
  **Bounds.** The `bounds { … }` list of an action's `regs` line and the
  `bounds` array of its signature hold, in text order, the trip count `n`
-@@ -621,7 +1094,8 @@
+@@ -621,7 +1096,8 @@
  ```
    rx/ry/rz(θ) ↦ (−θ)   s ↔ sdg   t ↔ tdg   x cx ccx mcx swap h cz: self-adjoint
    qalloc ↔ qfree   qborrow ↔ qreturn   qregion creation ↔ release   qcopy ↔ quncopy   qload ↔ qunload
@@ -925,7 +927,7 @@
    action_call @b ↦ adj action_call @b   qpred/qunpred pairs reversed as a whole
    qif w {A}{B} ↦ qif w {adj A}{adj B}   qloop n {A} ↦ qloop n {adj A}
    qloop n while cond {A} ↦ flags computed forward as §4.6; adj A for i = n..1 under c_i; flags uncomputed
-@@ -633,20 +1107,70 @@
+@@ -633,20 +1109,70 @@
  
  ### 5.4 Budgets and fault codes
  
@@ -998,7 +1000,7 @@
  
  ### 5.5 Nesting and matched cleanup
  
-@@ -655,10 +1179,23 @@
+@@ -655,10 +1181,23 @@
  = lift.icmp.ne fr' zero; lift.faultif p FAULT_CALLEE` (with `zero` a
  `lift.const` location) where the source requires it. To clear `fr'`, the
  producer emits `lift.oracle_uncall @o` with the same token, callee, `ins`
@@ -1025,7 +1027,7 @@
  
  ### 5.6 Borrowed systems and borrow frames
  
-@@ -696,7 +1233,8 @@
+@@ -696,7 +1235,8 @@
  
  Inlining, structure recovery, dispatch re-indexing and simplification
  MUST produce on every x ∈ D the same final interface tuple as §5.2's
@@ -1035,7 +1037,7 @@
  
  ## 6. Uncomputation validity (static discipline)
  
-@@ -722,7 +1260,7 @@
+@@ -722,7 +1262,7 @@
  | `oracle_call @o (ins) tgt fr (mem)` | tgt, fr: perm with S = ins ∪ {tgt, fr} ∪ cells(every region passed) ∪ Π; `in` regions unchanged |
  | `lift.perm_call` / permutation `action_call` | each mut: perm with S = mut ∪ ins ∪ cells(regions passed) ∪ Π; `mut`-region cells advance with the same S |
  | non-permutation `action_call` | every mut and every `mut`-region cell: other |
@@ -1044,7 +1046,7 @@
  | lifted rows | each written location/cell: perm with the union of its read operands' sets ∪ Π; written cells' versions advance |
  
  ### 6.2 Window and obligations
-@@ -752,7 +1290,7 @@
+@@ -752,7 +1292,7 @@
  (legal for `perm` values only: recompute g into a fresh clean bundle by
  the same sequence, `qxor` it into g's wires, uncompute the fresh bundle
  by the adjoint). **Measurement-based cleanup is not admitted in sched/
@@ -1053,7 +1055,7 @@
  target capability `mbu` is reserved and MUST be `false`, and no cleanup
  produces a `channel` claim. *(non-normative)* The fixup after an X-basis
  measurement of g with outcome m is the phase (−1)^{m·g(x)}, a function
-@@ -778,8 +1316,11 @@
+@@ -778,8 +1318,11 @@
  `(base, size = n, live = 1, pinned = 0)` and advances by `max(n, 1)`;
  globals have pre-entered pinned live entries; an access is valid iff its
  whole byte range lies in one live entry; `free p` marks the unique live
@@ -1067,7 +1069,7 @@
  Initial state: bump = `heap_base`, table = the pre-entries in layout
  order, memory zero except images.
  
-@@ -818,6 +1359,35 @@
+@@ -818,6 +1361,35 @@
  | `entropy` | position `p` (0) into the entropy tape (§10) | `read(ptr, len)`: copies tape[p..p+len) to ptr; p += len | p + len > length: fault `FAULT_ENTROPY_EXHAUSTED` | overwritten bytes; p −= len |
  | `block` | sector map from the `block_image` (else empty), 512-byte sectors; absent sectors read as zero | `read(sector, ptr)`; `write(sector, ptr)` | – | read: overwritten 512 bytes; write: the old sector contents **and a presence bit** (absent sectors are removed again on reversal) |
  
@@ -1103,7 +1105,7 @@
  Each `effect` appends `(dev, op, args)` to the effect tape.
  
  ### 7.4 Run history and the dynamic SSA model (CC, R)
-@@ -836,26 +1406,44 @@
+@@ -836,26 +1408,44 @@
  | `call` | invocation boundary (callee, argument values) |
  | `ret` | result values, the callee's activation and the frame link |
  | `uncall` | the reversed segment's id (skipped by whole-run reversal, below) |
@@ -1158,7 +1160,7 @@
  
  **Segment uncall** (`uncall @f (args) (results)`). Let S be the most
  recent completed call segment of the history (a `call` frame, its
-@@ -864,15 +1452,15 @@
+@@ -864,15 +1454,15 @@
  values equal the operand values, **every frame after S is pure**, and S
  contains, at any nesting depth, **no `measure` frame** and no `qreg.
  free` frame whose cleanliness was not verified (hardware, §17 item 14);
@@ -1178,7 +1180,7 @@
  `uncall` are pure, so at the `uncall` frame every component except the
  retained instances already equals its value before S. T4 is stated over
  these frames. *(non-normative)* S is never re-executed and never redone;
-@@ -882,7 +1470,7 @@
+@@ -882,7 +1472,7 @@
  leaves the clock at its entry value; and `uncall` of a segment that
  measured is a trap.
  
@@ -1187,7 +1189,7 @@
  
  ### 8.1 Format and expressions
  
-@@ -902,6 +1490,30 @@
+@@ -902,6 +1492,30 @@
  and a table index outside the array are load-time errors. Costs MUST be
  nonnegative and finite.
  
@@ -1218,7 +1220,7 @@
  **Variable binding** by evaluation context; referencing a variable that
  the context does not bind is a load-time error:
  
-@@ -941,7 +1553,8 @@
+@@ -941,7 +1555,8 @@
  instructions and effects take `classical_step_time`. Sequential in
  program order unless the schedule assigns start times; a gate occupies
  its wires for its `time`; gates on disjoint wires MAY overlap unless
@@ -1228,7 +1230,7 @@
  Interface wires are charged to the caller for the call's duration;
  borrowed wires to the borrower at `dirty_rate`, replacing the owner's
  charge.
-@@ -951,6 +1564,7 @@
+@@ -951,6 +1566,7 @@
  ```
    "ptr_widths_supported": [32, 64],
    "classes": { "<cls>": { "qubit_second": n, "dirty_rate": n, "capacity": n | "unbounded" } },
@@ -1236,7 +1238,7 @@
    "gates":   [ { "op": "<gate>", "classes": ["<cls>"|"*", …], "controls": {"min": n, "max": n | "unbounded"},
                   "params": ["theta"]?, "epsilon": expr, "cost": { "<resource>": expr, "time": expr } }, … ],
    "schemes": [ { "name": "<name>", "realises": { "op": "<gate>", "controls": {"min": n, "max": n | "unbounded"}, "params": ["theta"]? },
-@@ -983,11 +1597,40 @@
+@@ -983,11 +1599,40 @@
  descriptor. A scheme's correctness is the target author's obligation
  (suite E: T3 for permutation schemes, suite D for ε > 0).
  
@@ -1278,7 +1280,7 @@
  
  ### 9.1 Sections and schemas
  
-@@ -998,29 +1641,59 @@
+@@ -998,29 +1643,59 @@
  ```
    symbols:  { "<local index>": { "name", "kind": "cc"|"r"|"oracle"|"action"|"perm_action"|"lproc"|"data", "signature": <sig>, "interface_hash" } }
    imports:  { "<name>": { "signature": <sig>, "pinned_closure_hash"?: hex } }
@@ -1344,7 +1346,7 @@
    (2) "ptr_width=" INT
    (3) the JCS signature
    (4) the canonical function bytes (with reference tokens replaced, below); for a data symbol: its data line NAME SP HEX
-@@ -1055,7 +1728,13 @@
+@@ -1055,7 +1730,13 @@
  header line is a definition, not a reference, and is left unchanged); the **interface hash** uses
  interface hashes of defined symbols and `SHA-256(name ‖ 0x00 ‖ JCS
  signature)` (hex) for unresolved imports; the **closure hash** uses
@@ -1359,7 +1361,7 @@
  SCC `@name` token (parts (4)–(5)) is replaced by `@$<decimal index>`;
  intra-SCC references contribute no part-(6) line; `scc_hash` = SHA-256
  over the concatenation of the members' envelopes in that order; member
-@@ -1064,7 +1743,8 @@
+@@ -1064,7 +1745,8 @@
  `schedule`, `certificate` and `coverage` sections deleted together with
  the blank line preceding each. `reference_program_hash` = the oracle's
  interface hash. `params_hash` = SHA-256 of the JCS array of classical
@@ -1369,7 +1371,7 @@
  **Program-point id** = `(symbol interface hash, block name, instruction
  ordinal within the block counting nested lines in text order)`.
  Executable certificates and caches bind to **closure hashes** (required,
-@@ -1086,14 +1766,77 @@
+@@ -1086,14 +1768,77 @@
  - Region calls: interface bundles and regions passed in declared order,
    caller-owned; callee owns its workspace, returns it clean, local regions
    at image, borrowed bundles returned.
@@ -1454,7 +1456,7 @@
  
  **Model.** A run executes a device CC entry; the host passes classical
  arguments, register ids and the entropy tape, receives classical
-@@ -1101,9 +1844,11 @@
+@@ -1101,9 +1846,11 @@
  reached by `hostcall`. **Positional binding**: argument i of `bennett_
  run` binds to parameter i of the entry's signature: `INT(width, bytes)`
  to `iN` with width = N (else `E_ARG`), `F64` to `f64`, `QREG` to `qreg[n]`
@@ -1468,7 +1470,7 @@
  Accessor-returned pointers are valid until the owning object is freed.
  `bennett_unload` with a run not CLOSED: `E_INVALID_STATE`.
  
-@@ -1111,17 +1856,30 @@
+@@ -1111,17 +1858,30 @@
  calls); an R call's subtree is owned by its R history; `bennett_reverse`
  reverses post-order: CC segments by their run history, R calls by LIFO
  reversal of their history (§7.4, reversed segments and `uncall` frames
@@ -1505,7 +1507,7 @@
  is no reset and no trace-out: a register in unknown state is released by
  a `measure` inside a run, which consumes its handle (§3.3).
  
-@@ -1131,8 +1889,14 @@
+@@ -1131,8 +1891,14 @@
  `TOKEN` as the 8-byte little-endian id, `*width` = 64. A `cap` smaller
  than that byte count is `E_ARG` and nothing is written. Fault records
  are read by `bennett_result_nfaults` / `bennett_result_fault` (codes of
@@ -1522,7 +1524,7 @@
  
  **Waiting.** `bennett_wait` blocks until the run leaves `RUNNING` and
  returns `OK` with exactly one outcome: `HOST_REQUEST` (`*request_out`
-@@ -1145,7 +1909,9 @@
+@@ -1145,7 +1911,9 @@
  lie in one live allocation (else CC trap and no request is made); those
  bytes are copied into the request; the run enters `HOST_REQUEST`; the
  reply payload is written to `[ptr, ptr + min(len, reply length))` and
@@ -1533,7 +1535,7 @@
  records the request bytes, the overwritten bytes and the reply bytes.
  Every `service` is declared in `devices.services`; an undeclared one is
  a load error.
-@@ -1156,7 +1922,7 @@
+@@ -1156,7 +1924,7 @@
  `*alen` = 8 × arity.
  
  ```c
@@ -1542,7 +1544,7 @@
     released with the matching *_free. Status 0 = BENNETT_OK. */
  typedef enum { BENNETT_OK=0, BENNETT_E_VERSION, BENNETT_E_PTR_WIDTH, BENNETT_E_DEVICE_MISSING, BENNETT_E_GATE_UNSUPPORTED,
    BENNETT_E_TARGET, BENNETT_E_BUDGET, BENNETT_E_QREG_NOT_CLEAN, BENNETT_E_INVALID_STATE, BENNETT_E_NOT_REVERSIBLE,
-@@ -1198,7 +1964,10 @@
+@@ -1198,7 +1966,10 @@
  bennett_status bennett_tape_open(bennett_program_t*, bennett_run_id, bennett_tape_iter_t** out);
  bennett_status bennett_tape_next(bennett_tape_iter_t*, const char** dev, const char** op, const uint8_t** args, size_t* alen);
  void           bennett_tape_free(bennett_tape_iter_t*);
@@ -1554,7 +1556,7 @@
  size_t         bennett_estimate_nresources(const bennett_estimate_t*);
  bennett_status bennett_estimate_get(const bennett_estimate_t*, size_t i, const char** name, const char** value_decimal);
  const uint8_t* bennett_estimate_certificate(const bennett_estimate_t*, size_t* len);   void bennett_estimate_free(bennett_estimate_t*);
-@@ -1206,7 +1975,123 @@
+@@ -1206,7 +1977,123 @@
  const uint8_t* bennett_coverage_jcs(const bennett_coverage_t*, size_t* len);   void bennett_coverage_free(bennett_coverage_t*);
  ```
  
@@ -1679,7 +1681,7 @@
  
  ```c
  typedef struct bennett_sched_request_t bennett_sched_request_t;   typedef struct bennett_sched_response_t bennett_sched_response_t;
-@@ -1252,15 +2137,31 @@
+@@ -1252,15 +2139,31 @@
  ```
    { "bindings": { "closure_hash", "target_hash", "region", "variant", "inherited_controls", "budget": [B,heap,stack,depth],
                    "params_hash", "epsilon", "expansion": { "name", "version", "hash" }, "scheduler": { "name", "version" } },
@@ -1712,7 +1714,7 @@
  **Matching.** Every generated operation has an **invocation chain**: the
  program points of the region calls, `lift.call`s and `lift.oracle_call`s
  that led to it, outermost first, ending in its own point. `path` matches
-@@ -1291,25 +2192,244 @@
+@@ -1291,25 +2194,352 @@
  against the object and executes verbatim or rejects (`E_SCHEDULE_
  INFEASIBLE`).
  
@@ -1735,7 +1737,7 @@
 +tuple order. Each instantiated recipe has `kind`, its integer width or
 +other named integer parameters, `operations`, `scratch`, `removable`
 +and `source` (the motivating ISA sentence). A parameterised recipe
-+uses `parameters` (an ordered array of names) and `body` instead of the
++uses `parameters` (an ordered array of formals defined below) and `body` instead of the
 +instance's `operations`; its body uses the closed constructors below.
 +Recipes cover every §4 instruction/row, the §3.6 step, §3.7 activation
 +operations and §5.2 construction, with no implementation-private leaf.
@@ -1783,6 +1785,114 @@
 +must encode the algorithms below in these constructors before release;
 +this draft does not claim that prose alone is an interchangeable file.
 +
++**Typed binding (K19).** A formal is `{ "name": name, "type": type }`,
++with exactly these keys, except `wire`, which additionally requires
++`width` (an integer expression). Types are `integer`, `wire`, `angle`,
++`body`, `symbol`, `environment`, and `event`. A bare name abbreviates an
++`integer` formal, retaining the printed witness bytes. Names are unique
++within a parameter list. Width expressions use only earlier integer
++formals. A wire formal of width n is the ordered list w[n], with
++little-endian indexing, including the empty list when n = 0.
++
++`invoke` binds `args` positionally, evaluating actuals in the caller's
++lexical environment before binding any callee formal. Integer actuals use
++the scalar grammar above. A wire actual is a wire name, a subscripted
++wire, an array of wire actuals concatenated left to right, or exactly
++`{ "range": name, "from": scalar, "to": scalar }`, selecting [from,to)
++from a named bundle; bounds must satisfy 0 ≤ from ≤ to ≤ its width.
++An actual's resulting length must equal its formal's evaluated width.
++In a gate's `wires` array a whole formal emits all its wires in order;
++this encodes `mcx(k)` as k controls followed by one target, including k=0.
++`{ "each": name, "in": actual, "body": [...] }` additionally visits
++wire-list elements in order, binding name as a one-wire formal for each
++visit. Its binding shadows lexically and is restored after the loop.
++
++A body actual is an ordered constructor array, captured with its caller's
++lexical environment, or the name of an existing body formal. Exactly
++`{ "splice": name }` expands it at that point. Substitution is
++capture-free: caller references never resolve to callee locals, loop and
++`each` bindings have lexical scope, and every fresh allocation identity
++is derived from its expansion occurrence path (including loop iteration,
++body-splice occurrence and invocation path). Allocations must not shadow a
++live declaration in the same scope; a release names its matching live
++allocation. An inverse traverses constructors in reverse, toggles the
++adjoint on nested bodies and uses the same restored bindings at each
++position; allocation declarations supply release/adjoint metadata even
++when allocation and release occur in different nested constructor lists.
++
++A symbol actual is a 64-lowercase-hex §9.2 closure hash, or a bound symbol
++formal. The linked closure registry supplies that symbol's own typed
++interface and constructor body; the hash must match the linked closure,
++not an arbitrary supplied body. Exactly `{ "call": name, "args": [...] }`
++expands that symbol under a new invocation-path element identified by the
++call constructor's expansion occurrence. It retains its own ordinal
++space starting at zero. `invoke` is recipe composition within a row;
++`call` is a semantic symbol invocation and never flattens callee ordinals
++into the caller's space. Repeated calls have distinct paths.
++
++The inherited effective-control set is always passed to callees and body
++splices. An `environment` actual uses the wire-actual grammar and adds
++its wires to that set (set union, repeated controls counted once).
++Exactly `{ "under": actual, "body": [...] }` adds controls for its lexical
++body and restores the outer set afterwards. Controls apply to semantic
++gates only, never allocation/release or classical events (§3.5/§4.3).
++A control may coincide with a gate's explicit control or diagonal operand,
++but never with a changed target. Gate operands must otherwise be distinct.
++
++An `event` actual is exactly `{ "instruction": text, "point": text }`,
++or an event formal name. `instruction` is one complete canonical §9.1
++classical instruction with its operand bindings; `point` identifies its
++§8.2 classical execution point. `{ "classical": event_name, "point":
++"bound" }` emits that bound event without executing or substituting its
++instruction text; classical semantics and retained history are §4.1/§7.4.
++Literal classical leaves retain their existing `classical`/`point` form.
++A classical event is not a unitary; an `inverse` containing one requires
++retained §7.4 history and is not a quantum-library matrix witness.
++
++Consumers MUST reject the library document on arity/type/width mismatch,
++unbound name or closure hash, invalid wire range, duplicate formal,
++nonfinite angle, unknown constructor/key/gate, invalid gate arity,
++coincident changed target/control, unmatched allocation/release, or cyclic
++`invoke`/symbol expansion. Static integer bounds must yield finite
++expansion; validation is repeated for every actual parameter tuple before
++its expansion can be used. There are no implicit bindings or defaults.
++
++**Angles and quantum witnesses (K20).** An `angle` actual is a bound angle
++formal or a finite binary64 value. Reusing §12.3's bit-pattern encoding:
++`f64` is `0x` followed by exactly 16 lowercase hex digits of its IEEE 754
++binary64 bit pattern, most significant nibble first (so −0 and NaN payloads
++are not lost). Angles additionally reject NaN and infinities (§3.1).
++Only `rx`, `ry`, `rz` have `params`, an array containing exactly one angle;
++other §4.4 gates have no angle parameters. No recipe arithmetic on angles
++is permitted. `inverse` negates each rotation angle by toggling bit 63,
++including signed zero, and exchanges s/sdg and t/tdg as §5.3 requires.
++
++For h, phase gates s/sdg/t/tdg/cz, and rotations, correctness is equality
++of the §14.2 unitary (using §4.4 matrices), column by column on the full
++computational basis of all recipe interface wires, with scratch initially
++clean and finally clean. Arbitrary targets, controls and borrowed inputs
++are included. This full-basis unitary is the witness extending T3's
++basis argument; non-permutation leaves MUST NOT be certified by a basis
++permutation simulator. Exact algebraic amplitude checks apply to Clifford+T
++leaves. For arbitrary binary64 angles a numerical checker must state its
++round-trip criterion and error bounds; numerical agreement is evidence,
++not a proof of ε=0 for arbitrary transcendental matrix entries.
++
++**REF-BINDING / REF-QUANTUM witnesses.** With formals
++`[{"name":"N","type":"integer"},{"name":"w","type":"wire","width":"N"},
++{"name":"theta","type":"angle"},{"name":"B","type":"body"}]`, actuals
++`[1,{"range":"a","from":0,"to":1},"0x8000000000000000",[]]` bind
++w[0]=a[0], θ=−0 and an empty body. Replacing the range end by 0 rejects
++for width mismatch. Splicing a body allocating/releasing `tmp` twice gives
++two distinct scratch identities even if the callee also declares `tmp`.
++An inverse rx at `0x3ff0000000000000` emits rx at
++`0xbff0000000000000`. For `w=[a[0],a[1]]` and t=a[2],
++`{"gate":"mcx","wires":["w","t"]}` emits exactly those three operands;
++`each` over w visits a[0] then a[1]. Two calls to the same closure have
++separate invocation paths, each starting ordinal zero. H's two columns
++are (1,1)/√2 and (1,−1)/√2; S's second column is (0,i), distinguishing
++these witnesses from a bit permutation and fixing global phase.
++
 +Number every emitted leaf (including allocation/release and classical
 +leaves) 0,1,… within the containing row/instruction, after instantiating
 +widths and static loop counts, before any §5.7 transformation or target
@@ -1827,8 +1937,8 @@
 +| Address dispatch and multiplexers | Scan every address i in increasing numeric order; compute equality to i, copy/exchange cell bits in increasing order under that bit, uncompute equality before the next i. Lifted memory chooses the §7.2 mapped region in address order and scans its cells in increasing address order; captures use old addresses before exchanged counters. | §4.6: "for each cell i: under a == i"; §17 item 7: "one-hot address dispatch"; §3.7 C1–C5/R1–R5. |
 +| Row, oracle and structure | Compose these recipes in the printed §3.6 step order, §4.2 slot order, §3.7 activation order, §5.2 allocate/forward/commit/reverse/release order. `qif`, loops, local-region image X gates and `qinplace` use the literal sequences of §4.5–§4.6, incorporating 0.9's explicit parameters. Cleanup `reverse` adjoints that sequence; `recompute` follows §6.4. | §11: "Above gate level the order is fixed by §3.6, §4.2, §4.5–§4.6 and §5.2"; §5.2: "run the inverse step for t = B..1, then release (1)". |
 +
-+These algorithms define exact permutation circuits, preserving every
-+input and cleaning scratch; circuit correctness must still be checked
++The permutation algorithms define exact permutation circuits, preserving
++every input required by the row and cleaning scratch; circuit correctness must still be checked
 +against full-domain T3 witnesses and §5.7, not inferred from costs or
 +names. The separate catalog job computes the full catalog and its hash
 +under this contract; publication follows acceptance. In particular this is
@@ -1965,7 +2075,7 @@
  `error` entry (§12.3) is a **common upper bound over all contexts** of
  its key; the multiplicity composition of §12.3 is sound for that reason.
  
-@@ -1325,7 +2445,10 @@
+@@ -1325,7 +2555,10 @@
  rejects): Y − J(Φ) ⪰ 0, Y + J(Φ) ⪰ 0, mu·I − Tr_out(Y) ⪰ 0 (partial trace
  over the output factor), and mu ≤ `bound`; then ‖Φ‖◇ ≤ mu (the dual of
  Watrous's SDP with Y₀ = Y₁ = Y; this is the diamond norm itself, not
@@ -1977,7 +2087,7 @@
  hi, im_lo, im_hi]` (decimal strings). **Positivity test.** The checker
  proves each of the three matrices **positive definite** by an interval
  Cholesky (or Hermitian LDL†) factorisation in which the interval lower
-@@ -1335,13 +2458,25 @@
+@@ -1335,13 +2568,25 @@
  strictly feasible by replacing Y with Y + δI and mu with mu′ = mu + δ·(d
  + 1) for a small rational δ > 0 (any mu′ > mu + δ·d suffices): then Y ±
  J(Φ) ⪰ δI ≻ 0 and, since Tr_out(Y + δI) = Tr_out(Y) + δ·d·I, mu′·I −
@@ -2006,7 +2116,7 @@
  
  **Sampling.** For each domain component with range size R = hi − lo + 1,
  assemble m = ⌈⌈log₂ R⌉/64⌉ consecutive generator words (least-significant
-@@ -1350,18 +2485,22 @@
+@@ -1350,18 +2595,22 @@
  
  ### 12.2 Domains
  
@@ -2033,7 +2143,7 @@
                                                     fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
              cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },
              error:   { "<variant>:<inherited_controls>": { local: { "operator_norm"?: v, "diamond"?: v }, inclusive: { "operator_norm"?: v, "diamond"?: v } } },
-@@ -1369,6 +2508,63 @@
+@@ -1369,6 +2618,63 @@
    composition { multiplicities: { "<hash>:<variant>:<inherited_controls>": n (from the realised schedule) }, epsilon_total: { "diamond": v }, method: "sum_over_multiplicities" }
  ```
  
@@ -2097,7 +2207,7 @@
  `inclusive(R, key) = local(R, key) + Σ_callees n_c × inclusive(c, key_c)`
  **per metric**, keyed like `cleanup` by `<variant>:<inherited_controls>`
  (the realised error depends on both); every `local` value is a verified
-@@ -1380,27 +2576,41 @@
+@@ -1380,27 +2686,41 @@
  variants) require `operator_norm` bounds throughout. A controlled
  unitary variant requires a `numerical` claim; an ε > 0 realisation
  compared as a channel requires a `channel` claim. Executable claims
@@ -2145,7 +2255,7 @@
  ### 14.2 Quantum state semantics
  
  The state of a Q region is a vector in ⊗ over live wires in allocation
-@@ -1422,10 +2632,20 @@
+@@ -1422,10 +2742,20 @@
  - **T3 (permutation theorem).** If the realised unitary V of a circuit on
    span(D) is a permutation matrix and the final basis tuple equals P(x)
    for every x ∈ D, then V|span(D) = P.
@@ -2170,7 +2280,7 @@
  - **T5.** As §6.3.
  - **T6 (executor agreement).** Two executors conforming to §3–§7 on one
    target with the same schedule produce on every x ∈ D the same final
-@@ -1439,14 +2659,14 @@
+@@ -1439,14 +2769,14 @@
  
  | Suite | Class | Tests |
  |---|---|---|
@@ -2192,7 +2302,7 @@
  
  ## 16. Canonical textual form (normative)
  
-@@ -1458,7 +2678,17 @@
+@@ -1458,7 +2788,17 @@
  `INT := -?(0|[1-9][0-9]*)`; `FLOAT :=` shortest round-trip decimal with
  `.` or exponent, finite; `STRING := "…"` with escapes `\"`, `\\`, `\n`;
  `HEX := ([0-9a-f]{2})*`. Metadata lines are RFC 8785 canonical JSON
@@ -2211,7 +2321,7 @@
  
  ### 16.2 Grammar
  
-@@ -1472,10 +2702,10 @@
+@@ -1472,10 +2812,10 @@
    dataline  := NAME SP HEX NL
    function  := fhead NL regs? block+
    fhead     := ("fn" SP ("cc"|"r") | "oracle" | "action" | "perm_action" | "lproc") SP "@" NAME SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")"
@@ -2225,7 +2335,7 @@
    regs      := "regs" SP "{" SP (NAME ":" type ("," SP NAME ":" type)*)? SP "}" (SP "bounds" SP "{" INT ("," SP INT)* "}")? NL
    block     := "^" NAME "(" plist "):" NL instr+
    instr     := (lhs SP "=" SP)? OPCODE (SP operand)* (SP "{" NL instr+ "}" (SP "{" NL instr+ "}")?)? NL
-@@ -1485,16 +2715,32 @@
+@@ -1485,16 +2825,32 @@
    VER       := INT "." INT
  ```
  
@@ -2261,7 +2371,7 @@
  
  section functions
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
-@@ -1509,9 +2755,9 @@
+@@ -1509,9 +2865,9 @@
  empty and its envelope is exactly these bytes (each line LF-terminated):
  
  ```
@@ -2273,7 +2383,7 @@
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
  regs { one:reg[8], r:reg[8] }
  ^entry():
-@@ -1521,17 +2767,19 @@
+@@ -1521,17 +2877,19 @@
  ```
  
  With B ≥ 3 every x yields `(x + 1 mod 256, 0)` (`result_val` = 0 ⊕ r);
@@ -2296,7 +2406,7 @@
  
  section functions
  oracle @sum_db (n:wire[8] in) (t:wire[8]) (f:wire[4]) (db:region[4,8] in) ()
-@@ -1586,17 +2834,18 @@
+@@ -1586,17 +2944,18 @@
  SCC (its self-reference is written `@$0`, its `@zero` reference is
  replaced by `@` + the `zero` hash, which is its only part-(6) line; its
  closure set is the `zero` global's leaf and image), so its envelope is
@@ -2319,7 +2429,7 @@
  lift.boundscheck zp 1
  zv = lift.load.i8 zp
  z = lift.icmp.eq n zv
-@@ -1615,7 +2864,7 @@
+@@ -1615,7 +2974,7 @@
  lift.ret acc
  data zero 00
  layout globals.zero {"base":16,"image":"zero","size":1}
@@ -2328,7 +2438,7 @@
  ```
  
  `@sum_db`'s envelope includes every layout leaf, the `zero` image, `@` +
-@@ -1623,12 +2872,378 @@
+@@ -1623,12 +2982,378 @@
  line (`@db` is an interface region, not a symbol):
  
  ```
@@ -2711,7 +2821,7 @@
  ## 17. Decisions deferred to implementation, with defaults
  
  Each item is one an implementer must decide to build; any decision is
-@@ -1653,7 +3268,14 @@
+@@ -1653,7 +3378,14 @@
     (ripple-carry adders and comparators, linear `inrange` scans,
     one-hot address dispatch, clean scratch released in reverse order);
     a schedule that names no `expansion` binds `ref` at the ISA's own
@@ -2727,7 +2837,7 @@
  8. **Enclosure procedure for transcendental entries** (§12.1). Default:
     Taylor series of sin and cos to the first term whose Lagrange
     remainder bound is below 2^−(`precision_bits` + 2), argument reduced
-@@ -1669,7 +3291,65 @@
+@@ -1669,7 +3401,65 @@
  13. **Suite sizes** (§15): the exhaustive widths of suite C and the
      sample counts of `sampled` claims. Default: exhaustive for ≤ 16
      interface bits; 2^16 samples above.

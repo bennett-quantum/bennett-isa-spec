@@ -3,7 +3,7 @@
 use crate::json::{self, Json};
 use std::collections::{BTreeMap, BTreeSet};
 
-type Env = BTreeMap<String, i64>;
+pub(crate) type Env = BTreeMap<String, i64>;
 fn field<'a>(v: &'a Json, k: &str) -> Result<&'a Json, String> {
     v.get(k).ok_or_else(|| format!("missing {k}: {v}"))
 }
@@ -24,7 +24,7 @@ fn keys(v: &Json, expected: &[&str]) -> Result<(), String> {
     }
     Ok(())
 }
-fn scalar(v: &Json, env: &Env) -> Result<i64, String> {
+pub(crate) fn scalar(v: &Json, env: &Env) -> Result<i64, String> {
     match v {
         Json::Num(n) if n.fract() == 0.0 && n.abs() < (1u64 << 53) as f64 => Ok(*n as i64),
         Json::Str(s) => env
@@ -47,7 +47,7 @@ fn scalar(v: &Json, env: &Env) -> Result<i64, String> {
         _ => Err(format!("invalid scalar {v}")),
     }
 }
-fn index(s: &str, env: &Env) -> Result<(String, usize), String> {
+pub(crate) fn index(s: &str, env: &Env) -> Result<(String, usize), String> {
     let (name, expr) = s.split_once('[').ok_or("wire needs a subscript")?;
     let expr = expr.strip_suffix(']').ok_or("unclosed subscript")?;
     let v = if env.contains_key(expr) {

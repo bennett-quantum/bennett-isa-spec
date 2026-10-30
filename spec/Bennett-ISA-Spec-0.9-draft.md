@@ -130,6 +130,8 @@ north star §3.1 requires).
 | K16 | §9.1, §9.4, §12.3 | **Frame JSON (ratified B5)**: identified slots and typed scratch/history/borrow/ancilla records, c-only width expressions, disjoint shared lifetimes | b-isa-spec-2c9; circuits 4fa; SQ 11 | S | – |
 | K17 | §4.1 | **Draw ordering (ratified A5)**: FIFO draws; wire-first lexicographic outcomes, strict cumulative threshold; reference CLI witness | b-isa-spec-bas; SQ 29 | S | – |
 | K18 | §0, §3.7, §4.2, §4.9, §5.4, §7.3, §8.1 | **Confirmations (ratified A4/A5)**: Q14 explicit forwarding; EPS-DECADE, BLOCK-IMAGE, ISA-7 and Q1–Q13 confirmed as applied | b-isa-spec-7u6; b-isa-spec-f31; b-isa-spec-0d0; b-isa-spec-221; b-isa-spec-2c9 | E | – |
+| K19 | §11.1 | **REF-BINDING**. Typed integer/wire/body/symbol/environment bindings, lexical substitution, invocation-local ordinals and validation witnesses | b-isa-spec-cbk | S | new |
+| K20 | §11.1 | **REF-QUANTUM**. Binary64 angle bits, variadic wires and full-basis matrix witnesses | b-isa-spec-8sc | S | new |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -2210,7 +2212,7 @@ and `recipes`. The first three are strings `0.9`, `ref`, `0.9`.
 tuple order. Each instantiated recipe has `kind`, its integer width or
 other named integer parameters, `operations`, `scratch`, `removable`
 and `source` (the motivating ISA sentence). A parameterised recipe
-uses `parameters` (an ordered array of names) and `body` instead of the
+uses `parameters` (an ordered array of formals defined below) and `body` instead of the
 instance's `operations`; its body uses the closed constructors below.
 Recipes cover every §4 instruction/row, the §3.6 step, §3.7 activation
 operations and §5.2 construction, with no implementation-private leaf.
@@ -2258,6 +2260,114 @@ inverse reverses its fully expanded body and adjoints each leaf by
 must encode the algorithms below in these constructors before release;
 this draft does not claim that prose alone is an interchangeable file.
 
+**Typed binding (K19).** A formal is `{ "name": name, "type": type }`,
+with exactly these keys, except `wire`, which additionally requires
+`width` (an integer expression). Types are `integer`, `wire`, `angle`,
+`body`, `symbol`, `environment`, and `event`. A bare name abbreviates an
+`integer` formal, retaining the printed witness bytes. Names are unique
+within a parameter list. Width expressions use only earlier integer
+formals. A wire formal of width n is the ordered list w[n], with
+little-endian indexing, including the empty list when n = 0.
+
+`invoke` binds `args` positionally, evaluating actuals in the caller's
+lexical environment before binding any callee formal. Integer actuals use
+the scalar grammar above. A wire actual is a wire name, a subscripted
+wire, an array of wire actuals concatenated left to right, or exactly
+`{ "range": name, "from": scalar, "to": scalar }`, selecting [from,to)
+from a named bundle; bounds must satisfy 0 ≤ from ≤ to ≤ its width.
+An actual's resulting length must equal its formal's evaluated width.
+In a gate's `wires` array a whole formal emits all its wires in order;
+this encodes `mcx(k)` as k controls followed by one target, including k=0.
+`{ "each": name, "in": actual, "body": [...] }` additionally visits
+wire-list elements in order, binding name as a one-wire formal for each
+visit. Its binding shadows lexically and is restored after the loop.
+
+A body actual is an ordered constructor array, captured with its caller's
+lexical environment, or the name of an existing body formal. Exactly
+`{ "splice": name }` expands it at that point. Substitution is
+capture-free: caller references never resolve to callee locals, loop and
+`each` bindings have lexical scope, and every fresh allocation identity
+is derived from its expansion occurrence path (including loop iteration,
+body-splice occurrence and invocation path). Allocations must not shadow a
+live declaration in the same scope; a release names its matching live
+allocation. An inverse traverses constructors in reverse, toggles the
+adjoint on nested bodies and uses the same restored bindings at each
+position; allocation declarations supply release/adjoint metadata even
+when allocation and release occur in different nested constructor lists.
+
+A symbol actual is a 64-lowercase-hex §9.2 closure hash, or a bound symbol
+formal. The linked closure registry supplies that symbol's own typed
+interface and constructor body; the hash must match the linked closure,
+not an arbitrary supplied body. Exactly `{ "call": name, "args": [...] }`
+expands that symbol under a new invocation-path element identified by the
+call constructor's expansion occurrence. It retains its own ordinal
+space starting at zero. `invoke` is recipe composition within a row;
+`call` is a semantic symbol invocation and never flattens callee ordinals
+into the caller's space. Repeated calls have distinct paths.
+
+The inherited effective-control set is always passed to callees and body
+splices. An `environment` actual uses the wire-actual grammar and adds
+its wires to that set (set union, repeated controls counted once).
+Exactly `{ "under": actual, "body": [...] }` adds controls for its lexical
+body and restores the outer set afterwards. Controls apply to semantic
+gates only, never allocation/release or classical events (§3.5/§4.3).
+A control may coincide with a gate's explicit control or diagonal operand,
+but never with a changed target. Gate operands must otherwise be distinct.
+
+An `event` actual is exactly `{ "instruction": text, "point": text }`,
+or an event formal name. `instruction` is one complete canonical §9.1
+classical instruction with its operand bindings; `point` identifies its
+§8.2 classical execution point. `{ "classical": event_name, "point":
+"bound" }` emits that bound event without executing or substituting its
+instruction text; classical semantics and retained history are §4.1/§7.4.
+Literal classical leaves retain their existing `classical`/`point` form.
+A classical event is not a unitary; an `inverse` containing one requires
+retained §7.4 history and is not a quantum-library matrix witness.
+
+Consumers MUST reject the library document on arity/type/width mismatch,
+unbound name or closure hash, invalid wire range, duplicate formal,
+nonfinite angle, unknown constructor/key/gate, invalid gate arity,
+coincident changed target/control, unmatched allocation/release, or cyclic
+`invoke`/symbol expansion. Static integer bounds must yield finite
+expansion; validation is repeated for every actual parameter tuple before
+its expansion can be used. There are no implicit bindings or defaults.
+
+**Angles and quantum witnesses (K20).** An `angle` actual is a bound angle
+formal or a finite binary64 value. Reusing §12.3's bit-pattern encoding:
+`f64` is `0x` followed by exactly 16 lowercase hex digits of its IEEE 754
+binary64 bit pattern, most significant nibble first (so −0 and NaN payloads
+are not lost). Angles additionally reject NaN and infinities (§3.1).
+Only `rx`, `ry`, `rz` have `params`, an array containing exactly one angle;
+other §4.4 gates have no angle parameters. No recipe arithmetic on angles
+is permitted. `inverse` negates each rotation angle by toggling bit 63,
+including signed zero, and exchanges s/sdg and t/tdg as §5.3 requires.
+
+For h, phase gates s/sdg/t/tdg/cz, and rotations, correctness is equality
+of the §14.2 unitary (using §4.4 matrices), column by column on the full
+computational basis of all recipe interface wires, with scratch initially
+clean and finally clean. Arbitrary targets, controls and borrowed inputs
+are included. This full-basis unitary is the witness extending T3's
+basis argument; non-permutation leaves MUST NOT be certified by a basis
+permutation simulator. Exact algebraic amplitude checks apply to Clifford+T
+leaves. For arbitrary binary64 angles a numerical checker must state its
+round-trip criterion and error bounds; numerical agreement is evidence,
+not a proof of ε=0 for arbitrary transcendental matrix entries.
+
+**REF-BINDING / REF-QUANTUM witnesses.** With formals
+`[{"name":"N","type":"integer"},{"name":"w","type":"wire","width":"N"},
+{"name":"theta","type":"angle"},{"name":"B","type":"body"}]`, actuals
+`[1,{"range":"a","from":0,"to":1},"0x8000000000000000",[]]` bind
+w[0]=a[0], θ=−0 and an empty body. Replacing the range end by 0 rejects
+for width mismatch. Splicing a body allocating/releasing `tmp` twice gives
+two distinct scratch identities even if the callee also declares `tmp`.
+An inverse rx at `0x3ff0000000000000` emits rx at
+`0xbff0000000000000`. For `w=[a[0],a[1]]` and t=a[2],
+`{"gate":"mcx","wires":["w","t"]}` emits exactly those three operands;
+`each` over w visits a[0] then a[1]. Two calls to the same closure have
+separate invocation paths, each starting ordinal zero. H's two columns
+are (1,1)/√2 and (1,−1)/√2; S's second column is (0,i), distinguishing
+these witnesses from a bit permutation and fixing global phase.
+
 Number every emitted leaf (including allocation/release and classical
 leaves) 0,1,… within the containing row/instruction, after instantiating
 widths and static loop counts, before any §5.7 transformation or target
@@ -2302,8 +2412,8 @@ is balanced when the external control is false (§3.5, §4.3).
 | Address dispatch and multiplexers | Scan every address i in increasing numeric order; compute equality to i, copy/exchange cell bits in increasing order under that bit, uncompute equality before the next i. Lifted memory chooses the §7.2 mapped region in address order and scans its cells in increasing address order; captures use old addresses before exchanged counters. | §4.6: "for each cell i: under a == i"; §17 item 7: "one-hot address dispatch"; §3.7 C1–C5/R1–R5. |
 | Row, oracle and structure | Compose these recipes in the printed §3.6 step order, §4.2 slot order, §3.7 activation order, §5.2 allocate/forward/commit/reverse/release order. `qif`, loops, local-region image X gates and `qinplace` use the literal sequences of §4.5–§4.6, incorporating 0.9's explicit parameters. Cleanup `reverse` adjoints that sequence; `recompute` follows §6.4. | §11: "Above gate level the order is fixed by §3.6, §4.2, §4.5–§4.6 and §5.2"; §5.2: "run the inverse step for t = B..1, then release (1)". |
 
-These algorithms define exact permutation circuits, preserving every
-input and cleaning scratch; circuit correctness must still be checked
+The permutation algorithms define exact permutation circuits, preserving
+every input required by the row and cleaning scratch; circuit correctness must still be checked
 against full-domain T3 witnesses and §5.7, not inferred from costs or
 names. The separate catalog job computes the full catalog and its hash
 under this contract; publication follows acceptance. In particular this is

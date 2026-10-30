@@ -1,3 +1,21 @@
+## REF-BINDING / REF-QUANTUM completion — 2026-10-30
+
+K19/K20 extend §11.1 within A1's serialization/envelope/ordinal contract.
+Typed positional wires, lexical body closures, linked closure-hash symbols,
+effective-control environments, angle bit patterns and ordered wire lists
+replace the previous integer-only binding gap. The qxor witness is unchanged.
+Witness tests cover negative zero, inverse sign bits, width rejection and
+variadic mcx operands; additional binding/quantum witnesses live in conformance.
+
+Rejected alternatives: textual name substitution captures caller scratch;
+flattening symbol calls loses invocation-local ordinals; decimal angles lose
+signed zero and exact input bytes; angle arithmetic introduces independent
+rounding choices; fixed-arity mcx specializations omit larger k; permutation
+checking H loses amplitudes/global phase. Classical events stay canonical
+bound instruction events, not private quantum opcodes. Matrix comparison for
+arbitrary angles is explicitly numerical evidence, never an ε=0 proof.
+Publication remains gated on a complete catalog and accepted 0.9.
+
 # ISA 0.9 draft — progress file (resumable)
 
 ## VM certificate/estimate contract follow-up — 2026-10-30
