@@ -437,7 +437,7 @@ fn independent_canonical_bytes_and_envelope_hashes() {
             "-I",
             concat!(env!("CARGO_MANIFEST_DIR"), "/tools/ref_catalog.py"),
             "--families",
-            "3",
+            "4",
             "--check",
         ])
         .output()
@@ -450,4 +450,193 @@ fn independent_canonical_bytes_and_envelope_hashes() {
     let hash = envelope_hash(BYTES);
     assert!(String::from_utf8(output.stdout).unwrap().contains(&hash));
     println!("Rust and Python CHECKPOINT ONLY envelope SHA-256 {hash}");
+}
+#[test]
+fn linear_scan_full_domain() {
+    let c = catalog();
+    let mut counts = [0u64; 2];
+    for entries in 1..=2u32 {
+        for n in 1..=if entries == 1 { 4 } else { 2 } {
+            let size = 1u64 << n;
+            let tag = if entries == 1 {
+                "e1".into()
+            } else {
+                format!("e2.w{n}")
+            };
+            let args = if entries == 1 { vec![n as i64] } else { vec![] };
+            for (oi, op) in ["inrange", "free.flag"].iter().enumerate() {
+                let mut bundles = vec![
+                    ("p", n as usize),
+                    ("base", (n * entries) as usize),
+                    ("live", entries as usize),
+                    ("atop", if entries == 1 { 1 } else { 2 }),
+                    ("t", 1),
+                ];
+                if oi == 0 {
+                    bundles.extend([("n", n as usize), ("size", (n * entries) as usize)]);
+                } else {
+                    bundles.push(("pinned", entries as usize));
+                }
+                let m = Machine::compile(
+                    &c.expand(&format!("value.{op}.{tag}"), &args).unwrap(),
+                    &bundles,
+                )
+                .unwrap();
+                let mut batch = Vec::new();
+                for p in 0..size {
+                    for base in 0..1 << (n * entries) {
+                        for data in 0..if oi == 0 {
+                            1 << (n * entries)
+                        } else {
+                            1 << entries
+                        } {
+                            for len in 0..if oi == 0 { size } else { 1 } {
+                                for live in 0..1 << entries {
+                                    for atop in 0..=entries {
+                                        for en in [false, true] {
+                                            for t in 0..2 {
+                                                let mut valid = false;
+                                                for i in 0..atop {
+                                                    let b = (base >> (i * n)) & (size - 1);
+                                                    valid |= live >> i & 1 != 0
+                                                        && if oi == 0 {
+                                                            b <= p
+                                                                && p + len
+                                                                    <= b + ((data >> (i * n))
+                                                                        & (size - 1))
+                                                        } else {
+                                                            b == p && data >> i & 1 == 0
+                                                        };
+                                                }
+                                                let mut inputs = vec![
+                                                    ("p", p),
+                                                    ("base", base),
+                                                    ("live", live),
+                                                    ("atop", atop as u64),
+                                                    ("t", t),
+                                                ];
+                                                if oi == 0 {
+                                                    inputs.extend([("n", len), ("size", data)]);
+                                                } else {
+                                                    inputs.push(("pinned", data));
+                                                }
+                                                let mut outputs = inputs.clone();
+                                                outputs
+                                                    .iter_mut()
+                                                    .find(|(k, _)| *k == "t")
+                                                    .unwrap()
+                                                    .1 = t ^ u64::from(
+                                                    en && (if oi == 0 { valid } else { !valid }),
+                                                );
+                                                batch.push((inputs, en, outputs));
+                                                if batch.len() == 64 {
+                                                    packed(&m, &batch);
+                                                    batch.clear();
+                                                }
+                                                counts[oi] += 1;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if !batch.is_empty() {
+                    packed(&m, &batch);
+                }
+            }
+        }
+    }
+    println!(
+        "linear scans: inrange {} and free flag {} full-domain tuples",
+        counts[0], counts[1]
+    );
+}
+#[test]
+fn allocation_and_call_flags_full_domain() {
+    let c = catalog();
+    let mut counts = [0u64; 2];
+    for n in 1..=4u32 {
+        let size = 1u64 << n;
+        for (oi, op) in ["alloc", "call"].iter().enumerate() {
+            let m = if oi == 0 {
+                Machine::compile(
+                    &c.expand("value.alloc.flag", &[n as i64, 1]).unwrap(),
+                    &[
+                        ("n", n as usize),
+                        ("used", n as usize),
+                        ("limit", n as usize + 1),
+                        ("atop", 2),
+                        ("t", 1),
+                    ],
+                )
+                .unwrap()
+            } else {
+                Machine::compile(
+                    &c.expand(&format!("value.call.flag.rf4.w{n}"), &[]).unwrap(),
+                    &[
+                        ("depth", n as usize),
+                        ("depth_limit", n as usize + 1),
+                        ("sp", n as usize),
+                        ("stack_limit", n.max(3) as usize + 1),
+                        ("t", 1),
+                    ],
+                )
+                .unwrap()
+            };
+            let mut batch = Vec::new();
+            for a in 0..size {
+                for b in 0..size {
+                    for lim in 0..size * 2 {
+                        for other in 0..if oi == 0 { 4 } else { 1 << (n.max(3) + 1) } {
+                            for en in [false, true] {
+                                for t in 0..2 {
+                                    let inputs = if oi == 0 {
+                                        vec![
+                                            ("n", a),
+                                            ("used", b),
+                                            ("limit", lim),
+                                            ("atop", other),
+                                            ("t", t),
+                                        ]
+                                    } else {
+                                        vec![
+                                            ("depth", a),
+                                            ("sp", b),
+                                            ("depth_limit", lim),
+                                            ("stack_limit", other),
+                                            ("t", t),
+                                        ]
+                                    };
+                                    let flag = if oi == 0 {
+                                        b + a.max(1) > lim || other >= 2
+                                    } else {
+                                        a + 1 > lim || b + 4 > other
+                                    };
+                                    let mut outputs = inputs.clone();
+                                    outputs.iter_mut().find(|(k, _)| *k == "t").unwrap().1 =
+                                        t ^ u64::from(en && flag);
+                                    batch.push((inputs, en, outputs));
+                                    if batch.len() == 64 {
+                                        packed(&m, &batch);
+                                        batch.clear();
+                                    }
+                                    counts[oi] += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if !batch.is_empty() {
+                packed(&m, &batch);
+            }
+            println!("{op} flag width {n} done");
+        }
+    }
+    println!(
+        "allocator {} and call {} full-domain flag tuples",
+        counts[0], counts[1]
+    );
 }

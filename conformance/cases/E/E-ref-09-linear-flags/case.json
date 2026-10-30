@@ -1,0 +1,28 @@
+{
+  "id": "E-ref-09-linear-flags",
+  "suite": "E",
+  "spec": "\u00a711.1 linear inrange and flags; \u00a74.2 inrange/free/alloc flags; \u00a73.7 call flags",
+  "derivation": "Independent integer interval, live/pinned, allocator max(n,1) and prospective stack/depth predicates versus Boolean/ripple leaves; endpoints widened before sums. Every tuple in recorded configurations, both controls, arbitrary predicate targets, scratch release and reverse ordinal restoration. One-entry widths 1\u20134; two-entry widths 1\u20132; allocator table exponent 1; call R_f=4. General tables/record binding remain unfinished.",
+  "scenario": {
+    "family": 4,
+    "catalog": "spec/ref-0.9-draft.json",
+    "checker": "linear_scan_full_domain; allocation_and_call_flags_full_domain"
+  },
+  "expected_outcome": {
+    "recipes": 11,
+    "widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "inrange_tuples": 1318144,
+    "free_flag_tuples": 24704,
+    "alloc_flag_tuples": 149760,
+    "call_flag_tuples": 1123328
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-8r4; complete catalog and binding repair b-isa-spec-cbk required"
+  }
+}

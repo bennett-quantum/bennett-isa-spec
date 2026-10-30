@@ -107,6 +107,8 @@ def build(families):
     recipes=copy_family()
     if families>=2: recipes+=arithmetic_family()
     if families>=3: recipes+=runpy.run_path(str(ROOT/'conformance/tools/ref_arithmetic.py'))['family'](globals())
+    if families>=4: recipes+=runpy.run_path(str(ROOT/'conformance/tools/ref_flags.py'))['family'](globals())
+    if families>=5: recipes+=runpy.run_path(str(ROOT/'conformance/tools/ref_dispatch.py'))['family'](globals())
     recipes.sort(key=lambda r:r['kind'].encode())
     return {'isa':'0.9','name':'ref','version':'0.9','recipes':recipes}
 def witness():

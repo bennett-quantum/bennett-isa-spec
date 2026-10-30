@@ -88,3 +88,16 @@ Widths 1–4: 664,560 arithmetic and 21,760 cast/select tuples.
 Rust std-only SHA-256 and Python hashlib independently agree on the
 checkpoint envelope; both canonicalizers verify the printed qxor witness.
 A checkpoint digest does not identify the complete library.
+
+Linear scans: `value.inrange.e1`, `value.free.flag.e1` (N), and
+`value.inrange/free.flag.e2.w1/w2` (fixed widths); `value.alloc.flag` (N,A),
+`value.call.flag.rf4.w1/w2/w3/w4`. Table columns use flattened bundles
+`base`, `size`, `live`, `pinned`, with `atop` of width 1 (one entry) or 2
+(two entries). Only legal atop values 0..entry-count are enumerated.
+Pointer/range endpoints use N+1 bits so overflowing N-bit sums are not
+wrapped. Allocator witnesses use A=1 (two capacity slots), every Ac-bit
+entry; call witnesses fix R_f=4 and extend prospective sums before comparison.
+All configurations enumerate arbitrary predicate targets and both controls.
+Counts: inrange 1,318,144; free flag 24,704; alloc flag 149,760; call flag
+1,123,328. Wider table configurations and general call records remain open;
+these helpers do not implement allocator writes or activation operations.
