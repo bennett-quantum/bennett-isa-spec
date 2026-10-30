@@ -244,3 +244,40 @@ fn library_scratch_requires_reverse_release_and_balanced_lifetimes() {
             .is_err());
     }
 }
+
+#[test]
+fn unused_recipe_constructor_and_formal_shapes_are_still_closed() {
+    for body in [
+        r#"[{"private":"x"}]"#,
+        r#"[{"gate":"x","wires":[],"secret":true}]"#,
+        r#"[{"for":"i","from":0,"to":0,"body":[{"private":"x"}]}]"#,
+    ] {
+        let d = doc(&format!(
+            r#"[{{"kind":"unused","parameters":[],"body":{body}}}]"#
+        ));
+        assert!(Expander::new(&d, Registry::new()).is_err());
+    }
+    let d = doc(
+        r#"[{"kind":"unused","parameters":[{"name":"w","type":"wire","width":1,"secret":true}],"body":[]}]"#,
+    );
+    assert!(Expander::new(&d, Registry::new()).is_err());
+}
+
+#[test]
+fn canonical_integer_literal_has_only_lsb_ordered_x_leaves() {
+    let mut e = Expander::new(
+        include_str!("../../spec/ref-0.9-draft.json"),
+        Registry::new(),
+    )
+    .unwrap();
+    let args = json::parse(r#"[8,13,"w"]"#).unwrap();
+    let leaves = e
+        .expand("value.literal", args.as_arr().unwrap(), &[("w", 8)])
+        .unwrap();
+    assert_eq!(leaves.len(), 3);
+    assert!(leaves.iter().all(|l| l.gate == "x"));
+    assert_eq!(
+        leaves.iter().map(|l| l.wires[0].1).collect::<Vec<_>>(),
+        [0, 2, 3]
+    );
+}

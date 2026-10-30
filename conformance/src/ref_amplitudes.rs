@@ -248,3 +248,56 @@ pub fn rotation(g: &str, bits: u64) -> Result<[[(f64, f64); 2]; 2], String> {
         _ => return Err("not a rotation".into()),
     })
 }
+
+/// Binary64 evidence for controlled native rotation columns. Algebraic leaves
+/// use `column` instead; this routine never labels floating agreement exact.
+pub fn numerical_rotation_column(
+    leaves: &[Leaf],
+    inputs: &[Wire],
+    basis: usize,
+) -> Result<Vec<(f64, f64)>, String> {
+    if inputs.len() > 20 || basis >= 1 << inputs.len() {
+        return Err("numerical basis outside configured domain".into());
+    }
+    let ids = inputs
+        .iter()
+        .cloned()
+        .enumerate()
+        .map(|(i, w)| (w, i))
+        .collect::<BTreeMap<_, _>>();
+    let mut v = vec![(0.0, 0.0); 1 << inputs.len()];
+    v[basis] = (1.0, 0.0);
+    for leaf in leaves {
+        if leaf.allocation.is_some()
+            || leaf.event.is_some()
+            || leaf.angles.len() != 1
+            || leaf.wires.len() != 1
+        {
+            return Err("rotation-column evidence requires native rotation leaves".into());
+        }
+        let target = *ids.get(&leaf.wires[0]).ok_or("unbound rotation wire")?;
+        let controls = leaf
+            .controls
+            .iter()
+            .map(|w| ids.get(w).copied().ok_or("unbound numerical control"))
+            .collect::<Result<Vec<_>, _>>()?;
+        let matrix = rotation(&leaf.gate, leaf.angles[0])?;
+        let bit = 1 << target;
+        for i in 0..v.len() {
+            if i & bit == 0 && controls.iter().all(|c| i >> c & 1 == 1) {
+                let pair = [v[i], v[i | bit]];
+                let mut result = [(0.0, 0.0); 2];
+                for row in 0..2 {
+                    for (col, (br, bi)) in pair.iter().copied().enumerate() {
+                        let (ar, ai) = matrix[row][col];
+                        result[row].0 += ar * br - ai * bi;
+                        result[row].1 += ar * bi + ai * br;
+                    }
+                }
+                v[i] = result[0];
+                v[i | bit] = result[1];
+            }
+        }
+    }
+    Ok(v)
+}

@@ -106,6 +106,69 @@ fn wires(j: &Json, c: &Context) -> Result<Vec<Wire>, String> {
         _ => Err("invalid wire actual".into()),
     }
 }
+fn validate_body(body: &[Json]) -> Result<(), String> {
+    for c in body {
+        if c.get("gate").is_some() {
+            keys(
+                c,
+                if c.get("params").is_some() {
+                    &["gate", "wires", "params"]
+                } else {
+                    &["gate", "wires"]
+                },
+            )?;
+            s(f(c, "gate")?)?;
+            a(f(c, "wires")?)?;
+            if let Some(p) = c.get("params") {
+                a(p)?;
+            }
+        } else if c.get("alloc").is_some() {
+            keys(c, &["alloc", "width", "class", "state"])?;
+            s(f(c, "alloc")?)?;
+            s(f(c, "class")?)?;
+            s(f(c, "state")?)?;
+        } else if c.get("release").is_some() {
+            keys(c, &["release"])?;
+            s(f(c, "release")?)?;
+        } else if c.get("classical").is_some() {
+            keys(c, &["classical", "point"])?;
+            s(f(c, "classical")?)?;
+            s(f(c, "point")?)?;
+        } else if c.get("invoke").is_some() || c.get("call").is_some() {
+            let key = if c.get("invoke").is_some() {
+                "invoke"
+            } else {
+                "call"
+            };
+            keys(c, &[key, "args"])?;
+            s(f(c, key)?)?;
+            a(f(c, "args")?)?;
+        } else if c.get("for").is_some() {
+            keys(c, &["for", "from", "to", "body"])?;
+            s(f(c, "for")?)?;
+            validate_body(a(f(c, "body")?)?)?;
+        } else if c.get("each").is_some() {
+            keys(c, &["each", "in", "body"])?;
+            s(f(c, "each")?)?;
+            validate_body(a(f(c, "body")?)?)?;
+        } else if c.get("under").is_some() {
+            keys(c, &["under", "body"])?;
+            validate_body(a(f(c, "body")?)?)?;
+        } else if c.get("inverse").is_some() {
+            keys(c, &["inverse", "body"])?;
+            if f(c, "inverse")?.as_bool() != Some(true) {
+                return Err("inverse must be true".into());
+            }
+            validate_body(a(f(c, "body")?)?)?;
+        } else if c.get("splice").is_some() {
+            keys(c, &["splice"])?;
+            s(f(c, "splice")?)?;
+        } else {
+            return Err(format!("unknown constructor {c}"));
+        }
+    }
+    Ok(())
+}
 pub struct Expander {
     recipes: BTreeMap<String, Json>,
     registry: Registry,
@@ -125,6 +188,34 @@ impl Expander {
         let mut recipes = BTreeMap::new();
         let mut previous = None;
         for r in a(f(&d, "recipes")?)? {
+            validate_body(a(f(r, "body")?)?)?;
+            let mut formal_names = BTreeSet::new();
+            for p in a(f(r, "parameters")?)? {
+                if let Json::Str(name) = p {
+                    if !formal_names.insert(name.as_str()) {
+                        return Err("duplicate formal".into());
+                    }
+                    continue;
+                }
+                let ty = s(f(p, "type")?)?;
+                keys(
+                    p,
+                    if ty == "wire" {
+                        &["name", "type", "width"]
+                    } else {
+                        &["name", "type"]
+                    },
+                )?;
+                if !matches!(
+                    ty,
+                    "integer" | "wire" | "angle" | "body" | "symbol" | "environment" | "event"
+                ) {
+                    return Err("unknown formal type".into());
+                }
+                if !formal_names.insert(s(f(p, "name")?)?) {
+                    return Err("duplicate formal".into());
+                }
+            }
             let name = s(f(r, "kind")?)?.to_string();
             if previous.as_ref().is_some_and(|p| p >= &name) {
                 return Err("recipe order/duplicate".into());
@@ -287,7 +378,11 @@ impl Expander {
                     let b = if let Json::Str(n) = v {
                         caller.bodies.get(n).cloned().ok_or("unbound body")?
                     } else {
-                        (a(v)?.to_vec(), Box::new(caller.clone()))
+                        {
+                            let body = a(v)?;
+                            validate_body(body)?;
+                            (body.to_vec(), Box::new(caller.clone()))
+                        }
                     };
                     c.bodies.insert(name.into(), b);
                 }
@@ -603,7 +698,10 @@ impl Expander {
                     let expected = s(n)?;
                     let valid = opcode == expected
                         || opcode.strip_prefix(expected).is_some_and(|tail| {
-                            tail.starts_with(".i") && tail[2..].bytes().all(|b| b.is_ascii_digit())
+                            tail.starts_with(".i")
+                                && tail.len() > 2
+                                && !tail[2..].starts_with('0')
+                                && tail[2..].bytes().all(|b| b.is_ascii_digit())
                         });
                     if !valid {
                         return Err("bound classical opcode mismatch".into());

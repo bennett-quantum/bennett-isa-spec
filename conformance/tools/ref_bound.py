@@ -27,14 +27,14 @@ def rows(api):
         out.append(recipe('bind.value.'+op,[I('N'),W('a','N'),W('b','N'),W('t',1 if op.startswith('icmp.') else 'N')],[invoke('value.'+op,['N'])],'§11.1 typed binding of the §4.1 value circuit.'))
     # Width-uniform shifts: scan j with an N-bit constant counter. All >=N
     # cases contribute zero (including arithmetic shift, per §4.1).
-    inc=[loop('p','N',[gate('mcx',{'range':'counter','from':0,'to':minus(minus('N',1),'p')},wire('counter',minus(minus('N',1),'p')))])]
     for op in ['shl','lshr','ashr']:
-        eq=invoke('bind.value.icmp.eq',['N','b','counter','eq'])
+        eq=invoke('bind.value.icmp.eq',['N','b','counter','eq']);literal=invoke('value.literal',['N','j','counter'])
         if op=='shl':body=[{'for':'bit','from':'j','to':'N','body':[gate('ccx',wire('eq'),wire('a',minus('bit','j')),wire('t','bit'))]}]
         else:
             body=[loop('bit',minus('N','j'),[gate('ccx',wire('eq'),wire('a',plus('bit','j')),wire('t','bit'))])]
             if op=='ashr':body += [{'for':'bit','from':minus('N','j'),'to':'N','body':[gate('ccx',wire('eq'),wire('a',minus('N',1)),wire('t','bit'))]}]
-        out.append(recipe('bind.value.'+op,[I('N'),W('a','N'),W('b','N'),W('t','N')],[alloc('counter','N'),alloc('eq',1),loop('j','N',[eq]+body+[eq]+inc),inv([loop('j','N',inc)]),release('eq'),release('counter')],'§4.1: shift >= N gives zero; §11.1 increasing shift-amount scan.', ['counter','eq']))
+        scan=[alloc('counter','N'),literal,alloc('eq',1),eq]+body+[inv([eq]),release('eq'),inv([literal]),release('counter')]
+        out.append(recipe('bind.value.'+op,[I('N'),W('a','N'),W('b','N'),W('t','N')],[loop('j','N',scan)],'§4.1: shift >= N gives zero; §11.1 increasing shift-amount scan with fresh LSB-initialized constant bits.', ['counter','eq']))
     for op in ['add','sub','mul','and','or','xor','shl','lshr','ashr','icmp.eq','icmp.ne','icmp.ult','icmp.ule','icmp.slt','icmp.sle']:
         width=1 if op.startswith('icmp.') else 'N'
         out.append(recipe('lift.'+op,[I('N'),W('a','N'),W('b','N'),W('t',width),W('w',width)],captured_binary(op)+[swap('t','w',width)],'§4.2: capture both source operands into distinct clean snapshots, compute every value into its assignment slot, clear snapshots, then exchange with the destination.', ['source0','source1']))
@@ -45,9 +45,7 @@ def rows(api):
         out.append(recipe('lift.'+op,params,body,'§4.2: '+('w = lift.mov a; slot retains old w.' if op=='mov' else 'result_val ^= v; successor HALT.')))
     for op in ['zext','sext','trunc']:
         out.append(recipe('lift.'+op,[I('N'),I('M'),W('a','N'),W('t','M'),W('w','M')],[invoke('value.'+op,['N','M']),swap('t','w','M')],'§4.2 lift.cast: out-of-place extension/truncation then assignment exchange.'))
-    increment=[loop('bit','N',[gate('mcx',{'range':'literal','from':0,'to':minus(minus('N',1),'bit')},wire('literal',minus(minus('N',1),'bit')))])]
-    compute=[loop('count','C',increment)]
-    out.append(recipe('value.literal',[I('N'),I('C'),W('t','N')],[alloc('literal','N')]+compute+[loop('bit','N',[gate('cx',wire('literal','bit'),wire('t','bit'))]),inv(compute),release('literal')],'§4.1 const: XOR the literal bit vector into the slot; integer C is its canonical unsigned value.',['literal']))
+    out.append(recipe('value.literal',[I('N'),I('C'),W('t','N')],[loop('bit','N',[loop('one',['bit','C','bit'],[gate('x',wire('t','bit'))])])],'§4.1 const; §11.1 K21: XOR the unsigned literal bit vector with LSB-ordered X leaves.'))
     for op in ['const','label','addr']:
         out.append(recipe('lift.'+op,[I('N'),I('C'),W('t','N'),W('w','N')],[invoke('value.literal',['N','C','t']),swap('t','w','N')],'§4.2 lift.'+op+': resolved literal/canonical label/layout address computed into its slot then exchanged.'))
     out.append(recipe('lift.parmov',[I('N'),W('a','N'),W('t','N'),W('w','N')],[loop('bit','N',[gate('cx',wire('a','bit'),wire('t','bit'))]),swap('t','w','N')],'§4.2: concatenate source, slot and destination bundles in listed slot order, total N bits; all computes precede every exchange, including aliases.'))

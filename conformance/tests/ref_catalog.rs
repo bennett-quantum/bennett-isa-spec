@@ -439,7 +439,7 @@ fn independent_canonical_bytes_and_envelope_hashes() {
             "-I",
             concat!(env!("CARGO_MANIFEST_DIR"), "/tools/ref_catalog.py"),
             "--families",
-            "9",
+            "10",
             "--check",
         ])
         .output()

@@ -74,7 +74,7 @@ def copy_family():
         op=gate('swap',wire('a','i'),wire('b','i')) if k=='qexch' else gate('cx',wire('s','i'),wire('t','i'))
         body=[loop('i','N',[op])]
         if k=='qcopy': body.insert(0,alloc('t','N'))
-        if k=='quncopy': body=[inv([alloc('t','N')]+body)]
+        if k=='quncopy': body += [inv([alloc('t','N')])]
         out.append(recipe(k,['N'],body,'0.8 §4.5: '+('swap a[i] b[i]' if k=='qexch' else 'cx s[i] t[i]')))
     for k,ws in [('x',['a']),('cx',['a','b']),('ccx',['a','b','t']),('swap',['a','b'])]:
         out.append(recipe('gate.'+k,[],[gate(k,*map(wire,ws))],'0.8 §4.4: '+k+' is exact, including global phase.'))
@@ -87,12 +87,14 @@ def arithmetic_family():
         c.body += [loop('j','N',[gate('cx',wire(s,'j'),wire('t','j'))]),inv(compute)]
         out.append(c.recipe('value.'+op,['N'],'0.8 §4.1: add sub wrap; §17 item 7: ripple-carry adders and comparators.'))
     for op in ['eq','ne','ult','ule','slt','sle']:
-        c=Circuit(); s,carry,_=c.ripple(lambda i:wire('a',i),lambda i:wire('b',i),'N',True)
-        eq=c.temp(plus('N',1)); c.body.append(gate('x',wire(eq)))
-        start=len(c.body)
-        c.boolean(('and',wire(eq,'i'),('not',('xor',wire('a','i'),wire('b','i')))),wire(eq,plus('i',1)))
-        c.body[start:]=[loop('i','N',c.body[start:])]
-        u=('not',wire(carry,'N')); e=wire(eq,'N')
+        c=Circuit();carry=None;eq=None
+        if op in ['ult','ule','slt','sle']: _,carry,_=c.ripple(lambda i:wire('a',i),lambda i:wire('b',i),'N',True)
+        if op in ['eq','ne','ule','sle']:
+            eq=c.temp(plus('N',1)); c.body.append(gate('x',wire(eq)))
+            start=len(c.body)
+            c.boolean(('and',wire(eq,'i'),('not',('xor',wire('a','i'),wire('b','i')))),wire(eq,plus('i',1)))
+            c.body[start:]=[loop('i','N',c.body[start:])]
+        u=('not',wire(carry,'N')) if carry else None; e=wire(eq,'N') if eq else None
         v={'eq':e,'ne':('not',e),'ult':u,'ule':('or',u,e)}.get(op)
         if v is None:
             sa=wire('a',minus('N',1)); sb=wire('b',minus('N',1)); diff=('xor',sa,sb)
@@ -113,7 +115,9 @@ def build(families):
     if families>=7: recipes+=runpy.run_path(str(ROOT/'conformance/tools/ref_bound.py'))['rows'](globals())
     if families>=8: recipes+=runpy.run_path(str(ROOT/'conformance/tools/ref_memory.py'))['family'](globals())
     if families>=9: recipes+=runpy.run_path(str(ROOT/'conformance/tools/ref_structure.py'))['structure'](globals())
-    if families>=10: recipes+=runpy.run_path(str(ROOT/'conformance/tools/ref_structure.py'))['native'](globals())
+    if families>=10:
+        recipes+=runpy.run_path(str(ROOT/'conformance/tools/ref_structure.py'))['native'](globals())
+        recipes+=runpy.run_path(str(ROOT/'conformance/tools/ref_memory.py'))['call_flag'](globals())
     recipes.sort(key=lambda r:r['kind'].encode())
     return {'isa':'0.9','name':'ref','version':'0.9','recipes':recipes}
 def witness():
@@ -121,7 +125,7 @@ def witness():
     w=json.loads(text.split('**ISA-REF-LIB witness**')[1].split('```json\n')[1].split('\n```')[0])
     assert hashlib.sha256(('isa=0.9\nexpansion=ref\nversion=0.9\n'+jcs(w)+'\n').encode()).hexdigest()=='299510fd67cc626fdcbcc10adcd40730f9af294ba596d86fb25fd31be08a5c7f'
 if __name__=='__main__':
-    p=argparse.ArgumentParser(); p.add_argument('--families',type=int,choices=range(1,12),default=9); p.add_argument('--check',action='store_true'); a=p.parse_args()
+    p=argparse.ArgumentParser(); p.add_argument('--families',type=int,choices=range(1,11),default=10); p.add_argument('--check',action='store_true'); a=p.parse_args()
     witness(); raw=jcs(build(a.families)).encode(); path=ROOT/'spec/ref-0.9-draft.json'
     if a.check: assert path.read_bytes()==raw
     else: path.write_bytes(raw)

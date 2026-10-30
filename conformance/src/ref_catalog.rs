@@ -40,6 +40,7 @@ pub(crate) fn scalar(v: &Json, env: &Env) -> Result<i64, String> {
                 "*" => x.checked_mul(y),
                 "div" if y > 0 => Some(x.div_euclid(y)),
                 "mod" if y > 0 => Some(x.rem_euclid(y)),
+                "bit" if x >= 0 && y >= 0 => Some(if y >= 63 { 0 } else { (x >> y) & 1 }),
                 _ => None,
             }
             .ok_or_else(|| "invalid/overflowed integer expression".into())
