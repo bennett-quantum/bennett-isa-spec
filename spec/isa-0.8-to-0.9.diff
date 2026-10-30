@@ -1,6 +1,6 @@
---- spec/Bennett-ISA-Spec.md	2026-10-28 15:10:07.903399463 +0100
-+++ spec/Bennett-ISA-Spec-0.9-draft.md	2026-10-29 12:02:14.577505474 +0100
-@@ -1,25 +1,155 @@
+--- /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/Bennett-ISA-Spec.md	2026-10-28 15:10:07.903399463 +0100
++++ /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/Bennett-ISA-Spec-0.9-draft.md	2026-10-30 11:18:02.802063433 +0100
+@@ -1,25 +1,172 @@
 -# Bennett Virtual ISA — Specification, draft 0.8
 +# Bennett Virtual ISA — Specification, draft 0.9
  
@@ -115,7 +115,7 @@
 +| E17.11 | §5.1 | `in` wires may also be `qstore` value operands, memory-address operands and `qif` selectors | RC fable s10, muse B4 | S | – |
 +| E17.12 | §5.1 | Param role suffixes: optional on wires and equal to the group's role; required on regions | RC muse s3 | E | – |
 +| E17.13 | §4.2, §7.1 | `lift.free` / `free` match only unpinned entries (0.8 also cleared the live bit of a pinned size-0 global at the freed base) | RC fable s1, C3 | S | – |
-+| E17.14 | §4.2 | The `args` of lifted calls are classical arguments of the calling oracle, never locations (so an lproc's lifted calls pass none) | review of this draft | S | – |
++| E17.14 | §4.2 | The `args` of lifted calls are classical arguments, never locations; Q14 (§0.2) supplies them to lprocs through explicit parameters | review of this draft; Q14 | S | – |
 +| E17.15 | §3.3, §4.2 | A lifted row's `.iN`/`.iM` suffix names a location width and has no upper bound (except `lift.load`/`lift.store`), so wide locations can be initialised and cast | review of this draft (after E17.1) | S | – |
 +| E17.16 | §3.6, §4.2 | `qjumpr` to an in-range index that is not a block's first row enters that row (the kept 0.8 sentence read "any other index faults" under block indexing); re-indexing preserves every reachable row index | review of this draft (after E1) | E | – |
 +| E17.17 | §2, §3.3, §10, §17 item 14 | **Verifying** versus non-verifying executors defined; cleanliness tests (`qreg.free`, host prepare/free) stated for both | review of this draft | E | – |
@@ -130,10 +130,27 @@
 +| K2 | §3.3, §4.1, §4.8, §7.4 | **Quantum allocation in R**: `qreg.*` execute in CC and R; ledger frames and their reversal (`qreg.new` ↔ release, clean by construction; `qreg.free` ↔ re-creation with the same id); `measure` stays CC-only | EN BLK-4; DL BLK-4 | S | +bytes |
 +| K3 | §3.2, §4.1, §4.8, §5.1, §5.4, §7.4, §10 | **Device-minted budgets**: `budget.mint @o s h st d` in CC and R with `bennett_budget`'s checks; token validity (run-scoped, revoked by reversal); a token may be supplied to any region call of the program; an invocation executes the object's schedule only when its bindings (tuple and `params_hash` included) match, else the §11 defaults; a token is encoded in `params_hash` as its tuple | EN BLK-2; DL BLK-2; bd 4qy; bd 8wn (binding, found while drafting) | S | +bytes |
 +| K4 | §4.5, §5.3, §5.4, §6.1, §12.1–§12.3 | **Parametrised in-place**: `qinplace @g @ginv tk x (ins..) (mem..) (args..)`; signature compatibility; inverse-pair obligation carried by an `inverse_pairs` entry with a minimum tuple, exact `arg_tokens` tuples and an `args` domain, by an exhaustive claim (`expected: "inverse_pair"`) or a library claim (`inverse_pair_library`), covering both orientations, checked before any effect of the CC/R region call (executors check inverse-pair claims, §1.2); monotonicity in the tuple; §6.1 transfer with `ins`, `mem` cells and `other` preserved; adjoint swaps the pair and keeps the lists | EN BLK-3; DL BLK-3; bd gv7; RC codex B07, muse s4 | S | +bytes |
-+| K5 | §3.4, §4.1, §4.9, §5.4, §7.4, §10, §17 item 16 | **Classical fault contract**: CC trap = R fault record = one terminal record; a cause → code table; `fault C` in CC and R (literal < 2^64, effective cause); an `effect` memory operand out of range is 7; CC/R blocks end in `br`, `ret`, `trap` or `fault`; a `FAILED` run has exactly one record (0.8: "at least one") | EN ISA-7; DL ISA-7; bd 221; RC fable C5, s4 | S | +bytes |
++| K5 | §3.4, §4.1, §4.9, §5.4, §7.4, §10, §14.1, §15, §17 item 16 | **Classical fault contract**: CC trap = R fault record = one terminal record; a cause → code table; `fault C` in CC and R (literal < 2^64, effective cause); an `effect` memory operand out of range is 7; CC/R blocks end in `br`, `ret`, `trap` or `fault`; a `FAILED` run has exactly one record (0.8: "at least one"). Round-1 follow-up (2026-10-29): exact nonzero C through the launch API, no subsequent source effect, intact reversible prefix, and explicit classical charge versus Q step-machine semantics | EN ISA-7; DL ISA-7; bd 221; RC fable C5, s4; dialect draft 0.2.1 §25.1 BLK-5, council D02-21 re-derivation, b-dialect-spec-bz6 | S | +bytes |
 +| K6 | §7.4, §10, §14.3 | **Reversible failed runs**: R faults are terminal; `FAILED → REVERSED` under the shared eligibility (no `measure`, no unverified free, ownership); reversal undoes the record, then the rest including open activations (an `effect`'s undo also removes its tape entry); T4 covers `FAILED` runs, the ledger entries of the registers a run created or touched and token validity, and states the exactness hypothesis for quantum state (exact when every undo is the exact inverse of its realisation, else within the declared bounds) | EN ISA-8; DL ISA-8 (terminal reading, DL §17.6); bd 0b9 | S | – |
 +| K7 | §3.3, §17 item 14 | 0.8's §17 item 14 default (a `FAILED` record for a condition hardware cannot test) contradicted §7.4's unverified frees: non-verifying executors release unverified and exclude `uncall` and reversal; a verifying executor records `FAULT_UB_TRAP` (host calls: `E_QREG_NOT_CLEAN`) | found while drafting; bd exc | S | – |
 +| K8 | §16.3, §15 | Examples 4–9 (one per new family, hand-derived results) and the suite rows for every new instruction and fault | brief | E | new |
++| K9 | §8.1 | **EPS-DECADE**: exact zero-based decimal accuracy bucket, domain and exact-entry prohibition; boundary witness | bennett-vm-cxg; b-isa-spec-f31 | S | – |
++| K10 | §7.3 | **BLOCK-IMAGE**: contiguous complete 512-byte sectors, byte order, partial-image rejection at device initialisation; witness | bennett-vm-47i; b-isa-spec-0d0 | S | – |
++| K11 | §11.1, §17 item 7 | **ISA-REF-LIB (from bennett-vm-47t): maintainer decision required**. Proposed serialization, envelope hash, ordinals, scratch/removable rules and decomposition set; witness only, publication gated on accepted 0.9 | bennett-vm-47t; b-isa-spec-8r4 (open) | S | new |
++| K12 | §10, §10.1, §12.3 | **LAUNCH-ESTIMATE (ratified A2)**. Resolved parameters, class-preserving resource keys, upward decimal encoding and exact certificate binding; witness | bennett-vm-hsd; b-isa-spec-c15 (open) | S | – |
++| K13 | §9.2, §12.1–§12.3 | **CLAIM-REPLAY: maintainer decision required**. Sampled expected relation, standalone invocation binding, canonical parameter and full-table tuple encoding; witness; sampling stays evidence | bennett-vm-clw; b-isa-spec-9uy (open) | S | – |
++
++**Applied Q14 (2026-10-29, b-isa-spec-7u6).** Lprocs take explicit
++token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
++`lift.call`; mapped-region parameters preserve the complete lifted-call
++interface. Fixed binding instances (§3.6–§3.7) keep those arguments
++classical under coherent calls, without an extra budget charge (§5.4).
++The interface and its hash include the new groups (§9.1–§9.2); §15 and
++§16.3 example 10 supply conformance obligations and a witness. Source:
++the maintainer's acceptance recorded as "the Q14 edit (lproc
++token/classical params)" in the "interpreter milestone 1" session,
++`worklog/001_2026-10-28_bootstrap.md` line 26; the orchestrator's
++2026-10-29 decision selects that alternative in the progress file's Q14.
 +
 +### 0.3 Group 3: optional efficiency semantics (deferred)
 +
@@ -167,7 +184,7 @@
  ## 1. Scope and conformance
  
  ### 1.1 What the ISA is
-@@ -35,7 +165,7 @@
+@@ -35,7 +182,7 @@
  
  | Class | Who | Obligation |
  |---|---|---|
@@ -176,7 +193,7 @@
  | Producer | plugin, library compilers | well-formed objects (§9, §16) and regions (§5, §6); suite F |
  | Scheduler | `bennett-sched` and competitors | §11; only schedules valid under §6; suite H |
  | Checker | `bennett-conformance` | validates certificates (§12) without trusting producers |
-@@ -47,7 +177,7 @@
+@@ -47,7 +194,7 @@
  §14; device models beyond §7.3; the gate-name registry process; the
  memory layout of the opaque C objects of §10–§11 (every constructor,
  accessor and destructor is listed). **Minimality claims** (north star
@@ -185,7 +202,17 @@
  Decisions deferred to implementation, each with its default, are listed
  in §17.
  
-@@ -67,6 +197,11 @@
+@@ -56,7 +203,8 @@
+ - **Tier.** CC, R, Q. **Wire**, **bundle** `wire[N]` (little-endian).
+ - **Location** `reg[N]`: a named mutable cell of an oracle or lproc
+   register file. **Pseudo-location**: an oracle interface input or
+-  classical argument, readable in the oracle body only, never written.
++  classical argument, or an lproc classical parameter (§3.7), readable
++  only in its declaring function, never written.
+ - **Region**: a Q function with a declared interface: **lifted oracle**
+   (§5.2) or **quantum action** (§5.3); **permutation action** (§5.3).
+ - **lproc**: a lifted procedure with its own params and locations; it
+@@ -67,6 +215,11 @@
  - **Basis configuration**: classical values on every component of D.
  - **Gate classes.** Permutation: `x cx ccx mcx swap`. Diagonal: `s sdg t
    tdg cz rz`. Non-diagonal: `h rx ry`.
@@ -197,7 +224,7 @@
  - **Effective control context** at a point: the set of wires on the
    active predicate stack plus the inherited control context (the control
    wires of every enclosing `ctl` and predicate stack of every enclosing
-@@ -88,15 +223,29 @@
+@@ -88,15 +241,29 @@
  except through predication (§3.5). Gate angles are finite `f64` literals
  or classical arguments fixed at region entry.
  
@@ -229,7 +256,7 @@
  | quantum memory | Q | regions of `wire[W]` cells: local (§4.6) or interface (§5.1) |
  | register file | Q | locations of the active oracle and its lproc closure (§3.7) |
  | predicate stack | Q | wires; the active predicate is their conjunction |
-@@ -106,11 +255,19 @@
+@@ -106,11 +273,19 @@
  ### 3.3 Types, ownership, operand schema
  
  ```
@@ -250,7 +277,7 @@
  **Linear SSA with implicit versioning** (structured code and CC region
  calls): a `wire`/`wire[N]` value is produced once and consumed once;
  mode `in` consumes and re-produces a successor of the same name;
-@@ -134,7 +291,11 @@
+@@ -134,7 +309,11 @@
  a`). Width rules: `binop`/`icmp` operands equal width; `select` arms equal
  width; `zext`/`sext` strictly widen, `trunc` strictly narrows; `load.iN`
  and `lift.load.iN` require N ∈ {8, 16, …, 128}; `measure` of `qreg[n]`
@@ -263,7 +290,19 @@
  
  **Lifted width rules** (suite F; a mismatch is ill-formed, never a
  truncation or an extension). Every address operand (`a` of `lift.load`/
-@@ -151,30 +312,85 @@
+@@ -144,37 +323,94 @@
+ literal in [0, 2^ptr_width); `inrange` and every prospective sum are
+ computed at width max(widths of the operands involved) + 1 with no wrap.
+ The destination of `lift.label` and the operand of `qjumpr` have any
+-width N with 2^N > n (the index-space size). `lift.call` arguments have
+-exactly the callee's parameter widths and its destination the callee's
+-result width; `lift.ret v` has the containing lproc's result width;
++width N with 2^N > n (the index-space size). `lift.call` location
++arguments have exactly the callee's parameter widths and its destination the callee's
++result width; its token, classical and region lists match the callee's
++corresponding groups in count, order and type (§3.7); `lift.ret v` has
++the containing lproc's result width;
+ `lift.oracle_call`/`lift.oracle_uncall`/`lift.perm_call` operands have
  exactly the callee signature widths, and `mem` operands name caller
  regions whose `[A,W]` equal the callee's and whose role is `in` for an
  `in` slot (an `in` region is never passed to a `mut` slot); `fault C` and
@@ -366,7 +405,7 @@
  
  ### 3.4 Execution in CC and R
  
-@@ -182,6 +398,16 @@
+@@ -182,6 +418,16 @@
  parameters instead of phi nodes, dynamic control flow and allocation;
  every executed instruction pushes a run-history frame (§7.4).
  
@@ -383,7 +422,7 @@
  ### 3.5 Predication
  
  Every Q instruction with unitary semantics executes controlled on the
-@@ -193,15 +419,23 @@
+@@ -193,15 +439,24 @@
  
  ### 3.6 The predicated step machine
  
@@ -400,10 +439,11 @@
 +(§9.2); a one-member SCC's **order key** is its member's closure hash, a
 +multi-member SCC's order key is its closure `scc_hash`; SCCs are placed
 +in increasing bytewise order of their keys (64-hex), the members of a
-+multi-member SCC consecutively in SCC index order; each lproc's rows in
-+block text order as for the oracle. Each function therefore occupies a
-+contiguous range of indices, and a **label `^b` denotes the index of
-+the first row of block b**. `HALT = n`; 2^P > n. Branch and call
++multi-member SCC consecutively in SCC index order; each lproc's binding
++instances (§3.7) consecutively in binding-key order, each instance's rows
++in block text order as for the oracle. The oracle and each lproc
++instance therefore occupy a contiguous range of indices, and a **label
++`^b` denotes the index of the first row of block b**. `HALT = n`; 2^P > n. Branch and call
  targets are labels; `w = lift.label ^b` is the only way a location
  obtains an index value; executors MAY re-index dispatch extensionally
  **provided every label value observable through `lift.label` keeps its
@@ -413,7 +453,7 @@
  ret lift.retval fault`; every block ends in one; no label names HALT;
  **only `lift.retval` reaches HALT with success**.
  
-@@ -220,7 +454,9 @@
+@@ -220,7 +475,9 @@
  a **flag** compute it into `frame.flag` from the old state before any
  effect; rows with a data-dependent successor compute it into `frame.
  succ` before any effect; conditional-fault rows perform `faulted ^=
@@ -424,7 +464,7 @@
  
  **Frame layout** (fixed per oracle): `(old_pc : wire[P], disp_1..disp_
  {k_max}, flag : wire, succ : wire[P])`, `k_max` and widths `W_j` from the
-@@ -245,6 +481,11 @@
+@@ -245,6 +502,11 @@
  5. **Clean dispatch.** Uncompute every `at_k` from `frame_t.old_pc`.
  6. Decrement the classical step counter.
  
@@ -436,7 +476,7 @@
  **Inverse machine step** (prefix reversal runs it for t = B..1), in
  this order:
  
-@@ -255,7 +496,7 @@
+@@ -255,7 +517,7 @@
     using `frame_t.flag` / `frame_t.succ`; under `at_HALT`: XOR `HALT` into
     `pc'` (`pc'` is now clean).
  4. For each k < n in **reverse index order** under `at_k`: undo the fault
@@ -445,7 +485,85 @@
     effects. **D row**: its sub-operations in reverse order, each by its
     own inverse (`lift.perm_call` by the callee's adjoint; XORs,
     controlled flips and exchanges by themselves). **A row**: exchange
-@@ -307,7 +548,15 @@
+@@ -292,14 +554,71 @@
+ **Name resolution.** A read operand of a lifted row in an **oracle body**
+ is a location of the oracle or a pseudo-location (an interface input or
+ a classical argument). A read operand in an **lproc** is a param or
+-location of that lproc; nothing else. A written operand is a location of
+-the containing function. Globals and mapped interface regions are
+-reached only by address: `w = lift.addr @g`. Lprocs receive everything
++location of that lproc; nothing else. Token and region parameters are
++usable only in their operand kinds below, not as bit-vector locations.
++A written operand is a location of the containing function. Globals and
++mapped interface regions are reached only by address: `w = lift.addr @g`. Lprocs receive everything
+ else as parameters.
+ 
+-An oracle declares `regs { … }`; each lproc declares `params`, `result`
+-width and `regs`. All locations are clean at entry. The oracle's
+-`result_val : wire[T]` (T = the `tgt` width) is step state, initially 0.
++An oracle declares `regs { … }`; an lproc declares five header groups:
++
++```
++  lproc @f (params..) (result) (tokens..) (classical..) (mem..)
++```
++
++The first group consists of `reg[N]` parameters, the second of exactly
++one `reg[T]` result location; the third consists of `token` parameters,
++the fourth of `iN`, `ptr` or `f64` parameters, the fifth of `region[A,W]`
++parameters with role `in`. Token and classical parameters are immutable;
++their optional role suffixes are `token` and `classical` respectively
++and MUST agree with their group (§16.2). They are not locations, stack
++cells or frame slots. Classical parameters can be read as
++pseudo-locations (§4.7); tokens cannot be read as bits or constructed
++from them. Region parameters name the passed mapped regions, not copies
++of their cells. Names in all groups and `regs` are distinct.
++
++**Argument binding.** The complete call form is
++`w = lift.call @f (a_1..a_m) (tokens..) (classical..) (mem..)`.
++The first list supplies the location parameters using the capture and
++bind steps below. The token and classical lists supply parameters from
++the calling oracle's `args`, or from the calling lproc's token and
++classical parameters, with exactly matching types. A location (including
++a `reg[N]` parameter), an input wire or a literal cannot supply either
++list. The region list supplies mapped interface regions of the calling
++oracle, or region parameters of the calling lproc, with matching `[A,W]`
++and `in` role. Thus the enclosing oracle passes all three lists
++explicitly; a recursive or other lproc call forwards them explicitly.
++The original form `w = lift.call @f (a_1..a_m)` is canonical exactly
++when all three additional groups are empty; otherwise all four lists
++are required, including empty ones.
++
++**Fixed binding instances.** For one oracle invocation, resolve those
++three lists transitively to the oracle's entry arguments and mapped
++regions. An instance is a pair (lproc, binding key); its key is the
++concatenation of the zero-based oracle `args` positions supplying its
++token parameters, then its classical parameters, then the zero-based
++oracle `mem` positions supplying its region parameters. Compare keys
++lexicographically as integer sequences. Starting from calls in the
++oracle body, close this set under calls in every reached instance;
++only finitely many keys exist, even with recursion, since no call
++constructs new token, classical or region bindings. Distinct keys stay
++distinct even when entry values are equal. An lproc with no such
++parameters has the single empty key, preserving its previous indexing.
++
++The index space (§3.6), locations and labels are instantiated per key.
++A call targets the callee instance selected by its resolved key; labels
++and `qjumpr` ranges are local to the containing instance. All instance
++bindings are classical and fixed before oracle entry; reaching a call
++under a wire predicate only predicates its existing row operations.
++No classical binding changes as a result of quantum control. Different
++coherent paths may call the same lproc with different bindings: they
++reach distinct instances, each using its own fixed arguments. This is
++the reference semantics; executors MAY share their storage or inline
++instances only extensionally (§5.7).
++
++Each instance declares its own `regs`. All locations are clean at entry.
++The oracle's `result_val : wire[T]` (T = the `tgt` width) is step state,
++initially 0.
+ 
+ **Counters and sizes.** Size exponents: `mem` 2^H byte cells, `alloctab`
+ 2^A_tab entries, stack 2^S_cells cells. Counter widths: `heap_used :
+@@ -307,7 +626,15 @@
  wire[Sc]`, Sc ≥ S_cells + 1; `depth : wire[Dc]`, Dc ≥ ⌈log₂(depth_limit +
  2)⌉. Every prospective sum (`heap_used + max(n,1)`, `sp + R_f`, `depth +
  1`) is computed at width max(operand widths) + 1 before comparison, with
@@ -462,7 +580,61 @@
  
  **Initial allocator state** (oracle entry): `heap_used = 0`, bump =
  `heap_base`, `atop` = number of pre-entries, `sp = fp = 0`, `depth = 0`,
-@@ -393,19 +642,21 @@
+@@ -316,18 +643,21 @@
+ regions` order, storage of `mem` all zero except global images.
+ 
+ **Locations and the result name.** Locations of a function are numbered
+-in declaration order: an oracle's `regs`; for an lproc its `params`,
+-then its **result name** (`(r:reg[8])` declares a location `r` of the
+-lproc, written like any location and read by `lift.ret`), then its
+-`regs`. Every location of the oracle and its closure has a global id
+-(Did bits: index-space order of functions, then declaration order).
+-`L_f` = all locations of `@f`, m′ = |L_f| (params + 1 + regs for an
+-lproc); **R_f = 3 + m′** cells; cell width W_cell = max(P, Sc, Did,
+-W_max) with W_max the widest location width in the closure. A location
++in declaration order: an oracle's `regs`; for an lproc instance its
++`reg[N]` parameters, then its **result name** (`(r:reg[8])` declares a
++location `r` of the lproc, written like any location and read by `lift.ret`), then its
++`regs`. Every location of the oracle and its instantiated closure has
++a global id (Did bits: index-space order of instances, then declaration
++order). `L_f` = all locations of the selected instance of `@f`, m′ =
++|L_f| (`reg[N]` params + 1 + regs for an lproc); token, classical and
++region parameters contribute no locations or stack cells; **R_f = 3 + m′**
++cells; cell width W_cell = max(P, Sc, Did, W_max) with W_max the widest location width in the closure. A location
+ of width N exchanged with a cell exchanges the cell's low N bits; the
+ cell's remaining bits stay clean.
+ 
+-**`w = lift.call @f (a_1..a_m)`.** flag := (depth + 1 > depth_limit) ∨
++**`w = lift.call @f (a_1..a_m) (tokens..) (classical..) (mem..)`.**
++Resolve the fixed callee instance above; m counts only location
++arguments. flag := (depth + 1 > depth_limit) ∨
+ (sp + R_f > stack_limit), C = `FAULT_BUDGET_DEPTH`, computed first into
+ `frame.flag`; the elementary sub-operations C1–C5, in this order, run
+ under ¬flag:
+@@ -345,7 +675,7 @@
+    then `qexch disp_{m+1} fp`, `qexch disp_{m+2} sp`, `qexch disp_{m+3}
+    depth` (now `fp` = old `sp`; the slots hold the old `fp`, `sp`, `depth`).
+ 
+-Successor: the entry label of `@f`. **Inverse** (§3.6 step 4, after the
++Successor: the entry label of the selected instance of `@f`. **Inverse** (§3.6 step 4, after the
+ fault-write undo): C5⁻¹ `qexch disp_{m+3} depth; qexch disp_{m+2} sp;
+ qexch disp_{m+1} fp` (the old counters are back), then `disp_{m+3} ^=
+ depth + 1; disp_{m+2} ^= sp + R_f; disp_{m+1} ^= sp` (slots clean); C4⁻¹
+@@ -380,7 +710,12 @@
+ 
+ The stack is monotonic (`sp` only grows; records are history). Callee
+ rows are charged to the caller's budget; `lift.call` and `lift.ret` are
+-one step each. Executors MAY inline extensionally. Suite B runs one
++one step each. Forwarding or resolving the fixed token, classical and
++region bindings adds no rows, capture slots or stack cells. A nested
++`lift.oracle_call`/`lift.oracle_uncall` is one outer row and executes the
++callee with its own token's tuple; its internal rows do not decrement
++the outer B. `lift.perm_call` is likewise one outer row. Executors MAY
++inline extensionally. Suite B runs one
+ forward `lift.call` step and one forward `lift.ret` step of a recursive
+ call, each followed by its inverse, and asserts that the complete
+ pre-step tuple is restored and every frame field is clean.
+@@ -393,19 +728,21 @@
  |---|---|---|
  | `const` | `r = const.iN c` | |
  | `add sub mul and or xor shl lshr ashr` | `r = op a b` | wrap; shift ≥ N → 0 |
@@ -484,58 +656,75 @@
 +| `call` / `ret` | `results = call @f args` / `ret vals` | arguments and values are bare operands (`r = call @f a b`, `(r1, r2) = call @f a`, `call @f`, `ret v`, `ret`); results bind in order; a parenthesised argument list is ill-formed for `call`; callee tiers per §3.1 |
 +| `uncall` | `uncall @f (args) (results)` | **segment uncall**, legal exactly under §7.4: the most recent completed call segment of the history is a call of `@f` whose recorded boundary argument and result values equal the current operand values, every frame after it is pure, and it contains, at any nesting depth, no `measure` frame and no `qreg.free` frame whose cleanliness was not verified; otherwise CC trap / R fault `FAULT_UB_TRAP` with no state change beyond the fault record. The segment is reversed by the cancellation-aware history traversal of §7.4 (LIFO, nested segments included; frames already reversed and `uncall` markers skipped) and its frames are marked reversed; the `uncall` itself pushes a frame naming the segment |
 +| `trap` | `trap` | CC trap; R fault record (`FAULT_UB_TRAP`, §4.9) |
-+| `fault` | `fault C` | CC trap; R fault record with the effective cause of the literal C, 0 ≤ C < 2^64 (§4.9, §5.4); in an oracle body or lproc, the §4.2 row |
++| `fault` | `fault C` | CC and R; literal 0 ≤ C < 2^64; one terminal record with code C for C ≠ 0, else 4 (§5.4); run ends `FAILED`, no successor executes, prefix history retained for reversal (§7.4, §10, §14.1). One classical instruction (§8.2); in an oracle body or lproc, the one-budget-step §4.2 row instead |
 +| `qreg.new qreg.free qreg.slice qreg.concat qreg.width qreg.id qreg.from_id` | §3.3 | CC and R (§3.3) |
 +| `measure` | `r = measure q` / `r = measure.iN q` | CC only; Born rule (§14.2); consumes q; `.iN` for a `qreg[*]` (§3.3) |
 +| `budget.mint` | `tk = budget.mint @o s h st d` | CC and R; a token for the tuple (s, h, st, d) validated for oracle `@o` (§5.4) |
  | `effect` | `effect dev.op args` | R only (§7.3); results are written to memory operands |
  | `hostcall` | `rlen = hostcall service ptr len` | CC only (§10) |
  
-@@ -431,8 +682,8 @@
+@@ -431,9 +768,9 @@
  | `lift.load` | `w = lift.load.iN a` | A | the N/8 cells at a.. (§7.2) | w (under ¬flag) | flag = ¬inrange(a, N/8); C = `FAULT_UB_MEMFAULT` | ¬flag: k+1; flag: HALT |
  | `lift.store` | `lift.store.iN a v` | A | v | the N/8 cells at a.. (under ¬flag; one slot of N bits) | flag = ¬inrange(a, N/8); C = `FAULT_UB_MEMFAULT` | ¬flag: k+1; flag: HALT |
  | `lift.alloc` | `w = lift.alloc n` | A | n, heap_used, atop | under ¬flag, slots in this order: w ← heap_base + heap_used; alloctab[atop] ← (heap_base + heap_used, n, 1, 0); heap_used ← heap_used + max(n,1); atop ← atop + 1 (4 slots, all computed from the old state, then exchanged in this order, `alloctab[atop]` at the old `atop`). **Inverse exchanges**: atop, heap_used, alloctab[atop] (at the restored `atop`), w; then clear the four slots | flag = (heap_used + max(n,1) > heap_limit) ∨ (atop ≥ 2^A_tab); C = `FAULT_BUDGET_HEAP` | ¬flag: k+1; flag: HALT |
 -| `lift.free` | `lift.free p` | D | p, alloctab | match_i = (i < atop) ∧ (base_i = p) into scratch; under ¬flag: live_i ^= match_i for all i; scratch uncomputed | flag = ¬∃ i: match_i ∧ live_i ∧ ¬pinned_i; C = `FAULT_UB_MEMFAULT` | ¬flag: k+1; flag: HALT |
 -| `lift.faultif` | `lift.faultif p code` | D | p | – | flag = p; C = code | ¬flag: k+1; flag: HALT |
+-| `lift.call` | `w = lift.call @f (a_1..a_m)` | A+D | §3.7 | §3.7 (slots: m capture slots `disp_1..disp_m`, then assignment slots for fp, sp, depth) | flag per §3.7; C = `FAULT_BUDGET_DEPTH` | ¬flag: entry of @f; flag: HALT |
 +| `lift.free` | `lift.free p` | D | p, alloctab | match_i = (i < atop) ∧ (base_i = p) ∧ ¬pinned_i into scratch (at most one i matches: unpinned entries are heap entries, whose bases strictly increase); under ¬flag: live_i ^= match_i for all i; scratch uncomputed from the unchanged atop, bases and pinned bits | flag = ¬∃ i: match_i ∧ live_i; C = `FAULT_UB_MEMFAULT` | ¬flag: k+1; flag: HALT |
 +| `lift.faultif` | `lift.faultif p code` | D | p | – | flag = p; C = code, written as its effective cause C′ (§5.4) | ¬flag: k+1; flag: HALT |
- | `lift.call` | `w = lift.call @f (a_1..a_m)` | A+D | §3.7 | §3.7 (slots: m capture slots `disp_1..disp_m`, then assignment slots for fp, sp, depth) | flag per §3.7; C = `FAULT_BUDGET_DEPTH` | ¬flag: entry of @f; flag: HALT |
++| `lift.call` | `w = lift.call @f (a_1..a_m) (tokens..) (classical..) (mem..)` (short form: §3.7) | A+D | §3.7 | §3.7 (slots: m capture slots `disp_1..disp_m`, then assignment slots for fp, sp, depth) | flag per §3.7; C = `FAULT_BUDGET_DEPTH` | ¬flag: entry of @f; flag: HALT |
  | `lift.ret` | `lift.ret v` | A+D | §3.7 | §3.7 (slots: the delivery slot `disp_1`, then assignment slots for fp, depth) | flag = (depth = 0); C = `FAULT_UB_TRAP` | ¬flag: `succ`; flag: HALT |
  | `lift.retval` | `lift.retval v` | D | v | result_val ^= v | – | HALT |
-@@ -441,8 +692,8 @@
+ | `lift.oracle_call` | `lift.oracle_call @o tk (ins..) tgt fr (mem..) (args..)` | D | ins, tgt, fr, mem | tgt ^= payload; fr ^= code (callee contract) | – | k+1 |
+@@ -441,8 +778,8 @@
  | `lift.perm_call` | `lift.perm_call @a (mut..) (ins..) (mem..) (args..)` | D | ins, mut, mem | mut ← P(mut, ins, mem); inverse = `adj` of @a | – | k+1 |
  | `qjump` | `qjump ^b` | D | – | – | – | ^b |
  | `qbranch` | `qbranch p ^b1 ^b2` | D | p | – | – | p: ^b1; ¬p: ^b2 |
 -| `qjumpr` | `qjumpr a` | D | a | succ ← a | flag = (a < first_f) ∨ (a ≥ first_f + n_f), where `[first_f, first_f + n_f)` are the indices of the containing function's blocks (contiguous, §3.6); C = `FAULT_UB_TRAP` | ¬flag: `succ`; flag: HALT |
 -| `fault` | `fault C` | D | – | code ^= C; faulted ^= 1 | – | HALT |
-+| `qjumpr` | `qjumpr a` | D | a | succ ← a | flag = (a < first_f) ∨ (a ≥ first_f + n_f), where `[first_f, first_f + n_f)` are the row indices of the containing function (contiguous, §3.6); C = `FAULT_UB_TRAP` | ¬flag: `succ`; flag: HALT |
++| `qjumpr` | `qjumpr a` | D | a | succ ← a | flag = (a < first_f) ∨ (a ≥ first_f + n_f), where `[first_f, first_f + n_f)` are the row indices of the containing function instance (contiguous, §3.6); C = `FAULT_UB_TRAP` | ¬flag: `succ`; flag: HALT |
 +| `fault` | `fault C` | D | – | code ^= C′; faulted ^= 1 (C′ the effective cause of C, §5.4) | – | HALT |
  
  **`inrange(p, n)`** = ∃ i < atop: live_i ∧ base_i ≤ p ∧ p + n ≤ base_i +
  size_i, every comparison computed at width max(ptr_width, width(n)) + 1
-@@ -459,9 +710,18 @@
+@@ -452,16 +789,29 @@
+ explicit assertion row the dialect emits before each access (after it
+ the access's own flag is never set, so dialect-produced bodies' step
+ counts are unchanged). Rules: `lift.retval` is ill-formed in an lproc;
+-`lift.ret` is ill-formed outside lprocs; `tk` is a classical argument of
+-the calling oracle. `lift.oracle_call`/`uncall`/`perm_call` carry the
+-complete callee interface; `mem` operands name the caller's mapped
+-interface regions. `lift.addr @g` names a global anywhere; it names an
++`lift.ret` is ill-formed outside lprocs; `tk` is a token-typed classical
++argument of the calling oracle or a token parameter of the calling
++lproc. `lift.oracle_call`/`uncall`/`perm_call` carry the
++complete callee interface; `mem` operands name the calling oracle's
++mapped interface regions or the calling lproc's region parameters.
++`lift.addr @g` names a global anywhere; it names an
  interface region **only in the body of the oracle that declares it**
  (lprocs are shared between oracles and receive region bases as
  parameters, as in §16.3 example 2). Label values obtained by `lift.
 -label` denote blocks of the containing function; `qjumpr` to any other
 -index faults, so control never leaves a function except through `lift.
 -call`/`lift.ret`.
-+label` denote first rows of blocks of the containing function; `qjumpr`
-+to an index outside the containing function's row range faults, so
++label` denote first rows of blocks of the containing function instance;
++`qjumpr` to an index outside that instance's row range faults, so
 +control never leaves a function except through `lift.call`/`lift.ret`; an
 +in-range index that is not a block's first row enters that row. The
 +`args` operands of `lift.oracle_call`, `lift.oracle_uncall` and
-+`lift.perm_call` are classical arguments of the calling oracle (its
-+`args` pseudo-locations), never locations, so they are classical and
-+fixed at entry (§3.1); a lifted call in an lproc, which reads only its
-+params and locations (§3.7), therefore passes no `args`. In lifted rows
++`lift.perm_call` are classical arguments of the calling oracle or token
++and classical parameters of the calling lproc, in callee signature
++order and with exactly matching types, never locations. They are fixed
++at entry (§3.1, §3.7). Every lifted call available in an oracle body is
++also available in an lproc by passing the required token, classical
++arguments and mapped regions explicitly through `lift.call`. In lifted rows
 +a width suffix `.iN`/`.iM` names a location width and has no upper bound
 +(§3.3), except that `lift.load.iN`/`lift.store.iN` keep N ∈ {8, 16, …,
 +128}.
  
  **Reference body and binding.** Every oracle carries its **reference
  body**: the stream the dialect's versioned mapping produced from the
-@@ -505,7 +765,7 @@
+@@ -505,7 +855,7 @@
  | `quncopy` | `quncopy s d` | `cx s[i] d[i]` under the predicate; `qfree d` |
  | `qxor` | `qxor s t` | `cx s[i] t[i]` |
  | `qexch` | `qexch a b` | `swap a[i] b[i]` |
@@ -544,7 +733,7 @@
  
  ### 4.6 Quantum memory, predication, structure
  
-@@ -528,7 +788,17 @@
+@@ -528,7 +878,20 @@
  …` ≡ `oracle_call …`; `ctl w <call>` ≡ the call under `qpred w`. In CC
  and R, wire and region slots are filled by `qreg` operands per §3.3
  (§3.1: R functions call Q regions exactly as CC does; the call is one
@@ -559,11 +748,14 @@
 +`iN` or `ptr` argument is a pseudo-location of width N or ptr_width, an
 +`f64` argument a pseudo-location of width 64 holding its binary64 bits,
 +and a `token` argument is usable only as the `tk` operand of
-+`lift.oracle_call`/`lift.oracle_uncall` and in the `args` list of a call.
++`lift.oracle_call`/`lift.oracle_uncall`, in a region call's `args` list,
++or in `lift.call`'s token list. Lproc classical parameters have these
++same bit readings and may also be forwarded in `lift.call`'s classical
++list; token parameters retain their token identity and validity (§5.4).
  
  ### 4.8 Opcode table (tier, operands, result)
  
-@@ -540,14 +810,45 @@
+@@ -540,14 +903,68 @@
  | `ptrtoint.iM`, `inttoptr` | CC R | ptr / integer | iM / ptr |
  | `load.iN store.iN` | CC R | ptr [, value] | iN / – |
  | `alloc free` | CC R | iN / ptr | ptr / – |
@@ -575,7 +767,8 @@
 +| `budget.mint` | CC R | oracle reference, four i64 values | token |
  | `effect` | R | device op, ptr/len operands | – |
  | `hostcall` | CC | service literal, ptr, len | iN (rlen, width ptr_width) |
- | `lift.*`, `qjump qbranch qjumpr fault` | Q (oracle bodies, lprocs) | locations, pseudo-locations, labels, literals | locations |
+-| `lift.*`, `qjump qbranch qjumpr fault` | Q (oracle bodies, lprocs) | locations, pseudo-locations, labels, literals | locations |
++| `lift.*`, `qjump qbranch qjumpr fault` | Q (oracle bodies, lprocs) | locations, pseudo-locations, labels, literals; call token, classical and region arguments per §3.7, §4.2 | locations |
  | gates, `qalloc qborrow qfree qreturn qcopy quncopy qxor qexch qinplace qregion qload qunload qstore qexchm qpred qunpred qif qloop` | Q (actions) | wires, bundles, regions, literals | wires / – |
  | `oracle_call action_call adj ctl` | Q, CC, R | per §4.7 | – |
  
@@ -587,7 +780,8 @@
 +point, §7.4); the run ends `FAILED` (§10) with no further instruction
 +executed, so the CC caller of a faulting R call executes no successor
 +instruction and receives no results, and a `FAILED` run has exactly
-+one fault record. Its code is fixed by the cause:
++one fault record. Implicit trap causes and explicit faults have the
++following code mapping:
 +
 +| Cause | Code |
 +|---|---|
@@ -605,13 +799,35 @@
 +`fault C` takes a literal 0 ≤ C < 2^64 (a launch fault code is a
 +`uint64_t`, §10); codes above 10 are program-defined. Its frame is the
 +fault record. `bennett_result_fault` returns the record's code
-+unchanged. A Q region never produces a fault record: an oracle's fault
-+is an outcome in its fault register (§5.2).
++unchanged, including every nonzero program-defined code up to 2^64 − 1;
++it MUST NOT replace such a code with `FAULT_UB_TRAP` or `FAULT_CALLEE`.
++`trap` reports only code 4; it cannot stand in for an arbitrary `fault C`.
++No host service is needed to report C (`hostcall` remains CC-only).
++
++**Charge and history.** A CC/R `fault C` executes as one classical
++instruction, taking `classical_step_time` (§8.2); it does not consume a Q
++oracle's B. An R budget supplied by source instrumentation is enforced
++by that code, not by the Q step machine. The terminal record
++is appended to the existing logical history without erasing, cancelling
++or changing any earlier frame, displaced value, effect-tape entry or
++open activation. No subsequent source effect occurs, in this activation
++or any caller. Forward failure does not reverse the prefix; an eligible
++`bennett_reverse` removes the fault record and reverses that intact
++prefix under §7.4, §10 and T4.
++
++A Q region never produces a fault record: an oracle's fault is an
++outcome in its fault register (§5.2). Its `fault C` is the existing
++§4.2 D row: one executed reference row charges one step of B, writes
++`code ^= C′; faulted ^= 1`, and selects HALT. Remaining forward machine
++steps are the idle steps of §3.6; commit and prefix reversal follow
++§5.2, undoing the fault writes and all preceding rows while retaining
++the committed fault-register XOR (§14.1, T2). The classical terminal
++record and the Q step-machine outcome are distinct reporting paths.
 +
  ## 5. Regions
  
  ### 5.1 Interfaces and common well-formedness
-@@ -555,16 +856,29 @@
+@@ -555,16 +972,30 @@
  Signatures list roles: `oracle @o (in a: wire[8]) (tgt t: wire[8]) (fault
  f: wire[4]) (mem db: region[10,8] in) (args n: i64)`. **Interface
  regions** are caller-owned, passed by name, role `in` (returned to entry
@@ -621,7 +837,8 @@
 +text form (§16.2) a wire param's role suffix is optional and, when
 +present, MUST equal its group's role (`in` in an oracle's or action's
 +`in` group, `mut` in an action's `mut` group); a region param always
-+carries its role (`in` or `mut`); no other param carries a suffix. A region
++carries its role (`in` or `mut`); other region-interface params carry
++no suffix. Lproc parameter roles are specified in §3.7 and §16.2. A region
 +MUST NOT contain `measure effect br call uncall trap hostcall qreg.* budget.mint` or
  classical memory instructions, nor lifted rows outside oracle bodies.
  Predicate stack empty at entry and exit. Every `qalloc` matched by a
@@ -646,7 +863,7 @@
  
  ### 5.2 Lifted oracle
  
-@@ -621,7 +935,8 @@
+@@ -621,7 +1052,8 @@
  ```
    rx/ry/rz(θ) ↦ (−θ)   s ↔ sdg   t ↔ tdg   x cx ccx mcx swap h cz: self-adjoint
    qalloc ↔ qfree   qborrow ↔ qreturn   qregion creation ↔ release   qcopy ↔ quncopy   qload ↔ qunload
@@ -656,7 +873,19 @@
    action_call @b ↦ adj action_call @b   qpred/qunpred pairs reversed as a whole
    qif w {A}{B} ↦ qif w {adj A}{adj B}   qloop n {A} ↦ qloop n {adj A}
    qloop n while cond {A} ↦ flags computed forward as §4.6; adj A for i = n..1 under c_i; flags uncomputed
-@@ -638,15 +953,58 @@
+@@ -633,20 +1065,70 @@
+ 
+ ### 5.4 Budgets and fault codes
+ 
++Lproc token parameters forward existing tokens; they neither mint a
++token nor alter its validity or tuple. Binding and forwarding have no
++separate budget charge (§3.7); a lifted region call inside an lproc has
++the same charge and token semantics as in an oracle body. In
++particular, the enclosing oracle's token is not implicitly substituted
++for a nested call's explicit token.
++
+ Budget = (B, heap_limit, stack_limit, depth_limit), classical. `bennett_
+ budget` validates: `heap_limit ≤ layout.heap_limit_max`, `stack_limit ≤
  2^S_cells`, `depth_limit < 2^Dc − 1`; for a memoryless object (§7.2)
  `heap_limit = stack_limit = depth_limit = 0`. B is enforced by running
  exactly B steps; heap, stack and depth are wire counters.
@@ -717,22 +946,24 @@
  
  ### 5.5 Nesting and matched cleanup
  
-@@ -655,10 +1013,21 @@
+@@ -655,10 +1137,23 @@
  = lift.icmp.ne fr' zero; lift.faultif p FAULT_CALLEE` (with `zero` a
  `lift.const` location) where the source requires it. To clear `fr'`, the
  producer emits `lift.oracle_uncall @o` with the same token, callee, `ins`
 -and `mem` values (no intervening row writes those locations or cells:
 -suite F) and the successor versions of `tgt` and `fr'`; the pair shares a
-+and `mem` values (no intervening row writes those locations, suite F,
++and `args` and `mem` values (no intervening row writes those locations, suite F,
 +nor those cells, below) and the successor versions of `tgt` and `fr'`; the pair shares a
  dynamic invocation identity. Alternatively `fr'` is retained until the
 -prefix reversal.
 +prefix reversal. Matching is **LIFO**: on every path, a
 +`lift.oracle_uncall` matches the most recent preceding unmatched
-+`lift.oracle_call` with the same callee, token, `ins` and `mem`
++`lift.oracle_call` with the same callee, token, `ins`, `args` and `mem`
 +operands (two calls followed by two uncalls form two nested pairs); an
 +uncall that matches no call on some path, or different calls on
-+different paths, is ill-formed.
++different paths, is ill-formed. In an lproc the match includes the
++fixed bindings of its instance (§3.7); parameter forwarding does not
++weaken any matching or cleanup condition.
 +Suite F rejects a pair when a row on a path between them writes one of
 +its `ins` locations; an intervening `lift.store` is not ill-formed (its
 +address is data): `lift.oracle_uncall` is the same permutation as the
@@ -742,7 +973,7 @@
  
  ### 5.6 Borrowed systems and borrow frames
  
-@@ -696,7 +1065,8 @@
+@@ -696,7 +1191,8 @@
  
  Inlining, structure recovery, dispatch re-indexing and simplification
  MUST produce on every x ∈ D the same final interface tuple as §5.2's
@@ -752,7 +983,7 @@
  
  ## 6. Uncomputation validity (static discipline)
  
-@@ -722,7 +1092,7 @@
+@@ -722,7 +1218,7 @@
  | `oracle_call @o (ins) tgt fr (mem)` | tgt, fr: perm with S = ins ∪ {tgt, fr} ∪ cells(every region passed) ∪ Π; `in` regions unchanged |
  | `lift.perm_call` / permutation `action_call` | each mut: perm with S = mut ∪ ins ∪ cells(regions passed) ∪ Π; `mut`-region cells advance with the same S |
  | non-permutation `action_call` | every mut and every `mut`-region cell: other |
@@ -761,7 +992,7 @@
  | lifted rows | each written location/cell: perm with the union of its read operands' sets ∪ Π; written cells' versions advance |
  
  ### 6.2 Window and obligations
-@@ -752,7 +1122,7 @@
+@@ -752,7 +1248,7 @@
  (legal for `perm` values only: recompute g into a fresh clean bundle by
  the same sequence, `qxor` it into g's wires, uncompute the fresh bundle
  by the adjoint). **Measurement-based cleanup is not admitted in sched/
@@ -770,7 +1001,7 @@
  target capability `mbu` is reserved and MUST be `false`, and no cleanup
  produces a `channel` claim. *(non-normative)* The fixup after an X-basis
  measurement of g with outcome m is the phase (−1)^{m·g(x)}, a function
-@@ -778,8 +1148,11 @@
+@@ -778,8 +1274,11 @@
  `(base, size = n, live = 1, pinned = 0)` and advances by `max(n, 1)`;
  globals have pre-entered pinned live entries; an access is valid iff its
  whole byte range lies in one live entry; `free p` marks the unique live
@@ -784,7 +1015,43 @@
  Initial state: bump = `heap_base`, table = the pre-entries in layout
  order, memory zero except images.
  
-@@ -836,26 +1209,44 @@
+@@ -818,6 +1317,35 @@
+ | `entropy` | position `p` (0) into the entropy tape (§10) | `read(ptr, len)`: copies tape[p..p+len) to ptr; p += len | p + len > length: fault `FAULT_ENTROPY_EXHAUSTED` | overwritten bytes; p −= len |
+ | `block` | sector map from the `block_image` (else empty), 512-byte sectors; absent sectors read as zero | `read(sector, ptr)`; `write(sector, ptr)` | – | read: overwritten 512 bytes; write: the old sector contents **and a presence bit** (absent sectors are removed again on reversal) |
+ 
++**BLOCK-IMAGE** (K10; source: bennett-vm-47i). `layout.block_image`
++names a data symbol (§9.1, §16.1). Decode each successive pair of its
++lowercase hex digits to one byte, in textual order. Its decoded length
++L MUST be a multiple of 512, including L = 0. At block-device
++initialisation, before executing any instruction or changing device
++state, reject an image of any other length; never pad or truncate it.
++For 0 ≤ s < L/512, sector number s is present and its byte at offset b
++(0 ≤ b < 512) is image[512s + b]. There is no sector header, length
++prefix, sector-number field or reversal of bytes within a sector. An
++all-zero sector in the image is present. Every other sector is absent
++and reads as 512 zero bytes; no image and an empty image give an empty
++map. This specifies the initial map only; the §7.3 write/reversal
++presence-bit rule remains in force. Motivation (0.8 §7.3): "sector map
++from the `block_image` (else empty), 512-byte sectors; absent sectors
++read as zero"; §9.1: "`data` lines are `NAME SP HEX`". The contiguous
++encoding and partial-sector policy are additions, not a claimed 0.8
++loader requirement.
++
++**BLOCK-IMAGE witness**
++
++```json
++{"length":1024,"present_sectors":[0,1],"sector_first_bytes":[[0,0],[1,255]],"absent_sector":2,"partial_lengths_rejected":[1,511,513,1023]}
++```
++
++The image is 512 bytes 00 followed by 512 bytes ff (2048 hex digits).
++Sector 0 is present although zero; sector 1 is ff throughout; sector 2
++is absent and reads zero. Writing sector 2 then reversing removes it;
++writing sector 0 then reversing restores a present zero sector.
++
+ Each `effect` appends `(dev, op, args)` to the effect tape.
+ 
+ ### 7.4 Run history and the dynamic SSA model (CC, R)
+@@ -836,26 +1364,44 @@
  | `call` | invocation boundary (callee, argument values) |
  | `ret` | result values, the callee's activation and the frame link |
  | `uncall` | the reversed segment's id (skipped by whole-run reversal, below) |
@@ -839,7 +1106,7 @@
  
  **Segment uncall** (`uncall @f (args) (results)`). Let S be the most
  recent completed call segment of the history (a `call` frame, its
-@@ -864,15 +1255,15 @@
+@@ -864,15 +1410,15 @@
  values equal the operand values, **every frame after S is pure**, and S
  contains, at any nesting depth, **no `measure` frame** and no `qreg.
  free` frame whose cleanliness was not verified (hardware, §17 item 14);
@@ -859,7 +1126,7 @@
  `uncall` are pure, so at the `uncall` frame every component except the
  retained instances already equals its value before S. T4 is stated over
  these frames. *(non-normative)* S is never re-executed and never redone;
-@@ -882,7 +1273,7 @@
+@@ -882,7 +1428,7 @@
  leaves the clock at its entry value; and `uncall` of a segment that
  measured is a trap.
  
@@ -868,7 +1135,38 @@
  
  ### 8.1 Format and expressions
  
-@@ -941,7 +1332,8 @@
+@@ -902,6 +1448,30 @@
+ and a table index outside the array are load-time errors. Costs MUST be
+ nonnegative and finite.
+ 
++**EPS-DECADE** (K9; source: bennett-vm-cxg). A table expression with
++`index: "eps_decade"` evaluates its zero-based array index as the exact
++integer min{ j ≥ 0 : eps · 10^j ≥ 1 }. It requires a context binding
++`eps` and 0 < eps ≤ 1; otherwise it is a load-time error. Thus it uses
++the requested `epsilon_share`, not the entry's achieved `epsilon`.
++Evaluation uses exact rational comparisons, never a floating-point
++logarithm. The existing out-of-array rule applies to this integer. An
++entry with `epsilon` 0 MUST NOT use `eps_decade`, including through a
++table lookup. This extends the exact-entry prohibition above; it does
++not assign an index to eps = 0. Motivation (0.8 §8.1): the grammar names
++`"index": "k" | "eps_decade"`, and "Division by zero and a table index
++outside the array are load-time errors"; 0.8 defines no decimal index.
++
++**EPS-DECADE witness**
++
++```json
++[{"eps":"1","index":0},{"eps":"0.1","index":1},{"eps":"0.1001","index":1},{"eps":"0.0999","index":2},{"eps":"0.001","index":3},{"eps":"0.000999","index":4}]
++```
++
++For eps = 999/10000, eps·10 = 999/1000 < 1 and eps·100 = 999/100 ≥ 1,
++so the index is 2. A two-entry table rejects this index, a three-entry
++table selects element 2. eps = 0, eps > 1 and an unbound eps reject;
++no clamping, padding or fallback entry is admitted.
++
+ **Variable binding** by evaluation context; referencing a variable that
+ the context does not bind is a load-time error:
+ 
+@@ -941,7 +1511,8 @@
  instructions and effects take `classical_step_time`. Sequential in
  program order unless the schedule assigns start times; a gate occupies
  its wires for its `time`; gates on disjoint wires MAY overlap unless
@@ -878,7 +1176,7 @@
  Interface wires are charged to the caller for the call's duration;
  borrowed wires to the borrower at `dirty_rate`, replacing the owner's
  charge.
-@@ -987,7 +1379,7 @@
+@@ -987,7 +1558,7 @@
  
  The capacity constraint is peak live qubits per class.
  
@@ -887,7 +1185,7 @@
  
  ### 9.1 Sections and schemas
  
-@@ -998,20 +1390,33 @@
+@@ -998,29 +1569,57 @@
  ```
    symbols:  { "<local index>": { "name", "kind": "cc"|"r"|"oracle"|"action"|"perm_action"|"lproc"|"data", "signature": <sig>, "interface_hash" } }
    imports:  { "<name>": { "signature": <sig>, "pinned_closure_hash"?: hex } }
@@ -900,7 +1198,8 @@
 -  <sig>:    kind "oracle": { "tier":"q", "kind", "in":[w…], "tgt":w, "fault":F, "mem":[{"A","W","role"}], "args":[types], "abi":"0.8" }
 +  <sig>:    kind "oracle": { "tier":"q", "kind", "in":[w…], "tgt":w, "fault":F, "mem":[{"A","W","role"}], "args":[types], "abi":"0.9" }
              kind "action"/"perm_action": { "tier":"q", "kind", "mut":[w…], "in":[w…], "mem":[…], "args":[types], "bounds":[…], "abi" }
-             kind "lproc": { "tier":"q", "kind", "params":[w…], "result":w, "abi" }
+-            kind "lproc": { "tier":"q", "kind", "params":[w…], "result":w, "abi" }
++            kind "lproc": { "tier":"q", "kind", "params":[w…], "result":w, "tokens":["token"…], "args":[types], "mem":[{"A","W","role":"in"}], "abi" }
              kind "cc"/"r": { "tier", "kind", "params":[types], "results":[types], "abi" }
              kind "data": { "tier":"-", "kind", "size", "abi" }
  ```
@@ -912,7 +1211,10 @@
 +**Encodings.** `types` in `args`, `params` and `results` are the §16.2
 +type spellings as JSON strings (`"i64"`, `"ptr"`, `"f64"`, `"token"`,
 +`"qreg[8]"`); `w` in `in`, `tgt`, `mut`, lproc `params` and `result` is
-+the integer bundle or location width (§16.3). A **program-point id**
++the integer bundle or location width (§16.3). An lproc's `tokens`,
++`args` and `mem` arrays are mandatory (empty arrays when absent from the
++header); `args` excludes tokens and `mem` has only `in` roles (§3.7).
++Array order is header order within each group. A **program-point id**
 +(§9.2) is the JSON array `[interface_hash, block name, ordinal]`.
 +`devices.models` lists every §7.3 model that an `effect` of the object
 +uses (an `effect` on an unlisted §7.3 model is a load error; a device
@@ -925,7 +1227,20 @@
  
  ### 9.2 Identity
  
-@@ -1020,7 +1425,7 @@
++An lproc's token, classical and region parameter groups are part of
++its JCS signature (§9.1), including their order and types. The header
++and every forwarded operand list are canonical function bytes; changing
++them changes the envelope and, through references, the caller's closure
++hash. Fixed binding instances are derived per oracle (§3.7), not new
++symbols or separately hashed bodies; instance rows share the source
++row's program-point id, and invocation paths distinguish their uses
++(§12.1). Entry argument values and token tuples bind invocations through
++`params_hash`, not through the lproc's interface hash (this section).
++Imports must match all five groups; validation and instance formation
++are repeated after linking (§9.3).
++
+ **Canonical function bytes**: the text from the function's header line
+ through its last instruction line, lines joined by LF, no trailing LF.
  **Semantic envelope** of a symbol (byte-exact; every part ends with LF):
  
  ```
@@ -934,7 +1249,7 @@
    (2) "ptr_width=" INT
    (3) the JCS signature
    (4) the canonical function bytes (with reference tokens replaced, below); for a data symbol: its data line NAME SP HEX
-@@ -1055,7 +1460,13 @@
+@@ -1055,7 +1654,13 @@
  header line is a definition, not a reference, and is left unchanged); the **interface hash** uses
  interface hashes of defined symbols and `SHA-256(name ‖ 0x00 ‖ JCS
  signature)` (hex) for unresolved imports; the **closure hash** uses
@@ -949,7 +1264,17 @@
  SCC `@name` token (parts (4)–(5)) is replaced by `@$<decimal index>`;
  intra-SCC references contribute no part-(6) line; `scc_hash` = SHA-256
  over the concatenation of the members' envelopes in that order; member
-@@ -1089,11 +1500,20 @@
+@@ -1064,7 +1669,8 @@
+ `schedule`, `certificate` and `coverage` sections deleted together with
+ the blank line preceding each. `reference_program_hash` = the oracle's
+ interface hash. `params_hash` = SHA-256 of the JCS array of classical
+-parameter values; `schedule_hash` = SHA-256 of the schedule's JCS bytes.
++parameter values (the typed encoding of §12.3, K13); `schedule_hash` =
++SHA-256 of the schedule's JCS bytes.
+ **Program-point id** = `(symbol interface hash, block name, instruction
+ ordinal within the block counting nested lines in text order)`.
+ Executable certificates and caches bind to **closure hashes** (required,
+@@ -1089,11 +1695,20 @@
  - **Frame descriptor** (certificate): interface slots (role, width,
    class), scratch by class and cleanliness **as a function of the
    inherited control count c** (an expression in `c` of §8.1's language),
@@ -972,7 +1297,7 @@
  
  **Model.** A run executes a device CC entry; the host passes classical
  arguments, register ids and the entropy tape, receives classical
-@@ -1101,9 +1521,11 @@
+@@ -1101,9 +1716,11 @@
  reached by `hostcall`. **Positional binding**: argument i of `bennett_
  run` binds to parameter i of the entry's signature: `INT(width, bytes)`
  to `iN` with width = N (else `E_ARG`), `F64` to `f64`, `QREG` to `qreg[n]`
@@ -986,7 +1311,7 @@
  Accessor-returned pointers are valid until the owning object is freed.
  `bennett_unload` with a run not CLOSED: `E_INVALID_STATE`.
  
-@@ -1111,17 +1533,30 @@
+@@ -1111,17 +1728,30 @@
  calls); an R call's subtree is owned by its R history; `bennett_reverse`
  reverses post-order: CC segments by their run history, R calls by LIFO
  reversal of their history (§7.4, reversed segments and `uncall` frames
@@ -1023,7 +1348,7 @@
  is no reset and no trace-out: a register in unknown state is released by
  a `measure` inside a run, which consumes its handle (§3.3).
  
-@@ -1131,8 +1566,8 @@
+@@ -1131,8 +1761,14 @@
  `TOKEN` as the 8-byte little-endian id, `*width` = 64. A `cap` smaller
  than that byte count is `E_ARG` and nothing is written. Fault records
  are read by `bennett_result_nfaults` / `bennett_result_fault` (codes of
@@ -1031,10 +1356,16 @@
 -has at least one and exposes no values).
 +§4.9; a `COMPLETED` run has none, a `FAILED` run has exactly one, its
 +terminal record, and exposes no values).
++For an R `fault C`, `bennett_wait` returns `OK` with `*result_out` set
++and `*request_out` NULL as for any `FAILED` run;
++`bennett_result_nvalues` is 0, `bennett_result_nfaults` is 1 and
++`bennett_result_fault(result, 0)` is exactly C when C ≠ 0 (4 when C = 0,
++§5.4), with all 64 bits preserved. The fault code is result data, not a
++`bennett_status` error or a host-service reply.
  
  **Waiting.** `bennett_wait` blocks until the run leaves `RUNNING` and
  returns `OK` with exactly one outcome: `HOST_REQUEST` (`*request_out`
-@@ -1145,7 +1580,9 @@
+@@ -1145,7 +1781,9 @@
  lie in one live allocation (else CC trap and no request is made); those
  bytes are copied into the request; the run enters `HOST_REQUEST`; the
  reply payload is written to `[ptr, ptr + min(len, reply length))` and
@@ -1045,7 +1376,7 @@
  records the request bytes, the overwritten bytes and the reply bytes.
  Every `service` is declared in `devices.services`; an undeclared one is
  a load error.
-@@ -1156,7 +1593,7 @@
+@@ -1156,7 +1794,7 @@
  `*alen` = 8 × arity.
  
  ```c
@@ -1054,20 +1385,283 @@
     released with the matching *_free. Status 0 = BENNETT_OK. */
  typedef enum { BENNETT_OK=0, BENNETT_E_VERSION, BENNETT_E_PTR_WIDTH, BENNETT_E_DEVICE_MISSING, BENNETT_E_GATE_UNSUPPORTED,
    BENNETT_E_TARGET, BENNETT_E_BUDGET, BENNETT_E_QREG_NOT_CLEAN, BENNETT_E_INVALID_STATE, BENNETT_E_NOT_REVERSIBLE,
-@@ -1206,7 +1643,7 @@
+@@ -1198,7 +1836,10 @@
+ bennett_status bennett_tape_open(bennett_program_t*, bennett_run_id, bennett_tape_iter_t** out);
+ bennett_status bennett_tape_next(bennett_tape_iter_t*, const char** dev, const char** op, const uint8_t** args, size_t* alen);
+ void           bennett_tape_free(bennett_tape_iter_t*);
+-bennett_status bennett_estimate_run(bennett_program_t*, const char* region, bennett_token, bennett_estimate_t** out);
++/* K12: resolved classical parameter values, not live register ids. */
++bennett_status bennett_estimate_run(bennett_program_t*, const char* region, bennett_token,
++                                    const char* variant, uint32_t inherited_controls,
++                                    const uint8_t* params_jcs, size_t params_len, bennett_estimate_t** out);
+ size_t         bennett_estimate_nresources(const bennett_estimate_t*);
+ bennett_status bennett_estimate_get(const bennett_estimate_t*, size_t i, const char** name, const char** value_decimal);
+ const uint8_t* bennett_estimate_certificate(const bennett_estimate_t*, size_t* len);   void bennett_estimate_free(bennett_estimate_t*);
+@@ -1206,7 +1847,123 @@
  const uint8_t* bennett_coverage_jcs(const bennett_coverage_t*, size_t* len);   void bennett_coverage_free(bennett_coverage_t*);
  ```
  
 -## 11. Scheduling interface (sched 0.8)
++### 10.1 Launch-estimate contract (K12)
++
++**LAUNCH-ESTIMATE** (K12; b-isa-spec-c15, from bennett-vm-hsd).
++The 0.9 request carries the complete resolved parameter vector.
++
++**Resolved request.** `bennett_estimate_run` MUST copy and
++validate `params_jcs`, the JCS array of **all** classical arguments in
++signature order, encoded as §12.3 specifies; `params_len` is its UTF-8
++byte length, excluding any NUL terminator. The separately supplied
++valid token of that program fixes `[B,heap,stack,depth]`; token-typed
++arguments fix their own tuples, never the outer tuple by default.
++Host- and live device-minted tokens are both admitted (§5.4); the
++request copies the tuple while valid, so later revocation cannot
++retarget an already returned estimate.
++An empty array binds an empty signature only; no argument is implicitly
++zero, inferred from a hash, or taken from an earlier run. A missing,
++extra, mistyped or out-of-range argument is `E_ARG` before producing an
++estimate. Every well-typed resolved argument vector is supported; the
++interface bundles, arbitrary target/fault entries, dirty wires and
++interface cells remain quantum inputs, not chosen basis values.
++
++The caller supplies a nonempty `variant` and `inherited_controls` as
++in §11; these are part of the request, not inferred from a different
++invocation. The request denotes that region/variant/control count at
++its declared accuracy and those resolved parameters and budget.
++It uses the object's schedule exactly when every §5.4/§11 binding
++matches, otherwise the §11 defaults. The estimator MUST resolve the
++complete generated realisation and aggregate its scheduled leaf events
++and wire live intervals by §8.2; running one basis input, counting only
++executed oracle rows instead of all padded B steps, or silently changing
++parameters, budget, target, expansion library or cleanup is not an
++estimate of that request. A consumer lacking the selected expansion
++library reports `E_SCHEDULE_INFEASIBLE` as §11 requires (b-isa-spec-8r4);
++this postpones mechanics, not the estimate capability.
++
++**Resource rows.** `estimate_nresources` counts scalar rows,
++not target resource declarations. A `count` or `time` resource has one
++row named by its escaped resource name. Each `occupancy` or `peak`
++resource has one row **for every target class**, including unused classes with value
++zero, named `escape(resource)[escape(class)]`; no sum across classes is
++substituted. `escape` percent-encodes the UTF-8 bytes except ASCII
++letters, digits, `-._~`, using uppercase hex (including `%`, `[` and
++`]`). Scalar resource names use the same escape. Rows are enumerated
++by increasing bytewise encoded name. Thus names are injective even when
++target names contain delimiters; `name` and `value_decimal` remain
++ordinary NUL-terminated strings with §10's ownership lifetime.
++
++**Decimal values.** Aggregation is exact rational arithmetic;
++rounding occurs only at the accessor boundary. `value_decimal` is the
++least nonnegative decimal with at most **34 significant digits** that
++is ≥ the exact resource value. For q > 0 let e be the unique integer
++with 10^e ≤ q < 10^(e+1); return
++`ceil(q / 10^(e−33)) × 10^(e−33)`. Zero is `0`. The canonical spelling
++uses ASCII digits and an optional decimal point, no exponent, plus
++sign, leading integer zeros (except `0`), trailing fractional zeros or
++negative zero. Exact integers and terminating rationals that fit are
++unchanged. This is an upper enclosure, not a fabricated exact value for
++1/3; capacity, matching, objective comparison and certificate checking
++MUST use the exact rationals, never the rounded display.
++
++**Certificate binding.** The estimate's certificate MUST bind
++object, interface, closure, target and effective schedule hashes, root
++variant/controls, accuracy, expansion identity and the resolved
++`bindings.invocation` (§12.3). Even a default-only realisation has an
++explicit empty-entries schedule document with those bindings, hence a
++schedule hash. Its root region has `estimate: { precision_digits: 34,
++exact_resources: { "<encoded row name>": { numerator: "<integer>",
++denominator: "<positive integer>" } } }`; fractions are reduced,
++nonnegative and decimal-string encoded, zero is 0/1. `resources` uses
++the identical encoded keys and canonical decimal strings returned by
++`estimate_get`. A checker MUST rebuild the bound realisation, recompute
++all exact rows and their upward decimal encodings, and reject any
++binding, key, rational or display mismatch. A producer's resource map
++alone is not verification.
++
++**LAUNCH-ESTIMATE witness**
++
++```json
++{
++  "variant":"forward","inherited_controls":0,
++  "binding": {"args":["2"],"budget":["2","0","0","0"]},
++  "precision_digits": 34,
++  "classes": ["A","B]","idle"],
++  "live": [
++    {"class":"A","count":2,"start":"0","end":"1/3"},
++    {"class":"B]","count":1,"start":"0","end":"1/3"}
++  ],
++  "rows": [
++    ["peak_qubits[A]","2"],
++    ["peak_qubits[B%5D]","1"],
++    ["peak_qubits[idle]","0"],
++    ["qubit_second[A]","0.6666666666666666666666666666666667"],
++    ["qubit_second[B%5D]","0.3333333333333333333333333333333334"],
++    ["qubit_second[idle]","0"],
++    ["time","0.3333333333333333333333333333333334"]
++  ],
++  "decimal_checks": [
++    {"rational":"0","decimal":"0"},
++    {"rational":"2","decimal":"2"},
++    {"rational":"1/8","decimal":"0.125"},
++    {"rational":"1/3","decimal":"0.3333333333333333333333333333333334"},
++    {"rational":"2/3","decimal":"0.6666666666666666666666666666666667"},
++    {"rational":"1/30","decimal":"0.03333333333333333333333333333333334"},
++    {"rational":"10/3","decimal":"3.333333333333333333333333333333334"}
++  ]
++}
++```
++
++This **aggregation witness** assumes the displayed scheduled intervals,
++unit class rates and no other events; it does not assert an unbound
++oracle gate count. A permitted cost expression `1 / 3` produces that
++makespan. The exact class peaks are 2 and 1, not a replacement scalar 3;
++occupancies are 2/3 and 1/3, and the idle class is present. Changing the
++argument `2` to `1` denotes a different request, even at the same budget.
++No 0.8 request can transmit that distinction through §10's signature.
++
 +## 11. Scheduling interface (sched 0.9)
  
  ```c
  typedef struct bennett_sched_request_t bennett_sched_request_t;   typedef struct bennett_sched_response_t bennett_sched_response_t;
-@@ -1291,13 +1728,13 @@
+@@ -1291,25 +2048,247 @@
  against the object and executes verbatim or rejects (`E_SCHEDULE_
  INFEASIBLE`).
  
 -## 12. Certificate (cert 0.8; JCS)
++### 11.1 Proposed reference-library contract (K11)
++
++**ISA-REF-LIB (from bennett-vm-47t): maintainer decision required**
++(b-isa-spec-8r4). This subsection proposes the missing contract for 0.9;
++it is not a published library or a retroactive definition for 0.8.
++The maintainer must approve the decomposition set and hash rule below
++before publication, and 0.9 must be accepted before the `ref/` directory
++is created. Until then, consumers lacking the bound library continue
++to reject as §11 requires; staged conformance cases remain unavailable
++and cite b-isa-spec-8r4. No ordinal count or full-library hash is claimed.
++
++**Serialization and identity (proposal).** Publish `ref/README.md` and
++`ref/ref-0.9.json` after that gate. The JSON file is RFC 8785 canonical
++UTF-8, with no trailing LF, containing exactly `isa`, `name`, `version`
++and `recipes`. The first three are strings `0.9`, `ref`, `0.9`.
++`recipes` is an array in bytewise `kind` order, then increasing parameter
++tuple order. Each instantiated recipe has `kind`, its integer width or
++other named integer parameters, `operations`, `scratch`, `removable`
++and `source` (the motivating ISA sentence). A parameterised recipe
++uses `parameters` (an ordered array of names) and `body` instead of the
++instance's `operations`; its body uses the closed constructors below.
++Recipes cover every §4 instruction/row, the §3.6 step, §3.7 activation
++operations and §5.2 construction, with no implementation-private leaf.
++Classical instructions/effects remain classical leaf events (§8.2),
++not invented quantum gates. The README documents schema, parameters,
++coverage and witnesses; it is not hashed and cannot alter operations.
++
++The library hash is SHA-256 of this UTF-8 envelope (every line ends LF,
++including the last); the fourth line is the **entire** canonical library
++JSON, including all recipes, sources and versions, without an embedded
++hash field:
++
++```
++isa=0.9
++expansion=ref
++version=0.9
++<JCS library document>
++```
++
++`bindings.expansion` names `ref`, version `0.9`, and this 64-lowercase-hex
++hash. This adopts §9.2's version-prefixed, LF-terminated **envelope
++convention**, with explicit expansion-domain and library-version lines;
++it is a new library rule, not §9.2's symbol signature/SCC envelope.
++Motivation (0.8 §11): "a versioned document, identified in the schedule's
++`bindings.expansion` as { name, version, hash }"; 0.8 §9.2: "Semantic
++envelope ... every part ends with LF". A changed recipe, source, scratch
++name or ordering changes the library hash; no schedule/certificate can
++silently inherit that change (§12.1's realised-subject binding).
++
++**Expansion and ordinals (proposal).** Recipe bodies are ordered arrays
++of constructors: a gate (`gate`, ordered `wires`, optional `params`), an
++allocation (`alloc`, `width`, `class`, `state`), release (`release`),
++classical event (`classical`, `point`), counted loop (`for`, `from`,
++`to`, `body`), named recipe expansion (`invoke`, ordered `args`), or
++inverse (`inverse`, `body`). Constructor objects have exactly those
++keys. Fully instantiated `operations` contain only emitted leaves, each
++also carrying its computed `ordinal`; unexpanded `body` constructors
++carry no ordinal. Scalars are integer literals, parameter names, or prefix arrays
++`[op, operands…]` for `+ - * div mod`; div is floor division with a
++positive divisor. Wires are declaration names with integer-expression
++subscripts. Loops enumerate [from,to) in increasing order; expansion is
++depth first, array order, and recipe dependencies are acyclic. An
++inverse reverses its fully expanded body and adjoints each leaf by
++§5.3, interchanging allocation/release. The complete serialized catalog
++must encode the algorithms below in these constructors before release;
++this draft does not claim that prose alone is an interchangeable file.
++
++Number every emitted leaf (including allocation/release and classical
++leaves) 0,1,… within the containing row/instruction, after instantiating
++widths and static loop counts, before any §5.7 transformation or target
++scheme expansion. Calls have their own invocation-path element and
++callee ordinal space; `step` and `phase` select the invocation's oracle
++step as in §11. The inverse of a row visits the forward ordinals in
++reverse order, retaining each ordinal under `phase: rev`; it does not
++renumber them. Scratch identity is `(invocation chain, step, recipe
++expansion path, allocation ordinal, bit index)`; allocations in repeated
++bodies have their expanded occurrence path. All library scratch is
++clean, allocated unconditionally and released in reverse allocation
++order after uncomputation; borrowed user operands remain borrowed.
++`removable` is an explicit array of leaf ordinals, empty by default;
++the proposed initial set is empty for every recipe. No transformation
++may infer extra permission from a zero-valued basis input. Motivation
++(0.8 §11): "MUST keep the ordinals of the operations they keep and MAY
++remove only operations the library marks removable"; §17 item 7:
++"clean scratch released in reverse order".
++
++**Decomposition set (proposal, not an assertion of 0.8 choices).** Bit
++loops below increase from the least-significant bit. To make Boolean
++recipes deterministic, use no common-subexpression elimination: visit
++every Boolean expression tree in left-to-right postorder, giving each
++internal node a fresh clean scratch bit. NOT(a) uses X d; CX a d,
++XOR(a,b) uses CX a d; CX b d, AND(a,b) uses CCX a b d. OR(a,b) is the
++ordered tree XOR(XOR(a,b),AND(a,b)); repeated operands are separate tree
++occurrences (coincident AND operands reduce to a single CX so the gate
++has distinct operands). XOR the root into the destination, then reverse
++all compute gates and release scratch in reverse allocation order.
++Constants are zero or X of a clean bit. All formulas use old source
++values captured before an assignment/exchange. External effective
++controls apply to the resulting semantic gates, not allocations; scratch
++computations may be unconditional provided their compute/uncompute pair
++is balanced when the external control is false (§3.5, §4.3).
++
++| Family | Proposed ordered expansion | Motivating 0.8 sentence |
++|---|---|---|
++| Copy, XOR, exchange; native gates | `qxor`: CX s[i] t[i]; `qcopy`: allocate then the same; `quncopy`: the same then release; `qexch`: SWAP a[i] b[i]. Keep each §4.4 gate as a leaf; target schemes expand later. | §4.5: "`cx s[i] t[i]`" and "`swap a[i] b[i]`"; §8.3: "Every template gate MUST itself match a gates entry". |
++| Ripple add/sub and comparisons | c[0]=0; p[i]=a[i] XOR b[i]; sum[i]=p[i] XOR c[i]; c[i+1]=(a[i] AND b[i]) XOR (p[i] AND c[i]); compute each bit in this order, XOR sums out, reverse scratch. Subtraction adds bitwise NOT b with c[0]=1. Unsigned a<b is NOT the final subtraction carry; equality is the AND of NOT(a[i] XOR b[i]) in increasing-bit left-associated order. `ule` is OR(ult,eq); signed comparison selects sign(a) if signs differ, else ult. | §17 item 7: "ripple-carry adders and comparators"; §4.1: "wrap"; §3.7: prospective sums use "no wrap" (retain the extra carry for those). |
++| Other arithmetic, casts, select | AND/XOR/OR use the Boolean trees above; select emits ((NOT p) AND b[i]) XOR (p AND a[i]). Multiply folds shifted partial products in increasing multiplier-bit order through ripple add modulo 2^N. Shifts scan shift amounts j=0..N−1, equality-selecting the corresponding source bit; ≥N produces zero. Sign-extend replicates the high source bit, zero-extend supplies zero, truncate drops high bits. Division uses restoring unsigned long division, scanning dividend bits from N−1 to 0: append that bit to an N+1-bit remainder, compare with the zero-extended divisor, subtract iff ≥, and emit that predicate as quotient bit. Signed forms conditionally negate operands, divide magnitudes, negate quotient iff signs differ and remainder iff dividend negative; row fault predicates precede these outputs. | §4.2: "w (under ¬flag)" and the div fault predicates; §4.1 wrap/shift rules and signed MIN/−1 fault; §3.3 equal operand widths. |
++| Linear inrange and flags | For table entries i=0..2^A_tab−1 compute `(i<atop) AND live_i AND (base_i≤p) AND (p+n≤base_i+size_i)` in that parenthesisation at §4.2's widened width; left-fold OR from false, then uncompute entry scratch. `free` and allocator/call fault trees use their explicit §4.2/§3.7 formula and slot order (including 0.9's E17.13 correction). | §4.2: "inrange(p,n) = ∃ i < atop ..." and "no wrap"; §17 item 7: "linear inrange scans". |
++| Address dispatch and multiplexers | Scan every address i in increasing numeric order; compute equality to i, copy/exchange cell bits in increasing order under that bit, uncompute equality before the next i. Lifted memory chooses the §7.2 mapped region in address order and scans its cells in increasing address order; captures use old addresses before exchanged counters. | §4.6: "for each cell i: under a == i"; §17 item 7: "one-hot address dispatch"; §3.7 C1–C5/R1–R5. |
++| Row, oracle and structure | Compose these recipes in the printed §3.6 step order, §4.2 slot order, §3.7 activation order, §5.2 allocate/forward/commit/reverse/release order. `qif`, loops, local-region image X gates and `qinplace` use the literal sequences of §4.5–§4.6, incorporating 0.9's explicit parameters. Cleanup `reverse` adjoints that sequence; `recompute` follows §6.4. | §11: "Above gate level the order is fixed by §3.6, §4.2, §4.5–§4.6 and §5.2"; §5.2: "run the inverse step for t = B..1, then release (1)". |
++
++These algorithms propose exact permutation circuits, preserving every
++input and cleaning scratch; circuit correctness must still be checked
++against full-domain T3 witnesses and §5.7, not inferred from costs or
++names. The full catalog and its hash remain uncomputed until the two
++maintainer decisions and acceptance gate above. In particular this is
++not permission to publish a partial library that omits division, stack,
++coherent control, memory or any instruction.
++
++**ISA-REF-LIB witness**
++
++```json
++{"isa":"0.9","name":"ref","recipes":[{"kind":"qxor","operations":[{"gate":"cx","ordinal":0,"wires":["s[0]","t[0]"]},{"gate":"cx","ordinal":1,"wires":["s[1]","t[1]"]}],"removable":[],"scratch":[],"source":"0.8 §4.5","width":2}],"version":"0.9"}
++```
++
++This is a single instantiated recipe witness, **not** a complete
++library document for binding a schedule. Its envelope is the four-line
++envelope above with this entire JSON as line four. It has two ordinals,
++0 and 1, no scratch and no removable operations. For every two-bit s,t
++(16 tuples), the result is `(s, t XOR s)`; reversing visits ordinal 1
++then 0 and restores the entry tuple. Its hash identifies only these
++witness bytes, not `ref@0.9` as a whole.
++
++Witness envelope SHA-256: `299510fd67cc626fdcbcc10adcd40730f9af294ba596d86fb25fd31be08a5c7f`.
++
 +## 12. Certificate (cert 0.9; JCS)
  
  ### 12.1 Claims
@@ -1075,12 +1669,94 @@
  | kind | payload | checker obligation |
  |---|---|---|
 -| `exhaustive` | `domain` (§12.2); `expected`: `"oracle"` \| `{ "table": [...] }` \| `{ "program": closure_hash }` | re-execute every domain element on the reference interpreter / expected program; compare full tuples |
+-| `sampled` | `domain`; `sampler`: `{ "algorithm": "xoshiro256**", "seed": [4 decimal strings, not all zero], "count": n }` | replay; **evidence** |
 +| `exhaustive` | `domain` (§12.2); `expected`: `"oracle"` \| `{ "table": [...] }` \| `{ "program": closure_hash }` \| `"inverse_pair"` | re-execute every domain element on the reference interpreter / expected program; compare full tuples. For `"inverse_pair"` (the claim of an `inverse_pairs` entry, §12.3): for every element (x, ins, mem cells, args) run g and ginv at the entry's tuple, token-typed arguments at their `arg_tokens` tuples, and require both fault-free, ginv(g(x)) = x and g(ginv(x)) = x; the bundles and regions components MUST be the full domain of g's `in` and `mem` slots (the `args` component lists the covered classical values) |
- | `sampled` | `domain`; `sampler`: `{ "algorithm": "xoshiro256**", "seed": [4 decimal strings, not all zero], "count": n }` | replay; **evidence** |
++| `sampled` | `domain`; `expected`: `"oracle"` \| `{ "table": [...] }` \| `{ "program": closure_hash }`; `subject` and invocation binding as below (K13); `sampler`: `{ "algorithm": "xoshiro256**", "seed": [4 decimal strings, not all zero], "count": n }` | independently replay both sides of the declared relation on every sampled element; compare full tuples; always **evidence**, even if every element is drawn |
  | `structural` | `{ "rule": "translation_lemma" \| "inverse_pair_library" \| "adjoint_table", "subclaims": [indices], "witness": … }`; for `translation_lemma`: `{ "V": [points], "W": [points], "X": [wires], "B": [wires], "frame": [first point, last point] }`; for `inverse_pair_library`: `{ "library_closure_hash", "claim_index" }`; for `adjoint_table`: `{}` | check the rule's side conditions syntactically against the object and the subclaims' results |
  | `numerical` | `{ "subject": { "closure_hash", "variant", "inherited_controls", "schedule_hash" }, "metric": "operator_norm", "precision_bits": n, "bound": decimal }` | **checker-computed, for every invocation context of the subject** (below): build the realised unitary U of that invocation (the region's realisation under the root schedule at that path, with its resolved classical arguments, budget, epsilon shares and cleanup choices, and `inherited_controls` control wires prepended) and the reference unitary V (the region's §5.3 semantics with the same arguments, controlled on the same wires) at the subject's signature widths in interval arithmetic at `precision_bits` (basis order = allocation order, controls first), form interval enclosures of `V†U − I` entrywise, derive the operator-norm bound as the Frobenius-norm upper bound in interval arithmetic, and verify it is ≤ `bound`; the claim holds iff it holds for every context |
-@@ -1305,11 +1742,17 @@
+ | `channel` | `{ "subject": as above, "metric": "diamond", "precision_bits", "bound", "dual": [ { "Y": interval Hermitian matrix, "mu": decimal } … ] }` | for every invocation context of the subject, in enumeration order, verify its dual witness for the **diamond-norm SDP** below in interval arithmetic and `mu` ≤ `bound` (one witness per context; too few witnesses: reject) |
  
++**CLAIM-REPLAY (K13; from bennett-vm-clw): maintainer decision required**
++(b-isa-spec-9uy). The following comparison/binding/tuple encoding is a
++0.9 proposal. It supplies the relation missing from 0.8's `sampled`
++payload; it does not promote sampled observations to proof.
++
++**Comparison relation (proposal).** `exhaustive` and `sampled` claims
++MUST name their `subject: { closure_hash, variant, inherited_controls,
++schedule_hash? }` and an explicit `expected`; there is no implicit
++self-comparison or default expected relation. Without a schedule the
++left side is the subject's reference semantics at the bound invocation;
++with one it is that invocation's realised operation. `expected: "oracle"`
++compares the realised operation to §5.2's reference oracle map and
++requires `schedule_hash`. `expected: {program: H}` independently runs
++the reference semantics of linked closure H at the **same** arguments,
++budget and interface tuple; its signature MUST be compatible.
++`expected: {table: rows}` compares to the explicit full-tuple rows
++below. The checker MUST compare every interface output, preserve inputs
++and borrowed systems, and verify clean workspace and exact +1 basis
++phase for a permutation assertion (T3); matching a target or fault
++projection alone, or a producer's claimed verdict, is insufficient.
++For a non-permutation realisation, use the existing numerical/channel
++claims rather than labeling basis observations a permutation proof.
++K4's `expected: "inverse_pair"` retains its separate two-composition
++relation and entry/domain bindings; it is not a sampled proof option.
++
++**Table tuples (proposal).** Each table row is `{ before: tuple,
++after: tuple }`. A tuple is `{ bundles: ["<unsigned integer>", …],
++borrowed: ["<unsigned integer>", …], regions: [["<cell>", …], …] }`.
++`bundles` lists inherited control wires first (each width 1), then all
++signature bundles in operand order, **including arbitrary initial
++oracle target and fault bundles**. `borrowed` lists dirty bundles in
++allocation order, with widths fixed by the checked borrow lifetimes;
++`regions` lists interface regions in signature order, every cell in
++increasing address order, each as an unsigned W-bit integer. All
++integers use canonical decimal strings, within the declared widths;
++no cells, inputs or unchanged components may be omitted. Workspace is
++not an interface component and MUST finish zero. Rows are in domain
++enumeration order, one per distinct declared domain element (including
++for `sampled`); duplicate/missing/out-of-range rows reject. This favors
++an explicit table; `{program: H}` provides the compact relation when a
++full table is large. Sampling draws with replacement using the existing
++sampler; coverage counts distinct drawn elements, not draws. A mismatch
++rejects; success is always `evidence` with that distinct covered fraction
++of D, including when the draws happen to cover all of D.
++
++**CLAIM-REPLAY witness**
++
++```json
++{
++  "invocation":{"args":["2"],"budget":["2","0","0","0"]},
++  "row":{
++    "before":{"bundles":["1","2","3"],"borrowed":["1"],"regions":[["2","1"]]},
++    "after":{"bundles":["1","1","3"],"borrowed":["1"],"regions":[["2","1"]]}
++  },
++  "wrong_row":{
++    "before":{"bundles":["1","2","3"],"borrowed":["1"],"regions":[["2","1"]]},
++    "after":{"bundles":["1","2","3"],"borrowed":["1"],"regions":[["2","1"]]}
++  },
++  "changed_arg_after":{"bundles":["1","0","3"],"borrowed":["1"],"regions":[["2","1"]]},
++  "short_budget_after":{"bundles":["1","2","2"],"borrowed":["1"],"regions":[["2","1"]]},
++  "sampler":{"algorithm":"xoshiro256**","seed":["1","0","0","0"],"count":4},
++  "sample_count":4,"distinct_samples":1,"covered_fraction":"1/2048","verdict":"evidence"
++}
++```
++
++The subject is a two-row oracle body `r = lift.add x a;`
++`lift.retval r`, widths x = target = fault = a = 2, with a preserved
++one-bit dirty bundle and an unused two-cell, two-bit `in` interface
++region; no inherited controls. The **body** does not access memory;
++the interface cells remain part of D. The reference payload is
++(1 + 2) mod 4 = 3: target 2 XOR 3 = 1 and fault 3 XOR 0 = 3.
++The singleton declared domain is precisely `row.before`, within the
++full 11-bit D. Four samples of singleton components draw no generator
++words and cover one of 2048 full tuples. An identity implementation
++would agree with itself but MUST fail against `row`; using `wrong_row`
++also MUST fail. At argument 1 the target is 2 XOR 2 = 0; at B = 1 the
++payload is zero and fault is 3 XOR 1 = 2. A certificate for argument 2,
++B = 2 cannot be replayed as either of those invocations. The printed
++rows illustrate the relation; bound closure/object hashes still have
++to be supplied in an actual certificate, not invented for this witness.
++
  **Invocation contexts.** A subject denotes the set of invocations of
  the region `closure_hash`, with the given `variant` and `inherited_
 -controls`, in the root schedule `schedule_hash`: every path of that
@@ -1102,7 +1778,7 @@
  `error` entry (§12.3) is a **common upper bound over all contexts** of
  its key; the multiplicity composition of §12.3 is sound for that reason.
  
-@@ -1325,7 +1768,10 @@
+@@ -1325,7 +2304,10 @@
  rejects): Y − J(Φ) ⪰ 0, Y + J(Φ) ⪰ 0, mu·I − Tr_out(Y) ⪰ 0 (partial trace
  over the output factor), and mu ≤ `bound`; then ‖Φ‖◇ ≤ mu (the dual of
  Watrous's SDP with Y₀ = Y₁ = Y; this is the diamond norm itself, not
@@ -1114,7 +1790,7 @@
  hi, im_lo, im_hi]` (decimal strings). **Positivity test.** The checker
  proves each of the three matrices **positive definite** by an interval
  Cholesky (or Hermitian LDL†) factorisation in which the interval lower
-@@ -1335,7 +1781,17 @@
+@@ -1335,13 +2317,25 @@
  strictly feasible by replacing Y with Y + δI and mu with mu′ = mu + δ·(d
  + 1) for a small rational δ > 0 (any mu′ > mu + δ·d suffices): then Y ±
  J(Φ) ⪰ δI ≻ 0 and, since Tr_out(Y + δI) = Tr_out(Y) + δ·d·I, mu′·I −
@@ -1133,7 +1809,17 @@
  arithmetic** at `precision_bits`
  means every operation rounds outward to `precision_bits`-bit binary
  rationals; transcendental entries (`rx ry rz`) are enclosed by a Taylor
-@@ -1350,8 +1806,12 @@
+ series with the Lagrange remainder bound (§17 item 8 fixes the term
+-count). The subject's `schedule_hash` is required: an executable claim
+-names the realisation it is about.
++count). A `numerical` or `channel` subject's `schedule_hash` is required:
++it names the realisation the claim is about. K13 also requires it for
++`expected: "oracle"`; standalone reference relations use the explicit
++invocation binding instead.
+ 
+ **Sampling.** For each domain component with range size R = hi − lo + 1,
+ assemble m = ⌈⌈log₂ R⌉/64⌉ consecutive generator words (least-significant
+@@ -1350,18 +2344,22 @@
  
  ### 12.2 Domains
  
@@ -1147,19 +1833,75 @@
  A `proof` label requires the domain to equal D; otherwise the claim is
  `evidence` with the covered fraction.
  
-@@ -1361,7 +1821,7 @@
-   versions; bindings { object_hash, interface_hash, closure_hash (required), reference_program_hash, dialect_mapping_version, target_hash, schedule_hash? }
+ ### 12.3 Schema and composition
+ 
+ ```
+-  versions; bindings { object_hash, interface_hash, closure_hash (required), reference_program_hash, dialect_mapping_version, target_hash, schedule_hash? }
++  versions; bindings { object_hash, interface_hash, closure_hash (required), reference_program_hash, dialect_mapping_version, target_hash, schedule_hash?, invocation? (K13) }
    producer { name, version, materialisation { llvm_version, pipeline, normaliser_version } }
-   regions { <closure_hash>: { kind, signature, bounds, frame (§9.4), resources { name: decimal }, gates_used { gate: { count, scheme?, epsilon? } },
+-  regions { <closure_hash>: { kind, signature, bounds, frame (§9.4), resources { name: decimal }, gates_used { gate: { count, scheme?, epsilon? } },
 -            claims: [ <claim> … ], verification: { oracle: i, borrow_frames: [i], inverse_pairs: [ { g, ginv, claim: i } ], unitary: [i], channel: [i],
++  regions { <closure_hash>: { kind, signature, bounds, invocation? (K13), estimate? (K12), frame (§9.4), resources { name: decimal }, gates_used { gate: { count, scheme?, epsilon? } },
 +            claims: [ <claim> … ], verification: { oracle: i, borrow_frames: [i], inverse_pairs: [ { g, ginv, claim: i, budget: [B,heap,stack,depth], arg_tokens?: { "<arg>": [B,heap,stack,depth] } } ], unitary: [i], channel: [i],
                                                     fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
              cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },
              error:   { "<variant>:<inherited_controls>": { local: { "operator_norm"?: v, "diamond"?: v }, inclusive: { "operator_norm"?: v, "diamond"?: v } } },
-@@ -1369,6 +1829,11 @@
+@@ -1369,6 +2367,63 @@
    composition { multiplicities: { "<hash>:<variant>:<inherited_controls>": n (from the realised schedule) }, epsilon_total: { "diamond": v }, method: "sum_over_multiplicities" }
  ```
  
++**Invocation binding (K13 proposal).** An invocation is
++`{ args: [value, …], budget: [B,heap,stack,depth] }`, with every value
++resolved before replay and all four budget components explicit even
++when zero. `args` is in signature order: `iN` and `ptr` values are
++canonical **unsigned decimal strings** of exactly that bit-vector
++value (ptr has `ptr_width` bits); `f64` is `0x` followed by exactly 16
++lowercase hex digits of its IEEE 754 binary64 bit pattern, most
++significant nibble first (so −0 and NaN payloads are not lost); a token
++is its four-component tuple of canonical nonnegative decimal strings,
++not a process-local token id. Budget components are also canonical
++nonnegative decimal strings. Signature types disambiguate encodings;
++widths/ranges and every tuple MUST pass §5.4 validation. `params_hash`
++is SHA-256 of the UTF-8 JCS **args array**, no trailing LF (§9.2), not
++of the whole invocation. Thus equal token tuples have equal parameter
++hashes regardless of ids, while +0 and −0 `f64` parameters differ.
++
++A standalone table/program/structural claim MUST carry `invocation`
++(or inherit an explicit `regions.<closure_hash>.invocation`); it binds
++**every** classical argument and budget. Missing values have no implicit
++zero/default. Claims with no arguments still bind `args: []` and their
++budget. K4 inverse-pair claims instead bind the entry's budget,
++`arg_tokens` and quantified `args` domain as already specified; this
++rule does not replace that quantification by one chosen argument.
++A parameter-uniform structural claim MAY instead bind
++`invocation: { args: "all", budget: "all" }`: its checker MUST discharge
++the rule's side conditions for every well-typed argument vector and
++valid budget, not by replaying a chosen instance. Thus generic library
++and adjoint/translation proofs retain their universal scope.
++A scheduled certificate MUST carry the root `bindings.invocation`;
++its args hash and budget MUST equal the root schedule's bindings, and
++all nested arguments and budgets MUST be resolved at each realised
++invocation context (§12.1), including default-covered contexts.
++Explicit nested bindings, if supplied, MUST equal those resolutions;
++a root binding MUST NOT be silently reused for a different callee.
++A checker MUST reject absent or conflicting bindings before replay,
++and an executor may use a verified result only for the invocation(s)
++it actually covers. Reference table/program/structural claims need no
++schedule; they prove only their reference relation, not a target
++realisation. Scheduled/numerical/channel claims retain the expansion
++library gate and all existing context and composition obligations.
++
++**CLAIM-BINDING witness**
++
++```json
++{"signature":["i128","f64","token"],"args":["18446744073709551617","0x8000000000000000",["2","0","0","0"]],"params_hash":"9f628a694fa7259bf899bfb677aabce1c084e268a738a40f7f643eb6d8c9c093"}
++```
++
++The first argument is > 2^64; the second is binary64 negative zero;
++the third is a token tuple, not an id. Replacing negative zero with
++`0x0000000000000000` changes `params_hash`; replacing the token by
++another valid id of the same tuple does not.
++
 +`versions` is the object `{ "isa", "object", "launch", "sched", "cert",
 +"coverage", "target" }` of the seven header versions. A **variant** is a
 +nonempty string chosen by the producer (the ISA enumerates none); it is
@@ -1168,9 +1910,16 @@
  `inclusive(R, key) = local(R, key) + Σ_callees n_c × inclusive(c, key_c)`
  **per metric**, keyed like `cleanup` by `<variant>:<inherited_controls>`
  (the realised error depends on both); every `local` value is a verified
-@@ -1383,21 +1848,26 @@
- (`numerical`, `channel`, `exhaustive` with `expected: "oracle"`) bind to
- `schedule_hash` through their subject.
+@@ -1380,27 +2435,41 @@
+ variants) require `operator_norm` bounds throughout. A controlled
+ unitary variant requires a `numerical` claim; an ε > 0 realisation
+ compared as a channel requires a `channel` claim. Executable claims
+-(`numerical`, `channel`, `exhaustive` with `expected: "oracle"`) bind to
+-`schedule_hash` through their subject.
++(`numerical`, `channel`, and `exhaustive` or `sampled` with
++`expected: "oracle"`, plus table/program comparisons of a realised
++operation) bind to `schedule_hash` through their subject. Standalone
++reference relations have only the invocation scope defined above (K13).
  
 -## 13. Coverage (coverage 0.8)
 +## 13. Coverage (coverage 0.9)
@@ -1199,7 +1948,17 @@
  and the budget unit and rejects any body that executes a non-permutation
  gate.
  
-@@ -1422,10 +1892,20 @@
++For CC/R, `fault C` has the terminal-record semantics of §4.9 and the
++logical history of §7.4: it preserves the complete executed prefix for
++eligible reversal, including activations that have not returned. This
++is T4's history traversal, not the Q machine's B inverse steps. In an
++oracle body or lproc the same spelling remains the §4.2 fault row;
++§3.6 and §5.2 supply its step-machine inverse and T2 prefix reversal.
++
+ ### 14.2 Quantum state semantics
+ 
+ The state of a Q region is a vector in ⊗ over live wires in allocation
+@@ -1422,10 +2491,20 @@
  - **T3 (permutation theorem).** If the realised unitary V of a circuit on
    span(D) is a permutation matrix and the final basis tuple equals P(x)
    for every x ∈ D, then V|span(D) = P.
@@ -1224,7 +1983,7 @@
  - **T5.** As §6.3.
  - **T6 (executor agreement).** Two executors conforming to §3–§7 on one
    target with the same schedule produce on every x ∈ D the same final
-@@ -1439,14 +1919,14 @@
+@@ -1439,14 +2518,14 @@
  
  | Suite | Class | Tests |
  |---|---|---|
@@ -1232,21 +1991,21 @@
 -| B | Executor | oracle totality and prefix reversal: every fault code; B = 0; boundary halts; `lift.call`/`lift.ret` recursion with argument capture; one forward `lift.call` and one forward `lift.ret` step of a recursive call each followed by its inverse (§3.7); stack exhaustion (`sp + R_f > stack_limit`); matched `lift.oracle_uncall`; interface regions restored; pre-entries; `lift.free` on pinned entries; inherent load/store checks |
 -| C | Executor, Producer | T3 over full D at exhaustive widths for oracles, permutation actions, `qinplace` pairs, borrow frames; T6 agreement among VM, specialiser, transformed forms and the reference interpreter; the §16.3 examples as normative test vectors, including the stack-capacity boundary of example 2 |
 -| D | Executor | channel and unitary comparison for ε > 0 realisations; controlled-interference tests; checker-computed bounds; the diamond-norm SDP witness check of §12.1 |
-+| A | Executor | classical ISA; run history and LIFO reversal with loops, recursion, effects, segment `uncall` (impure suffix traps; nested `uncall` inside an uncalled segment; `uncall` over a `measure` traps; a segment that begins at the run's first instruction, uncalled, then whole-run reversal), `hostcall`, `qreg.*`, fault records (T4); CC `uncall` of a CC segment (§3.1); a use reached before any definition traps 4 whatever the block text order; `qreg[*]` (examples 4, 5): run-time widths 0, 2, 3, an id stored and reloaded, `qreg.from_id` of a stale, consumed or viewed id or of a register owned by another open run traps 4, a width-3 register bound to `wire[2]` or `qreg[2]` traps 4 with no effect, aliases consumed together, ids restored and never reused by reversal, run-time slice `lo` and `len`; `qreg.*` in R with whole-run reversal and segment `uncall` (a hardware-unverified free makes the segment non-uncallable); `budget.mint` valid and invalid and its reversal (example 6); the §4.9 causes — `udiv` by 0 → 5, i8 −128 `sdiv` −1 → 6, `load` at address 0 → 7, `alloc` beyond the heap → 2, `trap` → 4, `fault 1` → 1, `fault 0` → 4 — each with the pre-fault state unchanged and exactly one record; terminal R faults and FAILED-run reversal (example 8) |
-+| B | Executor | oracle totality and prefix reversal: every fault code; B = 0; boundary halts; `lift.call`/`lift.ret` recursion with argument capture; one forward `lift.call` and one forward `lift.ret` step of a recursive call each followed by its inverse (§3.7); stack exhaustion (`sp + R_f > stack_limit`); matched `lift.oracle_uncall`, including two calls followed by two uncalls; interface regions restored; pre-entries; `lift.free` on pinned entries, and of a heap entry whose base equals a size-0 global's (the global stays live); inherent load/store checks; row indices of multi-row blocks and their `lift.label` values; `qjumpr` to an in-range interior row enters it and to an out-of-range index faults 4; `fault 0` and a triggered `lift.faultif p 0` commit `FAULT_UB_TRAP`; counters at the §3.7 minimum widths and interface widths above 128 bits |
-+| C | Executor, Producer | T3 over full D at exhaustive widths for oracles, permutation actions, `qinplace` pairs, borrow frames; T6 agreement among VM, specialiser, transformed forms and the reference interpreter; the §16.3 examples as normative test vectors, including the stack-capacity boundary of example 2 and example 3 over its 8 basis and 16 controlled configurations with an entangled reference on the borrowed wire; `qinplace` with `ins` and `args` (example 7) over all x, y, a and both control values, scratch clean, and its adjoint (covered by the same entry); a library (`inverse_pair_library`) claim covering every `args` value; a token argument whose tuple differs from `arg_tokens` traps 4 |
++| A | Executor | classical ISA; run history and LIFO reversal with loops, recursion, effects, segment `uncall` (impure suffix traps; nested `uncall` inside an uncalled segment; `uncall` over a `measure` traps; a segment that begins at the run's first instruction, uncalled, then whole-run reversal), `hostcall`, `qreg.*`, fault records (T4); CC `uncall` of a CC segment (§3.1); a use reached before any definition traps 4 whatever the block text order; `qreg[*]` (examples 4, 5): run-time widths 0, 2, 3, an id stored and reloaded, `qreg.from_id` of a stale, consumed or viewed id or of a register owned by another open run traps 4, a width-3 register bound to `wire[2]` or `qreg[2]` traps 4 with no effect, aliases consumed together, ids restored and never reused by reversal, run-time slice `lo` and `len`; `qreg.*` in R with whole-run reversal and segment `uncall` (a hardware-unverified free makes the segment non-uncallable); `budget.mint` valid and invalid and its reversal (example 6); the §4.9 causes — `udiv` by 0 → 5, i8 −128 `sdiv` −1 → 6, `load` at address 0 → 7, `alloc` beyond the heap → 2, `trap` → 4, `fault 1` → 1, `fault 0` → 4 — each with the pre-fault state unchanged and exactly one record; terminal R faults and FAILED-run reversal (example 8), also with `fault 2`, `fault 3` and `fault 18446744073709551615`: exact record code, no caller continuation or subsequent source effect, earlier memory/device/tape history intact until reversal |
++| B | Executor | oracle totality and prefix reversal: every fault code; B = 0; boundary halts; `lift.call`/`lift.ret` recursion with argument capture; one forward `lift.call` and one forward `lift.ret` step of a recursive call each followed by its inverse (§3.7); stack exhaustion (`sp + R_f > stack_limit`); matched `lift.oracle_uncall`, including two calls followed by two uncalls; interface regions restored; pre-entries; `lift.free` on pinned entries, and of a heap entry whose base equals a size-0 global's (the global stays live); inherent load/store checks; row indices of multi-row blocks and their `lift.label` values; `qjumpr` to an in-range interior row enters it and to an out-of-range index faults 4; `fault 0` and a triggered `lift.faultif p 0` commit `FAULT_UB_TRAP`; `fault C` as the B-th executed row reports C′, whereas a cut just before that row reports 1; subsequent HALT steps and inverse steps preserve the §5.2 outcome and clean every frame; counters at the §3.7 minimum widths and interface widths above 128 bits |
++| C | Executor, Producer | T3 over full D at exhaustive widths for oracles, permutation actions, `qinplace` pairs, borrow frames; T6 agreement among VM, specialiser, transformed forms and the reference interpreter; the §16.3 examples as normative test vectors, including the stack-capacity boundary of example 2 and example 3 over its 8 basis and 16 controlled configurations with an entangled reference on the borrowed wire; `qinplace` with `ins` and `args` (example 7) over all x, y, a and both control values, scratch clean, and its adjoint (covered by the same entry); example 10's lproc token/classical/region forwarding over every x, a and byte d, arbitrary target/fault contents, and an external reference, with successful and insufficient nested budgets; coherent calls to two binding instances of one lproc, including recursive forwarding, and matched `lift.oracle_uncall` through parameters; a library (`inverse_pair_library`) claim covering every `args` value; a token argument whose tuple differs from `arg_tokens` traps 4 |
 +| D | Executor | channel and unitary comparison for ε > 0 realisations; controlled-interference tests; checker-computed bounds; the diamond-norm SDP witness check of §12.1, including d = 2, J(Φ) = 0, Y = I₄/8, mu = bound = 3/8 (accepted: every pivot 1/8) and Y = 0, mu = 0 (rejected: pivot 0) |
  | E | Target author, Executor | JCS parsing; AST evaluation; matching; scheme expansion and correctness; aggregation from event lists; timing model; imports |
 -| F | Producer | versioning, disjointness incl. control context; operand schema; row classes and frame sizing; index-space flattening; terminators; name resolution; permutation-only oracles; §6 transfer and windows; adjoint table; translation lemma side conditions with the four negative tests; `in`-wire use; acyclic action graphs; grammar; schemas; envelope and hashes; linking; frame-descriptor live ranges |
 -| G | Launch | every §10 entry point, state transition, binding rule, ownership rule; HOST_REQUEST/reply; reverse eligibility and tree order |
 -| H | Scheduler | §6 validity; capacity; reproducibility; specificity resolution; verbatim execution; INFEASIBLE/UNSUPPORTED |
-+| F | Producer | versioning, disjointness incl. control context; operand schema; row classes and frame sizing; index-space flattening; terminators; name resolution; permutation-only oracles; §6 transfer and windows; adjoint table; translation lemma side conditions with the four negative tests; `in`-wire use; acyclic action graphs; grammar; schemas; the §3.1 call-tier table (R → CC rejected); envelope and hashes, acyclic (inc8, zero, sum_db) and cyclic (sum, and a mutual SCC); SCC placement in the index space (mutual f, g whose member hashes order opposite to their names); empty data lines (`NAME SP LF` accepted, two spaces rejected); canonical `INT`/`FLOAT` at every literal site; const literal ranges; the region call graph with lifted calls and `qinplace`; `call` operand spelling; param role suffixes; interface-region names; local regions as call operands; the widened `in`-wire uses of §5.1; LIFO matched uncalls and an unmatched uncall rejected; the static view rule of §3.3 (a view passed through `br`, used twice, or left unconsumed is rejected); lifted-call `args` that are locations rejected; `qreg[*]` typing, the `measure.iN` form and width checks; `budget.mint` rejected in regions; CC/R block terminators; `qinplace` signature compatibility, its short form exactly when the three lists are empty, and its §6.1 transfer (cleaning a value that depends on x after changing an `ins` wire is rejected); CC/R `fault` literal range; linking; frame-descriptor live ranges |
-+| G | Launch | every §10 entry point, state transition, binding rule, ownership rule; HOST_REQUEST/reply (a reply whose length does not fit `ptr_width` bits is `E_ARG`); reverse eligibility and tree order; `QREG` bound to `qreg[*]`; `FAILED → REVERSED` (example 8) and `E_NOT_REVERSIBLE` after a `measure` or an unverified free; exactly one fault record per `FAILED` run; a device-minted token used after its run is CLOSED is `E_ARG` |
++| F | Producer | versioning, disjointness incl. control context; operand schema; row classes and frame sizing; index-space flattening; terminators; name resolution; permutation-only oracles; §6 transfer and windows; adjoint table; translation lemma side conditions with the four negative tests; `in`-wire use; acyclic action graphs; grammar; schemas; the §3.1 call-tier table (R → CC rejected); envelope and hashes, acyclic (inc8, zero, sum_db) and cyclic (sum, and a mutual SCC); SCC placement in the index space (mutual f, g whose member hashes order opposite to their names); empty data lines (`NAME SP LF` accepted, two spaces rejected); canonical `INT`/`FLOAT` at every literal site; const literal ranges; the region call graph with lifted calls and `qinplace`; `call` operand spelling; param role suffixes; interface-region names; local regions as call operands; the widened `in`-wire uses of §5.1; LIFO matched uncalls and an unmatched uncall rejected; the static view rule of §3.3 (a view passed through `br`, used twice, or left unconsumed is rejected); lifted-call `args` that are locations rejected; lproc header groups and `token`/`classical` suffixes (a suffix in the wrong group rejected), exact argument counts/types/region roles, missing nonempty lists and location-as-token/classical rejected, forwarding `iN ptr f64 token` without bit conversion, empty-list short form, fixed-binding closure and instance ordering (§3.7), lproc signatures including empty arrays and changed interface/closure hashes; `qreg[*]` typing, the `measure.iN` form and width checks; `budget.mint` rejected in regions; CC/R block terminators; `qinplace` signature compatibility, its short form exactly when the three lists are empty, and its §6.1 transfer (cleaning a value that depends on x after changing an `ins` wire is rejected); CC/R `fault` literal range; linking; frame-descriptor live ranges |
++| G | Launch | every §10 entry point, state transition, binding rule, ownership rule; HOST_REQUEST/reply (a reply whose length does not fit `ptr_width` bits is `E_ARG`); reverse eligibility and tree order; `QREG` bound to `qreg[*]`; `FAILED → REVERSED` (example 8) and `E_NOT_REVERSIBLE` after a `measure` or an unverified free; exactly one fault record per `FAILED` run; an R `fault C` returns `OK` from `bennett_wait` with a result and no request, zero values and the exact nonzero 64-bit C (including 2^64 − 1) from `bennett_result_fault(result, 0)`; a device-minted token used after its run is CLOSED is `E_ARG` |
 +| H | Scheduler | §6 validity; capacity; reproducibility; specificity resolution; verbatim execution; INFEASIBLE/UNSUPPORTED; invocation contexts covering default-only invocations (an action calling one region twice, one call scheduled explicitly: a claim with one witness rejects, two passing witnesses accept); a device-minted tuple binds the schedule (a schedule bound to B = 3 is not applied to an invocation minted with B = 2, which runs under the defaults) |
  
  ## 16. Canonical textual form (normative)
  
-@@ -1458,7 +1938,17 @@
+@@ -1458,7 +2537,17 @@
  `INT := -?(0|[1-9][0-9]*)`; `FLOAT :=` shortest round-trip decimal with
  `.` or exponent, finite; `STRING := "…"` with escapes `\"`, `\\`, `\n`;
  `HEX := ([0-9a-f]{2})*`. Metadata lines are RFC 8785 canonical JSON
@@ -1265,28 +2024,42 @@
  
  ### 16.2 Grammar
  
-@@ -1475,7 +1965,7 @@
-                -- oracle: (in..) (tgt) (fault) (mem..) (args..) ; action: (mut..) (in..) (mem..) (args..) () ; lproc: (params..) (result) () () () ; fn: (params..) (results..) () () ()
+@@ -1472,10 +2561,10 @@
+   dataline  := NAME SP HEX NL
+   function  := fhead NL regs? block+
+   fhead     := ("fn" SP ("cc"|"r") | "oracle" | "action" | "perm_action" | "lproc") SP "@" NAME SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")"
+-               -- oracle: (in..) (tgt) (fault) (mem..) (args..) ; action: (mut..) (in..) (mem..) (args..) () ; lproc: (params..) (result) () () () ; fn: (params..) (results..) () () ()
++               -- oracle: (in..) (tgt) (fault) (mem..) (args..) ; action: (mut..) (in..) (mem..) (args..) () ; lproc: (params..) (result) (tokens..) (classical..) (mem..) ; fn: (params..) (results..) () () ()
    plist     := (param ("," SP param)*)?
-   param     := NAME ":" type (SP ("in"|"mut"))?
+-  param     := NAME ":" type (SP ("in"|"mut"))?
 -  type      := "i" INT | "ptr" | "f64" | "token" | "wire" | "wire[" INT "]" | "reg[" INT "]" | "region[" INT "," INT "]" | "qreg[" INT "]"
++  param     := NAME ":" type (SP ("in"|"mut"|"token"|"classical"))?
 +  type      := "i" INT | "ptr" | "f64" | "token" | "wire" | "wire[" INT "]" | "reg[" INT "]" | "region[" INT "," INT "]" | "qreg[" (INT | "*") "]"
    regs      := "regs" SP "{" SP (NAME ":" type ("," SP NAME ":" type)*)? SP "}" (SP "bounds" SP "{" INT ("," SP INT)* "}")? NL
    block     := "^" NAME "(" plist "):" NL instr+
    instr     := (lhs SP "=" SP)? OPCODE (SP operand)* (SP "{" NL instr+ "}" (SP "{" NL instr+ "}")?)? NL
-@@ -1485,16 +1975,23 @@
+@@ -1485,16 +2574,32 @@
    VER       := INT "." INT
  ```
  
 -### 16.3 Example objects (normative test vectors, suite C and F)
++Lproc groups have the types and roles of §3.7. A `token` suffix is
++permitted only in the third group and a `classical` suffix only in the
++fourth, each agreeing with that group's role; either suffix may be
++omitted. The first and second groups carry no suffix, and the fifth
++requires `in`. The `token` and `classical` suffixes are not permitted on
++other kinds of function or on block parameters or `regs` entries. The additional
++`lift.call` lists use the existing list operand grammar (§3.7).
++
 +### 16.3 Example objects (normative test vectors, suites A, C, F and G)
 +
 +**Hashes.** Every hash in this section is written `<to be computed by
 +the 0.9 precheck: example k, name>`, one distinct placeholder per
 +example and symbol: the 0.9 precheck (`spec/README.md`) computes and
 +patches them before the draft is graded. Examples 1 and 2 are the 0.8
-+objects with the version string changed; their 0.8 hashes remain the
-+0.8 vectors.
++objects with the version string changed and, for example 2's lproc,
++the three empty signature arrays required by Q14; their 0.8 hashes
++remain the 0.8 vectors.
  
  **Example 1** (`inc8`): one oracle, no lprocs, no memory. The function
  has **six** canonical lines.
@@ -1301,7 +2074,7 @@
  
  section functions
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
-@@ -1509,9 +2006,9 @@
+@@ -1509,9 +2614,9 @@
  empty and its envelope is exactly these bytes (each line LF-terminated):
  
  ```
@@ -1313,7 +2086,7 @@
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
  regs { one:reg[8], r:reg[8] }
  ^entry():
-@@ -1521,17 +2018,19 @@
+@@ -1521,17 +2626,19 @@
  ```
  
  With B ≥ 3 every x yields `(x + 1 mod 256, 0)` (`result_val` = 0 ⊕ r);
@@ -1332,11 +2105,11 @@
  
  section symbols
 -{"0":{"interface_hash":"68225d213c44812fe844cd295d8821127c3cf31682be4eb19303cb53f9b147f7","kind":"oracle","name":"sum_db","signature":{"abi":"0.8","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[{"A":4,"W":8,"role":"in"}],"tgt":8,"tier":"q"}},"1":{"interface_hash":"74f110bbafde68a4785025e7e571ef871ddd83a09465ab9c1604f653a0cfcd92","kind":"lproc","name":"sum","signature":{"abi":"0.8","kind":"lproc","params":[8,8,32],"result":8,"tier":"q"}},"2":{"interface_hash":"7002ed5ea010907a0ae99065663f22fb7d18ca1d6cb171fed57e2594bd9367e6","kind":"data","name":"zero","signature":{"abi":"0.8","kind":"data","size":1,"tier":"-"}}}
-+{"0":{"interface_hash":"<to be computed by the 0.9 precheck: example 2, sum_db>","kind":"oracle","name":"sum_db","signature":{"abi":"0.9","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[{"A":4,"W":8,"role":"in"}],"tgt":8,"tier":"q"}},"1":{"interface_hash":"<to be computed by the 0.9 precheck: example 2, sum>","kind":"lproc","name":"sum","signature":{"abi":"0.9","kind":"lproc","params":[8,8,32],"result":8,"tier":"q"}},"2":{"interface_hash":"<to be computed by the 0.9 precheck: example 2, zero>","kind":"data","name":"zero","signature":{"abi":"0.9","kind":"data","size":1,"tier":"-"}}}
++{"0":{"interface_hash":"<to be computed by the 0.9 precheck: example 2, sum_db>","kind":"oracle","name":"sum_db","signature":{"abi":"0.9","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[{"A":4,"W":8,"role":"in"}],"tgt":8,"tier":"q"}},"1":{"interface_hash":"<to be computed by the 0.9 precheck: example 2, sum>","kind":"lproc","name":"sum","signature":{"abi":"0.9","args":[],"kind":"lproc","mem":[],"params":[8,8,32],"result":8,"tier":"q","tokens":[]}},"2":{"interface_hash":"<to be computed by the 0.9 precheck: example 2, zero>","kind":"data","name":"zero","signature":{"abi":"0.9","kind":"data","size":1,"tier":"-"}}}
  
  section functions
  oracle @sum_db (n:wire[8] in) (t:wire[8]) (f:wire[4]) (db:region[4,8] in) ()
-@@ -1586,17 +2085,18 @@
+@@ -1586,17 +2693,18 @@
  SCC (its self-reference is written `@$0`, its `@zero` reference is
  replaced by `@` + the `zero` hash, which is its only part-(6) line; its
  closure set is the `zero` global's leaf and image), so its envelope is
@@ -1350,7 +2123,7 @@
 +isa=0.9
  ptr_width=32
 -{"abi":"0.8","kind":"lproc","params":[8,8,32],"result":8,"tier":"q"}
-+{"abi":"0.9","kind":"lproc","params":[8,8,32],"result":8,"tier":"q"}
++{"abi":"0.9","args":[],"kind":"lproc","mem":[],"params":[8,8,32],"result":8,"tier":"q","tokens":[]}
  lproc @sum (n:reg[8], acc:reg[8], base:reg[32]) (r:reg[8]) () () ()
  regs { zp:reg[32], zv:reg[8], z:reg[1], one:reg[8], n2:reg[8], idx:reg[32], p:reg[32], v:reg[8], acc2:reg[8] }
  ^entry():
@@ -1359,7 +2132,7 @@
  lift.boundscheck zp 1
  zv = lift.load.i8 zp
  z = lift.icmp.eq n zv
-@@ -1615,7 +2115,7 @@
+@@ -1615,7 +2723,7 @@
  lift.ret acc
  data zero 00
  layout globals.zero {"base":16,"image":"zero","size":1}
@@ -1368,7 +2141,7 @@
  ```
  
  `@sum_db`'s envelope includes every layout leaf, the `zero` image, `@` +
-@@ -1623,11 +2123,309 @@
+@@ -1623,11 +2731,377 @@
  line (`@db` is an interface region, not a symbol):
  
  ```
@@ -1385,7 +2158,7 @@
 +**Example 3** (`borrow_demo`): a permutation action with a loop bound
 +and a borrow frame established by the translation lemma (§5.6).
 +
-+```
+ ```
 +bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
 +
 +section symbols
@@ -1526,7 +2299,7 @@
 +**Example 6** (`adaptive`, BLK-2): a budget minted on the device from a
 +run-time value.
 +
- ```
++```
 +bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
 +
 +section symbols
@@ -1679,10 +2452,78 @@
 +`FAULT_UB_TRAP`); under 0.8, x = 1 yielded (0, 0) for every B ≥ 1,
 +indistinguishable from success. A run of `@zero_cc` is `FAILED` with one
 +record `FAULT_UB_TRAP`.
++
++**Example 10** (`through`, lproc token/classical parameters): the
++oracle forwards its entry token, an `i2` argument and a mapped byte
++region to an lproc. The lproc makes both a parametrised oracle call and
++a parametrised permutation-action call, passing its token as `tk` and
++also as a token-typed `args` operand. All token uses preserve identity.
++
++```
++bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
++
++section symbols
++{"0":{"interface_hash":"<to be computed by the 0.9 precheck: example 10, through>","kind":"oracle","name":"through","signature":{"abi":"0.9","args":["token","i2"],"fault":4,"in":[2],"kind":"oracle","mem":[{"A":0,"W":8,"role":"in"}],"tgt":2,"tier":"q"}},"1":{"interface_hash":"<to be computed by the 0.9 precheck: example 10, worker>","kind":"lproc","name":"worker","signature":{"abi":"0.9","args":["i2"],"kind":"lproc","mem":[{"A":0,"W":8,"role":"in"}],"params":[2],"result":2,"tier":"q","tokens":["token"]}},"2":{"interface_hash":"<to be computed by the 0.9 precheck: example 10, plus_db>","kind":"oracle","name":"plus_db","signature":{"abi":"0.9","args":["i2"],"fault":4,"in":[2],"kind":"oracle","mem":[{"A":0,"W":8,"role":"in"}],"tgt":2,"tier":"q"}},"3":{"interface_hash":"<to be computed by the 0.9 precheck: example 10, flip_arg>","kind":"perm_action","name":"flip_arg","signature":{"abi":"0.9","args":["token","i2"],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[2],"tier":"q"}}}
++
++section functions
++oracle @through (x:wire[2] in) (t:wire[2]) (f:wire[4]) (db:region[0,8] in) (tk:token, a:i2)
++regs { r:reg[2] }
++^entry():
++r = lift.call @worker (x) (tk) (a) (db)
++lift.retval r
++lproc @worker (x:reg[2]) (r:reg[2]) (tk:token token) (a:i2 classical) (db:region[0,8] in)
++regs { fr:reg[4], zero:reg[4], bad:reg[1] }
++^entry():
++lift.oracle_call @plus_db tk (x) r fr (db) (a)
++zero = lift.const.i4 0
++bad = lift.icmp.ne fr zero
++lift.faultif bad 9
++lift.perm_call @flip_arg (r) () () (tk, a)
++lift.ret r
++oracle @plus_db (x:wire[2] in) (t:wire[2]) (f:wire[4]) (db:region[0,8] in) (a:i2)
++regs { base:reg[32], byte:reg[8], low:reg[2], r:reg[2] }
++^entry():
++base = lift.addr @db
++byte = lift.load.i8 base
++low = lift.trunc.i2 byte
++r = lift.add x a
++r = lift.add r low
++lift.retval r
++perm_action @flip_arg (x:wire[2]) () () (tk:token, a:i2) ()
++^entry():
++x x[0]
++
++section layout
++{"A_tab":2,"H":6,"S_cells":4,"globals":{},"heap_base":32,"heap_limit_max":32,"interface_regions":{"plus_db":{"db":{"base":17}},"through":{"db":{"base":16}}},"null_size":16,"ptr_width":32}
++```
++
++The outer invocation's B is independent of `tk`'s tuple. The sole
++`@worker` binding key is `[0,1,0]` (oracle argument positions 0 and 1,
++region position 0). It has five locations (`x r fr zero bad`), so
++R_worker = 8 cells; forwarding the three additional parameters adds no
++cells. The two outer rows precede its six rows: indices 0, 1 and 2..7,
++HALT = 8, P = 4. `@plus_db` has six rows and no lproc calls. The byte
++region maps at 16 in the outer oracle and 17 in the nested oracle;
++both mappings refer to the same passed cells, with no byte copy.
++
++For every x, a ∈ [0,4) and byte d ∈ [0,256), an outer tuple
++(B ≥ 8, 0, stack_limit ≥ 8, depth_limit ≥ 1) and `tk` tuple (6,0,0,0)
++give F_B(x,d) = (((x + a + (d mod 4)) mod 4) XOR 1, 0).
++For arbitrary initial target t and fault f, the final values are
++(t XOR payload, f); x and d are unchanged and all workspace is clean.
++This permutation extends by linearity to superpositions and an
++entangled reference. With outer B = 7 the success path has not executed
++`lift.retval`, so the outcome is (0, `FAULT_BUDGET_STEPS`); with outer
++stack_limit = 7 or depth_limit = 0 the first row gives
++(0, `FAULT_BUDGET_DEPTH`). With `tk` tuple (5,0,0,0), the nested oracle
++returns fault 1; the lproc's `lift.faultif` propagates code 9 at outer
++step 5, so B ≥ 5 gives (0, `FAULT_CALLEE`). The nested fault, stack
++history, parameters and locations are cleared by prefix reversal; no
++additional charge arises from forwarding, commit or reversal.
  
  ## 17. Decisions deferred to implementation, with defaults
  
-@@ -1653,7 +2451,11 @@
+@@ -1653,7 +3127,11 @@
     (ripple-carry adders and comparators, linear `inrange` scans,
     one-hot address dispatch, clean scratch released in reverse order);
     a schedule that names no `expansion` binds `ref` at the ISA's own
@@ -1695,7 +2536,7 @@
  8. **Enclosure procedure for transcendental entries** (§12.1). Default:
     Taylor series of sin and cos to the first term whose Lagrange
     remainder bound is below 2^−(`precision_bits` + 2), argument reduced
-@@ -1669,7 +2471,62 @@
+@@ -1669,7 +3147,62 @@
  13. **Suite sizes** (§15): the exhaustive widths of suite C and the
      sample counts of `sampled` claims. Default: exhaustive for ≤ 16
      interface bits; 2^16 samples above.

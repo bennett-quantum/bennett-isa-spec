@@ -123,7 +123,7 @@ north star §3.1 requires).
 | K9 | §8.1 | **EPS-DECADE**: exact zero-based decimal accuracy bucket, domain and exact-entry prohibition; boundary witness | bennett-vm-cxg; b-isa-spec-f31 | S | – |
 | K10 | §7.3 | **BLOCK-IMAGE**: contiguous complete 512-byte sectors, byte order, partial-image rejection at device initialisation; witness | bennett-vm-47i; b-isa-spec-0d0 | S | – |
 | K11 | §11.1, §17 item 7 | **ISA-REF-LIB (from bennett-vm-47t): maintainer decision required**. Proposed serialization, envelope hash, ordinals, scratch/removable rules and decomposition set; witness only, publication gated on accepted 0.9 | bennett-vm-47t; b-isa-spec-8r4 (open) | S | new |
-| K12 | §10, §10.1, §12.3 | **LAUNCH-ESTIMATE: maintainer decision required**. Resolved parameters, class-preserving resource keys, upward decimal encoding and exact certificate binding; witness | bennett-vm-hsd; b-isa-spec-c15 (open) | S | – |
+| K12 | §10, §10.1, §12.3 | **LAUNCH-ESTIMATE (ratified A2)**. Resolved parameters, class-preserving resource keys, upward decimal encoding and exact certificate binding; witness | bennett-vm-hsd; b-isa-spec-c15 (open) | S | – |
 | K13 | §9.2, §12.1–§12.3 | **CLAIM-REPLAY: maintainer decision required**. Sampled expected relation, standalone invocation binding, canonical parameter and full-table tuple encoding; witness; sampling stays evidence | bennett-vm-clw; b-isa-spec-9uy (open) | S | – |
 
 **Applied Q14 (2026-10-29, b-isa-spec-7u6).** Lprocs take explicit
@@ -1836,7 +1836,7 @@ const uint8_t* bennett_request_payload(const bennett_request_t*, size_t* len);  
 bennett_status bennett_tape_open(bennett_program_t*, bennett_run_id, bennett_tape_iter_t** out);
 bennett_status bennett_tape_next(bennett_tape_iter_t*, const char** dev, const char** op, const uint8_t** args, size_t* alen);
 void           bennett_tape_free(bennett_tape_iter_t*);
-/* K12 proposal: resolved classical parameter values, not live register ids. */
+/* K12: resolved classical parameter values, not live register ids. */
 bennett_status bennett_estimate_run(bennett_program_t*, const char* region, bennett_token,
                                     const char* variant, uint32_t inherited_controls,
                                     const uint8_t* params_jcs, size_t params_len, bennett_estimate_t** out);
@@ -1847,17 +1847,15 @@ bennett_status bennett_coverage_get(bennett_program_t*, bennett_coverage_t** out
 const uint8_t* bennett_coverage_jcs(const bennett_coverage_t*, size_t* len);   void bennett_coverage_free(bennett_coverage_t*);
 ```
 
-### 10.1 Proposed launch-estimate contract (K12)
+### 10.1 Launch-estimate contract (K12)
 
-**LAUNCH-ESTIMATE (from bennett-vm-hsd): maintainer decision required**
-(b-isa-spec-c15). This is proposed 0.9 text, not an interpretation of
-0.8's argument-free request. The API and decimal policy alternatives
-are recorded in `isa-0.9.PROGRESS.md`; neither removes parametrised
-estimates, padded oracle estimates or any target resource.
+**LAUNCH-ESTIMATE** (K12; b-isa-spec-c15, from bennett-vm-hsd).
+The 0.9 request carries the complete resolved parameter vector.
 
-**Resolved request (proposal).** `bennett_estimate_run` MUST copy and
+**Resolved request.** `bennett_estimate_run` MUST copy and
 validate `params_jcs`, the JCS array of **all** classical arguments in
-signature order, encoded as §12.3 specifies. The separately supplied
+signature order, encoded as §12.3 specifies; `params_len` is its UTF-8
+byte length, excluding any NUL terminator. The separately supplied
 valid token of that program fixes `[B,heap,stack,depth]`; token-typed
 arguments fix their own tuples, never the outer tuple by default.
 Host- and live device-minted tokens are both admitted (§5.4); the
@@ -1884,7 +1882,7 @@ estimate of that request. A consumer lacking the selected expansion
 library reports `E_SCHEDULE_INFEASIBLE` as §11 requires (b-isa-spec-8r4);
 this postpones mechanics, not the estimate capability.
 
-**Resource rows (proposal).** `estimate_nresources` counts scalar rows,
+**Resource rows.** `estimate_nresources` counts scalar rows,
 not target resource declarations. A `count` or `time` resource has one
 row named by its escaped resource name. Each `occupancy` or `peak`
 resource has one row **for every target class**, including unused classes with value
@@ -1896,7 +1894,7 @@ by increasing bytewise encoded name. Thus names are injective even when
 target names contain delimiters; `name` and `value_decimal` remain
 ordinary NUL-terminated strings with §10's ownership lifetime.
 
-**Decimal values (proposal).** Aggregation is exact rational arithmetic;
+**Decimal values.** Aggregation is exact rational arithmetic;
 rounding occurs only at the accessor boundary. `value_decimal` is the
 least nonnegative decimal with at most **34 significant digits** that
 is ≥ the exact resource value. For q > 0 let e be the unique integer
@@ -1909,7 +1907,7 @@ unchanged. This is an upper enclosure, not a fabricated exact value for
 1/3; capacity, matching, objective comparison and certificate checking
 MUST use the exact rationals, never the rounded display.
 
-**Certificate binding (proposal).** The estimate's certificate MUST bind
+**Certificate binding.** The estimate's certificate MUST bind
 object, interface, closure, target and effective schedule hashes, root
 variant/controls, accuracy, expansion identity and the resolved
 `bindings.invocation` (§12.3). Even a default-only realisation has an

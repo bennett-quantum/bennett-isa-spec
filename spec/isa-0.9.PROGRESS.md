@@ -663,3 +663,24 @@ Remaining lproc mechanics: none deferred by Q14. Implementation and the 0.9 prec
 conformance for example 10 and hash patching) remain pending under the draft's existing gate; this task does
 not change the read-only reference interpreter. General §17 defaults (notably the unpublished `ref` expansion
 bytes and optional checkpointed realisations) continue to apply to lproc rows as to other lifted rows.
+
+## Ratified decisions applied — 2026-10-30
+
+Binding source: the complete maintainer decision memo, Ratification section,
+2026-10-30; execution brief: docs/briefs/2026-10-30-isa-09-ratified-edits.md.
+This section supersedes the historical proposal/open-choice language above.
+Bead b-isa-spec-2c9 tracks this sole-editor text pass. No accepted 0.8 or
+interpreter files are edited; the orchestrator owns worklog updates.
+Baseline: 25 Rust tests green; full 0.8 harness 445 pass / 0 fail /
+48 unavailable (493 cases), exit 2.
+
+| Memo item | Section edited | Conformance witness | Status | Commit |
+|---|---|---|---|---|
+| A2 / LAUNCH-ESTIMATE | §10, §10.1, §12.3 (K12) | G-estimate-resolved-class-decimal (retained) | Applied, pending accepted 0.9 | commit containing this row |
+
+Step 1: explicit signature, complete args, escaped flat class keys, exact
+reduced rationals and 34-significant-digit upward enclosure are normative.
+Existing Fraction/Decimal witness checks independently reproduce every row.
+Rejected alternatives (retained historically above): separate bound-request
+entry, class-aware accessor, selectable precision/rounding. No alternative
+remains in §10.1. No new numerical example was needed.
