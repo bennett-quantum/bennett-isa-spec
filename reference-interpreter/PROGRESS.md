@@ -49,7 +49,14 @@ Fresh normal suite: **274 passed / 0 failed / 5 ignored** (270 integration,
 4 unit, 0 doctests; 29.53 s summed runner time under concurrent sweeps).
 All-target strict Clippy and fmt --check pass (0 tests executed), as does the
 unchanged Python seed (2 example objects, 2 printed envelopes).
-Affected ignored sweeps are running; their fresh counts follow separately.
+Fresh affected ignored sweeps so far: 17-wire execution **1 passed / 0 failed**,
+131,072 entries, 138.73 s; checked certificate **1 passed / 0 failed**,
+262,144 domain elements, subject and expected program, 357.91 s. The 200,000
+program discipline sweep remains running; its observed acceptance counts must
+be recorded before handoff. Standalone conformance: **445 pass / 0 fail /
+48 unavailable / 493**, exit 2. Its current read-only checkout adds two explicit
+unavailable contract-gap cases since the review's 491-case snapshot; no
+unavailable case is counted as passed. No new ISA reading was needed.
 
 ## Council round 5, codex/muse second pass (2026-10-30)
 

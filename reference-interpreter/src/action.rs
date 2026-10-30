@@ -934,9 +934,6 @@ fn gather_regions<'a>(seq: &'a [Instruction], out: &mut Vec<&'a Instruction>) {
         }
     }
 }
-/// Source-order lifetime resolution. A release records the width of its
-/// matching producer, so inverse traversal never consults a later definition
-/// with the same spelling. Instruction line identities survive body cloning.
 /// A structured execution plan, indexed by sequence position and dynamic
 /// loop entry, never by static source line. Width environments are finite
 /// deterministic maps: repeated entries share a cycle, with no trip-count cap.
