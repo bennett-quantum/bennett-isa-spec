@@ -219,3 +219,33 @@ assert result.returncode == 0, result.stderr
 measurements = json.loads(result.stdout)["measurements"]
 assert [m["bits"] for m in measurements] == bits
 assert [int(m["value"]) for m in measurements] == values
+
+# Recompute both 0.8 CLI witness envelopes without implementation imports.
+source = (draw_dir / "two-measures.bisa").read_text()
+symbols = json.loads(source.split("section symbols\n")[1].split("\n")[0])
+functions = source.split("section functions\n")[1].rstrip("\n")
+prep, main = functions.split("\nfn cc @twice", 1)
+main = "fn cc @twice" + main
+jcs = lambda obj: json.dumps(obj, sort_keys=True, separators=(",", ":"))
+prep_envelope = "isa=0.8\nptr_width=32\n" + jcs(symbols["0"]["signature"]) + "\n" + prep + "\n"
+prep_hash = hashlib.sha256(prep_envelope.encode()).hexdigest()
+assert prep_hash == symbols["0"]["interface_hash"]
+main_envelope = "isa=0.8\nptr_width=32\n" + jcs(symbols["1"]["signature"]) + "\n" + main.replace("@prepare", "@" + prep_hash) + "\n" + prep_hash + "\n"
+assert hashlib.sha256(main_envelope.encode()).hexdigest() == symbols["1"]["interface_hash"]
+
+# The ordered ratification inventory is closed, and the diff is byte-exact.
+import re
+assert "maintainer decision required" not in draft
+assert not re.search(r"(?i)\bpropos(?:al|ed|es)\b", draft)
+for k in range(9, 19):
+    assert len(re.findall(rf"^\| K{k} \|", draft, re.M)) == 1
+assert "target 0.9 has no topology field" not in draft
+assert "regions.<closure_hash>.invocation" not in draft
+assert "spec/ref-0.9-draft.json" in draft
+for name, bead in [("E-ref-09-qxor-witness", "b-isa-spec-8r4"), ("E-topology-grid-09", "b-isa-spec-wr7"), ("C-multiblock-09", "b-isa-spec-2c9"), ("F-frame-records-09", "b-isa-spec-2c9"), ("A-measure-draw-order-09", "b-isa-spec-bas"), ("F-ratified-confirmations-09", "b-isa-spec-2c9")]:
+    case = json.loads((root / "conformance/cases" / name[0] / name / "case.json").read_text())
+    assert "unavailable pending 0.9" in case["unavailable"]["reason"]
+    assert bead in case["unavailable"]["reason"]
+result = subprocess.run(["diff", "-u", str(accepted), str(root / "spec/Bennett-ISA-Spec-0.9-draft.md")], capture_output=True)
+assert result.returncode == 1
+assert result.stdout == (root / "spec/isa-0.8-to-0.9.diff").read_bytes()

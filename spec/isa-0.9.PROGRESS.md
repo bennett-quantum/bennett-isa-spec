@@ -674,9 +674,18 @@ interpreter files are edited; the orchestrator owns worklog updates.
 Baseline: 25 Rust tests green; full 0.8 harness 445 pass / 0 fail /
 48 unavailable (493 cases), exit 2.
 
+
 | Memo item | Section edited | Conformance witness | Status | Commit |
 |---|---|---|---|---|
 | A2 / LAUNCH-ESTIMATE | §10, §10.1, §12.3 (K12) | G-estimate-resolved-class-decimal (retained) | Applied, pending accepted 0.9 | `2e3ecd2ca4d96008bedfd429fbbf2a30c8e2f8f9` |
+| A3 / CLAIM-REPLAY | §9.2, §12.1–§12.3 (K13) | D-sampled-relation-invocation; CLAIM-BINDING (retained) | Applied, pending accepted 0.9 | `0e72b63adaa5ee5f446706f0ef628f1165d4e57a` |
+| A1 / ISA-REF-LIB; B6 | §11.1, §17 item 7 (K11) | E-ref-09-qxor-witness; retained qxor envelope | Applied, pending accepted 0.9 | `d9922bffe31b4aa4268c59b396a1a63eb969ffb0` |
+| A6 / topology | §8.2–§8.3, §11, §17 item 15 (K14/D1) | E-topology-grid-09 | Applied, pending accepted 0.9 | `679eae0b8b64dadc1b7c3105b07635058a868d85` |
+| B1 / multi-block actions | §5.3 (K15) | C-multiblock-09 | Applied, pending accepted 0.9 | `23013a54b90594ba9f6acb6a951cafeee76abc09` |
+| B5 / typed frame records | §9.1, §9.4, §12.3 (K16) | F-frame-records-09 | Applied, pending accepted 0.9 | `a300222603d9ca1c0ec303a3122ad896792f2db0` |
+| A5 / draw ordering | §4.1 (K17) | A-measure-draw-order-09 | Applied, pending accepted 0.9 | `ed044ecb6017ecd41fb98b4f8d3271eac7c40945` |
+| A4 / Q14; A5 / EPS-DECADE, BLOCK-IMAGE, ISA-7, Q1–Q13 | §0 (K9/K10/K5/K18), Q14 confirmation | F-ratified-confirmations-09; retained §16.3 examples and boundary/sector witnesses | Applied, pending accepted 0.9 | `78dd9df95ffd29abfdaa97e3c9a62185cef3811f` |
+| §0 / §17 audit | §0 change list, §17 defaults; all edited clauses | All retained and added draft cases | Applied, pending accepted 0.9 | commit containing this row |
 
 Step 1: explicit signature, complete args, escaped flat class keys, exact
 reduced rationals and 34-significant-digit upward enclosure are normative.
@@ -684,7 +693,6 @@ Existing Fraction/Decimal witness checks independently reproduce every row.
 Rejected alternatives (retained historically above): separate bound-request
 entry, class-aware accessor, selectable precision/rounding. No alternative
 remains in §10.1. No new numerical example was needed.
-| A3 / CLAIM-REPLAY | §9.2, §12.1–§12.3 (K13) | D-sampled-relation-invocation; CLAIM-BINDING (retained) | Applied, pending accepted 0.9 | `0e72b63adaa5ee5f446706f0ef628f1165d4e57a` |
 
 Step 2: expected is mandatory, standalone invocations are per claim,
 scheduled roots use bindings.invocation, and complete positional tuple
@@ -695,7 +703,6 @@ XOR outcomes, coverage, wide args, signed zero and canonical args hashes.
 Rejected: omitted expected defaulting to oracle; shared invocation registry
 or region-level inheritance; named or sample-only keyed tables. The
 region-inheritance parenthesis was removed to match ratification literally.
-| A1 / ISA-REF-LIB; B6 | §11.1, §17 item 7 (K11) | E-ref-09-qxor-witness; retained qxor envelope | Applied, pending accepted 0.9 | `05675d1dc80763cc2cc7d217f3129f5658ecdb07` |
 
 Step 3: schema, envelope hash, ordinals, scratch identity, empty removable
 sets and the complete deterministic decomposition families are decided.
@@ -709,7 +716,6 @@ realisation gate remains a delivery dependency, not an undecided contract.
 Gate note: raw unified diffs contain space-only context lines by design;
 git diff --check covers source/progress/conformance, and the diff artifact
 is verified by regeneration rather than stripping its context bytes.
-| A6 / topology | §8.2–§8.3, §11, §17 item 15 (K14/D1) | E-topology-grid-09 | Applied, pending accepted 0.9 | `679eae0b8b64dadc1b7c3105b07635058a868d85` |
 
 Step 4: optional vertices/edges with addressable classes, pairwise native
 adjacency and concrete schedule placement. The memo does not enumerate
@@ -722,7 +728,6 @@ computation reachable while automatic routing/cost rules wait for 0.10.
 Rejected: omitting topology entirely, or deferring its presence/meaning.
 Python -I JCS/hash and an independent Rust grid/byte/hash test check the
 new witness. Canonical bytes have no trailing LF (b-isa-spec-1pl).
-| B1 / multi-block actions | §5.3 (K15) | C-multiblock-09 | Applied, pending accepted 0.9 | `23013a54b90594ba9f6acb6a951cafeee76abc09` |
 
 Step 5: the ratified sentence is applied. Read reference README and all
 SPEC-QUESTIONS (no separate multi-block entry); action.rs flattens blocks
@@ -733,7 +738,6 @@ Rejected: interpreting action labels as executable CFG branch/join nodes.
 The fixture's 0.8 interface hash is computed from its complete envelope
 (body included), independently of the CLI; no 0.9 example hash is added.
 The separate staged case is unavailable pending 0.9.
-| B5 / typed frame records | §9.1, §9.4, §12.3 (K16) | F-frame-records-09 | Applied, pending accepted 0.9 | `a300222603d9ca1c0ec303a3122ad896792f2db0` |
 
 Step 6: published typed records with explicit slot/frame identities,
 class/state/width rules, c-only expressions and disjoint shared lifetimes.
@@ -745,7 +749,6 @@ Rejected: the previous interface/class-map/scheme_ancillae/retained_history
 encoding, and per-class expression maps with role annotations.
 SPEC-QUESTIONS 11's frame-encoding question is closed for 0.9; its 0.8
 reading remains unchanged in the interpreter-owned file.
-| A5 / draw ordering | §4.1 (K17) | A-measure-draw-order-09 | Applied, pending accepted 0.9 | `ed044ecb6017ecd41fb98b4f8d3271eac7c40945` |
 
 Step 7: FIFO dynamic measurement consumption, wire-first lexicographic
 outcomes and strict cumulative threshold match README, --draws handling,
@@ -755,7 +758,6 @@ and independent Rust integer arithmetic verify both ordering distinctions.
 The fixture hashes use complete independent 0.8 envelopes; 0.9 example
 hashes remain placeholders. SPEC-QUESTIONS 29 is closed for 0.9.
 Rejected: reverse draw consumption and integer-order CDF enumeration.
-| A4 / Q14; A5 / EPS-DECADE, BLOCK-IMAGE, ISA-7, Q1–Q13 | §0 (K9/K10/K5/K18), Q14 confirmation | F-ratified-confirmations-09; retained §16.3 examples and boundary/sector witnesses | Applied, pending accepted 0.9 | commit containing this row |
 
 Step 8: all confirmations marked decided. Existing operative sentences
 already match ratification and stay unchanged; no new numerical values
@@ -765,3 +767,45 @@ instead of explicit token/classical/mapped-region forwarding. Historical
 Q1–Q13 choices remain applied; this pass does not reopen them. The new
 staged case names the confirmation beads; independent existing witness
 checks remain green.
+
+Step 9: consolidated the K9–K18 rows and audited every ratified ISA edit
+and its deferral. §17 item 7 fixes the default library and publication
+dependency; item 15 fixes the routing default and preserves explicit
+swap sequences. All maintainer-decision markers and rejected readings
+are absent from normative text. The pre-existing §5.5 implementation
+choice to retain an already identified matched frame is semantically
+equivalent storage bookkeeping, not an unratified alternative reading.
+
+Ratification scope dispositions: B2 (versioned symbolic histories), B3
+(pending import obligations at linking), B4 (linked-object replay registry)
+are the memo's circuits M2 proof-contract jobs, not additional ISA text
+edits in this brief. Their ratification is preserved here for the circuits
+implementer; no competing ISA encoding or resolver is introduced by this
+text pass. B6 is satisfied by A1's decided identity contract; catalog
+delivery still waits on b-isa-spec-8r4. C is a process/release decision
+for the orchestrator (council round, seats, plugin/driver starts), not an
+ISA semantic clause and not executed by this implementation sub-agent.
+
+SPEC-QUESTIONS closures: 21's comparison/tuple/budget ambiguities are
+closed by K13 (the old flat tuple reading is superseded only for 0.9);
+11's frame format is superseded by K16; 29 closes through K17. This pass
+adds no multi-block question entry, and does not edit SPEC-QUESTIONS.md.
+
+Wording elaborations: removed K13 region-invocation inheritance to honor
+per-claim binding; supplied concrete field names and identity/order rules
+for the topology placements and typed frame schema; made native
+multi-wire adjacency pairwise so higher-arity gates have a determinate
+rule. These fill schema details the ratification leaves implicit. B1
+was applied as the requested single sentence. No reference-interpreter
+disagreement was found for the two behaviors checked (blocks and draws);
+0.9 schema/replay/estimate implementations are not claimed.
+
+Final observed full harness: **445 pass / 0 fail / 54 unavailable
+(499 cases), exit 2**; baseline **445 / 0 / 48 (493 cases)**.
+Six added cases are all unavailable pending 0.9 and name their beads.
+All 28 Rust tests pass headlessly/offline; the three added Rust tests
+independently check grid canonical bytes/hash/adjacency, typed-frame
+bytes/hash/widths/lifetimes, and FIFO/lexicographic CDF ties. Python runs
+with -I and imports no interpreter or VM implementation. Raw diff bytes
+are regenerated immediately before every commit; accepted 0.8 SHA-256
+remains 90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e.

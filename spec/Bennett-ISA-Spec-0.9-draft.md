@@ -125,15 +125,10 @@ north star §3.1 requires).
 | K11 | §11.1, §17 item 7 | **ISA-REF-LIB (ratified A1)**. Decided serialization, envelope hash, ordinals, scratch/removable rules and decomposition set; witness only, publication gated on accepted 0.9 | bennett-vm-47t; b-isa-spec-8r4 (open) | S | new |
 | K12 | §10, §10.1, §12.3 | **LAUNCH-ESTIMATE (ratified A2)**. Resolved parameters, class-preserving resource keys, upward decimal encoding and exact certificate binding; witness | bennett-vm-hsd; b-isa-spec-c15 (open) | S | – |
 | K13 | §9.2, §12.1–§12.3 | **CLAIM-REPLAY (ratified A3)**. Mandatory sampled expected relation, standalone invocation binding, canonical parameter and full-table tuple encoding; witness; sampling stays evidence | bennett-vm-clw; b-isa-spec-9uy (open) | S | – |
-
 | K14 | §8.2–§8.3, §11, §17 item 15 | **Topology (ratified A6)**: optional ordered class vertices and undirected edges; native adjacency, scheme/placement binding; absent all-to-all; routing deferral with explicit-gate construction | b-isa-spec-wr7; b-targets-dd3; circuits b4k | S | – |
-
 | K15 | §5.3 | **Multi-block actions (ratified B1)**: text-order unitary fragments, descriptive labels, cross-block lifetimes | b-isa-spec-2c9; circuits 7bu | E | – |
-
 | K16 | §9.1, §9.4, §12.3 | **Frame JSON (ratified B5)**: identified slots and typed scratch/history/borrow/ancilla records, c-only width expressions, disjoint shared lifetimes | b-isa-spec-2c9; circuits 4fa; SQ 11 | S | – |
-
 | K17 | §4.1 | **Draw ordering (ratified A5)**: FIFO draws; wire-first lexicographic outcomes, strict cumulative threshold; reference CLI witness | b-isa-spec-bas; SQ 29 | S | – |
-
 | K18 | §0, §3.7, §4.2, §4.9, §5.4, §7.3, §8.1 | **Confirmations (ratified A4/A5)**: Q14 explicit forwarding; EPS-DECADE, BLOCK-IMAGE, ISA-7 and Q1–Q13 confirmed as applied | b-isa-spec-7u6; b-isa-spec-f31; b-isa-spec-0d0; b-isa-spec-221; b-isa-spec-2c9 | E | – |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
@@ -154,9 +149,10 @@ classical arguments and mapped regions.
 **Decided confirmations (2026-10-30).** The maintainer ratified EPS-DECADE
 (K9), complete-sector BLOCK-IMAGE (K10), the reference CLI draw ordering
 (K17), ISA-7 `fault C` and its fault-code table (K5), and Q1–Q13 as
-already applied. Q12 keeps the §16.3 draft example hashes as placeholders
-until the 0.9 precheck; independently checked target/frame witness hashes
-are published in §8.3 and §9.4. These are decisions, not open proposals.
+already applied. These decisions are recorded in the maintainer memo,
+Ratification section, 2026-10-30. Q12 keeps the §16.3 draft example
+hashes as placeholders until the 0.9 precheck; independently checked target/frame witness hashes
+are published in §8.3 and §9.4.
 
 ### 0.3 Group 3: optional efficiency semantics (deferred)
 
@@ -1822,10 +1818,9 @@ Widths describe the actual realisation, including history and scheme
 ancillae, and are checked against it. Each `live_ranges` entry names a
 non-slot frame identity and a half-open interval `[start,end)` of its
 invocation's generated leaf order (including step/phase/path expansion,
-§11); `start < end`. Shared storage is legal only for compatible class
-and state records with disjoint live intervals; every use of shared
-storage MUST be listed and intervals of the same frame MUST be pairwise
-disjoint. An omitted list gives no shared-storage permission.
+§11); `start < end`. A shared frame identity retains its recorded class, state and width
+across uses; every use of shared storage MUST be listed and intervals
+of the same frame MUST be pairwise disjoint. An omitted list gives no shared-storage permission.
 
 **FRAME witness**
 
@@ -2153,10 +2148,9 @@ remove only operations the library marks removable.
 ```
 
 **Topology placement.** With a §8.3 topology, `interface_vertices`
-lists one vertex array per root interface slot in §9.4 slot order,
-with inherited control wires first as individual width-one arrays, then
-source interface slots; array elements follow bit order
-(and region cell address then bit order). A callee inherits its actual
+lists inherited control wires first as individual width-one arrays, then
+one vertex array per source interface slot in §9.4 slot order; array
+elements follow bit order (and region cell address then bit order). A callee inherits its actual
 operand placements. `alloc.vertices`, when present, assigns every bit
 of that allocation in bit order. These arrays MUST have the declared
 width, resolve to the correct classes and have disjoint live uses;
@@ -3278,8 +3272,8 @@ the item is revised. Items 1–5 are asserted non-semantic.
    empty removable sets and deterministic decomposition algorithms.
    Serialization as `spec/ref-0.9-draft.json` is a separate job under
    b-isa-spec-8r4; publication in `ref/` follows 0.9 acceptance. The
-   worked controlled-action
-   target/schedule/certificate fixture bound to it (zsw.4), are pending;
+   worked controlled-action target/schedule/certificate fixture bound to
+   it (zsw.4) is pending;
    until then two consumers agree on every order fixed above gate level
    (§11).
 8. **Enclosure procedure for transcendental entries** (§12.1). Default:
