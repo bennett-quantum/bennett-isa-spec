@@ -40,6 +40,53 @@ coverage. Original random seeds/distribution unchanged. Targeted suggestion
 checks: 50 integration tests and 2 new helper unit tests passed, 2 ignored.
 Deliverables 8–11 and all existing unavailable/Unverified disclosures stay staged.
 
+### Final codex/muse second-pass verification
+
+All three codex blockers resolved; none declined or partial. Blocker commits:
+**f108397** (B01, resolved-by d0f7dbb/738b233), **6635e4f** (B03, resolved-by
+e205f93), **88a62ff** (B02 mandatory structural premise in public borrow
+certificate verification). Pure correctness/clarity suggestions: **5be6fcf**.
+See council/response-round-5.md for exact witnesses, RED evidence, pin names,
+§12 claim-semantics quotes and each suggestion's disposition.
+
+After the last Rust edits, rebuilt offline and ran the exact standalone command
+from conformance/PROGRESS.md:
+`cargo run --offline --manifest-path /home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/Cargo.toml -- --bin /home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/target/debug/bennett-isa-ref`.
+Result: **445 pass / 0 fail / 46 unavailable of 491**, exit **2** for existing
+staging. CARGO_TARGET_DIR redirected build artifacts to this crate's ignored
+`.tmp/conformance-target`. Conformance sources are read-only and unavailable
+cases are never counted as passes; deliverables 8–11 remain staged below.
+
+Then ran all required gates with absolute
+`--manifest-path /home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/Cargo.toml`:
+
+| Gate | Result |
+|---|---|
+| `cargo test --offline` | **262 passed / 0 failed / 5 ignored** (258 integration + 4 unit, 0 doctests; 3.71 s summed runner time) |
+| `cargo test --offline -- --ignored --nocapture` | **5 passed / 0 failed**, 353.16 s summed runner time |
+| `cargo clippy --offline --all-targets -- -D warnings` | clean |
+| `cargo fmt -- --check` | clean |
+| unchanged Python `isa_check.py` | passes; diff against 71c1d6e empty |
+| `git diff --check` | clean |
+
+| Ignored sweep | Cases | Runner time |
+|---|---|---|
+| u8 division/remainder | 65,536 pairs × 4 operations = 262,144 executions | 1.75 s |
+| 17-wire borrow execution | 2^17 entries | 10.24 s |
+| checked borrow-frame certificate | 2^18 claim elements, both programs | 60.54 s |
+| extended §6 differential | 200,000 programs: **64,717 accepted, all exactly clean / 135,283 rejected** | 271.54 s |
+| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 9.09 s |
+
+All validation ran with DISPLAY, WAYLAND_DISPLAY, DBUS_SESSION_BUS_ADDRESS and
+BROWSER unset, and
+TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/.tmp.
+Logs: `.tmp/r5-codex-{conformance,tests,ignored,clippy,python}.log`.
+Accepted spec SHA-256:
+`90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e` (unchanged).
+No Rust changes followed these gates. No spec/docs/conformance/include/worklog/
+HANDOFF/CLAUDE or Python-seed edits, no dependencies or RNG changes, no push.
+Bead b-isa-spec-zq2 remains open for the staged whole-ISA deliverables.
+
 ## Council round 5, SOL first pass (2026-10-30)
 
 SOL-R5-B01 resolved after RED on the exact correctly bound certificate witness.

@@ -1,7 +1,7 @@
 # Editor response: council round 5
 
-Input so far: SOL out-sol.json against 5d6d03e. This response remains
-appendable for the pending codex/muse second pass. ISA 0.8, the Python seed,
+Inputs: SOL out-sol.json, codex out-codex.json and muse out-muse.json against
+5d6d03e. The SOL first pass and codex/muse second pass are recorded below. ISA 0.8, the Python seed,
 random seeds and conformance sources are unchanged; owned paths are exclusively
 reference-interpreter/.
 
@@ -278,3 +278,48 @@ No decline, partial or genuine new ambiguity; reading 20 is unchanged.
 
 Targeted suggestion gates: 50 integration tests passed / 0 failed / 2 ignored,
 plus the 2 new helper unit tests passed. Complete final gates follow below.
+
+## Final codex/muse second-pass verification (2026-10-30)
+
+All three codex blockers resolved, no declines or partials. Separate commits:
+**f108397** (B01 exact pins, resolved-by d0f7dbb/738b233), **6635e4f** (B03
+exact pins, resolved-by e205f93), **88a62ff** (B02 public certificate structural
+premise); **5be6fcf** contains the nonblocking correctness/clarity suggestions.
+The exact witnesses were run against HEAD before any additional production
+fix. Muse accepted with zero blockers; its pure correctness/clarity suggestions
+are applied and every other suggestion has an explicit disposition above.
+
+After the last source changes, rebuilt offline and ran the standalone command
+from conformance/PROGRESS.md, with absolute conformance manifest and reference
+binary paths. CARGO_TARGET_DIR kept build artifacts under this crate's ignored
+`.tmp/conformance-target`; conformance sources remained read-only. Result:
+**445 pass / 0 fail / 46 unavailable of 491**, exit **2** for unchanged staged
+deliverables 8–11. No unavailable case is counted as successful conformance.
+
+Then ran all requested Rust gates with absolute `--manifest-path
+/home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/Cargo.toml`:
+
+| Gate | Result |
+|---|---|
+| `cargo test --offline` | **262 passed / 0 failed / 5 ignored**, 258 integration + 4 unit, 0 doctests; 3.71 s summed runner time |
+| `cargo test --offline -- --ignored --nocapture` | **5 passed / 0 failed**, 353.16 s summed runner time |
+| `cargo clippy --offline --all-targets -- -D warnings` | clean |
+| `cargo fmt -- --check` | clean |
+| unchanged Python `isa_check.py` | passes; seed diff against 71c1d6e empty |
+| `git diff --check` | clean |
+
+Ignored sweeps: u8 division 262,144 executions (1.75 s); 17-wire borrow 2^17
+entries (10.24 s); checked 17-wire certificate 2^18 elements, both programs
+(60.54 s); 200,000-program §6 sweep **64,717 accepted, all exactly clean /
+135,283 rejected** (271.54 s); recursive prefix reversal 256 inputs × every
+prefix (9.09 s). Original RNG distribution and Python seed are unchanged.
+
+All validation was headless with DISPLAY, WAYLAND_DISPLAY,
+DBUS_SESSION_BUS_ADDRESS and BROWSER unset, and
+TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/.tmp.
+Logs: `.tmp/r5-codex-{conformance,tests,ignored,clippy,python}.log`.
+Accepted spec SHA-256 remains
+`90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e`.
+No Rust changes followed these final gates. No dependencies, accepted spec,
+docs, conformance, include, worklog, HANDOFF or CLAUDE edits, and no push.
+Bead b-isa-spec-zq2 remains open for the explicitly staged whole-ISA work.
