@@ -134,3 +134,30 @@ isolates verify_certificate on X/CX maps that cancel across two H gates:
 verify_claim sees the region identity, but frame auditing rejects the earlier
 invalid frame before the non-permutation boundary. Valid frames surrounding
 such gates still certify and preserve superposition/entangled references.
+
+## Final verification of this received SOL pass
+
+All four SOL blockers resolved; no declines or partials. Separate blocker
+commits: **d0f7dbb** (B01), **e205f93** (B02), **860ebbd** (B03), **f34ff55**
+(B04), with additional coverage in **6188112** and full-frame/quantum-context
+audit controls in **738b233**. Response stays appendable for codex/muse.
+
+After the final source changes, rebuilt offline and ran the exact standalone
+command from conformance/PROGRESS.md: **445 pass, 0 fail, 46 unavailable / 491**,
+exit **2** for unchanged explicit staging. Then ran the normal suite: **253
+passed, 0 failed, 5 ignored** (251 integration + 2 unit; 4.56 s summed runner
+time), and all ignored sweeps: **5 passed, 0 failed** (268.07 s summed runner
+time). The 200,000-program sweep retains **64,717 accepted, all exactly clean /
+135,283 rejected**. PROGRESS.md records each sweep's case count and timing.
+
+Strict all-target Clippy, formatting, unchanged Python seed and diff checks
+pass. An additional independent CLI replay verifies **72 B02 clean-context
+runs**: bounds 1/2/3/2^40, flat/nested, both t basis entries and a complex
+superposition, forward/adjoint plus equals_entry reversal. Every round-4
+regression remains green. No source changes followed these gates.
+
+All validation used absolute manifest/binary paths, the requested project-local
+TMPDIR and all four display/browser variables unset. Conformance/include are
+read-only; harness artifacts stay under the interpreter's ignored `.tmp`.
+No accepted spec, seed, dependency or random-distribution changes; no pushes.
+Staged/unverified whole-ISA deliverable disclosures remain unchanged.

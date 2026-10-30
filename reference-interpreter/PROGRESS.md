@@ -29,7 +29,7 @@ RED on the exact two-wire sparse observer. A projection marker normalizes
 sparse conditional diagnostics with extended exponents while retaining raw
 exact shadows and caller-supplied input scale. Tiny entangled residuals and
 subsequent Born results pass; quantum/register/CLI targets: 54 pass, 0 fail.
-All four received SOL blockers are resolved; final complete gates follow.
+All four received SOL blockers are resolved; final complete gates are recorded below.
 Additional deterministic coverage: 128 certified/uncertified lifetime and clean
 context cases (64 accept / 64 reject), plus 18 reused/renamed-width positives.
 Direct certificate verification rejects invalid internal returns and frames
@@ -41,6 +41,57 @@ frame boundaries as well as returns. Original random distribution is unchanged.
 Correction to round-4 evidence: the original X/CX rejection pins lacked
 certificate-adorned subjects, and generic-body proof discarded clean entry
 invariants. Round 5 covers these separately; prior counts below are historical.
+
+### Final round-5 SOL verification
+
+Blocker commits: **d0f7dbb** (B01), **e205f93** (B02), **860ebbd** (B03),
+**f34ff55** (B04). Additional admission/metamorphic coverage: **6188112**;
+quantum-context and full-frame audit correction/controls: **738b233**.
+Every received blocker is resolved, none declined or partial. The response
+remains appendable for pending codex/muse seats reviewing 5d6d03e.
+
+After the final source change, rebuilt offline and ran the exact standalone
+harness command from conformance/PROGRESS.md:
+`cargo run --offline --manifest-path /home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/Cargo.toml -- --bin /home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/target/debug/bennett-isa-ref`.
+Result: **445 pass, 0 fail, 46 unavailable / 491**, exit **2** for the existing
+staged deliverables 8–11. No unavailable case is counted as a pass. Build
+artifacts were redirected with CARGO_TARGET_DIR to this crate's ignored
+`.tmp/conformance-target`; conformance/include sources remained read-only.
+
+Then ran the complete required gates, each Rust command with absolute
+`--manifest-path /home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/Cargo.toml`:
+
+| Command | Result |
+|---|---|
+| `cargo test --offline` | **253 passed, 0 failed, 5 ignored** (251 integration + 2 unit; 0 doctests), 4.56 s summed runner time |
+| `cargo test --offline -- --ignored --nocapture` | **5 passed, 0 failed**, 268.07 s summed runner time |
+| `cargo clippy --offline --all-targets -- -D warnings` | clean |
+| `cargo fmt -- --check` | clean |
+| unchanged Python `isa_check.py` | passes; diff against 5d6d03e empty |
+| `git diff --check` | clean |
+
+| Ignored sweep | Cases | Runner time |
+|---|---|---|
+| u8 division/remainder | 65,536 operand pairs × 4 operations = 262,144 executions | 2.20 s |
+| 17-wire borrow execution | 2^17 basis entries | 12.29 s |
+| checked borrow-frame certificate | 2^18 claim elements, both programs | 64.41 s |
+| extended §6 differential | 200,000 programs: **64,717 accepted, all exactly clean**, 135,283 rejected | 180.51 s |
+| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 8.66 s |
+
+Independent CLI replay additionally passes **72 clean-context checks** for B02:
+trips 1/2/3/2^40, flat/nested, t=0/1 and complex superposition, forward/adjoint
+and equals_entry reversal. These use the hash-bound regression subjects.
+All round-4 tests remain green. Original RNG distribution/Python seed unchanged.
+
+All commands ran headlessly with DISPLAY, WAYLAND_DISPLAY,
+DBUS_SESSION_BUS_ADDRESS and BROWSER unset, and
+TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/.tmp.
+Logs: `.tmp/r5-sol-{conformance,tests,ignored,clippy,python,clean-cli}.log`.
+Accepted 0.8 SHA-256 remains
+`90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e`.
+No source changes followed these gates. No dependencies, spec/docs/conformance/
+include/worklog/HANDOFF/CLAUDE edits or pushes. Bead b-isa-spec-zq2 stays open
+for staged whole-ISA work; its round-5 notes are updated through bd.
 
 ## Council round 4, muse third pass (2026-10-30)
 
