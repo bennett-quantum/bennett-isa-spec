@@ -236,3 +236,45 @@ unrelated t and a valid permutation frame certify and preserve all basis,
 superposition and entangled-reference states. Legitimate unresolved black-box
 claim routes remain covered. README documents per-frame/per-return admission.
 No decline, partial or genuine new ambiguity; reading 20 is unchanged.
+
+## Nonblocking codex/muse suggestions — dispositions
+
+- Muse draw-order contract: applied. README and SPEC-QUESTIONS 29 record
+  lexicographic printed bits (wire 0 first), strict cumulative comparison and
+  little-endian numeric values. `muse_r5_measurement_draws_order_bits_lexicographically`
+  pins |++> draws 0.1/0.3/0.6/0.9 → values 0/2/1/3. No execution change.
+- Muse loop-nested maximality: applied. README and SPEC-QUESTIONS 30 record
+  maximality within the containing static sequence; the pre-loop identity
+  pair plus full in-loop translation frame at ordinals 4–7 returns Proof in
+  `muse_r5_translation_frame_maximality_is_within_its_static_sequence`.
+  No rule was weakened and every actual frame/return remains checked.
+- Muse exact-helper robustness: applied with RED before source changes.
+  `zero_amplitudes_normalize_without_refining` hit precision-doubling overflow;
+  `zero_probability_weight_does_not_refine` did not terminate (3 s timeout).
+  Exact-zero amplitudes now emit (0,0) without setting the shared exponent;
+  all-zero input emits zeros. A zero probability weight returns 0 directly.
+  Mixed zero/nonzero normalization is pinned too. The negative measurement
+  threshold is computed once outside the outcome loop. Both unit pins GREEN.
+- Codex sparse-diagnostic contract: behavior already fixed by f34ff55
+  (SOL-R5-B04). Expanded the public exact_support method comment and added
+  `codex_r5_bell_projection_diagnostics_are_conditional_amplitudes`: initial
+  Bell coefficients 1/sqrt(2), branch probabilities 1/2, projected sparse and
+  dense coefficient 1. Raw shadows remain internal, so callers cannot mistake
+  their old scale for the conditional diagnostic's amplitude.
+- Codex deterministic interaction generator: applied in addition to SOL's
+  128-case certificate-present family (unchanged). New
+  `generated_r5_one_iteration_cleanup_and_nonpermutation_certificates` adds
+  28 cases: 8 accepts / 20 rejects, with/without correctly bound certificates,
+  wrapped/unwrapped clean/dirty qfree and inner/outer borrowing, plus forbidden
+  CZ/S/H borrowed touches. Accepts preserve basis/superposition/entangled
+  reference states in both directions. Existing RNG and Python seeds unchanged.
+- Both seats' staging suggestions: retained explicitly, not claimed delivered
+  by this correctness pass. Deliverables 8–11, the proposed F-link-conflict /
+  F-frame-live-ranges promotions and the interval checker remain in the same
+  recorded order. Unavailable/Unverified results remain explicit; final
+  conformance must have 0 fail, not relabel unavailable cases as passes.
+- Muse's proposed ISA 0.9 adoption is for the spec editor. No accepted spec
+  edit; the proposed wording remains in SPEC-QUESTIONS for that work.
+
+Targeted suggestion gates: 50 integration tests passed / 0 failed / 2 ignored,
+plus the 2 new helper unit tests passed. Complete final gates follow below.

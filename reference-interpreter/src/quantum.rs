@@ -480,7 +480,11 @@ impl QuantumState {
         }
         Ok(())
     }
-    /// The exact support as (basis bits, approximate amplitude), for diagnostics.
+    /// Exact support as (basis bits, approximate amplitude), for diagnostics.
+    /// After projection the amplitudes describe the normalized conditional
+    /// state, including after further gates. Unprojected caller-supplied vectors
+    /// retain their input scale. Internal exact shadows keep their raw scale;
+    /// Born weights use norm ratios rather than these binary64 diagnostics.
     pub fn exact_support(&self) -> Vec<(Vec<bool>, (f64, f64))> {
         let n = self.ids.len();
         let entries: Vec<_> = match &self.state {

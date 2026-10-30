@@ -343,3 +343,18 @@ fn r4_dynamic_alias_checks_cover_regions_block_parameters_and_child_targets() {
         }
     }
 }
+
+#[test]
+fn muse_r5_measurement_draws_order_bits_lexicographically() {
+    // |++>: printed bits 00,01,10,11 have values 0,2,1,3 (little endian).
+    let text = program().text.replace("cx t[0] t[1]", "h t[1]");
+    let p = rehash(&text);
+    for (draw, expected) in [(0.1, 0), (0.3, 2), (0.6, 1), (0.9, 3)] {
+        let mut m = ClassicalMachine::new(&p, "measurement", &[], &[]).unwrap();
+        m.push_measurement_draw(draw).unwrap();
+        assert_eq!(
+            m.run(100).unwrap().values,
+            vec![ClassicalValue::int(2, expected).unwrap()]
+        );
+    }
+}

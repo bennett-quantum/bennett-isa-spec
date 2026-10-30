@@ -29,6 +29,17 @@ and unrelated-H positive certify the intended boundary. Targeted tests:
 31 pass / 0 fail / 2 ignored; normal suite: 256 pass / 0 fail / 5 ignored.
 No decline, partial or new ambiguity. README records mandatory frame/return checks.
 
+Muse's pure correctness/clarity suggestions applied: exact-zero measurement
+helpers now terminate (RED overflow/timeout first), the negative draw threshold
+is hoisted, draw order and containing-body frame maximality are documented and
+pinned (SPEC-QUESTIONS 29/30). Codex's Bell projection diagnostic contract is
+pinned and exact_support's comment clarified (normalized after projection,
+raw shadows internal). Additional deterministic 28-case family: 8 accept /
+20 reject, certificate-present and one-iteration cleanup/nonpermutation
+coverage. Original random seeds/distribution unchanged. Targeted suggestion
+checks: 50 integration tests and 2 new helper unit tests passed, 2 ignored.
+Deliverables 8–11 and all existing unavailable/Unverified disclosures stay staged.
+
 ## Council round 5, SOL first pass (2026-10-30)
 
 SOL-R5-B01 resolved after RED on the exact correctly bound certificate witness.

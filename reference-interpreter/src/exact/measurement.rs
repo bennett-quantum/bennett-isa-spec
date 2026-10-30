@@ -242,6 +242,12 @@ pub(crate) fn normalized(amplitudes: &[Amplitude]) -> Vec<(f64, f64)> {
         let mut values = Vec::new();
         let mut ready = true;
         for a in amplitudes {
+            if a.is_zero() {
+                // A zero diagnostic neither needs refinement nor determines
+                // the common scale of the supported amplitudes.
+                values.push((Dyadic::int(0), Dyadic::int(0), i64::MIN));
+                continue;
+            }
             let (r, i) = evaluate(a, p);
             let (re, im) = (r.midpoint(), i.midpoint());
             let exponent = [scaled(&re), scaled(&im)]
@@ -273,6 +279,9 @@ pub(crate) fn normalized(amplitudes: &[Amplitude]) -> Vec<(f64, f64)> {
             let norm = values
                 .iter()
                 .fold(0.0f64, |s, (r, i)| s.hypot(*r).hypot(*i));
+            if norm == 0.0 {
+                return vec![(0.0, 0.0); values.len()];
+            }
             return values
                 .into_iter()
                 .map(|(r, i)| (r / norm, i / norm))
@@ -283,6 +292,9 @@ pub(crate) fn normalized(amplitudes: &[Amplitude]) -> Vec<(f64, f64)> {
 }
 /// Approximate positive weight ratio for display only; sampling uses real_sign.
 pub(crate) fn probability(weight: &Amplitude, total: &Amplitude) -> f64 {
+    if weight.is_zero() {
+        return 0.0;
+    }
     let mut p = 64;
     loop {
         let (w, _) = evaluate(weight, p);
@@ -299,5 +311,26 @@ pub(crate) fn probability(weight: &Amplitude, total: &Amplitude) -> f64 {
             };
         }
         p *= 2;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn zero_amplitudes_normalize_without_refining() {
+        let zero = Amplitude::zero();
+        assert_eq!(normalized(std::slice::from_ref(&zero)), vec![(0.0, 0.0)]);
+        let one = zero.add(&Amplitude::one());
+        assert_eq!(
+            normalized(&[zero.clone(), one, zero]),
+            vec![(0.0, 0.0), (1.0, 0.0), (0.0, 0.0)]
+        );
+    }
+
+    #[test]
+    fn zero_probability_weight_does_not_refine() {
+        assert_eq!(probability(&Amplitude::zero(), &Amplitude::one()), 0.0);
     }
 }

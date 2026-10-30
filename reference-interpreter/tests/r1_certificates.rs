@@ -831,3 +831,15 @@ fn codex_r5_b02_exact_cz_certificate_cannot_admit_a_nonpermutation_frame() {
         support::borrow_identity(&o);
     }
 }
+
+#[test]
+fn muse_r5_translation_frame_maximality_is_within_its_static_sequence() {
+    // Two pre-loop borrowed touches form an identity frame. Each iteration's
+    // complete translation frame is maximal within its own static body.
+    let text = sol_translation_object("cx p b\ncx b t\ncx p b\ncx b t", true).replace(
+        "b = qborrow any 1\nqloop",
+        "b = qborrow any 1\ncx p b\ncx p b\nqloop",
+    );
+    let text = support::rehash(&text).text;
+    sol_assert_translation(&text, &sol_translation_claim(&text, 4, 7, 4, 5, "b"), true);
+}

@@ -224,3 +224,29 @@ changed in response to the council's round-1 review
     image preparation, body, inverse image gates and release. Both call directions
     preserve the image, including under inherited predicates. This follows the
     explicit §4.6 rule; no additional ambiguity or restriction is introduced.
+
+29. **Measurement draw order (§14.2)** *new (round 5, muse suggestion)*.
+    Question: projective Born probabilities do not specify how a supplied draw
+    maps to an outcome. Reading: outcomes follow lexicographic order of their
+    printed bits string (wire 0 first), independently of the little-endian
+    integer value. Select the first outcome whose cumulative exact weight is
+    strictly greater than draw × total weight; an exact CDF tie selects the
+    next outcome. The distribution is unchanged. *Proposed 0.9:* "Reference
+    measurement draws enumerate outcomes lexicographically by the bits string
+    (wire 0 first), selecting the first cumulative Born weight exceeding the
+    draw times total weight." Pin:
+    `registers::muse_r5_measurement_draws_order_bits_lexicographically`.
+
+30. **Translation-frame maximality in structured bodies (§5.6)**
+    *new (round 5, muse suggestion)*. Question: does “maximal contiguous
+    permutation-only subcircuits” mean maximal in unrolled execution or within
+    the static instruction sequence containing the endpoints? Reading: within
+    the containing static qloop/qif body sequence, consistent with canonical
+    nested-line points and independently checked frame instances. The region
+    still satisfies factorisation at every frame/return; this does not waive
+    any borrowed touch or lifetime obligation. *Proposed 0.9:* "Maximality of
+    a frame inside a qloop/qif body is judged within that body's instruction
+    sequence." Pin:
+    `r1_certificates::muse_r5_translation_frame_maximality_is_within_its_static_sequence`
+    has two pre-loop identity touches followed by a loop-body frame at ordinals
+    4–7; the structural claim proves that complete inner frame.

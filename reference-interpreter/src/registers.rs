@@ -222,14 +222,12 @@ impl QuantumRegisters {
         let total = branches
             .iter()
             .fold(crate::exact::Amplitude::zero(), |s, b| s.add(&b.weight));
-        let threshold = total.times_f64(draw)?;
+        let negative_threshold = total.times_f64(draw)?.times_f64(-1.0)?;
         let mut cumulative = crate::exact::Amplitude::zero();
         let mut selected = None;
         for branch in branches {
             cumulative = cumulative.add(&branch.weight);
-            if cumulative.add(&threshold.times_f64(-1.0)?).real_sign()
-                == std::cmp::Ordering::Greater
-            {
+            if cumulative.add(&negative_threshold).real_sign() == std::cmp::Ordering::Greater {
                 selected = Some(branch);
                 break;
             }

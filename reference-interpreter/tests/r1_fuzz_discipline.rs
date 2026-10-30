@@ -794,3 +794,77 @@ fn generated_r5_alpha_renaming_consumed_workspace_preserves_widths() {
     }
     assert_eq!(count, 18);
 }
+
+#[test]
+fn generated_r5_one_iteration_cleanup_and_nonpermutation_certificates() {
+    let (mut accepted, mut rejected) = (0, 0);
+    for inner_borrow in [false, true] {
+        for wrapped in [false, true] {
+            for dirty in [false, true] {
+                let release = if inner_borrow {
+                    "b = qborrow any 1\nqfree c\nqreturn b"
+                } else {
+                    "qfree c"
+                };
+                let release = if wrapped {
+                    format!("qloop 1 {{\n{release}\n}}")
+                } else {
+                    release.into()
+                };
+                let b = if inner_borrow {
+                    ""
+                } else {
+                    "b = qborrow any 1\n"
+                };
+                let ret = if inner_borrow { "" } else { "\nqreturn b" };
+                let x = if dirty { "x c\n" } else { "" };
+                let body = format!("c = qalloc any 1\n{x}{b}{release}{ret}");
+                let bounds: &[u64] = if wrapped { &[1] } else { &[] };
+                for certified in [false, true] {
+                    let text = if certified {
+                        support::certified_borrow_identity(&body, bounds)
+                    } else {
+                        support::borrow_lifetime_object(&body, bounds)
+                    };
+                    // Independent qalloc=0 and qloop-1 equivalence: precisely
+                    // X-before-free is dirty, regardless of wrapper/certificate.
+                    if dirty {
+                        assert!(Object::parse(&text).is_err());
+                        rejected += 1;
+                    } else {
+                        let o = Object::parse(&text).unwrap();
+                        support::borrow_identity(&o);
+                        if certified {
+                            o.verify_certificate().unwrap();
+                        }
+                        accepted += 1;
+                    }
+                }
+            }
+        }
+    }
+    for gate in ["cz b t", "s b", "h b"] {
+        for wrapped in [false, true] {
+            let lifetime = format!("b = qborrow any 1\n{gate}\n{gate}\nqreturn b");
+            let body = if wrapped {
+                format!("qloop 1 {{\n{lifetime}\n}}")
+            } else {
+                lifetime
+            };
+            let bounds: &[u64] = if wrapped { &[1] } else { &[] };
+            for certified in [false, true] {
+                let text = if certified {
+                    support::certified_borrow_identity_kind(&body, bounds, "action")
+                } else {
+                    support::borrow_lifetime_object(&body, bounds).replace("perm_action", "action")
+                };
+                assert!(Object::parse(&text)
+                    .unwrap_err()
+                    .to_string()
+                    .contains("§5.6"));
+                rejected += 1;
+            }
+        }
+    }
+    assert_eq!((accepted, rejected), (8, 20));
+}

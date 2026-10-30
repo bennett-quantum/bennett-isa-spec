@@ -341,3 +341,25 @@ fn sol_r5_b04_sparse_observer_reports_the_conditional_state() {
         .unwrap();
     assert_eq!(reset.exact_support(), vec![(vec![false], (3.0, 0.0))]);
 }
+
+#[test]
+fn codex_r5_bell_projection_diagnostics_are_conditional_amplitudes() {
+    let mut q = QuantumState::new();
+    let w = q.allocate(2).unwrap();
+    q.gate("h", &[w[0]], None, &[]).unwrap();
+    q.gate("cx", &[w[0], w[1]], None, &[]).unwrap();
+    for (_, (re, im)) in q.exact_support() {
+        close(
+            Complex::new(re, im),
+            Complex::new(std::f64::consts::FRAC_1_SQRT_2, 0.0),
+        );
+    }
+    for branch in q.measurement_branches(&[w[0]]).unwrap() {
+        assert!((branch.probability - 0.5).abs() < 1e-12);
+        assert_eq!(
+            branch.state.exact_support(),
+            vec![(vec![branch.bits[0]], (1.0, 0.0))]
+        );
+        sparse_matches_normalized_dense(&branch.state);
+    }
+}

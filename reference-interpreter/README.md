@@ -79,7 +79,10 @@ is a JSON number, `token` is an object with `steps`, `heap`, `stack` and
 null outside the §5.4 table), plus `fault`, that code or null. Tape entries
 are `{"args","bytes","dev","op"}`: the §7.3 tape triple plus the bytes the
 operation transferred, hex. Measurements are `{"bits","reg","value"}` with
-`bits` in wire order (wire 0 first). Console output is `console_hex` always
+`bits` in wire order (wire 0 first). Draws select the first outcome, in
+lexicographic order of the bits string (wire 0 first), whose cumulative Born
+weight exceeds draw × total weight; integer values remain little-endian
+(SPEC-QUESTIONS 29). Console output is `console_hex` always
 and `console` when it is valid UTF-8, else null. `memory_digest` is the
 SHA-256 of the complete §7.1 memory (allocation table, heap bump, every
 nonzero byte).
@@ -291,7 +294,8 @@ reference-interpreter/target/debug/bennett-isa-ref run-program reference-interpr
   sampled claims (`ClaimVerdict::Proof` only for exhaustive claims over D),
   check the complete named translation frame (canonical nested-line points,
   actual borrowed wires, exact reverse V, repeated W and side conditions) and
-  library structural claims. Borrow-frame admission preserves every frame and
+  library structural claims. Frame maximality inside qloop/qif is judged within
+  the containing static body sequence (SPEC-QUESTIONS 30). Borrow-frame admission preserves every frame and
   completed return: definite violations cannot be waived by a region-final
   certificate. Both parsing and public certificate verification require
   permutation-only instructions touching borrowed wires, independently of tuple
