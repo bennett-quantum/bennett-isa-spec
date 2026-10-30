@@ -871,3 +871,25 @@ fn r9_qinplace_zero_budget_rejects_before_mutation() {
     assert!(out.stdout.is_empty());
     assert!(String::from_utf8_lossy(&out.stderr).contains("§4.5"));
 }
+
+#[test]
+fn r9_qinplace_repeated_pairs_on_clean_workspace() {
+    let text = support::r9_fixture("sol-qinplace")
+        .replace("h c\n", "")
+        .replace("\"bounds\":[]", "\"bounds\":[3]")
+        .replace(
+            "(tk:token) ()\n^entry():",
+            "(tk:token) ()\nregs {  } bounds {3}\n^entry():",
+        )
+        .replace(
+            "qinplace @o @o tk c\nqinplace @o @o tk c",
+            "qloop 3 {\nqinplace @o @o tk c\nqinplace @o @o tk c\n}",
+        );
+    let o = support::rehash(&text);
+    support::r9_identity(
+        &o,
+        &[bennett_isa_ref::Argument::Token(
+            bennett_isa_ref::Budget::steps(1),
+        )],
+    );
+}

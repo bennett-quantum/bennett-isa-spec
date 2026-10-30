@@ -438,13 +438,27 @@ pub fn r9_identity(o: &Object, args: &[bennett_isa_ref::Argument]) {
     }
 }
 pub fn r9_fixture(case: &str) -> &'static str {
-    match case {
-        "sol-oracle" => include_str!("../fixtures/r9-sol-oracle.bisa"),
-        "sol-qinplace" => include_str!("../fixtures/r9-sol-qinplace.bisa"),
-        "codex-oracle" => include_str!("../fixtures/r9-codex-oracle.bisa"),
-        "loop" => include_str!("../fixtures/r9-loop.bisa"),
+    let (text, hash) = match case {
+        "sol-oracle" => (
+            include_str!("../fixtures/r9-sol-oracle.bisa"),
+            "ef010633dbc984abbaa9fbfb97c6233c5390fa99a17bc38e09725cddec936832",
+        ),
+        "sol-qinplace" => (
+            include_str!("../fixtures/r9-sol-qinplace.bisa"),
+            "77664ac9392aec50b0415027771ae7ef49dcea7762b70025f0cd918d53a6ee1e",
+        ),
+        "codex-oracle" => (
+            include_str!("../fixtures/r9-codex-oracle.bisa"),
+            "49ad3ba6c411ed73bebacdebe6728ebff5995dbf8bbc03c016d1cb0c5c3e8625",
+        ),
+        "loop" => (
+            include_str!("../fixtures/r9-loop.bisa"),
+            "80478acc73d52bbf64c395816470293b5b4b4a1ee36a5c550bf00436f06fc192",
+        ),
         _ => panic!("unknown R9 fixture"),
-    }
+    };
+    assert_eq!(bennett_isa_ref::sha256_hex(text.as_bytes()), hash);
+    text
 }
 
 pub fn r9_opaque_object(body: &str, bounds: &[u64], child: Option<&str>) -> String {

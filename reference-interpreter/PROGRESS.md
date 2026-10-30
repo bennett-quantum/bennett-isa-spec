@@ -15,13 +15,15 @@ in tests/support/r9_pins.py. Exact library/CLI tests added before source changes
 
 | Blocker | RED tests | Status | Commit |
 |---|---|---|---|
-| SOL-R9-B01 ≡ R9-B01 | r9_opaque_adjoint_restores_borrow_control, r9_matched_opaque_oracle_restores_outer_fact, r9_qinplace_adjoint_restores_borrow_control; CLI counterparts | RED 0/4 library + 0/4 CLI; exact GREEN 8/0 | — |
-| R9-B02 | r9_mixed_loop_threads_reallocated_bindings; CLI counterpart | RED 0/4 library + 0/4 CLI; exact GREEN 8/0 | — |
+| SOL-R9-B01 ≡ R9-B01 | r9_opaque_adjoint_restores_borrow_control, r9_matched_opaque_oracle_restores_outer_fact, r9_qinplace_adjoint_restores_borrow_control; CLI counterparts | exact GREEN | 334c27d |
+| R9-B02 | r9_mixed_loop_threads_reallocated_bindings; CLI counterpart | exact GREEN | 334c27d |
 
 Exact GREEN: 8/0; first completed full suite 323 passed / 0 failed / 5 ignored.
 The initial baseline run raced the newly added fixture files: its fixture audit
 failed 2 tests, so it is not a baseline pass. A clean git-archive baseline is
-being rerun under the owned ignored .tmp, with the accepted spec read via symlink.
+rerun under the owned ignored .tmp, with the accepted spec read via symlink:
+315 passed / 0 failed / 5 ignored. Its first build lacked the spec include;
+adding the read-only symlink resolved that setup error.
 Initial RED setup also had an Argument-vs-controls API compile error, corrected
 before the semantic REDs. No compile error is counted as a reproduced blocker.
 
@@ -37,6 +39,25 @@ separate transfers; recurring environments share the exact structured cycle.
 Zero visits publish no binding or fact effects; lexical qregions stay hoisted.
 All physical frame boundaries, complete borrowed-touch guards and per-return
 obligations remain mandatory. No trip cap, expansion sample or scope narrowing.
+
+Extended R9 families: 2 passed, **33 accepted / 8 rejected** (opaque 13/5,
+loop bindings 20/3; one huge loop is static-only). Intermediate family 2/0:
+28/7 (opaque 11/4, loops 17/3). The initial family 0/2 was fixture blank lines;
+a changed-control fixture then hit §3.3 for an aliased target and was corrected
+to a distinct read-only operand. No implementation change was needed for these.
+The exploratory 2^40 fresh-allocation execution was stopped without a result:
+execution cycle keys still distinguish fresh wire ids (existing performance
+follow-up b-isa-spec-436 updated). Small family cases execute both directions;
+large analysis has no trip cap or sampled proof.
+
+An additional causal audit reproduced **0/1 RED** for three qinplace inverse
+pairs on clean workspace with no outer H. Plain permutation-loop ANF squaring
+cannot simplify assigning opaque g^-1(g(x)); `Node::needs_history` now routes
+these loops through the exact stack transfer/cycle. This extends the same rule
+rather than adding a function-specific oracle identity. Targeted GREEN: 8/0 (6 library regressions + 2 deterministic families).
+Zero-budget qinplace rejects §4.5 before its own mutation, including independent
+adjoints; the literal member action rejects at execution as required. Earlier
+exact GREEN was 8/0, extended budget GREEN 9/0. RNG/seeds remain unchanged.
 
 ## Round-8 fixes (2026-10-30)
 

@@ -9,7 +9,12 @@
 //! borrowed variable. For Boolean-gate circuits this is a total, exact decision
 //! over the frame's full domain (T3), with no wire-count limit; permutation loops use repeated
 //! squaring; mixed loops carry facts through every iteration or a proved invariant. Opaque applications retain their full
-//! input expressions: composition substitutes recursively into those inputs and
+//! input expressions. Oracle self-adjoints and explicit qinplace g/ginv inverses
+//! join the same all-operand causal stacks as gates; unmatched readers block an
+//! outer pop. Loop transfers resolve each visit's live bindings, alpha-renaming
+//! nonoverlapping successor lifetimes to reusable slots; recurring environments
+//! share structured cycles, including first-visit width changes. ANF composition
+//! substitutes recursively into opaque inputs and
 //! interns the resulting application, rather than freezing an ANF variable.
 //! This proves identities valid for arbitrary black-box functions; unresolved
 //! function-specific identities need a checked claim. Calls whose outputs would
@@ -199,6 +204,15 @@ impl Node {
             Self::Other(_) | Self::Quantum { .. } | Self::Call { .. } => false,
             Self::Repeat(n, body) => *n == 0 || body.iter().all(Self::permutation),
             _ => true,
+        }
+    }
+    /// Assigning black boxes need their causal inverse events even when all
+    /// entries are basis-definite. Plain ANF substitution cannot reduce g^-1(g(x)).
+    fn needs_history(&self) -> bool {
+        match self {
+            Self::Opaque { assign: true, .. } => true,
+            Self::Repeat(n, body) => *n != 0 && body.iter().any(Self::needs_history),
+            _ => false,
         }
     }
     fn adjoint(&self) -> Self {
@@ -1344,7 +1358,7 @@ impl Facts<'_> {
         self.e.state.insert(w.into(), Poly::var(id));
     }
     fn forget_inverses(&mut self, touched: &BTreeSet<String>) {
-        // An opaque/lifetime touch is a causal barrier. Invalidate the whole
+        // An unresolved import or lifetime touch is a causal barrier. Invalidate the whole
         // connected history, including ancestors reached through another operand.
         let mut affected = touched.clone();
         loop {
@@ -1448,7 +1462,10 @@ impl Facts<'_> {
                 }
                 let mut wires = BTreeSet::new();
                 node.wires(&mut wires);
-                if !node.permutation() || wires.iter().any(|w| self.inverses.contains_key(w)) {
+                if !node.permutation()
+                    || node.needs_history()
+                    || wires.iter().any(|w| self.inverses.contains_key(w))
+                {
                     self.repeat(*n, body)?;
                     continue;
                 }

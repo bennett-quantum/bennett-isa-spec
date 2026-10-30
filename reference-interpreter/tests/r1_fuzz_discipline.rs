@@ -1419,3 +1419,195 @@ fn generated_r8_import_transfer_keeps_readonly_facts_but_blocks_history() {
     assert!(e.contains("§5.6"), "{e}");
     eprintln!("R8 import transfer (static): 1 accepted / 1 rejected");
 }
+
+#[test]
+fn generated_r9_opaque_histories_match_independent_identity() {
+    use bennett_isa_ref::{Argument, Budget};
+    let call = "oracle_call @o tk (c) t f () ()";
+    let tail = "b = qborrow any 1\ncx c b\nqreturn b\nqfree f\nqfree c";
+    let mut accepted = 0;
+    let mut rejected = 0;
+    let mut positives = vec![(format!("{call}\n{call}"), vec![])];
+    for n in [0, 1, 2, 3] {
+        positives.push((format!("qloop {n} {{\n{call}\n{call}\n}}"), vec![n]));
+    }
+    positives.push((
+        format!("qloop 1 {{\n{call}\n}}\nqloop 1 {{\n{call}\n}}"),
+        vec![1, 1],
+    ));
+    positives.push(("qinplace @o @o tk c\nqinplace @o @o tk c".into(), vec![]));
+    for (middle, bounds) in positives {
+        let body = format!("c = qalloc any 1\nf = qalloc any 4\nh c\n{middle}\nh c\n{tail}");
+        let o = support::rehash(&support::r9_opaque_object(&body, &bounds, None));
+        for steps in if middle.contains("qinplace") {
+            vec![1]
+        } else {
+            vec![0, 1]
+        } {
+            support::r9_identity(&o, &[Argument::Token(Budget::steps(steps))]);
+        }
+        accepted += 1;
+    }
+    // Two disjoint quantum/opaque histories interleave without sharing outputs.
+    for reverse in [false, true] {
+        let other = "oracle_call @o tk (e) u fr () ()";
+        let middle = if reverse {
+            format!("{call}\n{other}\n{other}\n{call}")
+        } else {
+            format!("{call}\n{other}\n{call}\n{other}")
+        };
+        let body = format!("c = qalloc any 1\ne = qalloc any 1\nu = qalloc any 1\nf = qalloc any 4\nfr = qalloc any 4\nh c\nh e\n{middle}\nh c\nh e\nqfree fr\nqfree u\nqfree e\n{tail}");
+        let o = support::rehash(&support::r9_opaque_object(&body, &[], None));
+        support::r9_identity(&o, &[Argument::Token(Budget::steps(1))]);
+        accepted += 1;
+    }
+    // Local non-permutation call boundaries retain the analysed opaque events.
+    let child = "action @child (v:wire mut, fr:wire[4] mut) (p:wire in) () (tk:token) ()\n^entry():\noracle_call @o tk (p) v fr () ()";
+    for adj in [false, true] {
+        let call = "action_call @child (t, f) (c) () (tk)";
+        let middle = if adj {
+            format!("adj {call}\n{call}")
+        } else {
+            format!("{call}\nadj {call}")
+        };
+        let body = format!("c = qalloc any 1\nf = qalloc any 4\nh c\n{middle}\nh c\n{tail}");
+        let o = support::rehash(&support::r9_opaque_object(&body, &[], Some(child)));
+        support::r9_identity(&o, &[Argument::Token(Budget::steps(1))]);
+        accepted += 1;
+    }
+    // Full opaque keys: changed input, unmatched reader and changed control.
+    let first = format!("c = qalloc any 1\nf = qalloc any 4\nh c\n{call}");
+    for middle in [
+        "".into(),
+        format!("x c\n{call}\nx c"),
+        format!("ctl c {call}"),
+    ] {
+        let body = format!("{first}\n{middle}\nh c\n{tail}");
+        let body = body
+            .lines()
+            .filter(|l| !l.is_empty())
+            .collect::<Vec<_>>()
+            .join("\n");
+        let text = support::r9_opaque_object(&body, &[], None);
+        let e = Object::parse(&text).unwrap_err().to_string();
+        assert!(e.contains("§5.6") || e.contains("§6.2"), "{e}");
+        let rule = if e.contains("§5.6") {
+            "§5.6"
+        } else {
+            "§6.2"
+        };
+        support::reject_cli(&text, rule, &format!("r9-unmatched-{rejected}"));
+        rejected += 1;
+    }
+    // Two later borrowings cancel globally; neither invalid earlier return is waived.
+    let body = format!("{first}\nh c\nb = qborrow any 1\ncx c b\nqreturn b\nb = qborrow any 1\ncx c b\nqreturn b\nh c\n{call}\nh c\nqfree f\nqfree c");
+    let text = support::r9_opaque_object(&body, &[], None);
+    support::reject_cli(&text, "§5.6", "r9-split-opaque");
+    rejected += 1;
+    // Distinct oracle names require the explicit swapped g/ginv identity.
+    for enclosing_h in [false, true] {
+        let os = r#"{"abi":"0.8","args":[],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#;
+        let ac = r#"{"abi":"0.8","args":["token"],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
+        let h = if enclosing_h { "h c\n" } else { "" };
+        let body = format!("action @a (t:wire mut) () () (tk:token) ()\n^entry():\nc = qalloc any 1\n{h}qinplace @g @gi tk c\nqinplace @gi @g tk c\n{h}b = qborrow any 1\ncx c b\nqreturn b\nqfree c");
+        let text = support::object(
+            &[
+                (
+                    "g",
+                    os,
+                    "oracle @g (p:wire in) (v:wire) (fr:wire[4]) () ()\n^entry():\nlift.retval p",
+                ),
+                (
+                    "gi",
+                    os,
+                    "oracle @gi (p:wire in) (v:wire) (fr:wire[4]) () ()\n^entry():\nlift.retval p",
+                ),
+                ("a", ac, &body),
+            ],
+            "{}",
+            "",
+        );
+        let o = support::rehash(&text);
+        support::r9_identity(&o, &[Argument::Token(Budget::steps(1))]);
+        accepted += 1;
+    }
+    // Different token specialisations cannot cancel even when operand names agree.
+    let body = format!("{first}\noracle_call @o tk2 (c) t f () ()\nh c\nb = qborrow any 1\ncx c b\nqreturn b\nh c\noracle_call @o tk2 (c) t f () ()\n{call}\nh c\nqfree f\nqfree c");
+    let text = support::r9_opaque_object(&body, &[], None)
+        .replace("\"args\":[\"token\"]", "\"args\":[\"token\",\"token\"]")
+        .replace("(tk:token)", "(tk:token, tk2:token)");
+    support::reject_cli(&text, "§5.6", "r9-token-specialisation");
+    rejected += 1;
+    eprintln!("R9 opaque: {accepted} accepted / {rejected} rejected");
+}
+
+#[test]
+fn generated_r9_loop_bindings_match_independent_identity() {
+    let mut accepted = 0;
+    let mut rejected = 0;
+    for n in [0, 1, 2, 3] {
+        for nested in [false, true] {
+            for renamed in [false, true] {
+                let visit =
+                    "b = qborrow any 1\ncx c b\nqreturn b\nqfree c\nc = qalloc any 1\nh t\nh t";
+                let (middle, bounds) = if renamed {
+                    let mut visits = Vec::new();
+                    for i in 0..(if nested { n * 2 } else { n }) {
+                        visits.push(format!("b{i} = qborrow any 1\ncx c{i} b{i}\nqreturn b{i}\nqfree c{i}\nc{} = qalloc any 1\nh t\nh t",i+1));
+                    }
+                    (
+                        format!(
+                            "c0 = qalloc any 1\n{}\nqfree c{}",
+                            visits.join("\n"),
+                            if nested { n * 2 } else { n }
+                        ),
+                        vec![],
+                    )
+                } else {
+                    let (body, bounds) = if nested {
+                        (format!("qloop 2 {{\n{visit}\n}}"), vec![n, 2])
+                    } else {
+                        (visit.into(), vec![n])
+                    };
+                    (
+                        format!("c = qalloc any 1\nqloop {n} {{\n{body}\n}}\nqfree c"),
+                        bounds,
+                    )
+                };
+                let middle = middle
+                    .lines()
+                    .filter(|l| !l.is_empty())
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                let text = support::borrow_lifetime_object(&middle, &bounds)
+                    .replace("perm_action", "action");
+                let o = support::rehash(&text);
+                support::r9_identity(&o, &[]);
+                accepted += 1;
+            }
+        }
+        if n > 0 {
+            let body = format!("c = qalloc any 1\nx c\nqloop {n} {{\nb = qborrow any 1\ncx c b\nqreturn b\nx c\nqfree c\nc = qalloc any 1\nx c\nh t\nh t\n}}\nx c\nqfree c");
+            let text =
+                support::borrow_lifetime_object(&body, &[n]).replace("perm_action", "action");
+            support::reject_cli(&text, "§5.6", &format!("r9-dirty-{n}"));
+            rejected += 1;
+        }
+    }
+    // First-visit width differs from the steady entry; indexed reads resolve anew.
+    for n in [1, 2, 3] {
+        let body = format!("c = qalloc any 1\nqloop {n} {{\nb = qborrow any 1\ncx c[0] b\nqreturn b\nqfree c\nc = qalloc any 2\nh t\nh t\n}}\nqfree c");
+        let text = support::borrow_lifetime_object(&body, &[n]).replace("perm_action", "action");
+        support::r9_identity(&support::rehash(&text), &[]);
+        accepted += 1;
+    }
+    // Static huge count exercises recurring binding transfers, not loop expansion.
+    let n = 1u64 << 40;
+    let body = format!("c = qalloc any 1\nqloop {n} {{\nb = qborrow any 1\ncx c b\nqreturn b\nqfree c\nc = qalloc any 1\nh t\nh t\n}}\nqfree c");
+    let o = support::rehash(
+        &support::borrow_lifetime_object(&body, &[n]).replace("perm_action", "action"),
+    );
+    o.check_hashes().unwrap(); // Static proof; dynamic fresh-wire execution is enumerative.
+    accepted += 1;
+    eprintln!("R9 loop bindings: {accepted} accepted / {rejected} rejected");
+}

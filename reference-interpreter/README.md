@@ -336,16 +336,29 @@ a later borrowing cannot restore an earlier completed lifetime. Loop proofs
 compose per-return obligations on reachable entries, retaining known-clean
 workspace invariants.
 
-**Design (round 8).** Per-wire ANF basis facts follow every gate: diagonal
+**Design (round 9).** Per-wire ANF basis facts follow every gate: diagonal
 operands and read-only controls retain their values, permutations transform
 their ANFs, and non-diagonal targets become independent unknowns. Per-wire
 operation stacks preserve nested compute/adjoint history: an exact adjoint
 restores saved expressions only when the same event tops every operand stack,
 so outstanding entangling readers block restoration. Basis-only permutations
-need no history unless touching an existing stack. Source lowering publishes
+need no history unless touching an existing stack. Opaque oracle calls and
+qinplace join those same causal stacks: oracle_call is self-adjoint; qinplace
+swaps g/ginv. Keys retain callee(s), token/classical specialisation, actual
+input/memory/output wires and effective controls. Matched pairs restore saved
+facts only at the top of every operand history; unmatched opaque readers block
+outer restoration, and lifetime/import barriers invalidate connected history.
+Assigning qinplace starts a history even on basis entries; loops containing it
+use causal transfer rather than uninterpreted ANF assignment composition.
+Source lowering publishes
 physical bindings, live borrows and fact nodes through one executed structured
 traversal: zero-trip bodies publish none of them; static validation and lexical
-qregion hoisting still apply. Local action calls reuse a memoised per-wire
+qregion hoisting still apply. Each loop visit resolves against its live entry
+binding map and publishes its successor map. Equal-width, equal-role successor
+lifetimes reuse entry slots only after the old lifetimes end (alpha-renaming).
+Distinct environments get distinct transfers; recurring maps share an exact
+structured cycle, without expansion proportional to the trip count.
+Local action calls reuse a memoised per-wire
 structured transfer per callee/classical specialization, instantiated on actual
 wires and effective controls. Known-false controls disable fact transfer;
 imports leave modified outputs unknown and preserve read-only facts, while
@@ -358,8 +371,9 @@ loops compose exact maps and return obligations by squaring. Every return still
 proves restoration and output independence. Certificates cannot override
 definite lifetime or non-permutation failures. §6 cleanup readers use complete captured
 version-stack prefixes, so older readers do not block a nested exact adjoint.
-Round-8 literal pins and deterministic families retain all round 4–7 negatives
-and add nested adjoints, dead bindings and controlled callee chains.
+Round-9 literal pins and deterministic families retain all round 4–8 negatives
+and add opaque pairs, unmatched readers and carried/reallocated loop bindings,
+with independent identity maps including Bell-paired borrowed references.
 
  Workspace widths follow executed
 producing/consuming lifetimes: zero-trip bodies have no lifetime effects (lexical
