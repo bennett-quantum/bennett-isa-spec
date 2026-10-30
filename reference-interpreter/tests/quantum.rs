@@ -414,3 +414,26 @@ fn r6_structured_lifetime_variants_match_independent_identity() {
         support::r6_map(&o, false);
     }
 }
+
+#[test]
+fn r7_bounded_h_t_exact_support_is_finite_and_reverses() {
+    let mut q = QuantumState::new();
+    let w = q.allocate(1).unwrap();
+    let entry = q.clone();
+    for _ in 0..5000 {
+        q.gate("h", &w, None, &[]).unwrap();
+        q.gate("t", &w, None, &[]).unwrap();
+    }
+    // Independent 100-digit evaluation of the §4.4 matrix product (TH)^5000.
+    let a = q.amplitudes().unwrap();
+    close(a[0], Complex::new(-0.9438757756719142, 0.22414147502106144));
+    close(
+        a[1],
+        Complex::new(-0.09284243884403397, 0.22414147502106144),
+    );
+    for _ in 0..5000 {
+        q.gate("tdg", &w, None, &[]).unwrap();
+        q.gate("h", &w, None, &[]).unwrap();
+    }
+    assert_eq!(q, entry);
+}

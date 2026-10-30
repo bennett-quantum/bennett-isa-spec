@@ -968,3 +968,206 @@ fn generated_r6_dynamic_width_lifetimes_match_identity_and_renamed_unrollings() 
     }
     assert_eq!(accepted, 96);
 }
+
+/// Independently expect I_t tensor I_bR; rejection concerns every lifetime,
+/// including globally identity subjects. This family never consumes RNG draws.
+fn r7_case(body: &str, bounds: &[u64], valid: bool, certified: bool) {
+    let text = if certified {
+        support::certified_borrow_identity_kind(body, bounds, "action")
+    } else {
+        support::borrow_lifetime_object(body, bounds).replace("perm_action", "action")
+    };
+    let result = Object::parse(&text);
+    if valid {
+        let o = result.unwrap_or_else(|e| panic!("{e}\n{body}"));
+        support::r6_map(&o, false);
+    } else {
+        let error = result.unwrap_err().to_string();
+        assert!(
+            error.contains("§5.6") || error.contains("§6.2"),
+            "{error}\n{body}"
+        );
+    }
+}
+
+#[test]
+fn generated_r7_diagonal_control_and_inverse_boundaries() {
+    let mut accepted = 0;
+    let mut rejected = 0;
+    // Diagonal gates preserve BOTH 0 and 1 basis controls. At 1 two CXs are
+    // needed; one CX violates that fresh borrowed lifetime.
+    for (gate, inverse) in [
+        ("s c", "sdg c"),
+        ("t c", "tdg c"),
+        ("rz 0.5 c", "rz -0.5 c"),
+        ("cz c t", "cz c t"),
+        ("qpred c\nh t\nh t\nqunpred c", ""),
+    ] {
+        for initial in [0, 1] {
+            for doubled in [false, true] {
+                let x = if initial == 1 { "x c\n" } else { "" };
+                let cx = if doubled { "cx c b\n" } else { "" };
+                let body = format!("c = qalloc any 1\n{x}{gate}\nb = qborrow any 1\ncx c b\n{cx}qreturn b\n{inverse}\n{x}qfree c").replace("\n\n", "\n");
+                let valid = initial == 0 || doubled;
+                for certified in [false, true] {
+                    r7_case(&body, &[], valid, certified);
+                    if valid {
+                        accepted += 1;
+                    } else {
+                        rejected += 1;
+                    }
+                }
+            }
+        }
+    }
+    // Matched non-diagonal inverses restore the allocation fact, even with a
+    // disjoint intervening touch; a touch on c that changes its state does not.
+    for (gate, inverse) in [
+        ("h c", "h c"),
+        ("rx 0.5 c", "rx -0.5 c"),
+        ("ry 0.5 c", "ry -0.5 c"),
+    ] {
+        for middle in ["", "x t\nx t\n", "s c\n"] {
+            for empty in [false, true] {
+                let borrow_gate = if empty { "" } else { "cx c b\n" };
+                let prefix = format!("{gate}\n{middle}{inverse}");
+                // With S in between, explicit full inverse cleanup follows the
+                // borrow. Empty lifetimes remain identity, despite unknown c.
+                let tail = if middle == "s c\n" {
+                    format!("{gate}\nsdg c\n{inverse}\n")
+                } else {
+                    String::new()
+                };
+                let body = format!("c = qalloc any 1\n{prefix}\nb = qborrow any 1\n{borrow_gate}qreturn b\n{tail}qfree c");
+                let valid = middle != "s c\n" || empty;
+                for certified in [false, true] {
+                    r7_case(&body, &[], valid, certified);
+                    if valid {
+                        accepted += 1;
+                    } else {
+                        rejected += 1;
+                    }
+                }
+            }
+        }
+    }
+    // Non-permutation touches of B remain forbidden, including disabled
+    // controls, diagonal inverse pairs and certified whole-region identities.
+    for gates in [
+        "s b\nsdg b",
+        "h b\nh b",
+        "qpred b\nh t\nh t\nqunpred b",
+        "c = qalloc any 1\ncz c b\nqfree c",
+    ] {
+        for certified in [false, true] {
+            r7_case(
+                &format!("b = qborrow any 1\n{gates}\nqreturn b"),
+                &[],
+                false,
+                certified,
+            );
+            rejected += 1;
+        }
+    }
+    println!("R7 boundaries: {accepted} accepted / {rejected} rejected");
+    assert_eq!((accepted, rejected), (60, 24));
+}
+
+#[test]
+fn generated_r7_evolving_loops_match_per_return_and_renamed_unrollings() {
+    let mut accepted = 0;
+    let mut rejected = 0;
+    for n in [1u64, 3, 4, 5, 8, 1 << 40] {
+        for initial in [0u64, 1] {
+            for shape in 0..3 {
+                if shape == 1 && n != 4 || shape == 2 && n > 8 {
+                    continue;
+                }
+                let (loop_body, bounds) = match shape {
+                    1 => ("qloop 2 {\nqloop 2 {\nh t\nx c\n}\n}".into(), vec![2, 2]),
+                    2 => (
+                        (0..n)
+                            .map(|_| "h t\nx c\n")
+                            .collect::<String>()
+                            .trim_end()
+                            .into(),
+                        vec![],
+                    ),
+                    _ => (format!("qloop {n} {{\nh t\nx c\n}}"), vec![n]),
+                };
+                let initial_x = if initial == 1 { "x c\n" } else { "" };
+                let final_c = initial ^ (n & 1);
+                let final_x = if final_c == 1 { "x c\n" } else { "" };
+                let final_h = if n & 1 == 1 { "h t\n" } else { "" };
+                let body = format!("c = qalloc any 1\n{initial_x}{loop_body}\nb = qborrow any 1\ncx c b\nqreturn b\n{final_h}{final_x}qfree c");
+                for certified in [false, true] {
+                    r7_case(&body, &bounds, final_c == 0, certified);
+                    if final_c == 0 {
+                        accepted += 1;
+                    } else {
+                        rejected += 1;
+                    }
+                }
+            }
+        }
+        if n > 8 {
+            continue;
+        }
+        // One-hot rotates 0 -> 1 -> 2 -> 3 -> 0. Return j is valid exactly
+        // when j mod 4 != 3. Later inverse rotations do not repair a return.
+        for shape in 0..3 {
+            if shape == 1 && n != 4 || shape == 2 && n > 8 {
+                continue;
+            }
+            let visit = |b: &str| {
+                format!("h t\n{b} = qborrow any 1\ncx c[3] {b}\nqreturn {b}\nh t\nswap c[3] c[2]\nswap c[2] c[1]\nswap c[1] c[0]\n")
+            };
+            let undo = "h t\nswap c[1] c[0]\nswap c[2] c[1]\nswap c[3] c[2]\nh t\n";
+            let (forward, inverse, bounds) = match shape {
+                1 => (
+                    format!("qloop 2 {{\nqloop 2 {{\n{}}}\n}}", visit("b")),
+                    format!("qloop 2 {{\nqloop 2 {{\n{undo}}}\n}}"),
+                    vec![2, 2, 2, 2],
+                ),
+                2 => (
+                    (0..n).map(|j| visit(&format!("b{j}"))).collect(),
+                    undo.repeat(n as usize),
+                    vec![],
+                ),
+                _ => (
+                    format!("qloop {n} {{\n{}}}", visit("b")),
+                    format!("qloop {n} {{\n{undo}}}"),
+                    vec![n, n],
+                ),
+            };
+            let body = format!("c = qalloc any 4\nx c[0]\n{forward}\n{inverse}\nx c[0]\nqfree c")
+                .replace("\n\n", "\n");
+            for certified in [false, true] {
+                r7_case(&body, &bounds, n < 4, certified);
+                if n < 4 {
+                    accepted += 1;
+                } else {
+                    rejected += 1;
+                }
+            }
+        }
+    }
+    println!("R7 evolving loops: {accepted} accepted / {rejected} rejected");
+    assert_eq!((accepted, rejected), (32, 38));
+}
+
+#[test]
+fn generated_r7_large_noncycling_loop_proves_unknown_top_invariant() {
+    // Intervening X touches prevent saved-H restoration in this fact domain,
+    // although H X X H = I by independent matrices. c stays zero, so every
+    // fresh borrowed lifetime is I. This forces the unknown-top proof route.
+    let n = 1u64 << 40;
+    for dirty in [false, true] {
+        let x = if dirty { "x c\n" } else { "" };
+        let body = format!("c = qalloc any 1\n{x}qloop {n} {{\nh t\nx t\nx t\nh t\nb = qborrow any 1\ncx c b\nqreturn b\n}}\n{x}qfree c");
+        let text = support::borrow_lifetime_object(&body, &[n]).replace("perm_action", "action");
+        let result = Object::parse(&text);
+        assert_eq!(result.is_ok(), !dirty, "{result:?}");
+    }
+    println!("R7 invariant: 1 accepted / 1 rejected (static proof, no execution)");
+}

@@ -348,11 +348,12 @@ pub fn r7_witness(case: &str) -> (String, &'static str, &'static str) {
         "rotate-8" => ("c = qalloc any 4\nx c[0]\nqloop 8 {\nh t\nb = qborrow any 1\ncx c[3] b\nqreturn b\nh t\nswap c[3] c[2]\nswap c[2] c[1]\nswap c[1] c[0]\n}\nqloop 8 {\nh t\nswap c[1] c[0]\nswap c[2] c[1]\nswap c[3] c[2]\nh t\n}\nx c[0]\nqfree c", &[8, 8], "4036a594dfa32ab65353367719970549a2cbe1237e471ff6f43b169e09844112", "bc9ac8d642fe4c4569d81021da302108919d500fda82cde3577a2916b681068c"),
         _ => panic!("unknown round-7 witness"),
     };
-    (
-        borrow_lifetime_object(body, bounds)
-            .replace("perm_action", "action")
-            .replace(&"0".repeat(64), h),
-        h,
-        oh,
-    )
+    let text = borrow_lifetime_object(body, bounds)
+        .replace("perm_action", "action")
+        .replace(&"0".repeat(64), h);
+    // Bind even rejected witnesses to their exact published stored-H bytes.
+    if !oh.is_empty() {
+        assert_eq!(bennett_isa_ref::sha256_hex(text.as_bytes()), oh);
+    }
+    (text, h, oh)
 }

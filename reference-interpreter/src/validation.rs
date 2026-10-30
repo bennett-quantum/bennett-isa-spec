@@ -185,7 +185,8 @@ impl Object {
                     let mut iteration = 0;
                     while iteration < n {
                         if selectors.is_empty() {
-                            if let Some((prior, _)) = seen.iter().find(|(_, prior)| prior == s) {
+                            let key = s.cycle_key();
+                            if let Some((prior, _)) = seen.iter().find(|(_, prior)| *prior == key) {
                                 let period = iteration - prior;
                                 let skip = (n - iteration) / period * period;
                                 if skip != 0 {
@@ -193,7 +194,7 @@ impl Object {
                                     continue;
                                 }
                             }
-                            seen.push((iteration, s.clone()));
+                            seen.push((iteration, key));
                         } else {
                             s.predicates
                                 .extend((0..=iteration).map(|k| format!("{}[{k}]", a[2])));
@@ -1427,6 +1428,33 @@ impl Discipline {
             modified: BTreeSet::new(),
         }
     }
+    /// Closure epochs are observed only by equality to saved computing epochs.
+    /// Compare their order/equality classes, not an irrelevant absolute clock.
+    /// Actual state/epochs stay unchanged, including selector snapshots outside
+    /// this loop. A skipped period preserves every live window comparison.
+    fn cycle_key(&self) -> Self {
+        let mut key = self.clone();
+        let mut epochs: BTreeMap<String, BTreeSet<u64>> = BTreeMap::new();
+        for (wire, epoch) in &self.closed {
+            epochs.entry(wire.clone()).or_default().insert(*epoch);
+        }
+        for creation in self.created.values() {
+            for (wire, epoch) in &creation.closures {
+                epochs.entry(wire.clone()).or_default().insert(*epoch);
+            }
+        }
+        let rank =
+            |wire: &str, epoch: u64| epochs[wire].iter().position(|v| *v == epoch).unwrap() as u64;
+        for (wire, epoch) in &mut key.closed {
+            *epoch = rank(wire, *epoch);
+        }
+        for creation in key.created.values_mut() {
+            for (wire, epoch) in &mut creation.closures {
+                *epoch = rank(wire, *epoch);
+            }
+        }
+        key
+    }
     fn wires(&self, n: &str) -> Result<Vec<String>> {
         let n = n.strip_prefix('!').unwrap_or(n);
         let (base, index) = if let Some((base, index)) = n.split_once('[') {
@@ -1887,6 +1915,36 @@ pub(crate) fn region_declarations(f: &Function) -> Vec<&Instruction> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn r7_epoch_cycle_equivalence_preserves_open_and_closed_windows() {
+        let object = Object::parse(include_str!("../tests/fixtures/inc8.bisa")).unwrap();
+        let f = &object.functions["inc8"];
+        let mut state = Discipline::new(f, BTreeMap::new());
+        state.closed.insert("t".into(), 10);
+        state.created.insert(
+            "copy".into(),
+            Creation {
+                kind: "qcopy".into(),
+                sources: vec!["t".into()],
+                versions: vec![],
+                controls: vec![],
+                closures: vec![("t".into(), 10)],
+            },
+        );
+        let open = state.cycle_key();
+        assert!(!state.window_closed(&state.created["copy"]));
+        state.closed.insert("t".into(), 100);
+        state.created.get_mut("copy").unwrap().closures[0].1 = 100;
+        assert_eq!(open, state.cycle_key());
+        state.closed.insert("t".into(), 101);
+        assert!(state.window_closed(&state.created["copy"]));
+        let closed = state.cycle_key();
+        assert_ne!(open, closed);
+        state.closed.insert("t".into(), 102);
+        assert_eq!(closed, state.cycle_key());
+        assert_eq!(state.closed["t"], 102); // keys never mutate actual epochs
+        assert!(state.window_closed(&state.created["copy"]));
+    }
     #[test]
     fn exchange_entry_histories_have_compact_references() {
         let f = Function {

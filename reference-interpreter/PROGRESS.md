@@ -15,7 +15,7 @@ Tracking bead b-isa-spec-lto. Sole interpreter implementer; no push.
 | SOL-R7-B01 | r7_restored_zero_before_borrow / r7_cli_restored | exact witness green | 1caa062 |
 | SOL-R7-B02 ≡ R7-B01 | r7_reject_loop_bad, r7_nonpermutation_loop_positive, r7_reject_rotate_4/8; CLI counterparts | exact witnesses green | 1caa062 |
 | R7-B02 | r7_diagonal_basis, r7_readonly_control; CLI counterparts | exact witnesses green | 1caa062 |
-| SOL-R7-B03 | r7_dyadic_scaled_conversion_boundary_rounding_and_subnormals; r7_cli_bounded_5000_h_t_reports_finite_amplitudes | exact witness and rounding/cancellation checks green | this numeric commit |
+| SOL-R7-B03 | r7_dyadic_scaled_conversion_boundary_rounding_and_subnormals; r7_cli_bounded_5000_h_t_reports_finite_amplitudes | exact witness and rounding/cancellation checks green | 51d45dc |
 
 RED before source edits: library 0 passed / 7 failed; CLI 0 passed / 7
 failed. Both bad-loop admissions and all four erroneous rejections reproduced.
@@ -34,6 +34,37 @@ that attempt is not RED evidence. The pinned old-conversion replay reproduced
 the member's diagnostic (35.89 s), followed by GREEN (70.78 s). An intermediate
 conversion failed the new subnormal assertion; exact power-of-two construction
 fixed it before commit. Diagnostic rejection of truly non-finite JSON remains.
+
+Deterministic R7 families: **93 accepted / 63 rejected** in 3 passing tests:
+60/24 diagonal/control/inverse cases, 32/38 evolving-loop cases, and 1/1
+large noncycling fact-invariant cases. Small loops include renamed unrollings,
+nested 2×2, trips 1/3/4/5/8; huge H/X evolving controls cover 2^40 in both
+valid and invalid shapes. Every accepted executed case uses the independent
+I_t tensor I_bR map; the invariant-only case is explicitly static evidence.
+Original RNG distribution/seeds are unchanged. Primitive 5000 H/T quantum
+map and exact reversal: 1 passed (3.54 s). Rejected literal byte hash pins:
+7 passed / 0 failed after strengthening the support helper.
+
+The family exposed an existing absolute-window-clock cycle-key problem.
+`validation.rs::Discipline::cycle_key` compares rank-normalized current/saved
+epochs, preserving all open/closed window comparisons and leaving actual
+counters unchanged. The huge H/X family was interrupted before this correction;
+afterwards it passes. A dedicated window-equivalence unit passes too.
+Tracking b-isa-spec-gui. Broader existing noncancelling §6 operation histories
+(huge TH, swap rotations and an outstanding-copy variant) remain enumerative:
+exploratory runs were interrupted without a completed result, not counted as
+passes/rejections; follow-up **b-isa-spec-436**. No ISA count was capped or
+newly rejected. The final huge noncycling *borrow-fact* case uses H X X H,
+whose independent matrix is I but whose intervening touches force the new
+unknown-top invariant proof. Rotation family coverage is through eight visits;
+large evolving positive and negative controls use H/X.
+
+Normal suite after families: **295 passed / 0 failed / 5 ignored** (6 unit,
+289 integration); new window-equivalence unit separately **1 passed**.
+Strict all-target Clippy and fmt --check passed before that test-only addition.
+Read-only standalone conformance: **445 pass / 0 fail / 60 unavailable / 505**,
+exit 2; concurrent conformance additions are outside this implementation.
+Fresh five-sweep run and final 296-test gate are recorded below when complete.
 
 The borrow engine now walks structured nodes with per-wire ANF basis facts.
 Unknown is a fresh independent symbol, never zero. Permutations transform facts;
