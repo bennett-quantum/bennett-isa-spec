@@ -29,6 +29,7 @@ struct Context {
     controls: Vec<Wire>,
     legacy: bool,
     declarations: BTreeMap<String, Json>,
+    allocations: BTreeMap<String, (String, usize, String, String)>,
 }
 fn f<'a>(j: &'a Json, k: &str) -> Result<&'a Json, String> {
     j.get(k).ok_or_else(|| format!("missing {k}"))
@@ -419,16 +420,13 @@ impl Expander {
                         s(f(declaration, "class")?)?.into(),
                         s(f(declaration, "state")?)?.into(),
                     ));
+                    c.allocations
+                        .insert(name.into(), leaf.allocation.clone().unwrap());
                 } else {
-                    let ws = c
-                        .wires
+                    c.wires
                         .remove(name)
                         .ok_or_else(|| format!("release unbound {name}"))?;
-                    let identity = ws
-                        .first()
-                        .map(|w| w.0.clone())
-                        .unwrap_or_else(|| format!("empty/{name}"));
-                    leaf.allocation = Some((identity, ws.len(), "any".into(), "clean".into()));
+                    leaf.allocation = Some(c.allocations.remove(name).ok_or("unmatched release")?);
                 }
                 leaf.gate = if allocating { "alloc" } else { "release" }.into();
                 leaf.controls.clear();
@@ -536,4 +534,54 @@ impl Expander {
         }
         Ok(())
     }
+}
+
+/// Lower typed permutation leaves to the independently compiled packed-basis
+/// machine. Controlled swaps use a balanced CX / multi-control-X / CX sequence.
+pub fn permutation(leaves: &[Leaf]) -> Result<Vec<crate::ref_catalog::Leaf>, String> {
+    use crate::ref_catalog::{Leaf as OldLeaf, Operation};
+    let mut out = Vec::new();
+    for l in leaves {
+        let mut emit = |operation| {
+            out.push(OldLeaf {
+                ordinal: l.ordinal,
+                operation,
+            })
+        };
+        if let Some((name, w, _, state)) = &l.allocation {
+            if state != "clean" {
+                return Err("borrowed wires must be explicit witness inputs".into());
+            }
+            emit(if l.gate == "alloc" {
+                Operation::Alloc(name.clone(), *w)
+            } else {
+                Operation::Release(name.clone(), *w)
+            });
+        } else if l.gate == "swap" {
+            if l.controls.is_empty() {
+                emit(Operation::Gate("swap".into(), l.wires.clone()));
+            } else {
+                let a = l.wires[0].clone();
+                let b = l.wires[1].clone();
+                emit(Operation::Gate("cx".into(), vec![a.clone(), b.clone()]));
+                let mut ws = l.controls.clone();
+                ws.push(b.clone());
+                ws.sort();
+                ws.dedup();
+                ws.push(a.clone());
+                emit(Operation::Gate("mcx".into(), ws));
+                emit(Operation::Gate("cx".into(), vec![a, b]));
+            }
+        } else if matches!(l.gate.as_str(), "x" | "cx" | "ccx" | "mcx") {
+            let mut ws = l.controls.clone();
+            ws.extend_from_slice(&l.wires[..l.wires.len() - 1]);
+            ws.sort();
+            ws.dedup();
+            ws.push(l.wires.last().unwrap().clone());
+            emit(Operation::Gate("mcx".into(), ws));
+        } else {
+            return Err(format!("non-permutation leaf {}", l.gate));
+        }
+    }
+    Ok(out)
 }

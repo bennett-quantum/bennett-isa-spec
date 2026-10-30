@@ -1,0 +1,23 @@
+{
+  "id": "E-ref-09-assignment-rows",
+  "suite": "E",
+  "spec": "\u00a74.2 assignments and faults; \u00a711.1 K19",
+  "derivation": "All value computations precede assignment exchanges. Faulting divisions preserve the destination, compute old-state flags, write code 5/6 and clean their code scratch under the saved flag. Parallel aliases capture before exchanges. Full domains include both controls and arbitrary destination/code/faulted entries; reverse ordinals restore the entry tuple.",
+  "scenario": {
+    "widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "checker": "ref_rows.rs and ref_div_rows.rs"
+  },
+  "expected_outcome": {
+    "tuples": 1318048,
+    "total_recipes": 153
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-8r4; complete catalog and accepted K19 required"
+  }
+}

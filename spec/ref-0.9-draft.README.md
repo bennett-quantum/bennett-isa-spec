@@ -141,3 +141,21 @@ bytes and its execution point. The expander rejects opcode mismatches.
 The 16,320 configurations at widths 1–4 check exact event-byte preservation;
 these are binding witnesses, not a second classical interpreter.
 The catalog currently has 102 recipes; its digest is a checkpoint only.
+
+### Lifted assignments and faults
+
+`lift.add/sub/mul/and/or/xor/shl/lshr/ashr`, `lift.icmp.<pred>`,
+`lift.zext/sext/trunc`, `lift.select/mov/parmov`, `lift.const/label/addr`,
+`lift.udiv/urem/sdiv/srem`, `lift.faultif`, `lift.retval`, and `fault` now
+encode assignment/effect order. `t` is the clean displacement slot and
+`w` the old destination. `parmov` concatenates heterogeneous bundles in
+slot order and captures every bit before any exchange. Literal C is the
+canonical unsigned bit-vector value or resolved label/layout base.
+New `bind.value.*` adapters implement positional wire binding; shifts scan
+all j<N with a quantum constant counter, so coverage is width-uniform.
+
+The row tests check 1,318,048 tuples at widths 1–4 (details in progress),
+including arbitrary displacement destinations, signed overflow, zero divisors,
+all four-bit code entries, both faulted states, controls and full reversal.
+Generic nested interfaces, output allocations/classes and nonzero region
+images remain blocked on 1a4/3xe/afi respectively; costs are not exclusions.

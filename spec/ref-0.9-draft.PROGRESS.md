@@ -56,3 +56,26 @@ Classical family: 48 `cc.*` event bindings added (102 total recipes).
 16,320 event-binding configurations: all two-operand bit-vector pairs at
 widths 1–4 for each event kind. These check binding bytes, not classical
 execution; history and effects remain ISA §4.1/§7.4 events.
+
+### Lifted assignment and fault rows
+
+Classical commit: 9847d91 (46 Rust tests; harness 445/0/61).
+Added 51 recipes/adapters: width-uniform shifts; add/sub/mul/Boolean,
+all comparisons, casts/select/mov/parmov, resolved const/label/addr,
+faultif/fault, retval, and all four divisions with old-state flags,
+conditional exchange and fault-code writes. 153 recipes total.
+Full domains: 84,240 binop tuples; 10,200 comparison/literal tuples;
+23,800 cast/select/mov/retval/parmov tuples (including parallel alias
+exchange); 1,198,080 division tuples; 1,728 fault tuples. Widths 1–4;
+all four-bit code entries and both faulted entries in division/fault rows.
+Reverse execution restores the complete allocated state; every release
+asserts cleanliness. No matrix claim is made for classical event recipes.
+
+New contract gaps, with exact sentences and required changes in bd:
+- b-isa-spec-afi: §4.6 arbitrary qregion images need unconditional image X
+  identification; inherited environments only add semantic controls.
+- b-isa-spec-1a4: arbitrary symbol interfaces need typed argument-list
+  forwarding (including classical/token values and heterogeneous operands).
+- b-isa-spec-3xe: named allocation classes and output/lifetime binders are
+  absent; passing every class as any would change resource identity.
+Do not treat fixed-width helper circuits as those missing generic bindings.
