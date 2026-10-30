@@ -695,7 +695,7 @@ XOR outcomes, coverage, wide args, signed zero and canonical args hashes.
 Rejected: omitted expected defaulting to oracle; shared invocation registry
 or region-level inheritance; named or sample-only keyed tables. The
 region-inheritance parenthesis was removed to match ratification literally.
-| A1 / ISA-REF-LIB; B6 | §11.1, §17 item 7 (K11) | E-ref-09-qxor-witness; retained qxor envelope | Applied, pending accepted 0.9 | commit containing this row |
+| A1 / ISA-REF-LIB; B6 | §11.1, §17 item 7 (K11) | E-ref-09-qxor-witness; retained qxor envelope | Applied, pending accepted 0.9 | `05675d1dc80763cc2cc7d217f3129f5658ecdb07` |
 
 Step 3: schema, envelope hash, ordinals, scratch identity, empty removable
 sets and the complete deterministic decomposition families are decided.
@@ -709,3 +709,16 @@ realisation gate remains a delivery dependency, not an undecided contract.
 Gate note: raw unified diffs contain space-only context lines by design;
 git diff --check covers source/progress/conformance, and the diff artifact
 is verified by regeneration rather than stripping its context bytes.
+| A6 / topology | §8.2–§8.3, §11, §17 item 15 (K14/D1) | E-topology-grid-09 | Applied, pending accepted 0.9 | commit containing this row |
+
+Step 4: optional vertices/edges with addressable classes, pairwise native
+adjacency and concrete schedule placement. The memo does not enumerate
+placement fields or multi-operand connectivity: §11 supplies explicit
+interface/allocation vertex arrays plus deterministic defaults, and §8.3
+uses pairwise adjacency for native gates with more than two operands.
+These details prevent conformant consumers choosing different placements;
+scheme leaves validate separately. Explicit swap sequences keep routed
+computation reachable while automatic routing/cost rules wait for 0.10.
+Rejected: omitting topology entirely, or deferring its presence/meaning.
+Python -I JCS/hash and an independent Rust grid/byte/hash test check the
+new witness. Canonical bytes have no trailing LF (b-isa-spec-1pl).

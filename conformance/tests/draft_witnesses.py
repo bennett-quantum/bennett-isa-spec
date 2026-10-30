@@ -134,3 +134,19 @@ assert hashlib.sha256(json.dumps(changed, separators=(",", ":")).encode()).hexdi
 # Carry at a decade boundary and >34-digit integer rounding still enclose.
 assert decimal_upper(Fraction(10**35-1, 10**34), 34) == "10"
 assert decimal_upper(Fraction(10**34+1), 34) == str(10**34+10)
+
+# ASCII/integer-only subset: json.dumps is JCS for these fixtures.
+grid = witness("TOPOLOGY witness")
+grid_dir = root / "conformance/cases/E/E-topology-grid-09"
+grid_bytes = json.dumps(grid, sort_keys=True, separators=(",", ":")).encode()
+assert (grid_dir / "target.json").read_bytes() == grid_bytes
+assert grid_bytes[-1:] == b"}"
+assert grid["topology"]["vertices"] == [{"class": "fast"}] * 4
+coords = [(x, y) for y in range(2) for x in range(2)]
+edges = [[u, v] for u, p in enumerate(coords) for v, q in enumerate(coords) if u < v and abs(p[0]-q[0])+abs(p[1]-q[1]) == 1]
+assert grid["topology"]["edges"] == edges
+assert [0, 1] in edges and [0, 3] not in edges
+assert grid["classes"]["fast"]["capacity"] == len(coords)
+grid_hash = hashlib.sha256(grid_bytes).hexdigest()
+assert json.loads((grid_dir / "case.json").read_text())["expected_outcome"]["target_hash"] == grid_hash
+assert f"Target SHA-256: `{grid_hash}`." in draft

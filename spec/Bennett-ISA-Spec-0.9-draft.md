@@ -105,7 +105,7 @@ north star §3.1 requires).
 | E17.15 | §3.3, §4.2 | A lifted row's `.iN`/`.iM` suffix names a location width and has no upper bound (except `lift.load`/`lift.store`), so wide locations can be initialised and cast | review of this draft (after E17.1) | S | – |
 | E17.16 | §3.6, §4.2 | `qjumpr` to an in-range index that is not a block's first row enters that row (the kept 0.8 sentence read "any other index faults" under block indexing); re-indexing preserves every reachable row index | review of this draft (after E1) | E | – |
 | E17.17 | §2, §3.3, §10, §17 item 14 | **Verifying** versus non-verifying executors defined; cleanliness tests (`qreg.free`, host prepare/free) stated for both | review of this draft | E | – |
-| D1 | §17 item 15, §8.2 | Target topology deferred with a default (all-to-all, no topology field) | zsw.16 | E | – |
+| D1 | §17 item 15, §8.2–§8.3, §11 | Routing/movement cost deferred to 0.10; optional topology and placement decided by K14 | zsw.16; b-isa-spec-wr7 | S | – |
 | D2 | – | Deferred r8 suggestions: zsw.4 (the controlled-action target/schedule/certificate fixture waits for `ref`, §17 item 7), zsw.5 (citation unverified), zsw.14 (`ref` artefact, §17 item 7) | zsw.4, .5, .14 | – | – |
 
 ### 0.2 Group 2: capability contracts
@@ -125,6 +125,8 @@ north star §3.1 requires).
 | K11 | §11.1, §17 item 7 | **ISA-REF-LIB (ratified A1)**. Decided serialization, envelope hash, ordinals, scratch/removable rules and decomposition set; witness only, publication gated on accepted 0.9 | bennett-vm-47t; b-isa-spec-8r4 (open) | S | new |
 | K12 | §10, §10.1, §12.3 | **LAUNCH-ESTIMATE (ratified A2)**. Resolved parameters, class-preserving resource keys, upward decimal encoding and exact certificate binding; witness | bennett-vm-hsd; b-isa-spec-c15 (open) | S | – |
 | K13 | §9.2, §12.1–§12.3 | **CLAIM-REPLAY (ratified A3)**. Mandatory sampled expected relation, standalone invocation binding, canonical parameter and full-table tuple encoding; witness; sampling stays evidence | bennett-vm-clw; b-isa-spec-9uy (open) | S | – |
+
+| K14 | §8.2–§8.3, §11, §17 item 15 | **Topology (ratified A6)**: optional ordered class vertices and undirected edges; native adjacency, scheme/placement binding; absent all-to-all; routing deferral with explicit-gate construction | b-isa-spec-wr7; b-targets-dd3; circuits b4k | S | – |
 
 **Applied Q14 (2026-10-29, b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -1511,8 +1513,8 @@ concurrently live wires per class (concurrent demands sum). Classical
 instructions and effects take `classical_step_time`. Sequential in
 program order unless the schedule assigns start times; a gate occupies
 its wires for its `time`; gates on disjoint wires MAY overlap unless
-`max_parallel` is declared; all-to-all over logical wires (target 0.9
-has no topology field, §17 item 15).
+`max_parallel` is declared. Connectivity is all-to-all when `topology`
+is absent, and is constrained by §8.3 when present (§17 item 15).
 Interface wires are charged to the caller for the call's duration;
 borrowed wires to the borrower at `dirty_rate`, replacing the owner's
 charge.
@@ -1522,6 +1524,7 @@ charge.
 ```
   "ptr_widths_supported": [32, 64],
   "classes": { "<cls>": { "qubit_second": n, "dirty_rate": n, "capacity": n | "unbounded" } },
+  "topology"?: { "vertices": [ { "class": "<cls>" }, … ], "edges": [ [u, v], … ] },
   "gates":   [ { "op": "<gate>", "classes": ["<cls>"|"*", …], "controls": {"min": n, "max": n | "unbounded"},
                  "params": ["theta"]?, "epsilon": expr, "cost": { "<resource>": expr, "time": expr } }, … ],
   "schemes": [ { "name": "<name>", "realises": { "op": "<gate>", "controls": {"min": n, "max": n | "unbounded"}, "params": ["theta"]? },
@@ -1553,6 +1556,35 @@ ancilla; `params` expressions may use `theta`; `repeat` binds `i` over
 of its template gates' charged errors. Scheme ancillae add to the frame
 descriptor. A scheme's correctness is the target author's obligation
 (suite E: T3 for permutation schemes, suite D for ε > 0).
+
+**Topology.** `topology` is optional. Its `vertices` array orders the
+physical vertices; a vertex's index is its address and its `class` MUST
+name a declared addressable class. Each edge is an undirected pair of
+integer indices `[u,v]`, with `0 ≤ u < v < vertices.length`; edges MUST
+be sorted lexicographically, without duplicates or self-loops. Unknown
+fields reject. Each live wire occupies one vertex of its resolved
+class, distinct from every other simultaneously live wire. The number
+of vertices of a class limits occupancy in addition to its capacity.
+A native multi-wire gate is realisable only if every pair of its
+operand vertices is joined by an edge (including all effective control
+wires); single-wire gates need no edge. Target schemes MUST meet this
+rule for each native template leaf, including their ancillae. §11
+schedules bind these placements to the target hash. Absent `topology`
+means all-to-all with the existing class capacities. Routing and
+movement costs are deferred to 0.10 under §17 item 15; placement itself
+is validated in 0.9.
+
+**TOPOLOGY witness**
+
+```json
+{"capabilities":{"classical_step_time":1,"max_parallel":"unbounded","max_predicate_depth":"unbounded","mbu":false,"measurement":{"feedforward_latency":0,"mid_circuit":false}},"classes":{"fast":{"capacity":4,"dirty_rate":1,"qubit_second":1}},"gates":[{"classes":["fast"],"controls":{"max":1,"min":1},"cost":{"time":1},"epsilon":0,"op":"cx"}],"imports":{},"objective":{"weighted":{"time":1}},"ptr_widths_supported":[32],"qram":null,"resources":{"peak_qubits":{"kind":"peak","unit":"qubit"},"qubit_second":{"kind":"occupancy","unit":"qubit_second"},"time":{"kind":"time","unit":"second"}},"schemes":[],"tables":{},"topology":{"edges":[[0,1],[0,2],[1,3],[2,3]],"vertices":[{"class":"fast"},{"class":"fast"},{"class":"fast"},{"class":"fast"}]}}
+```
+
+The vertices are the row-major 2×2 grid; its four edges connect
+horizontal and vertical neighbors. A CX on vertices 0 and 1 is
+realisable; on 0 and 3 it is infeasible under §17 item 15. The canonical
+UTF-8 bytes above exclude the code-fence LF.
+Target SHA-256: `960cee71e88da141cc6c2b13cab3f28fce1d50c006e67446aadb592e2bfd0882`.
 
 ### 8.4 Space budget
 
@@ -2009,14 +2041,30 @@ remove only operations the library marks removable.
 ```
   { "bindings": { "closure_hash", "target_hash", "region", "variant", "inherited_controls", "budget": [B,heap,stack,depth],
                   "params_hash", "epsilon", "expansion": { "name", "version", "hash" }, "scheduler": { "name", "version" } },
+    "interface_vertices"?: [ [v, …], … ],
     "entries": [ { "path": [ { "symbol": hex, "point": "<block>:<ordinal>", "iteration": [n, …] | "*" }, … ],
                    "step": n | "*",  "phase": "fwd" | "rev" | "*",  "generated": n | "*",
                    "kind": "cleanup" | "gate" | "alloc" | "start",
                    "cleanup": { "realisation": "reverse" | "recompute" },
                    "gate":    { "realisation": "native" | "<scheme name>", "epsilon_share": decimal },
-                   "alloc":   { "class": "<cls>" },           /* a concrete class; "any" is not allowed in a schedule */
+                   "alloc":   { "class": "<cls>", "vertices"?: [v, …] },           /* a concrete class; "any" is not allowed in a schedule */
                    "start":   { "time": decimal } } ] }
 ```
+
+**Topology placement.** With a §8.3 topology, `interface_vertices`
+lists one vertex array per root interface slot in §9.4 slot order,
+including inherited controls first; array elements follow bit order
+(and region cell address then bit order). A callee inherits its actual
+operand placements. `alloc.vertices`, when present, assigns every bit
+of that allocation in bit order. These arrays MUST have the declared
+width, resolve to the correct classes and have disjoint live uses;
+without a topology they MUST be absent. Omitted placements use the
+lowest-index free vertex of the resolved class, assigning bits in order;
+interface slots are assigned first in slot order, then allocations in
+generated order. Vertices are retained for a wire's lifetime and freed
+on release; borrowed wires retain their owner's vertices. Every native
+leaf, including scheme leaves, MUST satisfy §8.3 adjacency, else
+`E_SCHEDULE_INFEASIBLE` naming §17 item 15. No routing is inserted.
 
 **Matching.** Every generated operation has an **invocation chain**: the
 program points of the region calls, `lift.call`s and `lift.oracle_call`s
@@ -3159,11 +3207,14 @@ the item is revised. Items 1–5 are asserted non-semantic.
     `bennett_qreg_prepare` and `bennett_qreg_free` on a non-verifying
     executor. A verifying executor tests and records `FAULT_UB_TRAP` on
     failure (§4.9), or returns `E_QREG_NOT_CLEAN` from the host calls.
-15. **Target topology** (§8.2, §8.3). target 0.9 has no topology field
-    (an unknown field is a load error). Default: all-to-all over
-    logical wires, overlap limited only by `max_parallel`; a routing
-    cost a target wishes to charge is a declared resource (`resources`,
-    `imports`, §8.2–§8.3).
+15. **Routing and movement cost under a topology** (§8.2–§8.3, §11),
+    deferred to 0.10. Default: no routing cost is charged and no routing
+    is inserted; a schedule that needs a non-adjacent pair is
+    `E_SCHEDULE_INFEASIBLE` naming this item. Absent topology remains
+    all-to-all. A producer can supply an explicitly routed gate sequence
+    using §4.4 `swap` gates; those gates execute and are charged normally.
+    The optional topology schema and adjacency validation are decided in
+    0.9; only automatic routing and its movement-cost model are deferred.
 16. **Exhaustion of an executor's own classical resources in CC/R**
     (activation stack, history storage; §4.9). CC and R carry no budget
     (§5.4 budgets are Q-tier), so where a finite executor runs out is

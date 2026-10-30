@@ -1,0 +1,27 @@
+{
+  "id": "E-topology-grid-09",
+  "suite": "E",
+  "spec": "\u00a78.2\u2013\u00a78.3 optional topology; \u00a711 placement; \u00a717 item 15",
+  "derivation": "Row-major two-by-two grid: connect horizontal and vertical nearest neighbors. Four fast vertices and four edges; diagonal pairs are non-adjacent. Canonical ASCII/integer JCS bytes have no LF. No routing or movement is inserted.",
+  "scenario": {
+    "target": "target.json",
+    "adjacent": [
+      0,
+      1
+    ],
+    "non_adjacent": [
+      0,
+      3
+    ]
+  },
+  "expected_outcome": {
+    "target_hash": "960cee71e88da141cc6c2b13cab3f28fce1d50c006e67446aadb592e2bfd0882",
+    "native_cx_adjacent": "realisable",
+    "native_cx_non_adjacent": "E_SCHEDULE_INFEASIBLE: \u00a717 item 15",
+    "absent_topology": "all-to-all"
+  },
+  "unavailable": {
+    "deliverable": 9,
+    "reason": "unavailable pending 0.9: b-isa-spec-wr7; optional topology and physical placements require accepted 0.9"
+  }
+}
