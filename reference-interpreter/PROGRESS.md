@@ -15,7 +15,12 @@ restoration and independence before later pool reuse. Exact X/CX witnesses
 reject at parse/hash/check with or without metadata. Targeted borrow/certificate
 suite: 24 pass, 0 fail, 2 ignored; round-4 pins remain green. Reading 20 now
 explicitly records per-completed-lifetime qualification. See appendable
-council/response-round-5.md. Remaining received blockers B02–B04 are in progress.
+council/response-round-5.md. SOL-R5-B02 also resolved after RED on the exact clean-d loop: Repeat
+composes per-return restoration/independence obligations through every reachable
+entry using doubling, preserving clean invariants without aggregate cancellation.
+Trips 1/2/3/2^40, nesting, renamed unrolling, d=1 negatives and a second-entry
+toggle pin pass. Borrow/certificate/generator targets: 32 pass, 0 fail, 3 ignored.
+Remaining received blockers B03–B04 are in progress.
 
 Correction to round-4 evidence: the original X/CX rejection pins lacked
 certificate-adorned subjects, and generic-body proof discarded clean entry

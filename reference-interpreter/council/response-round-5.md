@@ -32,3 +32,26 @@ remain green: targeted borrow/certificate run **24 passed, 0 failed, 2 ignored**
 No new ambiguity or blocker decline. §4.3 requires qreturn to be the matched
 inverse after its frame; §§5.1/5.6 require the property per completed lifetime.
 Final whole-suite/conformance verification follows after all received blockers.
+
+## SOL-R5-B02 — resolved
+
+RED: `r1_borrow::sol_r5_b02_clean_surrounding_loop_controls_are_reachable_invariants`
+rejected the exact clean-d witness with §5.6. `Evaluation` now records
+restoration equations and Boolean-derivative independence obligations at each
+Return (and cleanliness equations at Free). Repeat composes both its carried
+map and these obligations by doubling: obligations in a later block are
+substituted through the preceding block's map. Only then are actual entry
+values substituted. All obligations must vanish, independently of the final
+map; repeated constraints are deduplicated, never parity-cancelled. No unrolling
+bound or wire/trip cap is introduced.
+
+The exact positive accepts at trips 1,2,3,2^40, with nesting; hash/check pass,
+and forward/adjoint preserve all interface/borrowed basis entries,
+superposition and an external entangled reference. Alpha-renamed unrollings
+agree. Setting d=1 before the loop and restoring it afterward rejects at
+every bound, including even counts. An additional d-toggle witness checks the
+second reachable entry: first-entry validity alone cannot admit it.
+
+GREEN: borrow/certificate/generator targets **32 passed, 0 failed, 3 ignored**,
+including all round-4 lifetime and opaque-composition pins. No spec question:
+§§4.3/5.2/14.2 fix allocation at zero and §4.6 requires the body n times.

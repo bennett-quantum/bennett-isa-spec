@@ -505,3 +505,59 @@ fn muse_r4_b01_carried_and_local_borrow_cx_identities_have_no_trip_cap() {
         }
     }
 }
+
+#[test]
+fn sol_r5_b02_clean_surrounding_loop_controls_are_reachable_invariants() {
+    for n in [1, 2, 3, 1 << 40] {
+        for nested in [false, true] {
+            let inner = format!("qloop {n} {{\nb = qborrow any 1\ncx d b\nqreturn b\n}}");
+            let (loops, bounds) = if nested {
+                (format!("qloop 3 {{\n{inner}\n}}"), vec![3, n])
+            } else {
+                (inner, vec![n])
+            };
+            // d=0 is unchanged: EACH CX is I on arbitrary/entangled beta_i.
+            let body = format!("d = qalloc any 1\n{loops}\nqfree d");
+            let o = support::rehash(&support::borrow_lifetime_object(&body, &bounds));
+            support::borrow_identity(&o);
+            let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(".tmp");
+            let path = dir.join(format!("r5-clean-{n}-{nested}.bisa"));
+            std::fs::write(&path, &o.text).unwrap();
+            for cmd in ["hash", "check"] {
+                let out = std::process::Command::new(env!("CARGO_BIN_EXE_bennett-isa-ref"))
+                    .arg(cmd)
+                    .arg(&path)
+                    .output()
+                    .unwrap();
+                assert!(out.status.success(), "{out:?}");
+            }
+            // d=1 makes each return invalid, including at even trip counts.
+            let bad = format!("d = qalloc any 1\nx d\n{loops}\nx d\nqfree d");
+            support::reject_cli(
+                &support::borrow_lifetime_object(&bad, &bounds),
+                "§5.6",
+                &format!("r5-dirty-{n}-{nested}"),
+            );
+            if n <= 3 {
+                let unrolled = (0..n)
+                    .map(|i| format!("b{i} = qborrow any 1\ncx d b{i}\nqreturn b{i}"))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                support::borrow_identity(&support::rehash(&support::borrow_lifetime_object(
+                    &format!("d = qalloc any 1\n{unrolled}\nqfree d"),
+                    &[],
+                )));
+            }
+        }
+    }
+    // Reachability must include later iterations: d=0 on the first entry,
+    // then toggles to 1. A first-iteration-only check would admit this.
+    support::reject_cli(
+        &support::borrow_lifetime_object(
+            "d = qalloc any 1\nqloop 2 {\nb = qborrow any 1\ncx d b\nqreturn b\nx d\n}\nqfree d",
+            &[2],
+        ),
+        "§5.6",
+        "r5-later-entry",
+    );
+}

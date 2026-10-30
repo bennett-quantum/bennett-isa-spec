@@ -597,6 +597,7 @@ struct Application {
 /// Symbolic evaluation state of one frame.
 struct Evaluation<'a> {
     opaque_seen: bool,
+    obligations: BTreeMap<Poly, String>,
     vars: BTreeMap<String, u32>,
     state: BTreeMap<String, Poly>,
     opaque: BTreeMap<Application, u32>,
@@ -652,6 +653,20 @@ impl Evaluation<'_> {
             .map(|(w, p)| Ok((w.clone(), self.substitute(p, &sub)?)))
             .collect()
     }
+    fn transport_obligations(
+        &mut self,
+        obligations: &BTreeMap<Poly, String>,
+        map: &BTreeMap<String, Poly>,
+    ) -> Result<BTreeMap<Poly, String>> {
+        let sub = map
+            .iter()
+            .filter_map(|(w, p)| self.vars.get(w).map(|v| (*v, p.clone())))
+            .collect();
+        obligations
+            .iter()
+            .map(|(p, message)| Ok((self.substitute(p, &sub)?, message.clone())))
+            .collect()
+    }
     fn var(&mut self, w: &str) -> Poly {
         if let Some(p) = self.state.get(w) {
             return p.clone();
@@ -696,19 +711,28 @@ impl Evaluation<'_> {
             Node::Return(wires) => {
                 let returned: BTreeSet<_> = wires.iter().map(|w| self.vars[w]).collect();
                 for w in wires {
-                    if self.var(w) != Poly::var(self.vars[w]) {
-                        return err(
-                            "§5.6",
-                            format!("qreturn does not restore borrowed wire {w}"),
-                        );
-                    }
+                    let difference = self.var(w).xor(&Poly::var(self.vars[w]));
+                    self.obligations.insert(
+                        difference,
+                        format!("qreturn does not restore borrowed wire {w}"),
+                    );
                 }
                 for (w, p) in &self.state {
-                    if !wires.contains(w) && p.mentions(&returned) {
-                        return err(
-                            "§5.6",
-                            format!("qreturn output {w} depends on borrowed entry values"),
-                        );
+                    if !wires.contains(w) {
+                        // Boolean derivative: zero iff this output is independent
+                        // of this lifetime's fresh borrowed entry bit.
+                        for v in &returned {
+                            let derivative = Poly(
+                                p.0.iter()
+                                    .filter(|m| m.contains(v))
+                                    .map(|m| m.iter().filter(|x| *x != v).copied().collect())
+                                    .collect(),
+                            );
+                            self.obligations.insert(
+                                derivative,
+                                format!("qreturn output {w} depends on borrowed entry values"),
+                            );
+                        }
                     }
                 }
                 for w in wires {
@@ -722,9 +746,11 @@ impl Evaluation<'_> {
             }
             Node::Free(wires) => {
                 for w in wires {
-                    if self.var(w) != Poly::zero() {
-                        return err("§5.6", "a wire released inside a borrow frame is not clean");
-                    }
+                    let value = self.var(w);
+                    self.obligations.insert(
+                        value,
+                        "a wire released inside a borrow frame is not clean".into(),
+                    );
                     self.state.remove(w);
                 }
             }
@@ -766,11 +792,10 @@ impl Evaluation<'_> {
                 if *n == 0 {
                     return Ok(());
                 }
-                // Prove all internal return boundaries on the generic body
-                // BEFORE squaring its surviving-wire map. Borrowed systems
-                // whose lifetimes span the loop remain in that map and may be
-                // restored by its full power, rather than by each iteration.
-                // The body as a map from its wires' entry values; M^n by squaring.
+                // Summarize both the carried map AND every internal lifetime
+                // obligation. Doubling transports obligations to each reachable
+                // entry; known-clean surrounding state is substituted only after
+                // composition, without assuming all iterations share that state.
                 let mut wires = BTreeSet::new();
                 for b in body {
                     b.wires(&mut wires);
@@ -787,11 +812,15 @@ impl Evaluation<'_> {
                     .map(|w| (w.clone(), Poly::var(self.vars[w])))
                     .collect();
                 let saved = std::mem::replace(&mut self.state, identity);
+                let saved_obligations = std::mem::take(&mut self.obligations);
                 for b in body {
                     self.apply(b)?;
                 }
                 let body_map = std::mem::replace(&mut self.state, saved);
                 let mut power: BTreeMap<String, Poly> = body_map;
+                let mut power_obligations =
+                    std::mem::replace(&mut self.obligations, saved_obligations);
+                let mut result_obligations = BTreeMap::new();
                 let mut result: BTreeMap<String, Poly> = wires
                     .iter()
                     .map(|w| (w.clone(), Poly::var(self.vars[w])))
@@ -799,12 +828,20 @@ impl Evaluation<'_> {
                 let mut k = *n;
                 while k > 0 {
                     if k & 1 == 1 {
+                        result_obligations
+                            .extend(self.transport_obligations(&power_obligations, &result)?);
                         result = self.compose(&result, &power)?;
                     }
                     k >>= 1;
                     if k > 0 {
+                        power_obligations
+                            .extend(self.transport_obligations(&power_obligations, &power)?);
                         power = self.compose(&power, &power)?;
                     }
+                }
+                for (p, message) in result_obligations {
+                    let value = self.substitute(&p, &entry)?;
+                    self.obligations.insert(value, message);
                 }
                 for (w, p) in result {
                     let value = self.substitute(&p, &entry)?;
@@ -907,6 +944,7 @@ fn factorises(
         .collect();
     let mut e = Evaluation {
         opaque_seen: false,
+        obligations: BTreeMap::new(),
         state: vars
             .iter()
             .map(|(w, v)| (w.clone(), Poly::var(*v)))
@@ -925,6 +963,11 @@ fn factorises(
     };
     for n in frame {
         e.apply(n).map_err(|error| failure(&e, error))?;
+    }
+    for (p, message) in &e.obligations {
+        if *p != Poly::zero() {
+            return Err(failure(&e, Error(format!("§5.6: {message}"))));
+        }
     }
     for (w, p) in &e.state {
         match e.vars.get(w) {
