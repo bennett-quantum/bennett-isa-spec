@@ -268,3 +268,34 @@ fn const_literals_outside_the_destination_range_are_rejected_not_reduced() {
         }
     }
 }
+
+#[test]
+fn council_r4_sum_db_literal_step_and_stack_cutoffs() {
+    let o = Object::parse(include_str!("fixtures/sum_db.bisa")).unwrap();
+    // n=0: entry addr/const/call, five base-case rows, ret, retval = 10.
+    // n=2: two recursive levels add 14 each -> 38; db[1]+db[0]=2+1=3.
+    // The third 16-cell activation cannot fit stack=47; call row 29 faults.
+    for (n, steps, stack, depth, expected) in [
+        (0, 9, 16, 1, (0, 1, 9)),
+        (0, 10, 16, 1, (0, 0, 10)),
+        (2, 38, 48, 3, (3, 0, 38)),
+        (2, 37, 48, 3, (0, 1, 37)),
+        (2, 38, 47, 3, (0, 3, 29)),
+    ] {
+        let mut input = OracleInput::bits(&[n]);
+        input.regions.insert("db".into(), (1..=16).collect());
+        let r = o
+            .run_oracle(
+                "sum_db",
+                &input,
+                Budget {
+                    steps,
+                    heap: 4080,
+                    stack,
+                    depth,
+                },
+            )
+            .unwrap();
+        assert_eq!((r.payload, r.code, r.steps), expected);
+    }
+}

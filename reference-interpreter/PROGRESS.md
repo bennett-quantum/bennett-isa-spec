@@ -6,6 +6,75 @@ under `reference-interpreter/`; commit own paths
 (`git add -A -- reference-interpreter && git commit -- reference-interpreter`),
 never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
+## Council round 4, muse third pass (2026-10-30)
+
+MUSE-R4-B01 **resolved by 40ef8ce**, independently pinned in this pass. The
+new exact CX witness was RED on archived round-4 source 8e11fe7, GREEN on the
+current source: each Return proves restoration and independence before Repeat
+composes only its carried-wire map. Added parser/hash/check negatives for
+both CX directions, trips 2/4, nesting and distinct-name unrolling, plus carried
+and local doubled-CX positives at 2 and 2^40 iterations. Every positive preserves
+all t,b basis inputs, superposition and an entangled external reference exactly
+in both directions. No loop cap or unrolling was added; the Repeat comment now
+states the local-lifetime invariant, including inlined children.
+
+Two separate deterministic families add **64 fresh-CX lifetime cases (32 accept /
+32 reject)** and **128 nested-call/mutable-region/borrow-pool cases (96 accept /
+32 reject)**. Expectations come from per-return freshness and an independent
+small Boolean map over the complete interface and memory. All accepted nested
+cases check 32 basis inputs, full superposition and an entangled borrowed
+reference against that map, then reverse exactly. Existing RNG/Python seeds
+and random-sweep distribution are unchanged.
+
+Non-blocking improvements: refuse vacuous --samples 0 (§17.13), cite §5.4 and
+§16.1 in all four reported malformed-option errors, remove seven handle-map
+expects and the SSA retry expect, add independent literal SCC/CC-service
+envelopes, five literal sum_db step/stack boundary tuples, and 132 normal-suite
+recursive prefixes for n=0..3. The CLI witnesses were RED before the fixes.
+Full suggestion-by-suggestion dispositions (including coverage/API/spec-edit
+declines and already-applied earlier suggestions) are in council/response-round-4.md.
+No blocker declines/partials and no new spec ambiguity; SPEC-QUESTIONS unchanged.
+
+Read-only conformance at **92c26af**: **445 pass, 0 fail, 46 unavailable / 491**,
+exit **2** for the existing staged deliverables. The extra unavailable target
+case is disclosed by the updated harness; it is not an interpreter regression.
+The exact command from conformance/PROGRESS.md used the absolute reference
+binary and redirected CARGO_TARGET_DIR into this crate's ignored `.tmp`.
+Conformance/include/spec/docs/worklog/HANDOFF/CLAUDE remained unedited.
+
+### Final muse-pass verification
+
+| Command | Result |
+|---|---|
+| `cargo test --offline` | **242 passed, 0 failed, 5 ignored** (241 integration + 1 unit; 0 doctests; 12.05 s summed runner time) |
+| `cargo test --offline -- --ignored --nocapture` | **5 passed, 0 failed**; 596.07 s summed runner time |
+| `cargo clippy --offline --all-targets -- -D warnings` | clean |
+| `cargo fmt -- --check` | clean |
+| unchanged Python seed `isa_check.py` | passes; seed diff against 8fa5d98 empty |
+| standalone conformance | **445 pass, 0 fail, 46 unavailable / 491**, exit 2 for explicit staging |
+| `git diff --check` | clean |
+
+| Ignored sweep | Cases | Runner time |
+|---|---|---|
+| u8 division/remainder | 65,536 operand pairs × 4 operations = 262,144 executions | 4.27 s |
+| 17-wire borrow execution | 2^17 basis entries | 21.55 s |
+| checked borrow-frame certificate | 2^18 claim elements, both programs | 119.32 s |
+| extended §6 differential | 200,000 programs: **64,717 accepted, all exactly clean**, 135,283 rejected | 432.24 s |
+| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 18.69 s |
+
+All Rust commands used the absolute `--manifest-path
+/home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/Cargo.toml`.
+All validation ran headlessly with DISPLAY, WAYLAND_DISPLAY,
+DBUS_SESSION_BUS_ADDRESS and BROWSER unset, and
+TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/.tmp.
+Logs: `.tmp/r4-muse-{tests,ignored,clippy,conformance,python}.log`; archived RED
+logs: `.tmp/r4-muse-{borrow,options}-red.log`. Independent Python hashlib
+reproduced the literal SCC digest 05e79eab6ee962e7d1c2c9c4f4db5d27f07ef0e0231b6d394ab802d24bea7724
+and both ASCII-suffixed member hashes. No Rust changes followed these gates.
+No dependencies, spec edits, changed seeds or pushes. Bead b-isa-spec-zq2 stays
+open for the whole-ISA staged deliverables, including the proposed first
+F-link-conflict/F-frame-live-ranges promotions when their surfaces are ready.
+
 ## Council round 4, sol second pass (2026-10-29)
 
 SOL-R4-B01 resolved: exact-shadow Born weights and refined outward-rounded

@@ -538,3 +538,159 @@ fn generated_loop_local_borrow_returns_match_alpha_renamed_unrollings() {
     }
     assert_eq!(counts, (16, 16));
 }
+
+#[test]
+fn generated_fresh_borrow_cx_loops_match_per_lifetime_maps() {
+    // Fresh beta_i is universally quantified for EVERY return: neither an
+    // even number of iterations nor alpha-renaming can cancel its influence.
+    let mut counts = (0, 0);
+    for trips in 1..=4u64 {
+        for gate in ["cx d t", "cx t d"] {
+            for copies in 1..=2 {
+                for nested in [false, true] {
+                    for unrolled in [false, true] {
+                        let lifetime = |name: &str| {
+                            format!(
+                                "{name} = qborrow any 1\n{}qreturn {name}\n",
+                                format!("{gate}\n").replace('d', name).repeat(copies)
+                            )
+                        };
+                        let (mut body, mut bounds) = if unrolled {
+                            (
+                                (0..trips)
+                                    .map(|i| lifetime(&format!("b{i}")))
+                                    .collect::<String>(),
+                                vec![],
+                            )
+                        } else {
+                            (
+                                format!("qloop {trips} {{\n{}}}", lifetime("d")),
+                                vec![trips],
+                            )
+                        };
+                        if nested {
+                            body = format!("qloop 2 {{\n{}\n}}", body.trim_end());
+                            bounds.insert(0, 2);
+                        }
+                        let text = support::borrow_lifetime_object(&body, &bounds);
+                        if copies == 1 {
+                            assert!(
+                                Object::parse(&text)
+                                    .unwrap_err()
+                                    .to_string()
+                                    .contains("§5.6"),
+                                "{body}"
+                            );
+                            counts.1 += 1;
+                        } else {
+                            support::borrow_identity(&Object::parse(&text).unwrap());
+                            counts.0 += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert_eq!(counts, (32, 32));
+}
+
+#[test]
+fn generated_nested_calls_with_regions_and_local_borrows_match_boolean_maps() {
+    // V: b ^= p; W: t ^= b, r[p] ^= b. V;W;V;W is exactly
+    // (t,r[0],r[1],p,b) -> (t XOR p,r[0],r[1] XOR p,p,b).
+    // Dropping the second W leaves beta in both outputs iff W's count is odd.
+    // Expected states are built from this independent map, not another execution.
+    let sig = r#"{"abi":"0.8","args":[],"bounds":[],"in":[1],"kind":"perm_action","mem":[{"A":1,"W":1,"role":"mut"}],"mut":[1],"tier":"q"}"#;
+    let mut counts = (0, 0);
+    for trips in 1..=4u64 {
+        for copies in 0..=3 {
+            for complete in [false, true] {
+                for wrapped in [false, true] {
+                    for nested in [false, true] {
+                        let w = "cx b t\nqstore r p b\n".repeat(copies);
+                        let leaf = format!("perm_action @leaf (t:wire mut) (p:wire in) (r:region[1,1] mut) () ()\n^entry():\nb = qborrow any 1\ncx p b\n{w}cx p b\n{}qreturn b", if complete { &w } else { "" });
+                        let middle = "perm_action @middle (u:wire mut) (v:wire in) (s:region[1,1] mut) () ()\n^entry():\naction_call @leaf (u) (v) (s) ()";
+                        let call = format!(
+                            "action_call @{} (t) (p) (r) ()",
+                            if wrapped { "middle" } else { "leaf" }
+                        );
+                        let (body, bounds) = if nested {
+                            (
+                                format!("qloop 2 {{\nqloop {trips} {{\n{call}\n}}\n}}"),
+                                vec![2, trips],
+                            )
+                        } else {
+                            (format!("qloop {trips} {{\n{call}\n}}"), vec![trips])
+                        };
+                        let ps = sig.replace("\"bounds\":[]", &format!("\"bounds\":{bounds:?}"));
+                        let regs = bounds
+                            .iter()
+                            .map(u64::to_string)
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        let parent = format!("perm_action @a (t:wire mut) (p:wire in) (r:region[1,1] mut) () ()\nregs {{  }} bounds {{{regs}}}\n^entry():\n{body}");
+                        let text = support::object(&[("leaf", sig, &leaf), ("middle", sig, middle), ("a", &ps, &parent)], "{}", "\nsection layout\n{\"A_tab\":0,\"H\":0,\"S_cells\":0,\"globals\":{},\"heap_base\":1,\"heap_limit_max\":0,\"interface_regions\":{},\"null_size\":1,\"ptr_width\":32}\n");
+                        if !complete && copies % 2 == 1 {
+                            assert!(
+                                Object::parse(&text)
+                                    .unwrap_err()
+                                    .to_string()
+                                    .contains("§5.6"),
+                                "{leaf}\n{body}"
+                            );
+                            counts.1 += 1;
+                            continue;
+                        }
+                        let o = Object::parse(&text).unwrap();
+                        counts.0 += 1;
+                        for input in 0..34u32 {
+                            let mut q = QuantumState::new();
+                            let wires = q.allocate(6).unwrap();
+                            for (bit, wire) in wires[..5].iter().enumerate() {
+                                if input == 32 {
+                                    q.gate("h", &[*wire], None, &[]).unwrap();
+                                } else if input == 33 {
+                                    if bit == 0 || bit == 1 || bit == 4 {
+                                        q.gate("h", &[*wire], None, &[]).unwrap();
+                                    }
+                                } else if input >> bit & 1 == 1 {
+                                    q.gate("x", &[*wire], None, &[]).unwrap();
+                                }
+                            }
+                            if input == 33 {
+                                q.gate("cx", &[wires[4], wires[5]], None, &[]).unwrap();
+                            }
+                            let entry = q.clone();
+                            let mut expected = entry.clone();
+                            if complete && copies % 2 == 1 && trips % 2 == 1 && !nested {
+                                expected
+                                    .gate("cx", &[wires[1], wires[0]], None, &[])
+                                    .unwrap();
+                                expected
+                                    .gate("cx", &[wires[1], wires[3]], None, &[])
+                                    .unwrap();
+                            }
+                            let mut b = QuantumBindings::default();
+                            b.bundles.insert("t".into(), vec![wires[0]]);
+                            b.bundles.insert("p".into(), vec![wires[1]]);
+                            b.regions.insert(
+                                "r".into(),
+                                bennett_isa_ref::QuantumRegion {
+                                    address_width: 1,
+                                    cell_width: 1,
+                                    cells: vec![vec![wires[2]], vec![wires[3]]],
+                                },
+                            );
+                            b.borrowed.push(vec![wires[4]]);
+                            o.execute_action("a", &mut q, &b, false, &[]).unwrap();
+                            assert_eq!(q, expected, "input={input}, {leaf}\n{body}");
+                            o.execute_action("a", &mut q, &b, true, &[]).unwrap();
+                            assert_eq!(q, entry, "adjoint, input={input}, {leaf}\n{body}");
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert_eq!(counts, (96, 32));
+}

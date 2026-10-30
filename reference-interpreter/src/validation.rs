@@ -816,7 +816,9 @@ impl Object {
                 break;
             }
             if retry.len() == before {
-                return Err(first_error.expect("retry records its error"));
+                return Err(first_error.unwrap_or_else(|| {
+                    Error("§3.3: unresolved SSA definitions without a recorded diagnostic".into())
+                }));
             }
             pending = retry;
         }

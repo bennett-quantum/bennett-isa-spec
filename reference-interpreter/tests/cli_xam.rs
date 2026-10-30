@@ -1235,3 +1235,36 @@ fn sol_r4_b01_tiny_born_branch_is_selectable() {
         );
     }
 }
+
+#[test]
+fn muse_r4_step_check_requires_a_nonempty_sample() {
+    fails(
+        &["step-check", &fixture("inc8"), "inc8", "--samples", "0"],
+        "§17.13",
+    );
+    let sampled = ok(&["step-check", &fixture("inc8"), "inc8", "--samples", "1"]);
+    assert_eq!(uint(&sampled, "cases"), 1);
+}
+
+#[test]
+fn muse_r4_malformed_options_cite_the_isa_without_partial_output() {
+    for (flag, value, cite) in [
+        ("--budget", "-1", "§5.4"),
+        ("--budget", "18446744073709551616", "§5.4"),
+        ("--arg", "token:", "§5.4"),
+        ("--mem", "db=zz/0", "§16.1"),
+    ] {
+        fails(
+            &[
+                "run-oracle",
+                &fixture("inc8"),
+                "inc8",
+                "--input",
+                "0",
+                flag,
+                value,
+            ],
+            cite,
+        );
+    }
+}

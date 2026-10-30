@@ -86,6 +86,17 @@ impl QuantumRegisters {
     pub(crate) fn idle_bundle(&self, id: u64) -> Result<&[Wire]> {
         Ok(&self.ordinary(id)?.wires)
     }
+    fn set_status(&mut self, id: u64, status: Status) -> Result<()> {
+        self.handles
+            .get_mut(&id)
+            .ok_or_else(|| {
+                Error(format!(
+                    "§3.3: missing qreg handle {id} during ownership transition"
+                ))
+            })?
+            .status = status;
+        Ok(())
+    }
     fn record(&self, ids: &[u64]) -> RegisterUndo {
         RegisterUndo {
             handles: ids
@@ -134,7 +145,7 @@ impl QuantumRegisters {
             .map(|w| Ok((self.state.position(*w)?, *w)))
             .collect::<Result<Vec<_>>>()?;
         self.state.release(&wires)?;
-        self.handles.get_mut(&id).expect("live handle").status = Status::Consumed;
+        self.set_status(id, Status::Consumed)?;
         undo.kernel = KernelUndo::Release(positions);
         Ok(undo)
     }
@@ -154,7 +165,7 @@ impl QuantumRegisters {
             .ok_or_else(|| Error("§3.3: qreg slice out of bounds".into()))?;
         let wires = h.wires[lo..end].to_vec();
         let undo = self.record(&[id, self.next]);
-        self.handles.get_mut(&id).expect("live parent").status = Status::Viewed;
+        self.set_status(id, Status::Viewed)?;
         let view = self.create(wires, Some(id))?;
         Ok((view, undo))
     }
@@ -171,8 +182,8 @@ impl QuantumRegisters {
             return err("§3.3", "qreg concat wires overlap");
         }
         let undo = self.record(&[a, b, self.next]);
-        self.handles.get_mut(&a).expect("handle").status = Status::Consumed;
-        self.handles.get_mut(&b).expect("handle").status = Status::Consumed;
+        self.set_status(a, Status::Consumed)?;
+        self.set_status(b, Status::Consumed)?;
         let id = self.create(wires, None)?;
         Ok((id, undo))
     }
@@ -196,8 +207,8 @@ impl QuantumRegisters {
         let undo = self.record(&affected);
         for id in ids {
             if let Some(parent) = self.handles[id].parent {
-                self.handles.get_mut(id).expect("view").status = Status::Consumed;
-                self.handles.get_mut(&parent).expect("parent").status = Status::Live;
+                self.set_status(*id, Status::Consumed)?;
+                self.set_status(parent, Status::Live)?;
             }
         }
         Ok(undo)
@@ -226,7 +237,7 @@ impl QuantumRegisters {
         let branch =
             selected.ok_or_else(|| Error("§14.2: measurement has no nonzero outcome".into()))?;
         self.state = branch.state;
-        self.handles.get_mut(&id).expect("handle").status = Status::Consumed;
+        self.set_status(id, Status::Consumed)?;
         Ok(branch.bits)
     }
     pub(crate) fn undo(&mut self, undo: RegisterUndo) -> Result<()> {

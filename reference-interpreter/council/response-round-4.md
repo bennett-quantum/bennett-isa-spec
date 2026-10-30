@@ -219,3 +219,122 @@ PROGRESS.md records individual sweep counts/times and retained log names.
 All validation used absolute manifest/binary paths, the specified local
 TMPDIR, and DISPLAY/WAYLAND_DISPLAY/DBUS_SESSION_BUS_ADDRESS/BROWSER unset.
 No dependencies, spec/conformance/header edits, seed changes or pushes.
+
+## MUSE-R4-B01 — resolved (by 40ef8ce; exact muse pins in this pass)
+
+Input: `out-muse.json` and the complete round-4 report; implementation starts
+from 8fa5d98 with the read-only conformance update at 92c26af. This blocker
+shares the lifetime/factorisation cause fixed in pass 1, rather than requiring
+a second, different loop model. No blocker is declined or partial.
+
+RED: copied the committed 8e11fe7 crate into the interpreter's ignored `.tmp`
+and added the new regression/support files. Running
+`r1_borrow::muse_r4_b01_each_iteration_has_an_independent_borrowed_entry`
+there failed on the EXACT `qloop 2 { d = qborrow any 1; cx d t; qreturn d }`
+object: Object::parse accepted it. The same new test passes on the current
+implementation. Log: `.tmp/r4-muse-borrow-red.log`. This replay did not replace
+or edit live source, spec, conformance or the Python seed.
+
+The existing `Compiler::compile` emits Borrow/Return nodes, including inside
+inlined permutation children. `Evaluation::apply(Return)` proves both identity
+on the returned wires AND absence of their entry variables in every other live
+output, before removing the returned system. Repeat checks that generic body
+before squaring its surviving-wire map. Thus each iteration-local beta is
+universally quantified independently, while a lifetime spanning the loop stays
+carried and can be restored by the whole loop. This pass clarifies this invariant
+on Node::Repeat; no new cap, unrolling strategy or semantic special case is added.
+
+Named pins in `tests/r1_borrow.rs`:
+
+- `muse_r4_b01_each_iteration_has_an_independent_borrowed_entry`: both CX
+  directions, single lifetime, trips 2 and 4, nested 2x2 and independently named
+  unrolling. Every negative requires Object::parse Err plus CLI hash/check exit
+  1, empty stdout and §5.6. For d→t, t'=t XOR beta at each return; for t→d,
+  d'=beta XOR t. Even iteration counts cannot remove either per-return failure.
+- `muse_r4_b01_carried_and_local_borrow_cx_identities_have_no_trip_cap`:
+  borrowing outside the two-iteration loop, and doubled-CX local lifetimes at
+  trips 2 and **1,099,511,627,776**, for both CX directions. Every positive checks
+  hashes and exact forward/adjoint state equality over all t,b basis entries,
+  superposition, and b entangled with an untouched reference.
+
+New independent generated families in `tests/r1_fuzz_discipline.rs`:
+
+- `generated_fresh_borrow_cx_loops_match_per_lifetime_maps`: 64 cases, **32
+  accept / 32 reject**; both CX directions, trips 1..4, one/two gates per
+  lifetime, nested loops, alpha-renamed unrollings. The oracle is each lifetime's
+  map, never whole-loop parity or simulator agreement. Every accept gets the
+  full basis/superposition/entangled-reference identity check.
+- `generated_nested_calls_with_regions_and_local_borrows_match_boolean_maps`:
+  128 cases, **96 accept / 32 reject**, direct and doubly nested calls, renamed
+  interfaces, passed mutable-region cells, iteration-local borrowed pools,
+  loop bounds 1..4 and nested loops. From V=(b ^= p), W=(t ^= b; r[p] ^= b),
+  the independent map for V;W;V;W is t ^= p, r[1] ^= p, with r[0],p,b unchanged.
+  Omitting the second W with odd multiplicity must reject irrespective of loop
+  parity. All accepts compare the complete state against that map on 32 basis
+  inputs, a full superposition and an entangled borrowed reference, then reverse
+  exactly. No RNG, Python seed or existing sweep expectation changed.
+
+No SPEC-QUESTIONS entry is needed: §4.6 explicitly says "body n times", §5.1
+requires each qreturn after its frame, and §5.6 requires identity on EVERY
+borrowed bundle and its external reference. Readings 20 and 28 are unchanged.
+
+## Non-blocking round-4 suggestions — dispositions
+
+All three JSON `suggestions` arrays and criterion-level `change` proposals
+were read. The table includes proposals already completed by passes 1–2;
+non-blocking coverage declines below are not blocker declines.
+
+| Source / suggestion | Disposition and reason |
+|---|---|
+| codex suggestions / C7: lifetime loops versus unrollings and dynamic aliases | Applied in pass 1; this pass adds the fresh-CX 64-case family and exact muse pins. Existing select/block-parameter CC/R alias tests still pass with FAILED/fault=4 and reversible prefixes. |
+| muse suggestions 1 / C8: refuse --samples 0 | Applied in main.rs, README and `cli_xam::muse_r4_step_check_requires_a_nonempty_sample`; zero exits 1 with §17.13 and empty stdout; one sample still runs. Witnessed RED: the old CLI returned cases=0/status=ok. |
+| muse suggestions 2 / C8: cite rules on malformed CLI numbers/HEX | Applied: shared budget parsing cites §5.4, including host-counter overflow; memory/HEX diagnostics cite §16.1. `cli_xam::muse_r4_malformed_options_cite_the_isa_without_partial_output` pins all four exact reported options. Archived old CLI reproduces each bare error independently in `.tmp/r4-muse-options-red.log`; the new test was also witnessed RED live. |
+| muse suggestions 3: handle-map and SSA error expects | Applied: all seven register transition expects use a fallible §3.3 status helper; the SSA retry invariant now returns a §3.3 error if its recorded diagnostic is unexpectedly absent. Existing ownership/alias/reversal tests verify normal behavior. |
+| muse suggestions 3: signature Json::Array expects | Declined: these arrays are constructed as Json::Array immediately before reading them, and header validation checks singleton arity; making the infallible public signature API return Result for this unreachable invariant is not a pure correctness gain for validated objects. |
+| muse suggestions 4 / C7: broaden generated structured borrowing | Applied with the 64-case local-borrow family and the 128-case nested mutable-region/call/pool family; existing seeds and the 200,000-case random distribution are unchanged. |
+| muse suggestions 4 / C7: also add qinplace, ctl/adj oracle calls, while selectors and indexed multi-bit random families | Declined in this pass: these are separate coverage projects with different semantic oracles; changing the old random distribution would obscure the retained sweep baseline. Existing instruction support and dedicated tests remain in scope and unchanged. |
+| sol suggestions: nested calls with mutable regions and borrowed pools | Applied: the 128-case Boolean-map family checks the full interface/memory/borrow/reference state and its exact adjoint, independently of interpreter-to-interpreter agreement. |
+| muse suggestions 5: adopt readings into spec 0.9 | Declined here: spec/ is explicitly read-only for this task; all proposed wordings remain recorded in SPEC-QUESTIONS.md. |
+| muse suggestions 6: complete staged deliverables 8–11, first F probes | Retained as whole-ISA work, not falsely marked complete; the current pass verifies the updated harness and keeps every unavailable outcome explicit. F-link-conflict/F-frame-live-ranges remain the proposed first F promotions when those surfaces land. |
+| codex C2 / muse C2: independent two-member SCC envelope | Applied in `identity::council_r4_mutual_scc_has_independent_literal_envelopes`: literal LF bytes, f/g name order, @$0/@$1 references, no intra-SCC dependency lines, concatenation and ASCII member suffixes; FIPS-tested SHA-256 only builds the expectation. |
+| sol C2: independent CC envelope with service and model | Adapted in `identity::council_r4_cc_envelope_includes_service_but_not_unused_model`: literal service/layout/LF bytes and exclusion of a declared unused model. A single function cannot directly use both: §4.8 makes effect R-only and hostcall CC-only. Existing R model envelope/hash pins remain. |
+| codex C3 / sol C3: literal recursive step/stack boundaries | Applied in `oracle::council_r4_sum_db_literal_step_and_stack_cutoffs`: n=2 at B=38/37 and stack=47 gives (3,0,38)/(0,1,37)/(0,3,29); n=0 at B=9/10 gives (0,1,9)/(0,0,10). |
+| muse C4: small recursive every-prefix sweep in normal tests | Applied for n=0..3, 132 prefixes through the first idle-HALT step, in `step_machine::council_r4_small_recursive_inputs_gate_every_prefix_in_normal_suite`; the full ignored 256-input sweep is retained. |
+| codex C4 / sol C4: inspect private call-record fields | Declined: no incorrect record was identified; inspecting private slots/stack requires a new inspection API, while complete pre/post snapshot inversion, every-prefix checks and literal outcomes already gate this path. |
+| muse C3: add a fault-to-fixture index to all fixture comments | Declined: no incorrect fixture derivation was identified; a second index duplicates the existing fixture/test inventory rather than correcting it. |
+| muse C5: one new registers.rs test name for each trap cause | Declined: reorganizing every trap witness into registers.rs is a separate test-organization expansion; this pass retains the current named fault/reversal pins and makes no trap-code semantic change. |
+| sol C1/C5/C6/C7/C8 and codex C1/C5/C6/C8 | Applied by the five prior blocker fixes and their independent regressions; all retained tests pass in this pass. |
+
+
+## Final verification of the MUSE third pass
+
+MUSE-R4-B01 is resolved-by **40ef8ce**, now pinned by its exact independent
+muse witnesses, huge-bound positives and two new generated families. No new
+borrow semantic fix was necessary or claimed. All six round-4 blocker IDs
+(codex 2, SOL 3, MUSE 1) are resolved; none is declined or partial. The
+non-blocking dispositions above deliberately distinguish coverage suggestions
+from correctness requirements. SPEC-QUESTIONS.md and the accepted ISA 0.8
+are unchanged.
+
+After rebuilding the binary offline, the exact standalone harness command
+from conformance/PROGRESS.md against the updated **92c26af** conformance crate
+reported **445 passed, 0 failed, 46 unavailable / 491**, exit **2**. The extra
+unavailable target case is the documented harness addition; no unavailable
+outcome is silently skipped or counted as a pass. Conformance/include stayed
+read-only; CARGO_TARGET_DIR kept build artifacts in the interpreter's `.tmp`.
+
+Normal suite: **242 passed, 0 failed, 5 ignored**, 12.05 s summed runner time.
+Ignored suite: **5 passed, 0 failed**, 596.07 s summed runner time, including
+2^17 borrow entries, 2^18 certificate elements, every recursive prefix for all
+256 inputs, and the 200,000-program discipline sweep (**64,717 accepted, all
+exactly clean / 135,283 rejected**). The two new deterministic families run
+separately in the normal suite; existing seeds/distribution are unchanged.
+Strict all-target Clippy, formatting, unchanged Python seed and diff checks
+pass. PROGRESS.md records per-sweep times and log paths.
+
+All validation used the required absolute manifests/binary, with DISPLAY,
+WAYLAND_DISPLAY, DBUS_SESSION_BUS_ADDRESS and BROWSER unset and
+TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/.tmp.
+Only reference-interpreter paths changed; no dependencies, spec/docs/header/
+conformance/worklog/HANDOFF/CLAUDE edits, seed changes or pushes. The full-ISA
+bead remains in progress for staged deliverables 8–11.

@@ -458,3 +458,50 @@ fn r4_borrow_lifetimes_inside_and_across_loops_preserve_full_state() {
         support::borrow_identity(&o);
     }
 }
+
+#[test]
+fn muse_r4_b01_each_iteration_has_an_independent_borrowed_entry() {
+    // Each return must factor on its OWN arbitrary beta_i. For d->t,
+    // t' = t XOR beta_i; for t->d, d' = beta_i XOR t. Both fail for
+    // one iteration regardless of the parity of the surrounding loop count.
+    for gate in ["cx d t", "cx t d"] {
+        let lifetime = format!("d = qborrow any 1\n{gate}\nqreturn d");
+        for (tag, body, bounds) in [
+            ("single", lifetime.clone(), vec![]),
+            ("two", format!("qloop 2 {{\n{lifetime}\n}}"), vec![2]),
+            ("four", format!("qloop 4 {{\n{lifetime}\n}}"), vec![4]),
+            (
+                "nested",
+                format!("qloop 2 {{\nqloop 2 {{\n{lifetime}\n}}\n}}"),
+                vec![2, 2],
+            ),
+            (
+                "unrolled",
+                format!("{lifetime}\n{}", lifetime.replace('d', "e")),
+                vec![],
+            ),
+        ] {
+            support::reject_cli(
+                &support::borrow_lifetime_object(&body, &bounds),
+                "§5.6",
+                &format!("muse-r4-{tag}-{}", gate.replace(' ', "-")),
+            );
+        }
+    }
+}
+
+#[test]
+fn muse_r4_b01_carried_and_local_borrow_cx_identities_have_no_trip_cap() {
+    for gate in ["cx d t", "cx t d"] {
+        let spanning = format!("d = qborrow any 1\nqloop 2 {{\n{gate}\n}}\nqreturn d");
+        let o = support::rehash(&support::borrow_lifetime_object(&spanning, &[2]));
+        support::borrow_identity(&o);
+        for trips in [2, 1_099_511_627_776u64] {
+            let body =
+                format!("qloop {trips} {{\nd = qborrow any 1\n{gate}\n{gate}\nqreturn d\n}}");
+            let o = support::rehash(&support::borrow_lifetime_object(&body, &[trips]));
+            o.check_hashes().unwrap();
+            support::borrow_identity(&o);
+        }
+    }
+}

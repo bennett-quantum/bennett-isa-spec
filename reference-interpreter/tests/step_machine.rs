@@ -162,3 +162,26 @@ fn full_small_domain_includes_memory_and_nonzero_target_and_fault() {
     }
     assert_eq!(covered, 10 * (1 << 14));
 }
+
+#[test]
+fn council_r4_small_recursive_inputs_gate_every_prefix_in_normal_suite() {
+    let o = Object::parse(include_str!("fixtures/sum_db.bisa")).unwrap();
+    for n in 0..4 {
+        let mut input = OracleInput::bits(&[n]);
+        input.regions.insert("db".into(), (1..=16).collect());
+        // 14*n+10 real rows, then one HALT idle row: cover every cutoff.
+        for steps in 0..=14 * n as u64 + 11 {
+            compare(
+                &o,
+                "sum_db",
+                &input,
+                Budget {
+                    steps,
+                    heap: 4080,
+                    stack: 512,
+                    depth: 64,
+                },
+            );
+        }
+    }
+}

@@ -58,11 +58,18 @@ fn object(pairs: impl IntoIterator<Item = (String, Json)>) -> Json {
     Json::Object(pairs.into_iter().collect())
 }
 fn budget(raw: &str, default: Budget) -> Result<Budget> {
-    let v = raw.split(',').map(uint).collect::<Result<Vec<_>>>()?;
+    let v = raw
+        .split(',')
+        .map(|s| uint(s).map_err(|e| fail(format!("§5.4: invalid budget component {s:?}: {e}"))))
+        .collect::<Result<Vec<_>>>()?;
     if v.len() != 1 && v.len() != 4 {
         return Err(fail("budget requires B or B,heap,stack,depth (§5.4)"));
     }
-    let steps = u64::try_from(v[0]).map_err(fail)?;
+    let steps = u64::try_from(v[0]).map_err(|e| {
+        fail(format!(
+            "§5.4: host limit: step budget exceeds the u64 counter: {e}"
+        ))
+    })?;
     Ok(if v.len() == 1 {
         Budget { steps, ..default }
     } else {
@@ -79,7 +86,9 @@ fn hex(bytes: &[u8]) -> String {
 }
 fn parse_hex(s: &str) -> Result<Vec<u8>> {
     if !s.len().is_multiple_of(2) || !s.bytes().all(|c| c.is_ascii_hexdigit()) {
-        return Err(fail("invalid HEX (even-length hexadecimal expected)"));
+        return Err(fail(
+            "§16.1: invalid HEX (even-length hexadecimal expected)",
+        ));
     }
     (0..s.len())
         .step_by(2)
@@ -1779,7 +1788,14 @@ fn run() -> Result<()> {
             }
             "--budget" => limits = budget(value, limits)?,
             "--max-bits" => max_bits = uint(value)?,
-            "--samples" => samples = Some(uint(value)?),
+            "--samples" => {
+                let count =
+                    uint(value).map_err(|e| fail(format!("§17.13: invalid sample count: {e}")))?;
+                if count == 0 {
+                    return Err(fail("§17.13: --samples requires at least one case"));
+                }
+                samples = Some(count);
+            }
             "--seed" => {
                 let words = value
                     .split(',')
@@ -1795,7 +1811,9 @@ fn run() -> Result<()> {
                     .split_once('=')
                     .ok_or_else(|| fail("--mem requires name=hex"))?;
                 if hex.len() % 2 != 0 || !hex.bytes().all(|c| c.is_ascii_hexdigit()) {
-                    return Err(fail("invalid memory HEX"));
+                    return Err(fail(
+                        "§16.1: invalid memory HEX (even-length hexadecimal expected)",
+                    ));
                 }
                 let bytes = (0..hex.len())
                     .step_by(2)

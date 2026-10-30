@@ -1,3 +1,4 @@
+mod support;
 use bennett_isa_ref::{sha256_hex, Object};
 
 #[test]
@@ -165,4 +166,68 @@ fn every_committed_fixture_has_valid_identity() {
         o.identity().unwrap().interface_hashes["g"],
         "e8a3dc5429049b16559aa6a4262779e3dcd37a758967def4e08c371a5b765fff"
     );
+}
+
+#[test]
+fn council_r4_mutual_scc_has_independent_literal_envelopes() {
+    // §9.2: f < g bytewise; headers are definitions, calls are references;
+    // lprocs without lift.addr globals have NO layout leaves or part-(6) lines.
+    let f = concat!(
+        "isa=0.8\nptr_width=16\n",
+        "{\"abi\":\"0.8\",\"kind\":\"lproc\",\"params\":[],\"result\":16,\"tier\":\"q\"}\n",
+        "lproc @f () (r:reg[16]) () () ()\n^entry():\nr = lift.call @$1 ()\nlift.ret r\n"
+    );
+    let g = concat!(
+        "isa=0.8\nptr_width=16\n",
+        "{\"abi\":\"0.8\",\"kind\":\"lproc\",\"params\":[],\"result\":16,\"tier\":\"q\"}\n",
+        "lproc @g () (r:reg[16]) () () ()\nregs { p:reg[1] }\n^entry():\n",
+        "p = lift.const.i1 1\nqbranch p ^done ^recurse\n^done():\nr = lift.label ^entry\nlift.ret r\n",
+        "^recurse():\nr = lift.call @$0 ()\nlift.ret r\n"
+    );
+    let digest = sha256_hex(format!("{f}{g}").as_bytes());
+    let id = Object::parse(include_str!("fixtures/mutual.bisa"))
+        .unwrap()
+        .identity()
+        .unwrap();
+    assert_eq!(id.envelopes["f"], f);
+    assert_eq!(id.envelopes["g"], g);
+    assert_eq!(id.scc_members["f"], ["f", "g"]);
+    assert_eq!(id.scc_hashes["f"], digest);
+    assert_eq!(
+        sha256_hex(format!("{digest}:0").as_bytes()),
+        "e4028cf7347c2779e19c8193ef1039837944acebd4784e9c3a42fbe236e737ec"
+    );
+    assert_eq!(
+        sha256_hex(format!("{digest}:1").as_bytes()),
+        "7dc9c25aff5230a46ae697edf187d34ba72a03f7a3c1a520c6fc6bf5462c6374"
+    );
+    assert_eq!(
+        id.interface_hashes["f"],
+        sha256_hex(format!("{digest}:0").as_bytes())
+    );
+    assert_eq!(
+        id.interface_hashes["g"],
+        sha256_hex(format!("{digest}:1").as_bytes())
+    );
+}
+
+#[test]
+fn council_r4_cc_envelope_includes_service_but_not_unused_model() {
+    // §4.8: effect is R-only, hostcall CC-only. A CC envelope includes its
+    // service but not an unused declared model; both cannot be used directly.
+    let raw = support::object(
+        &[("mix", r#"{"abi":"0.8","kind":"cc","params":["ptr","i32"],"results":[],"tier":"cc"}"#,
+        "fn cc @mix (p:ptr, n:i32) () () () ()\n^entry():\nr = hostcall a.service p n\nret")], "{}",
+        "\nsection devices\n{\"models\":{\"clock\":{\"version\":\"0.8\"}},\"services\":{\"a.service\":{\"version\":\"1\"}}}\n\nsection layout\n{\"A_tab\":0,\"H\":0,\"S_cells\":0,\"globals\":{},\"heap_base\":1,\"heap_limit_max\":0,\"interface_regions\":{},\"null_size\":1,\"ptr_width\":32}\n"
+    );
+    let expected = concat!(
+        "isa=0.8\nptr_width=32\n",
+        "{\"abi\":\"0.8\",\"kind\":\"cc\",\"params\":[\"ptr\",\"i32\"],\"results\":[],\"tier\":\"cc\"}\n",
+        "fn cc @mix (p:ptr, n:i32) () () () ()\n^entry():\nr = hostcall a.service p n\nret\n",
+        "layout A_tab 0\nlayout H 0\nlayout S_cells 0\nlayout heap_base 1\nlayout heap_limit_max 0\nlayout null_size 1\nlayout ptr_width 32\n",
+        "device a.service {\"version\":\"1\"}\n"
+    );
+    let id = Object::parse(&raw).unwrap().identity().unwrap();
+    assert_eq!(id.envelopes["mix"], expected);
+    assert_eq!(id.interface_hashes["mix"], sha256_hex(expected.as_bytes()));
 }

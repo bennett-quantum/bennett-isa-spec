@@ -64,7 +64,7 @@ delivery). MODE is one of:
   user's guard N (default 16; no fixed ceiling);
 - `--suite`: the §17 item 13 default, exhaustive at ≤ 16 bits and otherwise
   2^16 xoshiro256** samples;
-- `--samples N`: N samples (`--seed a,b,c,d` sets the four state words).
+- `--samples N`: N samples, N ≥ 1 (`--seed a,b,c,d` sets the four state words).
 
 Output: `cases`, `input_and_memory_bits`, `mode` (`exhaustive` or `sampled`),
 `fixed_regions`, `status`. Default B is 256; `--budget`, `--mem` and `--arg`
