@@ -12,10 +12,10 @@ Tracking b-isa-spec-41i; sole interpreter implementer, no push.
 
 | Blocker | RED test | Status | Commit |
 |---|---|---|---|
-| SOL-R8-B01 ≡ R8-B02 | r8_compound_adjoint_restores_borrow_control, r8_diagonal_nested_adjoint_restores_borrow_control; r8_cli_compound_x/s | exact nested X/S witnesses green | this step |
-| SOL-R8-B02 ≡ R8-B01 | exact zero-trip binding and borrowed H/S subjects | implementation follows | — |
+| SOL-R8-B01 ≡ R8-B02 | r8_compound_adjoint_restores_borrow_control, r8_diagonal_nested_adjoint_restores_borrow_control; r8_cli_compound_x/s | exact nested X/S witnesses green | 366a711 |
+| SOL-R8-B02 ≡ R8-B01 | r8_zero_trip_lifetime_environment_does_not_escape, r8_zero_trip_surviving_fact, r8_zero_trip_cannot_hide_borrowed_quantum_touches; CLI counterparts | exact witnesses green | this step |
 | R8-B03 | exact disabled controlled action call | implementation follows | — |
-| SOL-R8-B03 | r8_unsigned_decimal_multiplication; r8_unsigned_multiplicity_composition | exact unsigned boundary and composition green | this step |
+| SOL-R8-B03 | r8_unsigned_decimal_multiplication; r8_unsigned_multiplicity_composition | exact unsigned boundary and composition green | 366a711 |
 
 RED: nested library **0 passed / 2 failed**, CLI **0 passed / 2 failed**,
 §5.6 released wire not clean. Numeric unit **0 passed / 1 failed** at
@@ -30,6 +30,20 @@ outstanding entangling reader prevents an outer restoration. Saved ANFs retain
 correlations. Opaque/lifetime barriers invalidate the connected history.
 Quantum frame boundaries, full touched sets and every return equation remain.
 `BigInt::from_u128` constructs all unsigned limbs, with no signed narrowing.
+
+Zero-trip RED: **0 passed / 3 failed** in each library and CLI target.
+The H subject was incorrectly admitted; wide c reported §3.3 scalar width;
+same-width c reported §5.6 released wire not clean. Both H and S pins remain
+literal tests (the first failure stops their combined RED test). GREEN:
+**10 passed / 0 failed** across R8 borrow/CLI tests. Existing huge permutation
+loop `sol_r5_b02` separately **1 passed / 0 failed**. Source lowering now omits
+zero visits before ANY binding, borrow-set, node or trace effect, following the
+executed-lifetime rule in LifetimeWidths; lexical qregions remain hoisted.
+The environment and fact-node output share that single structured traversal.
+An early full-suite run overlapped test authoring, observed the new zero-trip
+REDs and was stopped during a needless history expansion; it is not final gate
+evidence. Basis-only permutations now retain exact ANFs without recording
+history unless touching an existing quantum history; the huge test passes.
 
 ## Round-7 fixes (2026-10-30)
 

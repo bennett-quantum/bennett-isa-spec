@@ -425,6 +425,13 @@ impl Compiler<'_> {
                 }
                 "qloop" => {
                     let n = crate::object::host_count(&a[0], "qloop trip count")?;
+                    // The static validator has checked the lexical body already.
+                    // Lower executed lifetimes once for BOTH names and fact nodes,
+                    // as LifetimeWidths does for execution. qregions are hoisted
+                    // by compile_function independently of these dynamic visits.
+                    if n == 0 {
+                        continue;
+                    }
                     if a.len() == 3 {
                         // Coherent while: iteration i runs under cond[0..=i] (§4.6),
                         // n = the width of cond, which is materialised anyway.
@@ -1052,6 +1059,18 @@ impl Facts<'_> {
                 self.e.state.extend(saved.before);
                 return true;
             }
+        }
+        // Basis permutations already retain exact ANFs. Record history only
+        // around a quantum loss of information, or above an existing history.
+        if !matches!(
+            node,
+            Node::Quantum {
+                diagonal: false,
+                ..
+            }
+        ) && !touched.iter().any(|w| self.inverses.contains_key(w))
+        {
+            return false;
         }
         let before = touched.iter().map(|w| (w.clone(), self.e.var(w))).collect();
         let fact = InverseFact {

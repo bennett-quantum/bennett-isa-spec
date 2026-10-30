@@ -1567,3 +1567,22 @@ fn r8_cli_identity(case: &str) {
         assert_eq!(uint(&v, "wires"), 1);
     }
 }
+
+#[test]
+fn r8_cli_zero_wide() {
+    r8_cli_identity("zero-wide");
+}
+#[test]
+fn r8_cli_zero_same() {
+    r8_cli_identity("zero-same");
+}
+#[test]
+fn r8_cli_zero_borrowed_quantum_touches() {
+    for case in ["zero-h", "zero-s"] {
+        let (text, _, _) = support::r8_witness(case);
+        let path = tmp_file(&format!("r8-{case}.bisa"), &text);
+        for cmd in ["hash", "check"] {
+            fails(&[cmd, &path], "§5.6");
+        }
+    }
+}

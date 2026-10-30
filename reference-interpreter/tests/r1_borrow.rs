@@ -780,3 +780,22 @@ fn r8_identity(case: &str) {
     o.check_hashes().unwrap();
     support::r6_map(&o, false);
 }
+
+#[test]
+fn r8_zero_trip_lifetime_environment_does_not_escape() {
+    r8_identity("zero-wide");
+}
+#[test]
+fn r8_zero_trip_surviving_fact() {
+    r8_identity("zero-same");
+}
+#[test]
+fn r8_zero_trip_cannot_hide_borrowed_quantum_touches() {
+    for case in ["zero-h", "zero-s"] {
+        let (text, _, _) = support::r8_witness(case);
+        assert!(Object::parse(&text)
+            .unwrap_err()
+            .to_string()
+            .contains("§5.6"));
+    }
+}
