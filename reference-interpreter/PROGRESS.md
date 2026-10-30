@@ -12,15 +12,28 @@ Tracking bead b-isa-spec-lto. Sole interpreter implementer; no push.
 
 | Blocker | RED test | Status | Commit |
 |---|---|---|---|
-| SOL-R7-B01 | r7_restored_zero_before_borrow / r7_cli_restored | exact witness green | this core commit |
-| SOL-R7-B02 ≡ R7-B01 | r7_reject_loop_bad, r7_nonpermutation_loop_positive, r7_reject_rotate_4/8; CLI counterparts | exact witnesses green | this core commit |
-| R7-B02 | r7_diagonal_basis, r7_readonly_control; CLI counterparts | exact witnesses green | this core commit |
-| SOL-R7-B03 | pending numeric witness | implementation follows separately | — |
+| SOL-R7-B01 | r7_restored_zero_before_borrow / r7_cli_restored | exact witness green | 1caa062 |
+| SOL-R7-B02 ≡ R7-B01 | r7_reject_loop_bad, r7_nonpermutation_loop_positive, r7_reject_rotate_4/8; CLI counterparts | exact witnesses green | 1caa062 |
+| R7-B02 | r7_diagonal_basis, r7_readonly_control; CLI counterparts | exact witnesses green | 1caa062 |
+| SOL-R7-B03 | r7_dyadic_scaled_conversion_boundary_rounding_and_subnormals; r7_cli_bounded_5000_h_t_reports_finite_amplitudes | exact witness and rounding/cancellation checks green | this numeric commit |
 
 RED before source edits: library 0 passed / 7 failed; CLI 0 passed / 7
 failed. Both bad-loop admissions and all four erroneous rejections reproduced.
 GREEN targeted: 14 passed / 0 failed. Normal suite: 288 passed / 0 failed /
 5 ignored. All existing round 4–7 negatives remain in the suite.
+
+Numeric RED: unit 0 passed / 1 failed at k=1024 (NaN vs 1.0);
+pinned CLI 0 passed / 1 failed, §16.1 non-finite binary64 has no JSON number;
+Root2 cancellation 0 passed / 1 failed. GREEN: 2 unit tests and 1 CLI test
+passed (the CLI covers forward, independent adjoint, norm and reversal).
+Dyadic conversion rounds the combined numerator/exponent once, nearest ties to
+even, including subnormal ties. Root2 severe cancellation uses refining dyadic
+enclosures before conversion. No denominator/gate-count ceiling or NaN clamp.
+An initial CLI RED attempt raced a subsequent rebuild and passed (103.67 s);
+that attempt is not RED evidence. The pinned old-conversion replay reproduced
+the member's diagnostic (35.89 s), followed by GREEN (70.78 s). An intermediate
+conversion failed the new subnormal assertion; exact power-of-two construction
+fixed it before commit. Diagnostic rejection of truly non-finite JSON remains.
 
 The borrow engine now walks structured nodes with per-wire ANF basis facts.
 Unknown is a fresh independent symbol, never zero. Permutations transform facts;

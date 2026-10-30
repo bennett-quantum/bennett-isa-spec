@@ -1466,3 +1466,57 @@ fn r7_cli_reject_rotate_8() {
         fails(&[cmd, &path], "§5.6");
     }
 }
+
+#[test]
+fn r7_cli_bounded_5000_h_t_reports_finite_amplitudes() {
+    let (body, h, oh) = support::r7_witness("float");
+    let path = tmp_file("r7-float.bisa", &body);
+    let hashes = ok(&["hash", &path]);
+    assert!(hashes.canonical().contains(h));
+    assert!(hashes.canonical().contains(oh));
+    ok(&["check", &path]);
+    // Independently evaluated (TH)^5000|0> at 100 decimal digits by the member.
+    // The adjoint's first column is the conjugate first row; U_01=e^-iπ/4 U_10.
+    for adj in [false, true] {
+        let mut args = vec!["run-action", &path, "a", "--mut", "0"];
+        if adj {
+            args.push("--adjoint");
+        }
+        let v = ok(&args);
+        assert_eq!(uint(&v, "wires"), 1);
+        assert_eq!(field(&v, "mut").canonical(), "[null]");
+        let state = field(&v, "state").object().unwrap();
+        assert_eq!(state.len(), 2);
+        r6_amplitude(
+            &state["0"],
+            -0.9438757756719142,
+            if adj {
+                -0.22414147502106144
+            } else {
+                0.22414147502106144
+            },
+        );
+        r6_amplitude(
+            &state["1"],
+            if adj {
+                0.09284243884403397
+            } else {
+                -0.09284243884403397
+            },
+            if adj {
+                -0.22414147502106144
+            } else {
+                0.22414147502106144
+            },
+        );
+        let norm: f64 = state
+            .values()
+            .flat_map(|x| x.array().unwrap())
+            .map(|x| x.canonical().parse::<f64>().unwrap().powi(2))
+            .sum();
+        assert!((norm - 1.0).abs() < 1e-12);
+    }
+    let v = ok(&["reverse", &path, "a", "--mut", "0"]);
+    assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
+    assert_eq!(uint(&v, "wires"), 1);
+}

@@ -284,7 +284,9 @@ reference-interpreter/target/debug/bennett-isa-ref run-program reference-interpr
   Supported outcomes survive underflow; conditional binary64 amplitudes are
   normalized with a shared extended exponent in both `amplitudes` and
   `exact_support`, including after further gates. Unprojected user vectors
-  retain their supplied scale. Display probabilities remain
+  retain their supplied scale. Dyadic display conversion combines mantissa and exponent before rounding,
+  including subnormals; algebraic cancellation refines exact enclosures before
+  conversion when needed. Display probabilities remain
   approximations (a positive value can display as zero).
   `QuantumState::set_state_vector` installs a sparse superposition with each
   binary64 amplitude held exactly as its dyadic value.

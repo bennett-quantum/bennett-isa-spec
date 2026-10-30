@@ -262,14 +262,50 @@ impl Dyadic {
         .normalize()
     }
     pub fn to_f64(&self) -> f64 {
-        let mut v = 0f64;
-        for (i, l) in self.n.limbs.iter().enumerate() {
-            v += *l as f64 * 2f64.powi(32 * i as i32);
+        if self.n.is_zero() {
+            return 0.0;
         }
-        if self.n.negative {
-            v = -v;
+        let bits = 32 * (self.n.limbs.len() as i128 - 1)
+            + i128::from(32 - self.n.limbs.last().unwrap().leading_zeros());
+        let exponent = bits - 1 - i128::from(self.k);
+        let sign = if self.n.negative { -1.0 } else { 1.0 };
+        if exponent > 1023 {
+            return sign * f64::INFINITY;
         }
-        v * 2f64.powi(-(self.k.min(i32::MAX as u64) as i32))
+        if exponent < -1075 {
+            return sign * 0.0;
+        }
+        // Round once, to 53 significant bits for normals or the 2^-1074
+        // subnormal grid. Neither numerator nor cancelling denominator is ever
+        // converted separately. Guard + sticky implement nearest, ties to even.
+        let shift = (bits - 53).max(i128::from(self.k) - 1074).max(0) as u64;
+        let top = self.n.shr(shift);
+        let mut mantissa = top
+            .limbs
+            .iter()
+            .rev()
+            .fold(0u64, |v, l| (v << 32) | u64::from(*l));
+        if shift != 0 {
+            let guard_index = shift - 1;
+            let guard = self
+                .n
+                .limbs
+                .get((guard_index / 32) as usize)
+                .is_some_and(|l| (l >> (guard_index % 32)) & 1 != 0);
+            let sticky = self.n.trailing_zeros() < guard_index;
+            if guard && (sticky || mantissa & 1 != 0) {
+                mantissa += 1;
+            }
+        }
+        let scale = i128::from(shift) - i128::from(self.k);
+        // Here scale is in [-1074, 971]. Multiplying by the representable
+        // power of two introduces no second rounding except final overflow.
+        let power = if scale < -1022 {
+            f64::from_bits(1u64 << (scale + 1074))
+        } else {
+            f64::from_bits(((scale + 1023) as u64) << 52)
+        };
+        sign * (mantissa as f64 * power)
     }
 }
 /// a + b sqrt(2), a and b dyadic.
@@ -302,7 +338,16 @@ impl Root2 {
         }
     }
     fn to_f64(&self) -> f64 {
-        self.a.to_f64() + self.b.to_f64() * std::f64::consts::SQRT_2
+        let a = self.a.to_f64();
+        let b = self.b.to_f64() * std::f64::consts::SQRT_2;
+        let value = a + b;
+        if !value.is_finite()
+            || (a.signum() != b.signum() && value.abs() < a.abs().max(b.abs()) * 1e-12)
+        {
+            measurement::root2_approximate(self)
+        } else {
+            value
+        }
     }
 }
 /// x + y i over Q(sqrt 2).
@@ -698,3 +743,46 @@ impl Decimal {
 
 mod measurement;
 pub(crate) use measurement::{normalized, probability};
+
+#[cfg(test)]
+mod r7_tests {
+    use super::*;
+    #[test]
+    fn r7_root2_cancellation_does_not_overflow_intermediate_terms() {
+        // (1 - sqrt(2))^810 has enormous opposite-sign coordinates, but
+        // a positive representable subnormal value. Independent scalar formula.
+        let factor = Root2 {
+            a: Dyadic::int(1),
+            b: Dyadic::int(-1),
+        };
+        let mut value = Root2 {
+            a: Dyadic::int(1),
+            b: Dyadic::int(0),
+        };
+        for _ in 0..810 {
+            value = value.mul(&factor);
+        }
+        let actual = value.to_f64();
+        let expected = (std::f64::consts::SQRT_2 - 1.0).powi(810);
+        assert!(actual.is_finite() && actual > 0.0);
+        assert!((actual / expected - 1.0).abs() < 1e-10);
+    }
+    #[test]
+    fn r7_dyadic_scaled_conversion_boundary_rounding_and_subnormals() {
+        for k in [1023, 1024, 1056, 2000, 5000] {
+            let n = BigInt::from_i128(1).shl(k).add(&BigInt::from_i128(1));
+            assert_eq!(Dyadic { n: n.clone(), k }.to_f64(), 1.0, "k={k}");
+            assert_eq!(Dyadic { n: n.neg(), k }.to_f64(), -1.0);
+        }
+        assert_eq!(Dyadic::scaled(1, 1074).to_f64().to_bits(), 1);
+        assert_eq!(Dyadic::scaled(1, 1075).to_f64().to_bits(), 0);
+        assert_eq!(Dyadic::scaled(3, 1075).to_f64().to_bits(), 2);
+        assert_eq!(Dyadic::scaled(5, 1075).to_f64().to_bits(), 2);
+        assert_eq!(Dyadic::scaled((1i128 << 53) + 1, 53).to_f64(), 1.0);
+        assert_eq!(
+            Dyadic::scaled((1i128 << 53) + 3, 53).to_f64().to_bits(),
+            1.0f64.to_bits() + 2
+        );
+        assert_eq!(dyadic_from_f64(f64::MAX).unwrap().to_f64(), f64::MAX);
+    }
+}

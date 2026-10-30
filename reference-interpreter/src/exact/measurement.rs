@@ -92,6 +92,26 @@ fn sqrt2(p: u64) -> Interval {
         lo,
     }
 }
+/// Convert the combined algebraic value, refining through severe cancellation
+/// before binary64 conversion. Equal rounded endpoints prove the rounding.
+pub(super) fn root2_approximate(value: &Root2) -> f64 {
+    if value.is_zero() {
+        return 0.0;
+    }
+    let mut precision = 64;
+    loop {
+        let interval = Interval::point(value.a.clone()).add(
+            &Interval::point(value.b.clone()).mul(&sqrt2(precision), precision),
+            precision,
+        );
+        let lo = interval.lo.to_f64();
+        let hi = interval.hi.to_f64();
+        if lo.to_bits() == hi.to_bits() {
+            return lo;
+        }
+        precision *= 2;
+    }
+}
 fn phase(e: &BigInt, p: u64) -> (Interval, Interval) {
     let bits = e.limbs.last().map_or(0, |n| {
         32 * (e.limbs.len() as u64 - 1) + u64::from(32 - n.leading_zeros())
