@@ -20,7 +20,7 @@ in tests/support/r9_pins.py. Exact library/CLI tests added before source changes
 
 Exact GREEN: 8/0; first completed full suite 323 passed / 0 failed / 5 ignored.
 The initial baseline run raced the newly added fixture files: its fixture audit
-failed 2 tests, so it is not a baseline pass. A clean git-archive baseline is
+failed 2 tests, so it is not a baseline pass. A clean git-archive baseline was
 rerun under the owned ignored .tmp, with the accepted spec read via symlink:
 315 passed / 0 failed / 5 ignored. Its first build lacked the spec include;
 adding the read-only symlink resolved that setup error.
@@ -58,6 +58,44 @@ rather than adding a function-specific oracle identity. Targeted GREEN: 8/0 (6 l
 Zero-budget qinplace rejects §4.5 before its own mutation, including independent
 adjoints; the literal member action rejects at execution as required. Earlier
 exact GREEN was 8/0, extended budget GREEN 9/0. RNG/seeds remain unchanged.
+
+### Final round-9 verification
+
+Core commit **334c27d**, extended history/families commit **b07ab5b**.
+All gates use absolute crate manifest, offline, headless and repository .tmp;
+test optimization level 1 preserves domains/assertions/overflow checks.
+
+| Gate | Observed result |
+|---|---|
+| clean archived baseline | **315 passed / 0 failed / 5 ignored**, 8 unit + 307 integration; 15.96 s |
+| first full suite | **323 passed / 0 failed / 5 ignored**; 37.65 s |
+| final full suite | **327 passed / 0 failed / 5 ignored**, 8 unit + 319 integration, 0 doctests; 14.65 s |
+| fmt --check | pass, 0 tests executed |
+| strict all-target Clippy | pass, 0 warnings, 0 tests executed; 1.16 s |
+| all five ignored sweeps | **5 passed / 0 failed**, 93.83 s runner sum |
+| independent pins | all four root H/object pairs and both oracle H values match, no correction |
+| archived pre-fix CLI replay | **44 commands**, each exit 1, empty stdout, exact §5.6 diagnostic |
+
+| Sweep | Domain | Result / runner time |
+|---|---|---|
+| u8 division/remainder | 65,536 pairs × 4 = 262,144 executions | 1/0; 0.51 s |
+| 17-wire borrow | 131,072 entries | 1/0; 2.72 s |
+| checked certificate | 262,144 domain elements, subject and expected program | 1/0; 14.85 s |
+| differential | 200,000 programs: **70,930 accepted, all clean / 129,070 rejected** | 1/0; 73.38 s |
+| recursive prefixes | 256 inputs × every prefix through completion/first fault | 1/0; 2.37 s |
+
+Final pin-only strengthening explicitly compares interface AND closure values
+with stored member pins in library/CLI tests. Semantic sources are unchanged
+since the passing sweeps. Pin-targeted rerun: **10/0**; final full-suite rerun: **327/0/5**, 14.61 s runner sum.
+Fmt passes; strict all-target Clippy passes with 0 warnings (0.29 s).
+Tracking b-isa-spec-82k closed; evidence commit follows.
+No conformance test was run. All existing round 4–8 negatives remain.
+No new ISA gap or amendment; SPEC-QUESTIONS unchanged. Accepted spec SHA-256:
+90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e.
+Beads metadata auto-export is outside owned commits; no push. External response:
+../bennett/docs/council/isa-ref-2026-10-29/round-9/response.md.
+Logs: repository .tmp/r9-final-*.log, r9-clean-baseline.log,
+r9-red-{library,cli,assign-repeat}.log, r9-independent-pins.log.
 
 ## Round-8 fixes (2026-10-30)
 

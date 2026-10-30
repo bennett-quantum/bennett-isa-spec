@@ -1600,6 +1600,19 @@ fn r9_cli_identity(case: &str, tokens: &[&str]) {
         field(&hashes, "object_hash"),
         &Json::String(bennett_isa_ref::sha256_hex(text.as_bytes()))
     );
+    let stored = support::json(text.lines().nth(3).unwrap());
+    for symbol in stored.object().unwrap().values() {
+        let name = field(symbol, "name").string().unwrap();
+        let actual = field(&hashes, "symbols").get(name).unwrap();
+        assert_eq!(
+            field(actual, "interface_hash"),
+            field(symbol, "interface_hash")
+        );
+        assert_eq!(
+            field(actual, "closure_hash"),
+            field(symbol, "interface_hash")
+        );
+    }
     ok(&["check", &path]);
     for token in tokens {
         for (flag, input) in [

@@ -808,6 +808,10 @@ fn r8_action_call_preserves_readonly_control() {
 fn r9_pinned_identity(case: &str, budgets: &[u64]) {
     let o = Object::parse(support::r9_fixture(case)).unwrap();
     o.check_hashes().unwrap();
+    let id = o.identity().unwrap();
+    for (name, h) in &id.interface_hashes {
+        assert_eq!(id.closure_hashes[name].as_deref(), Some(h.as_str()));
+    }
     assert_eq!(
         o.identity().unwrap().object_hash,
         bennett_isa_ref::sha256_hex(o.text.as_bytes())
@@ -837,6 +841,11 @@ fn r9_qinplace_adjoint_restores_borrow_control() {
 fn r9_mixed_loop_threads_reallocated_bindings() {
     let o = Object::parse(support::r9_fixture("loop")).unwrap();
     o.check_hashes().unwrap();
+    let id = o.identity().unwrap();
+    assert_eq!(
+        id.closure_hashes["a"].as_deref(),
+        Some("bb983f1dc5a8eea46912ea64d1226a9345a05d6cba6cc8452efc9f39b4a17a89")
+    );
     support::r9_identity(&o, &[]);
 }
 
