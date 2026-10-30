@@ -511,6 +511,10 @@ fn r5_certified_lifetime(gate: &str) -> String {
             "1e0d1484447af491bd512ef5cc3cbe4f1b9532863aa56ae2149f61247973f343",
             "4aaf72716633ad6037e3b542f000eb31372accd743ddb97aa97d2960447ac43b",
         ),
+        "cx t b" => (
+            "020372af2df49bc56df0f37f08dfc7b58af2e258df9fb58da7010a7a8d3eb24a",
+            "cb7ef9243fc8e1144a6863142a46e2969941940894e993bd2abddb685725f7cd",
+        ),
         _ => panic!("test gate"),
     };
     let body = format!("qloop 2 {{\nb = qborrow any 1\n{gate}\nqreturn b\n}}");
@@ -682,5 +686,35 @@ fn sol_r5_b01_library_replay_checks_frames_before_nonpermutation_boundaries() {
             .unwrap_err()
             .to_string()
             .contains("§5.6"));
+    }
+}
+
+#[test]
+fn codex_r5_b01_exact_three_certified_lifetime_witnesses() {
+    for (i, gate) in ["x b", "cx b t", "cx t b"].iter().enumerate() {
+        let exact = r5_certified_lifetime(gate);
+        for (j, text) in [exact.split("\nsection certificate").next().unwrap(), &exact]
+            .iter()
+            .enumerate()
+        {
+            support::reject_cli(text, "§5.6", &format!("codex-r5-b01-{i}-{j}"));
+        }
+        // No lifetime may borrow a future lifetime's parity cancellation.
+        for (j, (body, bounds)) in [
+            (format!("b = qborrow any 1\n{gate}\nqreturn b"), vec![]),
+            (
+                format!("qloop 2 {{\nqloop 2 {{\nb = qborrow any 1\n{gate}\nqreturn b\n}}\n}}"),
+                vec![2, 2],
+            ),
+        ]
+        .iter()
+        .enumerate()
+        {
+            support::reject_cli(
+                &support::certified_borrow_identity(body, bounds),
+                "§5.6",
+                &format!("codex-r5-b01-more-{i}-{j}"),
+            );
+        }
     }
 }

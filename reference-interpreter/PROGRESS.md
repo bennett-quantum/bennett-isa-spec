@@ -6,6 +6,14 @@ under `reference-interpreter/`; commit own paths
 (`git add -A -- reference-interpreter && git commit -- reference-interpreter`),
 never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
+## Council round 5, codex/muse second pass (2026-10-30)
+
+Codex R5-B01 resolved-by d0f7dbb and 738b233. Exact three certified witnesses
+(including the third CX direction's published hashes) reject on HEAD before
+production edits; straight-line/nested certificate forms reject too. New pin
+`codex_r5_b01_exact_three_certified_lifetime_witnesses`: 1 passed. The
+appendable response records the SOL proof/audit pins and positive controls.
+
 ## Council round 5, SOL first pass (2026-10-30)
 
 SOL-R5-B01 resolved after RED on the exact correctly bound certificate witness.

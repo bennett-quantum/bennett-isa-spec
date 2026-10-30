@@ -161,3 +161,22 @@ TMPDIR and all four display/browser variables unset. Conformance/include are
 read-only; harness artifacts stay under the interpreter's ignored `.tmp`.
 No accepted spec, seed, dependency or random-distribution changes; no pushes.
 Staged/unverified whole-ISA deliverable disclosures remain unchanged.
+
+## Codex R5-B01 — resolved-by d0f7dbb (SOL-R5-B01), 738b233
+
+Re-ran the exact three astra/codex witnesses against HEAD before changing
+production code. New pin
+`r1_certificates::codex_r5_b01_exact_three_certified_lifetime_witnesses`
+independently checks all three published interface/object digests, including
+CX t b, without parsing the invalid subject to compute its identity. All
+three reject at Object::parse and CLI hash/check with §5.6, exit 1, empty
+stdout, both with and without their correctly bound exhaustive certificates.
+Certified straight-line and nested equivalents also reject. GREEN on HEAD:
+1 test passed. No additional production fix required.
+
+The SOL pins `sol_r5_b01_library_replay_checks_boundaries_even_when_region_map_is_identity`
+and `sol_r5_b01_library_replay_checks_frames_before_nonpermutation_boundaries`
+retain the independent public-API checks; certified carried/doubled-gate
+positives retain full basis, superposition and external entangled-reference
+checks. §§4.3/5.1 require each matched return after its frame; §5.6 requires
+P_F = P′ ⊗ I_B. No decline, partial, new ambiguity or scope change.
