@@ -55,3 +55,24 @@ second reachable entry: first-entry validity alone cannot admit it.
 GREEN: borrow/certificate/generator targets **32 passed, 0 failed, 3 ignored**,
 including all round-4 lifetime and opaque-composition pins. No spec question:
 §§4.3/5.2/14.2 fix allocation at zero and §4.6 requires the body n times.
+
+## SOL-R5-B03 — resolved
+
+RED: exact CLI and library witnesses independently failed with `§3.3: scalar
+wire required`. `action.rs::infer_widths` now scans live producing/consuming
+lifetimes in source order and records widths by instruction line identity,
+which is retained by body cloning. Both qalloc/qborrow and inverse qfree/qreturn
+use their own row's resolved width; `produce` cannot overwrite another row's
+metadata. qcopy/quncopy and qload/qunload participate in lifetime resolution.
+
+`quantum::sol_r5_b03_consumed_workspace_names_keep_their_own_widths` pins the
+literal interface/object hashes, all basis inputs and superposition, then
+mixed qalloc/qcopy/qload/qborrow lifetimes at widths 1/2 with nested loops,
+alpha-renamed counterparts, all eight t/pool basis entries, superposition and
+an entangled reference. Each direction is independently identity and leaves no
+workspace. Producing a still-live spelling remains rejected.
+`cli_xam::sol_r5_b03_reused_workspace_widths_run_and_reverse` checks hash-bound
+check, forward/adjoint at t=0/1, exact state output and equals_entry reversal,
+plus a complex superposition. GREEN: quantum/CLI targets **42 passed, 0 failed**.
+No ambiguity: §§4.3/5.1 fix each producer's width and cleanup, and §5.3 explicitly
+renumbers versions under adjoints.

@@ -204,3 +204,77 @@ fn sol_r4_b01_projection_recovers_amplitudes_below_binary64_range() {
     assert_eq!(rare.read_basis(&[w[2]]).unwrap(), 0);
     rare.release(&[w[2]]).unwrap();
 }
+
+mod support;
+
+#[test]
+fn sol_r5_b03_consumed_workspace_names_keep_their_own_widths() {
+    let exact = "d = qalloc any 1\ncx t d\ncx t d\nqfree d\nd = qalloc any 2\nqfree d";
+    let o = support::rehash(&support::borrow_lifetime_object(exact, &[]));
+    assert_eq!(
+        o.identity().unwrap().interface_hashes["a"],
+        "ba05b26390994f78dc6405906f8ecf555075f83b6f2c47da1ffbee78e7afd140"
+    );
+    assert_eq!(
+        o.identity().unwrap().object_hash,
+        "1004ce41faf18591bbfa75d3cff461a2c61c0df9f3a89bcac513b3553c223340"
+    );
+    support::borrow_identity(&o);
+
+    for renamed in [false, true] {
+        for nested in [false, true] {
+            // Reuse after qcopy, qload, qborrow and qalloc; all consumed
+            // lifetimes have their own width, including inverse releases.
+            let body = "a = qalloc any 1\nz = qalloc any 2\nd = qcopy t\nquncopy t d\nd = qcopy z\nquncopy z d\nd = qload r a\nqunload r a d\nd = qalloc any 1\ncx t d\ncx t d\nqfree d\nd = qborrow any 2\nx d[1]\nx d[1]\nqreturn d\nd = qborrow any 1\ncx d t\ncx d t\nqreturn d\nqfree z\nqfree a";
+            let body = if renamed {
+                body.replacen("d = qcopy z\nquncopy z d", "e = qcopy z\nquncopy z e", 1)
+                    .replacen(
+                        "d = qborrow any 2\nx d[1]\nx d[1]\nqreturn d",
+                        "f = qborrow any 2\nx f[1]\nx f[1]\nqreturn f",
+                        1,
+                    )
+            } else {
+                body.into()
+            };
+            let (body, bounds) = if nested {
+                (
+                    format!("qregion r 1 2\nqloop 2 {{\nqloop 3 {{\n{body}\n}}\n}}"),
+                    vec![2, 3],
+                )
+            } else {
+                (format!("qregion r 1 2\n{body}"), vec![])
+            };
+            let o = support::rehash(&support::borrow_lifetime_object(&body, &bounds));
+            for input in 0..10 {
+                let mut q = QuantumState::new();
+                let w = q.allocate(4).unwrap();
+                for (i, wire) in w[..3].iter().enumerate() {
+                    if input >= 8 {
+                        q.gate("h", &[*wire], None, &[]).unwrap();
+                    } else if input >> i & 1 == 1 {
+                        q.gate("x", &[*wire], None, &[]).unwrap();
+                    }
+                }
+                if input == 9 {
+                    q.gate("cx", &[w[1], w[3]], None, &[]).unwrap();
+                }
+                let entry = q.clone();
+                let mut b = QuantumBindings::default();
+                b.bundles.insert("t".into(), vec![w[0]]);
+                b.borrowed.push(w[1..3].to_vec());
+                for adjoint in [false, true] {
+                    o.execute_action("a", &mut q, &b, adjoint, &[]).unwrap();
+                    assert_eq!(
+                        q, entry,
+                        "renamed={renamed}, nested={nested}, input={input}, adj={adjoint}"
+                    );
+                }
+            }
+        }
+    }
+    assert!(Object::parse(&support::borrow_lifetime_object(
+        "d = qalloc any 1\nd = qalloc any 2\nqfree d",
+        &[]
+    ))
+    .is_err());
+}

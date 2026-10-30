@@ -1268,3 +1268,37 @@ fn muse_r4_malformed_options_cite_the_isa_without_partial_output() {
         );
     }
 }
+
+#[test]
+fn sol_r5_b03_reused_workspace_widths_run_and_reverse() {
+    let o = support::rehash(&support::borrow_lifetime_object(
+        "d = qalloc any 1\ncx t d\ncx t d\nqfree d\nd = qalloc any 2\nqfree d",
+        &[],
+    ));
+    let path = tmp_file("r5-widths.bisa", &o.text);
+    ok(&["check", &path]);
+    for t in ["0", "1"] {
+        for adj in [false, true] {
+            let mut args = vec!["run-action", &path, "a", "--mut", t];
+            if adj {
+                args.push("--adjoint");
+            }
+            let v = ok(&args);
+            assert_eq!(field(&v, "state").canonical(), format!("{{\"{t}\":[1,0]}}"));
+            assert_eq!(array(&v, "mut")[0].uint().unwrap().to_string(), t);
+        }
+        assert_eq!(
+            field(&ok(&["reverse", &path, "a", "--mut", t]), "equals_entry"),
+            &Json::Bool(true)
+        );
+    }
+    let v = ok(&["run-action", &path, "a", "--state", "0=0.6,0;1=0,0.8"]);
+    assert_eq!(field(&v, "state").object().unwrap().len(), 2);
+    assert_eq!(
+        field(
+            &ok(&["reverse", &path, "a", "--state", "0=0.6,0;1=0,0.8"]),
+            "equals_entry"
+        ),
+        &Json::Bool(true)
+    );
+}

@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 struct Environment {
     bindings: QuantumBindings,
-    widths: BTreeMap<String, usize>,
+    widths: BTreeMap<usize, usize>,
     predicates: Vec<Wire>,
     borrowed: BTreeMap<String, Vec<usize>>,
     borrow_used: BTreeSet<usize>,
@@ -58,7 +58,6 @@ impl Environment {
         if self.bindings.bundles.contains_key(n) {
             return err("§3.3", "live bundle produced twice");
         }
-        self.widths.insert(n.into(), wires.len());
         self.bindings.bundles.insert(n.into(), wires);
         Ok(())
     }
@@ -262,11 +261,7 @@ impl Object {
         }
         let mut env = Environment {
             bindings: bindings.clone(),
-            widths: bindings
-                .bundles
-                .iter()
-                .map(|(n, w)| (n.clone(), w.len()))
-                .collect(),
+            widths: BTreeMap::new(),
             predicates: Vec::new(),
             borrowed: BTreeMap::new(),
             borrow_used: BTreeSet::new(),
@@ -309,8 +304,13 @@ impl Object {
             );
             local.push((wires, image));
         }
+        let mut live_widths = bindings
+            .bundles
+            .iter()
+            .map(|(n, w)| (n.clone(), w.len()))
+            .collect();
         for b in &f.blocks {
-            infer_widths(&b.instructions, &mut env)?;
+            infer_widths(&b.instructions, &mut env, &mut live_widths)?;
         }
         let instructions: Vec<_> = f
             .blocks
@@ -500,7 +500,10 @@ impl Object {
                     let allocate = (op == "qalloc") ^ adjoint;
                     let name = if op == "qalloc" { &i.lhs[0] } else { &a[0] };
                     if allocate {
-                        let n = e.widths[name];
+                        let n = *e
+                            .widths
+                            .get(&i.line)
+                            .ok_or_else(|| Error("§4.3: missing matched lifetime width".into()))?;
                         let w = q.allocate(n)?;
                         e.produce(name, w)?;
                     } else {
@@ -513,7 +516,10 @@ impl Object {
                     let borrow = (op == "qborrow") ^ adjoint;
                     let name = if op == "qborrow" { &i.lhs[0] } else { &a[0] };
                     if borrow {
-                        let n = e.widths[name];
+                        let n = *e
+                            .widths
+                            .get(&i.line)
+                            .ok_or_else(|| Error("§4.3: missing matched lifetime width".into()))?;
                         let pool = e
                             .bindings
                             .borrowed
@@ -903,39 +909,55 @@ fn gather_regions<'a>(seq: &'a [Instruction], out: &mut Vec<&'a Instruction>) {
         }
     }
 }
-fn infer_widths(seq: &[Instruction], e: &mut Environment) -> Result<()> {
+/// Source-order lifetime resolution. A release records the width of its
+/// matching producer, so inverse traversal never consults a later definition
+/// with the same spelling. Instruction line identities survive body cloning.
+fn infer_widths(
+    seq: &[Instruction],
+    e: &mut Environment,
+    live: &mut BTreeMap<String, usize>,
+) -> Result<()> {
     for i in seq {
-        match i.op.as_str() {
-            "qalloc" | "qborrow" => {
-                e.widths.insert(
-                    i.lhs[0].clone(),
-                    i.operands[1]
-                        .parse()
-                        .map_err(|_| Error("§4.3: allocation width".into()))?,
-                );
-            }
-            "qcopy" => {
-                let n = if i.operands[0].contains('[') {
-                    1
-                } else {
-                    *e.widths
-                        .get(&i.operands[0])
-                        .ok_or_else(|| Error("§3.3: copy source width".into()))?
-                };
-                e.widths.insert(i.lhs[0].clone(), n);
-            }
-            "qload" => {
-                let r = e
-                    .bindings
+        let width = match i.op.as_str() {
+            "qalloc" | "qborrow" => Some(
+                i.operands[1]
+                    .parse()
+                    .map_err(|_| Error("§4.3: allocation width".into()))?,
+            ),
+            "qcopy" => Some(if i.operands[0].contains('[') {
+                1
+            } else {
+                *live
+                    .get(&i.operands[0])
+                    .ok_or_else(|| Error("§3.3: copy source width".into()))?
+            }),
+            "qload" => Some(
+                e.bindings
                     .regions
                     .get(&i.operands[0])
-                    .ok_or_else(|| Error("§4.6: load region width".into()))?;
-                e.widths.insert(i.lhs[0].clone(), r.cell_width as usize);
-            }
-            _ => {}
+                    .ok_or_else(|| Error("§4.6: load region width".into()))?
+                    .cell_width as usize,
+            ),
+            _ => None,
+        };
+        if let Some(width) = width {
+            live.insert(i.lhs[0].clone(), width);
+            e.widths.insert(i.line, width);
+        }
+        let consumed = match i.op.as_str() {
+            "qfree" | "qreturn" => Some(&i.operands[0]),
+            "quncopy" => Some(&i.operands[1]),
+            "qunload" => Some(&i.operands[2]),
+            _ => None,
+        };
+        if let Some(name) = consumed {
+            let width = live
+                .remove(name)
+                .ok_or_else(|| Error("§3.3: missing consumed lifetime width".into()))?;
+            e.widths.insert(i.line, width);
         }
         for b in &i.bodies {
-            infer_widths(b, e)?;
+            infer_widths(b, e, live)?;
         }
     }
     Ok(())

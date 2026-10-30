@@ -20,7 +20,11 @@ composes per-return restoration/independence obligations through every reachable
 entry using doubling, preserving clean invariants without aggregate cancellation.
 Trips 1/2/3/2^40, nesting, renamed unrolling, d=1 negatives and a second-entry
 toggle pin pass. Borrow/certificate/generator targets: 32 pass, 0 fail, 3 ignored.
-Remaining received blockers B03–B04 are in progress.
+SOL-R5-B03 resolved after independent CLI/library RED witnesses. Workspace
+widths now bind to each producing/consuming instruction lifetime, including
+inverse releases. Exact hashes, basis/superposition, mixed qcopy/qload/qborrow,
+alpha-renamed counterparts, nested loops and entangled references pass in both
+directions; quantum/CLI targets: 42 pass, 0 fail. B04 remains in progress.
 
 Correction to round-4 evidence: the original X/CX rejection pins lacked
 certificate-adorned subjects, and generic-body proof discarded clean entry
