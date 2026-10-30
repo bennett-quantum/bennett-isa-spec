@@ -1,0 +1,25 @@
+{
+  "id": "E-ref-09-copy-native",
+  "suite": "E",
+  "spec": "\u00a711.1 first decomposition family; \u00a74.4\u20134.5",
+  "derivation": "Independent Rust expander and basis simulator enumerate all legal tuples at widths 1\u20134 with both inherited controls. Copy targets start clean; uncopy targets are matching copies. Scratch release and reverse ordinal execution restore the complete entry state. Native fixed permutation gates enumerate every basis state. No interpreter-source dependency. Other native gates and the complete catalog remain blocked, not certified.",
+  "expected_outcome": {
+    "copy_tuples": 1480,
+    "native_permutation_tuples": 36,
+    "widths": [
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-8r4; complete library contract gaps b-isa-spec-cbk / b-isa-spec-8sc; draft checkpoint only"
+  },
+  "scenario": {
+    "catalog": "spec/ref-0.9-draft.json",
+    "checker": "cargo test --test ref_catalog",
+    "family": 1
+  }
+}

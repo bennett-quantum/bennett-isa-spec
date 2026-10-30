@@ -17,6 +17,7 @@
 //! silently accepts is a FAIL.
 
 pub mod json;
+pub mod ref_catalog;
 
 use json::Json;
 use std::collections::BTreeMap;
