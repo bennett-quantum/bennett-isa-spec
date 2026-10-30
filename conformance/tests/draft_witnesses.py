@@ -203,3 +203,19 @@ assert [r["id"] for r in frame["slots"]] == ["mut:0", "in:0"]
 ranges = frame["live_ranges"]
 assert [(r["start"], r["end"]) for r in ranges] == [(0, 2), (2, 4)]
 assert all(a["end"] <= b["start"] or b["end"] <= a["start"] for i, a in enumerate(ranges) for b in ranges[i+1:] if a["frame"] == b["frame"])
+
+draws = witness("DRAW-ORDER witness")
+bit_order = ["00", "01", "10", "11"]
+def measure(draw):
+    return next(bits for i, bits in enumerate(bit_order) if Fraction(i+1, 4) > Fraction(draw))
+bits = [measure(d) for d in draws["draws"]]
+values = [sum(int(v) << i for i, v in enumerate(b)) for b in bits]
+assert bits == draws["outcomes_bits"] and values == draws["outcomes_values"]
+assert values[::-1] == draws["reversed_draw_values"]
+assert [bit_order.index(b) for b in bits] == draws["integer_order_values"]
+draw_dir = root / "conformance/cases/A/A-measure-draw-order-09"
+result = subprocess.run([str(root / "reference-interpreter/target/debug/bennett-isa-ref"), "run-program", str(draw_dir / "two-measures.bisa"), "twice", "--draws", ",".join(draws["draws"])], capture_output=True, text=True)
+assert result.returncode == 0, result.stderr
+measurements = json.loads(result.stdout)["measurements"]
+assert [m["bits"] for m in measurements] == bits
+assert [int(m["value"]) for m in measurements] == values

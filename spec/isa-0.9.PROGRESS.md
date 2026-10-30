@@ -733,7 +733,7 @@ Rejected: interpreting action labels as executable CFG branch/join nodes.
 The fixture's 0.8 interface hash is computed from its complete envelope
 (body included), independently of the CLI; no 0.9 example hash is added.
 The separate staged case is unavailable pending 0.9.
-| B5 / typed frame records | §9.1, §9.4, §12.3 (K16) | F-frame-records-09 | Applied, pending accepted 0.9 | commit containing this row |
+| B5 / typed frame records | §9.1, §9.4, §12.3 (K16) | F-frame-records-09 | Applied, pending accepted 0.9 | `a300222603d9ca1c0ec303a3122ad896792f2db0` |
 
 Step 6: published typed records with explicit slot/frame identities,
 class/state/width rules, c-only expressions and disjoint shared lifetimes.
@@ -745,3 +745,13 @@ Rejected: the previous interface/class-map/scheme_ancillae/retained_history
 encoding, and per-class expression maps with role annotations.
 SPEC-QUESTIONS 11's frame-encoding question is closed for 0.9; its 0.8
 reading remains unchanged in the interpreter-owned file.
+| A5 / draw ordering | §4.1 (K17) | A-measure-draw-order-09 | Applied, pending accepted 0.9 | commit containing this row |
+
+Step 7: FIFO dynamic measurement consumption, wire-first lexicographic
+outcomes and strict cumulative threshold match README, --draws handling,
+classical.rs VecDeque and registers.rs. The two-measurement 0.8 CLI
+fixture returns bits 01 then 11 at the exact CDF ties; Python Fraction
+and independent Rust integer arithmetic verify both ordering distinctions.
+The fixture hashes use complete independent 0.8 envelopes; 0.9 example
+hashes remain placeholders. SPEC-QUESTIONS 29 is closed for 0.9.
+Rejected: reverse draw consumption and integer-order CDF enumeration.

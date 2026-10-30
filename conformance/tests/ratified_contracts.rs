@@ -87,3 +87,19 @@ fn typed_frame_bytes_widths_and_disjoint_lifetimes() {
     assert!(draft.contains(&doc.to_string()));
     assert!(draft.contains(case.at_path("expected_outcome.frame_hash").unwrap().as_str().unwrap()));
 }
+
+#[test]
+fn measurement_fifo_and_lexicographic_cdf_ties() {
+    let dir = cases_dir().join("A/A-measure-draw-order-09");
+    let case = checked_document_case(&dir.join("case.json"));
+    let outcomes = ["00", "01", "10", "11"];
+    // All weights = 1/4; compare integer quarter-units without floating point.
+    let values: Vec<_> = [1, 3].iter().map(|draw| {
+        let bits = outcomes.iter().enumerate().find(|(i, _)| i+1 > *draw).unwrap().1;
+        bits.bytes().enumerate().map(|(i, b)| ((b-b'0') as u64) << i).sum::<u64>()
+    }).collect();
+    assert_eq!(values, [2, 3]);
+    assert_ne!(values, [3, 2], "FIFO is observable");
+    assert_ne!(values, [1, 3], "lexicographic order differs from integer order");
+    assert_eq!(case.at_path("expected_outcome.values"), Some(&Json::Arr(values.iter().map(|v|Json::Num(*v as f64)).collect())));
+}

@@ -132,6 +132,8 @@ north star §3.1 requires).
 
 | K16 | §9.1, §9.4, §12.3 | **Frame JSON (ratified B5)**: identified slots and typed scratch/history/borrow/ancilla records, c-only width expressions, disjoint shared lifetimes | b-isa-spec-2c9; circuits 4fa; SQ 11 | S | – |
 
+| K17 | §4.1 | **Draw ordering (ratified A5)**: FIFO draws; wire-first lexicographic outcomes, strict cumulative threshold; reference CLI witness | b-isa-spec-bas; SQ 29 | S | – |
+
 **Applied Q14 (2026-10-29, b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
 `lift.call`; mapped-region parameters preserve the complete lifted-call
@@ -751,6 +753,29 @@ pre-step tuple is restored and every frame field is clean.
 | `budget.mint` | `tk = budget.mint @o s h st d` | CC and R; a token for the tuple (s, h, st, d) validated for oracle `@o` (§5.4) |
 | `effect` | `effect dev.op args` | R only (§7.3); results are written to memory operands |
 | `hostcall` | `rlen = hostcall service ptr len` | CC only (§10) |
+
+**Measurement draws.** Supplied draws are consumed FIFO, one per
+executed measurement in dynamic execution order (including measurements
+of deterministic states); a failing precondition consumes no draw.
+Each draw is in [0,1). Enumerate outcomes lexicographically by their
+printed bits string, wire 0 first, and select the first outcome whose
+cumulative Born weight is **strictly greater** than the draw times the
+total weight. Thus an exact CDF tie selects the next nonzero-weight
+outcome. Returned integers remain little-endian (wire 0 is bit 0).
+This fixes the reference CLI convention; unsupplied draws follow the
+Born distribution (§14.2).
+
+**DRAW-ORDER witness**
+
+```json
+{"draws":["0.25","0.75"],"integer_order_values":[1,3],"outcomes_bits":["01","11"],"outcomes_values":[2,3],"reversed_draw_values":[3,2]}
+```
+
+Prepare two fresh two-wire registers with H on both wires and measure
+them in order. Each has weights 1/4 on `00`, `01`, `10`, `11` in that
+order. The first draw selects `01` (integer 2) and the second `11`
+(integer 3). Reversed draw consumption would give integers 3,2;
+integer-ordered outcomes would give 1,3. Both draws test exact CDF ties.
 
 ### 4.2 Lifted rows (oracle bodies and lprocs)
 
