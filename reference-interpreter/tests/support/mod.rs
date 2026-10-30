@@ -334,3 +334,25 @@ pub fn r6_map(o: &Object, hadamard: bool) {
         }
     }
 }
+
+/// Literal round-7 member witnesses; hashes computed independently by the members.
+pub fn r7_witness(case: &str) -> (String, &'static str, &'static str) {
+    let (body, bounds, h, oh): (&str, &[u64], &str, &str) = match case {
+        "restored" => ("c = qalloc any 1\nh c\nh c\nb = qborrow any 1\ncx c b\nqreturn b\nqfree c", &[], "12efae749cb84eec0918c9aa49adb348957eba9e81e0eaa8f2514481a0d9dba0", "b2534762bf5eb795efd7ba74195198f0b67e2012b9f3243700e58ee92ee9fc53"),
+        "loop-bad" => ("c = qalloc any 1\nx c\nqloop 4 {\nh t\nx c\n}\nb = qborrow any 1\ncx c b\nqreturn b\nh t\nx c\nqfree c", &[4], "232f157c4fe6c4abdb3ebc384d1b19b01751b68df4949b86d25996e87c300515", "3e8f134a472e3e31545e6bd3ec22058da463927ea24af3929bf3357a36ca3926"),
+        "loop-good" => ("c = qalloc any 1\nqloop 4 {\nh t\nx c\n}\nb = qborrow any 1\ncx c b\nqreturn b\nqfree c", &[4], "fe26a45f4d75fde7d13f0e915a13d15a6ab9bb6b280dcc302996df1391f899d9", "7f1312cd66fc88f5819be157a1a5964c27363f8f1bc728a9b21cdb342685b198"),
+        "diagonal" => ("c = qalloc any 1\ns c\nb = qborrow any 1\ncx c b\nqreturn b\nsdg c\nqfree c", &[], "0d7a3eccbc3cdd7440ec3c1ad66a12e8650203486b2736f6fe5ea2ddb87a56f6", "5b407065c615539c15c7f9381b8fccfebc8e109cae3e8966c05fbd4acd687205"),
+        "control" => ("c = qalloc any 1\nqpred c\nh t\nqunpred c\nb = qborrow any 1\ncx c b\nqreturn b\nqfree c", &[], "06b70e4ca0799aac622c280b3f1de5b825888d21c19da5ec3f015c88b4fc1fe6", ""),
+        "float" => ("qloop 5000 {\nh t\nt t\n}", &[5000], "2b29d4983fd4149572528e684e31ed7802cd7727f628c50058f7d62329ca22e9", "8af0b609daca8eb239a88ad3f47fddec0e6e43e9a456bca951887ccd89af0080"),
+        "rotate-4" => ("c = qalloc any 4\nx c[0]\nqloop 4 {\nh t\nb = qborrow any 1\ncx c[3] b\nqreturn b\nh t\nswap c[3] c[2]\nswap c[2] c[1]\nswap c[1] c[0]\n}\nqloop 4 {\nh t\nswap c[1] c[0]\nswap c[2] c[1]\nswap c[3] c[2]\nh t\n}\nx c[0]\nqfree c", &[4, 4], "5dcd11b58f335ac7f301caf4e2773ffbfb172a01330fdb6c7c990c15036b340f", "d58420852a90bad7d351d52072827bff5c6a8b592ae25072cffdf3b793e88de3"),
+        "rotate-8" => ("c = qalloc any 4\nx c[0]\nqloop 8 {\nh t\nb = qborrow any 1\ncx c[3] b\nqreturn b\nh t\nswap c[3] c[2]\nswap c[2] c[1]\nswap c[1] c[0]\n}\nqloop 8 {\nh t\nswap c[1] c[0]\nswap c[2] c[1]\nswap c[3] c[2]\nh t\n}\nx c[0]\nqfree c", &[8, 8], "4036a594dfa32ab65353367719970549a2cbe1237e471ff6f43b169e09844112", "bc9ac8d642fe4c4569d81021da302108919d500fda82cde3577a2916b681068c"),
+        _ => panic!("unknown round-7 witness"),
+    };
+    (
+        borrow_lifetime_object(body, bounds)
+            .replace("perm_action", "action")
+            .replace(&"0".repeat(64), h),
+        h,
+        oh,
+    )
+}

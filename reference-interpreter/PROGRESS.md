@@ -6,6 +6,38 @@ under `reference-interpreter/`; commit own paths
 (`git add -A -- reference-interpreter && git commit -- reference-interpreter`),
 never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
+## Round-7 fixes (2026-10-30)
+
+Tracking bead b-isa-spec-lto. Sole interpreter implementer; no push.
+
+| Blocker | RED test | Status | Commit |
+|---|---|---|---|
+| SOL-R7-B01 | r7_restored_zero_before_borrow / r7_cli_restored | exact witness green | this core commit |
+| SOL-R7-B02 ≡ R7-B01 | r7_reject_loop_bad, r7_nonpermutation_loop_positive, r7_reject_rotate_4/8; CLI counterparts | exact witnesses green | this core commit |
+| R7-B02 | r7_diagonal_basis, r7_readonly_control; CLI counterparts | exact witnesses green | this core commit |
+| SOL-R7-B03 | pending numeric witness | implementation follows separately | — |
+
+RED before source edits: library 0 passed / 7 failed; CLI 0 passed / 7
+failed. Both bad-loop admissions and all four erroneous rejections reproduced.
+GREEN targeted: 14 passed / 0 failed. Normal suite: 288 passed / 0 failed /
+5 ignored. All existing round 4–7 negatives remain in the suite.
+
+The borrow engine now walks structured nodes with per-wire ANF basis facts.
+Unknown is a fresh independent symbol, never zero. Permutations transform facts;
+diagonal gates and read-only controls retain them; non-diagonal targets become
+unknown. An exact inverse with untouched operands restores the saved prior fact.
+Any intervening operand touch invalidates that saved inverse, including a
+multi-wire operation, so an entangled result cannot resurrect a clean fact.
+Every quantum gate remains a frame boundary with its full borrowed-touch set.
+Every return's restoration/independence equations remain mandatory. Pure
+permutation loops compose both maps and obligations by repeated squaring. Mixed
+loops retain the actual count, execute fact transfers per iteration, and skip
+only identical complete analysis states. For large noncycling transfers, a
+join replaces disagreeing facts by independent unknowns until the body proves
+an inductive invariant, including frame and return obligations. No sampled
+expansion or semantic trip cap remains. Execution cycle skipping is separate.
+No reading in SPEC-QUESTIONS is contradicted; no new ISA gap is needed.
+
 ## Round-6 fixes (2026-10-30)
 
 | Blocker ids | RED test | Status | Commit |

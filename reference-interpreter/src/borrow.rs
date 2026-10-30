@@ -7,8 +7,8 @@
 //! denote the same function iff they are equal. P_F = P' ⊗ I_B iff every
 //! borrowed output equals its input variable and no other output mentions a
 //! borrowed variable. For Boolean-gate circuits this is a total, exact decision
-//! over the frame's full domain (T3), with no wire-count limit; loops use repeated
-//! squaring, never unrolled bound times. Opaque applications retain their full
+//! over the frame's full domain (T3), with no wire-count limit; permutation loops use repeated
+//! squaring; mixed loops carry facts through every iteration or a proved invariant. Opaque applications retain their full
 //! input expressions: composition substitutes recursively into those inputs and
 //! interns the resulting application, rather than freezing an ANF variable.
 //! This proves identities valid for arbitrary black-box functions; unresolved
@@ -123,6 +123,14 @@ enum Node {
     /// A non-permutation operation (non-diagonal or diagonal gate, measurement-free
     /// non-permutation call): it ends a frame and may not touch a borrowed wire.
     Other(Vec<String>),
+    /// Known gate action, separate from its FULL touched set used by §5.6.
+    Quantum {
+        key: String,
+        inverse: String,
+        controls: Vec<(String, bool)>,
+        targets: Vec<String>,
+        diagonal: bool,
+    },
     /// Allocate clean wires; image preparation is represented by explicit flips.
     Alloc(Vec<String>),
     Free(Vec<String>),
@@ -153,13 +161,23 @@ impl Node {
                 out.extend(inputs.iter().cloned());
                 out.extend(outputs.iter().cloned());
             }
+            Self::Quantum {
+                controls, targets, ..
+            } => {
+                out.extend(controls.iter().map(|(w, _)| w.clone()));
+                out.extend(targets.iter().cloned());
+            }
             Self::Other(w) | Self::Alloc(w) | Self::Free(w) | Self::Borrow(w) | Self::Return(w) => {
                 out.extend(w.iter().cloned());
             }
         }
     }
     fn permutation(&self) -> bool {
-        !matches!(self, Self::Other(_))
+        match self {
+            Self::Other(_) | Self::Quantum { .. } => false,
+            Self::Repeat(n, body) => *n == 0 || body.iter().all(Self::permutation),
+            _ => true,
+        }
     }
     fn adjoint(&self) -> Self {
         match self {
@@ -178,6 +196,19 @@ impl Node {
                 inputs: inputs.clone(),
                 outputs: outputs.clone(),
                 assign: true,
+            },
+            Self::Quantum {
+                key,
+                inverse,
+                controls,
+                targets,
+                diagonal,
+            } => Self::Quantum {
+                key: inverse.clone(),
+                inverse: key.clone(),
+                controls: controls.clone(),
+                targets: targets.clone(),
+                diagonal: *diagonal,
             },
             Self::Alloc(w) => Self::Free(w.clone()),
             Self::Free(w) => Self::Alloc(w.clone()),
@@ -407,16 +438,7 @@ impl Compiler<'_> {
                     } else {
                         let mut body = Vec::new();
                         self.compile(&i.bodies[0], &predicate, &mut body)?;
-                        if body.iter().all(Node::permutation) {
-                            out.push(Node::Repeat(n, body));
-                        } else {
-                            // A non-permutation op bounds every frame within two
-                            // consecutive iterations: three iterations exhibit every
-                            // frame shape (first, junction, last), each repeating.
-                            for _ in 0..n.min(3) {
-                                out.extend(body.iter().cloned());
-                            }
-                        }
+                        out.push(Node::Repeat(n, body));
                     }
                 }
                 "qregion" => {} // Hoisted once at function entry.
@@ -562,9 +584,31 @@ impl Compiler<'_> {
                         .map(|t| self.scalar(t))
                         .collect::<Result<Vec<_>>>()?;
                     if diagonal || other {
-                        let mut wires: Vec<String> = c.iter().map(|(w, _)| w.clone()).collect();
-                        wires.extend(targets);
-                        out.push(Node::Other(wires));
+                        let (key, inverse) = match op {
+                            "s" => ("s".into(), "sdg".into()),
+                            "sdg" => ("sdg".into(), "s".into()),
+                            "t" => ("t".into(), "tdg".into()),
+                            "tdg" => ("tdg".into(), "t".into()),
+                            "rx" | "ry" | "rz" => {
+                                if let Ok(angle) = a[0].parse::<f64>() {
+                                    (
+                                        format!("{op}:{}", angle.to_bits()),
+                                        format!("{op}:{}", (-angle).to_bits()),
+                                    )
+                                } else {
+                                    let angle = self.classical(&a[0])?;
+                                    (format!("{op}:{angle}"), format!("inverse:{op}:{angle}"))
+                                }
+                            }
+                            _ => (op.into(), op.into()),
+                        };
+                        out.push(Node::Quantum {
+                            key,
+                            inverse,
+                            controls: c,
+                            targets,
+                            diagonal,
+                        });
                     } else if op == "swap" {
                         out.push(Node::Swap(c, targets[0].clone(), targets[1].clone()));
                     } else {
@@ -595,6 +639,7 @@ struct Application {
     inputs: Vec<Poly>,
 }
 /// Symbolic evaluation state of one frame.
+#[derive(Clone)]
 struct Evaluation<'a> {
     opaque_seen: bool,
     obligations: BTreeMap<Poly, String>,
@@ -848,7 +893,9 @@ impl Evaluation<'_> {
                     self.state.insert(w, value);
                 }
             }
-            Node::Other(_) => return err("§5.6", "non-permutation operation inside a frame"),
+            Node::Other(_) | Node::Quantum { .. } => {
+                return err("§5.6", "non-permutation operation inside a frame")
+            }
         }
         Ok(())
     }
@@ -939,96 +986,229 @@ impl From<Error> for FrameFailure {
         Self::Invalid(e)
     }
 }
-fn factorises(
-    prefix: &[Node],
-    frame: &[Node],
-    borrowed: &BTreeSet<String>,
-) -> std::result::Result<(), FrameFailure> {
-    let mut wires = BTreeSet::new();
-    for n in prefix.iter().chain(frame) {
-        n.wires(&mut wires);
+/// A saved inverse is usable only until any operand is touched. Keeping the
+/// old polynomial also keeps correlations; an unknown result never invents zero.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct InverseFact {
+    gate: Node,
+    before: BTreeMap<String, Poly>,
+}
+struct Facts<'a> {
+    e: Evaluation<'a>,
+    borrowed: &'a BTreeSet<String>,
+    inverses: Vec<InverseFact>,
+    frame: Vec<Node>,
+    unresolved: Option<Error>,
+}
+impl Facts<'_> {
+    fn unknown(&mut self, w: &str) {
+        let id = (self.e.vars.len() + self.e.opaque.len()) as u32;
+        self.e.vars.insert(format!("unknown_{id}"), id);
+        self.e.state.insert(w.into(), Poly::var(id));
     }
-    let vars: BTreeMap<String, u32> = wires
-        .iter()
-        .enumerate()
-        .map(|(i, w)| (w.clone(), i as u32))
-        .collect();
-    let borrowed_vars: BTreeSet<u32> = vars
-        .iter()
-        .filter(|(w, _)| borrowed.contains(*w))
-        .map(|(_, v)| *v)
-        .collect();
-    let no_borrowed = BTreeSet::new();
-    let mut e = Evaluation {
-        opaque_seen: false,
-        obligations: BTreeMap::new(),
-        state: vars
-            .iter()
-            .map(|(w, v)| (w.clone(), Poly::var(*v)))
-            .collect(),
-        vars,
-        opaque: BTreeMap::new(),
-        applications: BTreeMap::new(),
-        borrowed: &no_borrowed,
-    };
-    // Replay the established entry context without re-proving earlier frames.
-    // At a quantum boundary only the touched outputs become unconstrained;
-    // untouched polynomials (in particular qalloc's zero) remain valid. Old
-    // variables stay available to describe correlations among surviving wires.
-    for n in prefix {
-        if let Node::Other(touched) = n {
-            for w in touched {
-                let id = (e.vars.len() + e.opaque.len()) as u32;
-                e.vars.insert(format!("boundary_{id}"), id);
-                e.state.insert(w.clone(), Poly::var(id));
+    fn forget_inverses(&mut self, touched: &BTreeSet<String>) {
+        self.inverses.retain(|fact| {
+            let mut operands = BTreeSet::new();
+            fact.gate.wires(&mut operands);
+            operands.is_disjoint(touched)
+        });
+    }
+    fn flush(&mut self) -> std::result::Result<(), FrameFailure> {
+        if self.frame.iter().any(|n| touches(n, self.borrowed)) {
+            // The cropped translation lemma remains a sufficient gate-frame
+            // proof. Lifetime equations are mandatory even on this route.
+            let first = self
+                .frame
+                .iter()
+                .position(|n| touches(n, self.borrowed))
+                .unwrap();
+            let last = self
+                .frame
+                .iter()
+                .rposition(|n| touches(n, self.borrowed))
+                .unwrap();
+            let structural = translation_lemma(&self.frame[first..=last], self.borrowed);
+            let result = check_factorisation(&self.e, self.borrowed, structural);
+            match result {
+                Err(FrameFailure::NeedsClaim(e)) => {
+                    self.unresolved.get_or_insert(e);
+                }
+                other => other?,
             }
-        } else {
-            e.apply(n)?;
+        }
+        self.e.obligations.clear();
+        self.frame.clear();
+        Ok(())
+    }
+    fn sequence(&mut self, nodes: &[Node]) -> std::result::Result<(), FrameFailure> {
+        for node in nodes {
+            if let Node::Repeat(n, body) = node {
+                if !node.permutation() {
+                    self.repeat(*n, body)?;
+                    continue;
+                }
+            }
+            let mut touched = BTreeSet::new();
+            node.wires(&mut touched);
+            if !node.permutation() {
+                self.flush()?;
+                if let Node::Quantum {
+                    controls,
+                    targets,
+                    diagonal,
+                    ..
+                } = node
+                {
+                    // A known-false predicate disables the gate. Controls are
+                    // read-only even when they enable a genuinely quantum gate.
+                    if self.e.condition(controls) == Poly::zero() {
+                        continue;
+                    }
+                    if let Some(index) =
+                        self.inverses.iter().position(|f| f.gate.adjoint() == *node)
+                    {
+                        let saved = self.inverses.remove(index);
+                        self.forget_inverses(&touched);
+                        self.e.state.extend(saved.before);
+                        continue;
+                    }
+                    self.forget_inverses(&touched);
+                    if !diagonal {
+                        let before = targets.iter().map(|w| (w.clone(), self.e.var(w))).collect();
+                        for w in targets {
+                            self.unknown(w);
+                        }
+                        self.inverses.push(InverseFact {
+                            gate: node.clone(),
+                            before,
+                        });
+                    }
+                } else {
+                    self.forget_inverses(&touched);
+                    for w in touched {
+                        self.unknown(&w);
+                    }
+                }
+            } else {
+                self.forget_inverses(&touched);
+                if let Err(error) = self.e.apply(node) {
+                    if self.e.opaque_seen {
+                        self.unresolved.get_or_insert(error);
+                    } else {
+                        return Err(FrameFailure::Invalid(error));
+                    }
+                }
+                self.frame.push(node.clone());
+            }
+        }
+        Ok(())
+    }
+    fn repeat(&mut self, n: u64, body: &[Node]) -> std::result::Result<(), FrameFailure> {
+        let mut seen = Vec::new();
+        let mut iteration = 0;
+        while iteration < n {
+            let snapshot = (
+                self.e.state.clone(),
+                self.e.obligations.clone(),
+                self.inverses.clone(),
+                self.frame.clone(),
+            );
+            if let Some((previous, _)) = seen.iter().find(|(_, state)| *state == snapshot) {
+                let period = iteration - previous;
+                let skip = (n - iteration) / period * period;
+                if skip != 0 {
+                    iteration += skip;
+                    continue;
+                }
+            }
+            // Exact finite traversal is the default. Beyond this work threshold,
+            // prove an inductive lattice invariant rather than sampling visits.
+            if n - iteration > 1024 && seen.len() >= 1024 {
+                return self.invariant(body);
+            }
+            seen.push((iteration, snapshot));
+            self.sequence(body)?;
+            iteration += 1;
+        }
+        Ok(())
+    }
+    fn invariant(&mut self, body: &[Node]) -> std::result::Result<(), FrameFailure> {
+        // Join equal expressions unchanged; disagreement becomes an independent
+        // top variable. Every pass removes at least one precise wire fact, or
+        // establishes closure. No bound is replaced by a finite sample.
+        self.inverses.clear();
+        let mut tops: BTreeMap<String, Poly> = BTreeMap::new();
+        loop {
+            let entry = self.e.state.clone();
+            let obligations = self.e.obligations.clone();
+            let frame = self.frame.clone();
+            self.sequence(body)?;
+            self.inverses.clear();
+            let mut joined = entry.clone();
+            let wires: BTreeSet<_> = entry.keys().chain(self.e.state.keys()).cloned().collect();
+            for w in &wires {
+                if entry.get(w) != self.e.state.get(w) {
+                    let top = if let Some(p) = tops.get(w) {
+                        p.clone()
+                    } else {
+                        self.unknown(w);
+                        let p = self.e.state[w].clone();
+                        tops.insert(w.clone(), p.clone());
+                        p
+                    };
+                    joined.insert(w.clone(), top);
+                }
+            }
+            if joined == entry && obligations == self.e.obligations && frame == self.frame {
+                self.e.state = joined;
+                // This state contains every remaining reachable loop entry and
+                // exit; body/return proofs above hold for all of them.
+                return Ok(());
+            }
+            self.e.state = joined;
         }
     }
-    e.obligations.clear();
-    e.borrowed = &borrowed_vars;
-    let failure = |e: &Evaluation<'_>, error| {
+}
+fn check_factorisation(
+    e: &Evaluation<'_>,
+    borrowed: &BTreeSet<String>,
+    structural: bool,
+) -> std::result::Result<(), FrameFailure> {
+    let failure = |error| {
         if e.opaque_seen {
             FrameFailure::NeedsClaim(error)
         } else {
             FrameFailure::Invalid(error)
         }
     };
-    for n in frame {
-        e.apply(n).map_err(|error| failure(&e, error))?;
-    }
     for (p, message) in &e.obligations {
         if *p != Poly::zero() {
-            return Err(failure(&e, Error(format!("§5.6: {message}"))));
+            return Err(failure(Error(format!("§5.6: {message}"))));
         }
+    }
+    if structural {
+        return Ok(());
     }
     for (w, p) in &e.state {
         match e.vars.get(w) {
             Some(v) if borrowed.contains(w) => {
                 if *p != Poly::var(*v) {
-                    return Err(failure(
-                        &e,
-                        Error(format!(
-                            "§5.6: borrow frame does not restore borrowed wire {w}"
-                        )),
-                    ));
+                    return Err(failure(Error(format!(
+                        "§5.6: borrow frame does not restore borrowed wire {w}"
+                    ))));
                 }
             }
-            _ => {
-                if p.mentions(&borrowed_vars) {
-                    return Err(failure(
-                        &e,
-                        Error(format!(
-                            "§5.6: borrow frame output {w} depends on borrowed entry values"
-                        )),
-                    ));
-                }
+            _ if p.mentions(e.borrowed) => {
+                return Err(failure(Error(format!(
+                    "§5.6: borrow frame output {w} depends on borrowed entry values"
+                ))));
             }
+            _ => {}
         }
     }
     Ok(())
 }
+
 impl Object {
     fn borrow_compiler<'a>(&'a self, f: &Function) -> Result<Compiler<'a>> {
         let mut compiler = Compiler {
@@ -1282,43 +1462,43 @@ impl Object {
         nodes: &[Node],
         borrowed: &BTreeSet<String>,
     ) -> std::result::Result<(), FrameFailure> {
-        // Frames: maximal permutation-only runs, from the first to the last
-        // operation touching a borrowed wire.
-        let mut unresolved = None;
-        let mut start = 0;
-        while start < nodes.len() {
-            if !nodes[start].permutation() {
-                if touches(&nodes[start], borrowed) {
-                    return Err(FrameFailure::Invalid(Error(
-                        "§5.6: borrowed wire touched by a non-permutation instruction".into(),
-                    )));
-                }
-                start += 1;
-                continue;
-            }
-            let end = (start..nodes.len())
-                .find(|i| !nodes[*i].permutation())
-                .unwrap_or(nodes.len());
-            let first = (start..end).find(|i| touches(&nodes[*i], borrowed));
-            let last = (start..end).rfind(|i| touches(&nodes[*i], borrowed));
-            if let (Some(first), Some(last)) = (first, last) {
-                let frame = &nodes[first..=last];
-                if !translation_lemma(frame, borrowed) {
-                    // Keep surrounding allocation/cleanup when evaluating
-                    // lifetime boundaries; the cropped gate frame alone may
-                    // omit a clean allocation consumed before a qreturn.
-                    match factorises(&nodes[..start], &nodes[start..end], borrowed) {
-                        Ok(()) => {}
-                        Err(FrameFailure::Invalid(e)) => return Err(FrameFailure::Invalid(e)),
-                        Err(FrameFailure::NeedsClaim(e)) => {
-                            unresolved.get_or_insert(e);
-                        }
-                    }
-                }
-            }
-            start = end;
+        check_permutation_touches(nodes, borrowed)?;
+        let mut wires = BTreeSet::new();
+        for node in nodes {
+            node.wires(&mut wires);
         }
-        match unresolved {
+        let vars: BTreeMap<String, u32> = wires
+            .into_iter()
+            .enumerate()
+            .map(|(i, w)| (w, i as u32))
+            .collect();
+        let borrowed_vars = vars
+            .iter()
+            .filter(|(w, _)| borrowed.contains(*w))
+            .map(|(_, v)| *v)
+            .collect();
+        let e = Evaluation {
+            opaque_seen: false,
+            obligations: BTreeMap::new(),
+            state: vars
+                .iter()
+                .map(|(w, v)| (w.clone(), Poly::var(*v)))
+                .collect(),
+            vars,
+            opaque: BTreeMap::new(),
+            applications: BTreeMap::new(),
+            borrowed: &borrowed_vars,
+        };
+        let mut facts = Facts {
+            e,
+            borrowed,
+            inverses: Vec::new(),
+            frame: Vec::new(),
+            unresolved: None,
+        };
+        facts.sequence(nodes)?;
+        facts.flush()?;
+        match facts.unresolved {
             Some(e) => Err(FrameFailure::NeedsClaim(e)),
             None => Ok(()),
         }

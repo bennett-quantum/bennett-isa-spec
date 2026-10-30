@@ -332,11 +332,17 @@ composition and adjoints: each return proves restoration and independence before
 repetitions compose. A borrow spanning a loop may be restored by the whole loop;
 a later borrowing cannot restore an earlier completed lifetime. Loop proofs
 compose per-return obligations on reachable entries, retaining known-clean
-workspace invariants. At unrelated non-permutation boundaries, established
-facts about untouched live workspace survive; touched outputs become fresh
-unknowns without merging frames or waiving any return. Round-6 exact pins cover
-H before and after qborrow, loop-wrapped lifetimes, and untouched entangled
-references. Certificates cannot override definite lifetime or
+workspace invariants. Per-wire basis facts follow every gate: diagonal operands and read-only controls
+retain their values, permutations transform their ANFs, and non-diagonal targets
+become independent unknowns. Exactly matched inverses on untouched operands
+restore saved facts; intervening multi-wire touches invalidate those inverse
+records. All quantum gates still partition frames and retain their complete
+borrowed-touch sets. Mixed loops transfer facts at every actual iteration,
+skipping only repeated complete analysis states, or prove an inductive unknown-top
+lattice invariant for large noncycling bounds. Pure permutation loops retain
+exact map/return-obligation composition by squaring. Round-7 pins cover restored
+workspace, diagonal/control boundaries and evolving loop controls beyond the
+third visit, alongside all round-6 entangled-reference pins. Certificates cannot override definite lifetime or
 non-permutation failures; their exhaustive replay checks restoration and output
 independence at each completed return. Workspace widths follow executed
 producing/consuming lifetimes: zero-trip bodies have no lifetime effects (lexical

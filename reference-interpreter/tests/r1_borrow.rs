@@ -675,3 +675,80 @@ fn r6_boundary_variants_retain_clean_controls_and_reject_dirty_frames() {
         }
     }
 }
+
+#[test]
+fn r7_restored_zero_before_borrow() {
+    let (text, h, oh) = support::r7_witness("restored");
+    let o = Object::parse(&text).unwrap();
+    let id = o.identity().unwrap();
+    assert_eq!(id.interface_hashes["a"], h);
+    assert_eq!(id.closure_hashes["a"].as_deref(), Some(h));
+    if !oh.is_empty() {
+        assert_eq!(id.object_hash, oh);
+    }
+    o.check_hashes().unwrap();
+    support::r6_map(&o, false);
+}
+
+#[test]
+fn r7_nonpermutation_loop_positive() {
+    let (text, h, oh) = support::r7_witness("loop-good");
+    let o = Object::parse(&text).unwrap();
+    let id = o.identity().unwrap();
+    assert_eq!(id.interface_hashes["a"], h);
+    assert_eq!(id.closure_hashes["a"].as_deref(), Some(h));
+    if !oh.is_empty() {
+        assert_eq!(id.object_hash, oh);
+    }
+    o.check_hashes().unwrap();
+    support::r6_map(&o, false);
+}
+
+#[test]
+fn r7_diagonal_basis() {
+    let (text, h, oh) = support::r7_witness("diagonal");
+    let o = Object::parse(&text).unwrap();
+    let id = o.identity().unwrap();
+    assert_eq!(id.interface_hashes["a"], h);
+    assert_eq!(id.closure_hashes["a"].as_deref(), Some(h));
+    if !oh.is_empty() {
+        assert_eq!(id.object_hash, oh);
+    }
+    o.check_hashes().unwrap();
+    support::r6_map(&o, false);
+}
+
+#[test]
+fn r7_readonly_control() {
+    let (text, h, oh) = support::r7_witness("control");
+    let o = Object::parse(&text).unwrap();
+    let id = o.identity().unwrap();
+    assert_eq!(id.interface_hashes["a"], h);
+    assert_eq!(id.closure_hashes["a"].as_deref(), Some(h));
+    if !oh.is_empty() {
+        assert_eq!(id.object_hash, oh);
+    }
+    o.check_hashes().unwrap();
+    support::r6_map(&o, false);
+}
+
+#[test]
+fn r7_reject_loop_bad() {
+    let (text, _, _) = support::r7_witness("loop-bad");
+    let e = Object::parse(&text).unwrap_err().to_string();
+    assert!(e.contains("§5.6"), "{e}");
+}
+
+#[test]
+fn r7_reject_rotate_4() {
+    let (text, _, _) = support::r7_witness("rotate-4");
+    let e = Object::parse(&text).unwrap_err().to_string();
+    assert!(e.contains("§5.6"), "{e}");
+}
+
+#[test]
+fn r7_reject_rotate_8() {
+    let (text, _, _) = support::r7_witness("rotate-8");
+    let e = Object::parse(&text).unwrap_err().to_string();
+    assert!(e.contains("§5.6"), "{e}");
+}

@@ -1380,3 +1380,89 @@ fn r6_amplitude(v: &Json, re: f64, im: f64) {
         assert!((actual - expected).abs() < 1e-12, "{actual} != {expected}");
     }
 }
+
+#[test]
+fn r7_cli_restored() {
+    r7_cli_identity("restored");
+}
+
+#[test]
+fn r7_cli_loop_good() {
+    r7_cli_identity("loop-good");
+}
+
+#[test]
+fn r7_cli_diagonal() {
+    r7_cli_identity("diagonal");
+}
+
+#[test]
+fn r7_cli_control() {
+    r7_cli_identity("control");
+}
+
+fn r7_cli_identity(case: &str) {
+    let (body, h, oh) = support::r7_witness(case);
+    let path = tmp_file(&format!("r7-{case}.bisa"), &body);
+    let hashes = ok(&["hash", &path]);
+    assert!(hashes.canonical().contains(h));
+    if !oh.is_empty() {
+        assert!(hashes.canonical().contains(oh));
+    }
+    ok(&["check", &path]);
+    for (flag, input) in [
+        ("--mut", "0"),
+        ("--mut", "1"),
+        ("--state", "0=0.6,0;1=0,0.8"),
+    ] {
+        for adj in [false, true] {
+            let mut args = vec!["run-action", &path, "a", flag, input];
+            if adj {
+                args.push("--adjoint");
+            }
+            let v = ok(&args);
+            assert_eq!(uint(&v, "wires"), 1);
+            let state = field(&v, "state").object().unwrap();
+            if flag == "--mut" {
+                assert_eq!(
+                    field(&v, "state").canonical(),
+                    format!("{{\"{input}\":[1,0]}}")
+                );
+            } else {
+                assert_eq!(state.len(), 2);
+                r6_amplitude(&state["0"], 0.6, 0.0);
+                r6_amplitude(&state["1"], 0.0, 0.8);
+            }
+        }
+        let v = ok(&["reverse", &path, "a", flag, input]);
+        assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
+        assert_eq!(uint(&v, "wires"), 1);
+    }
+}
+
+#[test]
+fn r7_cli_reject_loop_bad() {
+    let (body, _, _) = support::r7_witness("loop-bad");
+    let path = tmp_file("r7-loop-bad.bisa", &body);
+    for cmd in ["hash", "check"] {
+        fails(&[cmd, &path], "§5.6");
+    }
+}
+
+#[test]
+fn r7_cli_reject_rotate_4() {
+    let (body, _, _) = support::r7_witness("rotate-4");
+    let path = tmp_file("r7-rotate-4.bisa", &body);
+    for cmd in ["hash", "check"] {
+        fails(&[cmd, &path], "§5.6");
+    }
+}
+
+#[test]
+fn r7_cli_reject_rotate_8() {
+    let (body, _, _) = support::r7_witness("rotate-8");
+    let path = tmp_file("r7-rotate-8.bisa", &body);
+    for cmd in ["hash", "check"] {
+        fails(&[cmd, &path], "§5.6");
+    }
+}
