@@ -1724,22 +1724,33 @@ impl Discipline {
             if other {
                 *self.closed.entry(w.clone()).or_default() += 1;
             }
+            // Only a read of THIS outstanding computation blocks its inverse.
+            // An earlier reader of an ancestor version must not block a nested
+            // compute/adjoint pair (e.g. swap; Rx; Rx†; swap).
+            let current = self
+                .versions
+                .get(&w)
+                .and_then(|v| v.last())
+                .and_then(|v| self.value_ids.get(v));
+            let reads_current = |reads: &Vec<(String, Vec<String>)>| {
+                current.is_some_and(|id| {
+                    reads
+                        .iter()
+                        .any(|(source, log)| source == &w && log.contains(id))
+                })
+            };
             let blocked = needs_adjoint
-                && (self.phases.iter().any(|v| {
-                    self.reads
-                        .get(v)
-                        .is_some_and(|reads| reads.iter().any(|(source, _)| source == &w))
-                }) || self.versions.iter().any(|(target, log)| {
-                    target != &w
-                        && log.iter().any(|v| {
-                            self.reads
-                                .get(v)
-                                .is_some_and(|reads| reads.iter().any(|(source, _)| source == &w))
-                        })
-                }) || self
-                    .created
-                    .values()
-                    .any(|c| c.versions.iter().any(|(source, _)| source == &w)));
+                && (self
+                    .phases
+                    .iter()
+                    .any(|v| self.reads.get(v).is_some_and(reads_current))
+                    || self.versions.iter().any(|(target, log)| {
+                        target != &w
+                            && log
+                                .iter()
+                                .any(|v| self.reads.get(v).is_some_and(reads_current))
+                    })
+                    || self.created.values().any(|c| reads_current(&c.versions)));
             self.update_log(&w, &version, blocked);
         }
         Ok(())

@@ -334,19 +334,33 @@ composition and adjoints: each return proves restoration and independence before
 repetitions compose. A borrow spanning a loop may be restored by the whole loop;
 a later borrowing cannot restore an earlier completed lifetime. Loop proofs
 compose per-return obligations on reachable entries, retaining known-clean
-workspace invariants. Per-wire basis facts follow every gate: diagonal operands and read-only controls
-retain their values, permutations transform their ANFs, and non-diagonal targets
-become independent unknowns. Exactly matched inverses on untouched operands
-restore saved facts; intervening multi-wire touches invalidate those inverse
-records. All quantum gates still partition frames and retain their complete
-borrowed-touch sets. Mixed loops transfer facts at every actual iteration,
-skipping only repeated complete analysis states, or prove an inductive unknown-top
-lattice invariant for large noncycling bounds. Pure permutation loops retain
-exact map/return-obligation composition by squaring. Round-7 pins cover restored
-workspace, diagonal/control boundaries and evolving loop controls beyond the
-third visit, alongside all round-6 entangled-reference pins. Certificates cannot override definite lifetime or
-non-permutation failures; their exhaustive replay checks restoration and output
-independence at each completed return. Workspace widths follow executed
+workspace invariants.
+
+**Design (round 8).** Per-wire ANF basis facts follow every gate: diagonal
+operands and read-only controls retain their values, permutations transform
+their ANFs, and non-diagonal targets become independent unknowns. Per-wire
+operation stacks preserve nested compute/adjoint history: an exact adjoint
+restores saved expressions only when the same event tops every operand stack,
+so outstanding entangling readers block restoration. Basis-only permutations
+need no history unless touching an existing stack. Source lowering publishes
+physical bindings, live borrows and fact nodes through one executed structured
+traversal: zero-trip bodies publish none of them; static validation and lexical
+qregion hoisting still apply. Local action calls reuse a memoised per-wire
+structured transfer per callee/classical specialization, instantiated on actual
+wires and effective controls. Known-false controls disable fact transfer;
+imports leave modified outputs unknown and preserve read-only facts. Existing
+SCC validation excludes action recursion. Every quantum gate and non-permutation
+call retains its physical frame boundary and full borrowed-touch guard, even
+when disabled. Mixed loops visit every actual fact entry, skip repeated full
+analysis states, or prove an inductive unknown-top invariant; pure permutation
+loops compose exact maps and return obligations by squaring. Every return still
+proves restoration and output independence. Certificates cannot override
+definite lifetime or non-permutation failures. §6 cleanup readers use captured
+version identities, so older readers do not block a nested exact adjoint.
+Round-8 literal pins and deterministic families retain all round 4–7 negatives
+and add nested adjoints, dead bindings and controlled callee chains.
+
+ Workspace widths follow executed
 producing/consuming lifetimes: zero-trip bodies have no lifetime effects (lexical
 qregions are still hoisted), and every inverse loop visit recreates its own
 matched producer's width. Structured width plans share repeated entry maps as

@@ -14,7 +14,7 @@ Tracking b-isa-spec-41i; sole interpreter implementer, no push.
 |---|---|---|---|
 | SOL-R8-B01 ≡ R8-B02 | r8_compound_adjoint_restores_borrow_control, r8_diagonal_nested_adjoint_restores_borrow_control; r8_cli_compound_x/s | exact nested X/S witnesses green | 366a711 |
 | SOL-R8-B02 ≡ R8-B01 | r8_zero_trip_lifetime_environment_does_not_escape, r8_zero_trip_surviving_fact, r8_zero_trip_cannot_hide_borrowed_quantum_touches; CLI counterparts | exact witnesses green | b11b43f |
-| R8-B03 | r8_action_call_preserves_readonly_control; r8_cli_call | exact disabled controlled-H witness green | this step |
+| R8-B03 | r8_action_call_preserves_readonly_control; r8_cli_call | exact disabled controlled-H witness green | 5ad0555 |
 | SOL-R8-B03 | r8_unsigned_decimal_multiplication; r8_unsigned_multiplicity_composition | exact unsigned boundary and composition green | 366a711 |
 
 RED: nested library **0 passed / 2 failed**, CLI **0 passed / 2 failed**,
@@ -23,7 +23,8 @@ RED: nested library **0 passed / 2 failed**, CLI **0 passed / 2 failed**,
 Targeted GREEN `cargo test --offline ... r8_ -- --nocapture`: **6 passed /
 0 failed**, 1 unit + 5 integration. Logs `.tmp/r8-{red-*,green-stack-numeric}.log`.
 
-Design: every reversible gate is recorded on each operand's operation stack.
+Design: each basis-changing gate, and each reversible gate above a saved
+quantum history, is recorded on every operand's operation stack.
 An exact adjoint pops only when the same entry tops every operand stack;
 nested/disjoint computation therefore restores in LIFO order, while an
 outstanding entangling reader prevents an outer restoration. Saved ANFs retain
@@ -56,6 +57,25 @@ transfer; read-only operands keep their facts. The independent call boundary
 guard retains FULL actual touched sets, including disabled borrowed controls;
 callee-internal borrowed touches are checked recursively. Every physical call
 and quantum gate still delimits frames.
+
+Deterministic R8 families: **3 passed / 0 failed**, **134 accepted / 25
+rejected**: nested stacks **86/6**, zero trips **33/10**, callee transfers
+**15/9**. Includes depth 3, X/CX/S/SWAP/Rx/Ry, interleaved wires, loop wrapping,
+renamed/dead qcopy/qload/qborrow bindings, hoisted dead qregions, certified
+H/S borrowed-touch negatives, live-name/scalar-width negatives, known-zero/one
+controls, readonly input controls, unknown-control negatives and callee chains.
+Initial family run **0 passed / 3 failed**: wrong qload address width and
+missing explicit adjoint-call cleanup were fixture errors; the nested
+SWAP/Rx identity exposed a real §6.2 over-rejection, tracked as b-isa-spec-2kd.
+`Discipline::change` now distinguishes readers of the current operation's
+captured version ID from older readers of an ancestor. Outstanding entangling
+readers still block cancellation. SPEC-QUESTIONS 25's version-sensitive
+reading remains unchanged; no new ISA ambiguity or scope restriction.
+
+First completed normal gate after variants: **314 passed / 0 failed /
+5 ignored** (8 unit + 306 integration, 0 doctests). Fmt passed; strict Clippy
+found one map-entry style violation, corrected without a behavior change.
+Final gates and all five ignored sweeps follow after that correction.
 
 ## Round-7 fixes (2026-10-30)
 

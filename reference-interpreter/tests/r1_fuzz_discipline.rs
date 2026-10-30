@@ -1171,3 +1171,216 @@ fn generated_r7_large_noncycling_loop_proves_unknown_top_invariant() {
     }
     println!("R7 invariant: 1 accepted / 1 rejected (static proof, no execution)");
 }
+
+#[test]
+fn generated_r8_nested_causal_adjoint_stacks() {
+    let pairs = [
+        ("h c", "h c"),
+        ("x c", "x c"),
+        ("s c", "sdg c"),
+        ("cx c t", "cx c t"),
+        ("swap c t", "swap c t"),
+        ("rx 0.25 c", "rx -0.25 c"),
+        ("ry 0.5 c", "ry -0.5 c"),
+    ];
+    let mut accepted = 0;
+    for depth in 1..=3 {
+        for start in 0..pairs.len() {
+            let computation: Vec<_> = std::iter::once(("h c", "h c"))
+                .chain((0..depth).map(|k| pairs[(start + k) % pairs.len()]))
+                .collect();
+            let sequence = computation
+                .iter()
+                .map(|p| p.0)
+                .chain(computation.iter().rev().map(|p| p.1))
+                .collect::<Vec<_>>()
+                .join("\n");
+            for wrapped in [false, true] {
+                let gates = if wrapped {
+                    format!("qloop 3 {{\n{sequence}\n}}")
+                } else {
+                    sequence.clone()
+                };
+                for certified in [false, true] {
+                    let body = format!(
+                        "c = qalloc any 1\n{gates}\nb = qborrow any 1\ncx c b\nqreturn b\nqfree c"
+                    );
+                    r7_case(&body, if wrapped { &[3] } else { &[] }, true, certified);
+                    accepted += 1;
+                }
+            }
+        }
+    }
+    // Independent stacks interleave; every sequence is literally U followed by U†.
+    for certified in [false, true] {
+        r7_case("c = qalloc any 1\nd = qalloc any 1\nh c\nrx 0.25 d\ns c\nx d\nsdg c\nx d\nh c\nrx -0.25 d\nb = qborrow any 1\ncx c b\ncx d b\nqreturn b\nqfree d\nqfree c", &[], true, certified);
+        accepted += 1;
+    }
+    let mut rejected = 0;
+    for inner in ["s c", "cx c t", "swap c t"] {
+        let inverse = if inner == "s c" { "sdg c" } else { inner };
+        for certified in [false, true] {
+            // Overall cleanup is matched, but the borrow occurs BEFORE it. An
+            // outstanding reader must prevent H from inventing a zero at that return.
+            let body = format!("c = qalloc any 1\nh c\n{inner}\nh c\nb = qborrow any 1\ncx c b\nqreturn b\nh c\n{inverse}\nh c\nqfree c");
+            r7_case(&body, &[], false, certified);
+            rejected += 1;
+        }
+    }
+    eprintln!("R8 nested stacks: {accepted} accepted / {rejected} rejected");
+}
+
+#[test]
+fn generated_r8_zero_trip_rebindings_share_executed_structure() {
+    let mut accepted = 0;
+    for dead in [
+        "qfree c\nc = qalloc any 2",
+        "qfree c\nc = qborrow any 2",
+        "qfree c\nc = qcopy t",
+        "qfree c\nc = qload r a0",
+    ] {
+        for nested in [false, true] {
+            for renamed in [false, true] {
+                for certified in [false, true] {
+                    let (dead, bounds) = if nested {
+                        (format!("qloop 0 {{\n{dead}\n}}"), vec![0, 0])
+                    } else {
+                        (dead.into(), vec![0])
+                    };
+                    let mut body = format!("qregion r 1 1\na0 = qalloc any 1\nc = qalloc any 1\nqloop 0 {{\n{dead}\n}}\nb = qborrow any 1\ncx c b\nqreturn b\nqfree c\nqfree a0");
+                    if renamed {
+                        body = body
+                            .replace("c =", "clean =")
+                            .replace(" c ", " clean ")
+                            .replace(" c\n", " clean\n");
+                    }
+                    r7_case(&body, &bounds, true, certified);
+                    accepted += 1;
+                }
+            }
+        }
+    }
+    // A declaration in a dead body still has function scope and entry lifetime.
+    r7_case("qloop 0 {\nqregion r 1 1\n}\na0 = qalloc any 1\nc = qload r a0\nb = qborrow any 1\ncx c b\nqreturn b\nqunload r a0 c\nqfree a0", &[0], true, false);
+    accepted += 1;
+    let mut rejected = 0;
+    for gate in ["h", "s"] {
+        for nested in [false, true] {
+            for certified in [false, true] {
+                let dead = "qreturn b\nb = qalloc any 1";
+                let (dead, bounds) = if nested {
+                    (format!("qloop 0 {{\n{dead}\n}}"), vec![0, 0])
+                } else {
+                    (dead.into(), vec![0])
+                };
+                let body =
+                    format!("b = qborrow any 1\nqloop 0 {{\n{dead}\n}}\n{gate} b\nqreturn b");
+                r7_case(&body, &bounds, false, certified);
+                rejected += 1;
+            }
+        }
+    }
+    for (body,bounds) in [
+        ("c = qalloc any 1\nqloop 0 {\nc = qalloc any 2\n}\nqfree c",vec![0]),
+        ("c = qalloc any 1\nqloop 1 {\nqfree c\nc = qalloc any 2\n}\nb = qborrow any 1\ncx c b\nqreturn b\nqfree c",vec![1]),
+    ] {
+        let text = support::borrow_lifetime_object(body,&bounds).replace("perm_action","action");
+        assert!(Object::parse(&text).unwrap_err().to_string().contains("§3.3"));
+        rejected += 1;
+    }
+    eprintln!("R8 zero trips: {accepted} accepted / {rejected} rejected");
+}
+
+fn r8_call_family(depth: usize, readonly: bool, operation: &str, body: &str) -> String {
+    let sig = r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
+    let child_sig = if readonly {
+        sig.replace("\"in\":[]", "\"in\":[1]")
+    } else {
+        sig.into()
+    };
+    let mut declarations = Vec::new();
+    for k in 0..depth {
+        let name = format!("u{k}");
+        let inputs = if readonly { "p:wire in" } else { "" };
+        let ins = if readonly { "p" } else { "" };
+        let op = if k == 0 {
+            if readonly {
+                format!("qpred p\n{operation}\nqunpred p")
+            } else {
+                operation.into()
+            }
+        } else {
+            format!("action_call @u{} (v) ({ins}) () ()", k - 1)
+        };
+        declarations.push((
+            name,
+            child_sig.clone(),
+            format!("action @u{k} (v:wire mut) ({inputs}) () () ()\n^entry():\n{op}"),
+        ));
+    }
+    declarations.push((
+        "a".into(),
+        sig.into(),
+        format!(
+            "action @a (t:wire mut) () () () ()\n^entry():\n{}",
+            body.replace("@LAST", &format!("@u{}", depth - 1))
+        ),
+    ));
+    support::object(
+        &declarations
+            .iter()
+            .map(|(n, s, b)| (n.as_str(), s.as_str(), b.as_str()))
+            .collect::<Vec<_>>(),
+        "{}",
+        "",
+    )
+}
+
+#[test]
+fn generated_r8_calls_transfer_per_wire_through_callee_chains() {
+    let mut accepted = 0;
+    let mut rejected = 0;
+    for depth in 1..=3 {
+        for readonly in [false, true] {
+            for one in [false, true] {
+                let init = if one { "x c\n" } else { "" };
+                let call = if readonly {
+                    "action_call @LAST (t) (c) () ()"
+                } else {
+                    "ctl c action_call @LAST (t) () () ()"
+                };
+                let body = format!("c = qalloc any 1\n{init}{call}\n{init}b = qborrow any 1\ncx c b\nqreturn b\nqfree c");
+                let text = r8_call_family(depth, readonly, "h v", &body);
+                let o = Object::parse(&text).unwrap();
+                support::r6_map(&o, one); // literal controlled-H: I for zero, H for one
+                accepted += 1;
+            }
+        }
+        // Callee analysed net effect, rather than its action kind, preserves d=0.
+        let body = "d = qalloc any 1\naction_call @LAST (d) () () ()\nb = qborrow any 1\ncx d b\nqreturn b\nadj action_call @LAST (d) () () ()\nqfree d";
+        let o = Object::parse(&r8_call_family(depth, false, "h v\nx v\nx v\nh v", body)).unwrap();
+        support::r6_map(&o, false);
+        accepted += 1;
+        // Unknown interface t controls a genuine H on clean d: d may be 1,
+        // so borrowing through d is invalid despite matched cleanup afterward.
+        let body = "d = qalloc any 1\nctl t action_call @LAST (d) () () ()\nb = qborrow any 1\ncx d b\nqreturn b\nctl t adj action_call @LAST (d) () () ()\nqfree d";
+        let e = Object::parse(&r8_call_family(depth, false, "h v", body))
+            .unwrap_err()
+            .to_string();
+        assert!(e.contains("§5.6"), "{e}");
+        rejected += 1;
+        // Both effective controls and direct operands remain structural touches.
+        for call in [
+            "ctl b action_call @LAST (t) () () ()",
+            "action_call @LAST (b) () () ()",
+        ] {
+            let body = format!("b = qborrow any 1\n{call}\nqreturn b");
+            let e = Object::parse(&r8_call_family(depth, false, "h v", &body))
+                .unwrap_err()
+                .to_string();
+            assert!(e.contains("§5.6"), "{e}");
+            rejected += 1;
+        }
+    }
+    eprintln!("R8 call transfer: {accepted} accepted / {rejected} rejected");
+}

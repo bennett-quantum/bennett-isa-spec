@@ -515,9 +515,7 @@ impl Compiler<'_> {
             n.wires(&mut all);
         }
         for from in all {
-            if !wires.contains_key(&from) {
-                wires.insert(from, self.fresh(1).remove(0));
-            }
+            wires.entry(from).or_insert_with(|| self.fresh(1).remove(0));
         }
         self.borrowed
             .extend(transfer.borrowed.iter().map(|w| wires[w].clone()));
