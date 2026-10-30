@@ -722,7 +722,7 @@ computation reachable while automatic routing/cost rules wait for 0.10.
 Rejected: omitting topology entirely, or deferring its presence/meaning.
 Python -I JCS/hash and an independent Rust grid/byte/hash test check the
 new witness. Canonical bytes have no trailing LF (b-isa-spec-1pl).
-| B1 / multi-block actions | §5.3 (K15) | C-multiblock-09 | Applied, pending accepted 0.9 | commit containing this row |
+| B1 / multi-block actions | §5.3 (K15) | C-multiblock-09 | Applied, pending accepted 0.9 | `23013a54b90594ba9f6acb6a951cafeee76abc09` |
 
 Step 5: the ratified sentence is applied. Read reference README and all
 SPEC-QUESTIONS (no separate multi-block entry); action.rs flattens blocks
@@ -733,3 +733,15 @@ Rejected: interpreting action labels as executable CFG branch/join nodes.
 The fixture's 0.8 interface hash is computed from its complete envelope
 (body included), independently of the CLI; no 0.9 example hash is added.
 The separate staged case is unavailable pending 0.9.
+| B5 / typed frame records | §9.1, §9.4, §12.3 (K16) | F-frame-records-09 | Applied, pending accepted 0.9 | commit containing this row |
+
+Step 6: published typed records with explicit slot/frame identities,
+class/state/width rules, c-only expressions and disjoint shared lifetimes.
+Independent Python and Rust checks reconstruct canonical bytes, SHA-256,
+width arithmetic and half-open interval disjointness; no 0.9 executor
+claim. The memo names record categories but not field spellings: §9.4
+defines those plus mandatory empty arrays and identity/order rules.
+Rejected: the previous interface/class-map/scheme_ancillae/retained_history
+encoding, and per-class expression maps with role annotations.
+SPEC-QUESTIONS 11's frame-encoding question is closed for 0.9; its 0.8
+reading remains unchanged in the interpreter-owned file.

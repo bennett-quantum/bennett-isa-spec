@@ -171,3 +171,35 @@ for t in range(4):
             assert result.returncode == 0, result.stderr
             state = json.loads(result.stdout)
             assert state["mut"] == [output] and state["in"] == [p]
+
+frame = witness("FRAME witness")
+frame_dir = root / "conformance/cases/F/F-frame-records-09"
+frame_bytes = json.dumps(frame, sort_keys=True, separators=(",", ":")).encode()
+assert frame_bytes == (frame_dir / "frame.json").read_bytes()
+frame_hash = hashlib.sha256(frame_bytes).hexdigest()
+assert f"Frame SHA-256: `{frame_hash}`." in draft
+frame_case = json.loads((frame_dir / "case.json").read_text())
+assert frame_case["expected_outcome"]["frame_hash"] == frame_hash
+assert set(frame) == {"slots", "scratch", "history", "borrow", "ancillae", "live_ranges"}
+def frame_width(expr, c):
+    if type(expr) is int:
+        assert expr >= 0
+        return expr
+    if "var" in expr:
+        assert expr == {"var": "c"}
+        return c
+    assert set(expr) == {"op", "args"} and expr["op"] == "+"
+    a, b = expr["args"]
+    return frame_width(a, c) + frame_width(b, c)
+identities = set()
+for category in ("slots", "scratch", "history", "borrow", "ancillae"):
+    keys = {"id", "class", "width"} | ({"role"} if category == "slots" else {"state"} if category == "scratch" else {"scheme", "state"} if category == "ancillae" else set())
+    for record in frame[category]:
+        assert set(record) == keys
+        assert record["id"] not in identities
+        identities.add(record["id"])
+    assert sum(frame_width(r["width"], 2) for r in frame[category]) == frame_case["expected_outcome"][category]
+assert [r["id"] for r in frame["slots"]] == ["mut:0", "in:0"]
+ranges = frame["live_ranges"]
+assert [(r["start"], r["end"]) for r in ranges] == [(0, 2), (2, 4)]
+assert all(a["end"] <= b["start"] or b["end"] <= a["start"] for i, a in enumerate(ranges) for b in ranges[i+1:] if a["frame"] == b["frame"])

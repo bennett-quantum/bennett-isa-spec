@@ -130,6 +130,8 @@ north star §3.1 requires).
 
 | K15 | §5.3 | **Multi-block actions (ratified B1)**: text-order unitary fragments, descriptive labels, cross-block lifetimes | b-isa-spec-2c9; circuits 7bu | E | – |
 
+| K16 | §9.1, §9.4, §12.3 | **Frame JSON (ratified B5)**: identified slots and typed scratch/history/borrow/ancilla records, c-only width expressions, disjoint shared lifetimes | b-isa-spec-2c9; circuits 4fa; SQ 11 | S | – |
+
 **Applied Q14 (2026-10-29, b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
 `lift.call`; mapped-region parameters preserve the complete lifted-call
@@ -1628,6 +1630,8 @@ the integer bundle or location width (§16.3). An lproc's `tokens`,
 header); `args` excludes tokens and `mem` has only `in` roles (§3.7).
 Array order is header order within each group. A **program-point id**
 (§9.2) is the JSON array `[interface_hash, block name, ordinal]`.
+Certificate `frame` fields use exactly the typed-record schema of §9.4;
+unknown fields are errors there as in every metadata record.
 `devices.models` lists every §7.3 model that an `effect` of the object
 uses (an `effect` on an unlisted §7.3 model is a load error; a device
 outside §7.3 is never listed and faults at run time, §17 item 3; a key
@@ -1729,21 +1733,76 @@ rebinding to closure hashes.
 - Region calls: interface bundles and regions passed in declared order,
   caller-owned; callee owns its workspace, returns it clean, local regions
   at image, borrowed bundles returned.
-- **Frame descriptor** (certificate): interface slots (role, width,
-  class), scratch by class and cleanliness **as a function of the
-  inherited control count c** (an expression in `c` of §8.1's language),
-  retained history (oracles: B × frame width under the full-history
-  reference expansion, otherwise the realised history of the bound
-  expansion library, §17 item 18), borrow requirement, scheme
-  ancillae. Shared frames only with disjoint live ranges (suite F);
-  callees `qborrow` only from the caller's designated idle set.
-  Encoded (JCS) as `{ "interface": [ { "role", "width", "class" } ],
-  "scratch": { "<cls>": { "clean": expr, "dirty": expr } }, "borrow": {
-  "<cls>": expr }, "scheme_ancillae": { "<cls>": expr },
-  "retained_history": expr, "live_ranges"?: [ { "frame", "start", "end"
-  } ] }`, every `expr` in §8.1's language over `c`; `live_ranges` are
-  half-open intervals of generated-operation ordinals (§11) per shared
-  frame identifier, and two uses of one frame have disjoint intervals.
+- **Frame descriptor** (certificate): interface slots retain their identities;
+  scratch is recorded by class and cleanliness, with widths as expressions
+  in inherited control count `c`; retained history is B × frame width for
+  the full-history oracle expansion, otherwise the bound library's realised
+  history (§17 item 18). Borrowed wires and scheme ancilla frames are
+  separate records. Callees `qborrow` only from the caller's designated
+  idle set. Shared frames require disjoint live ranges (suite F).
+
+**Frame JSON schema (B5).** The descriptor is the following JCS object;
+all five arrays are required, including empty arrays. Every record has
+exactly the shown fields; `live_ranges` is optional. Unknown fields at
+any depth are errors under §9.1.
+
+```
+  { "slots": [ { "id": "<slot identity>", "role": "in"|"tgt"|"fault"|"mut"|"mem_in"|"mem_mut", "class": "<cls>", "width": expr }, … ],
+    "scratch": [ { "id": "<frame identity>", "class": "<cls>", "state": "clean"|"dirty", "width": expr }, … ],
+    "history": [ { "id": "<frame identity>", "class": "<cls>", "width": expr }, … ],
+    "borrow": [ { "id": "<frame identity>", "class": "<cls>", "width": expr }, … ],
+    "ancillae": [ { "id": "<frame identity>", "scheme": "<scheme name>", "class": "<cls>", "state": "clean"|"dirty", "width": expr }, … ],
+    "live_ranges"?: [ { "frame": "<frame identity>", "start": ordinal, "end": ordinal }, … ] }
+```
+
+`slots` lists the source interface in operand order: oracle `in`, `tgt`,
+`fault`, then regions; action `mut`, `in`, then regions. Slot identities
+are `<group>:<zero-based index within group>` (`in:0`, `tgt:0`,
+`fault:0`, `mut:0`, `mem:0`, …); a region uses role `mem_in` or
+`mem_mut`. A region slot's width counts all its cells, in address then
+bit order; bundle bits are least-significant first. Slot widths MUST
+match the signature. Inherited controls are caller-owned and precede
+these slots in §11 topology placement; they are not renamed callee
+slots. Every class is a resolved target class. Non-slot frame identities
+are nonempty producer-chosen strings, distinct from every other record
+identity in the descriptor; a dynamic identity additionally includes
+the invocation context and the expansion scratch identity (§11.1).
+Array order is source interface order for slots, and first allocation
+order in the realised expansion for each other array. `scratch` records
+per-class, per-cleanliness workspace; `history` records retained history;
+`borrow` records dirty requirements; `ancillae` records each scheme's
+ancilla frame and its declared state. These categories do not double
+count the same wires. No requirements may be omitted because they vanish
+for one chosen basis input.
+
+Every `expr` uses §8.1's expression language with **only `c` bound**;
+other variables and table lookups (whose indices require `k` or `eps`)
+are invalid. At every covered inherited control count the widths MUST
+be nonnegative integers; interface widths are positive and signature
+fixed. Instantiation substitutes the resolved budget, parameters and
+expansion choices into constants before forming these expressions.
+Widths describe the actual realisation, including history and scheme
+ancillae, and are checked against it. Each `live_ranges` entry names a
+non-slot frame identity and a half-open interval `[start,end)` of its
+invocation's generated leaf order (including step/phase/path expansion,
+§11); `start < end`. Shared storage is legal only for compatible class
+and state records with disjoint live intervals; every use of shared
+storage MUST be listed and intervals of the same frame MUST be pairwise
+disjoint. An omitted list gives no shared-storage permission.
+
+**FRAME witness**
+
+```json
+{"ancillae":[{"class":"fast","id":"a","scheme":"controlled-x","state":"clean","width":{"var":"c"}}],"borrow":[{"class":"fast","id":"b","width":1}],"history":[{"class":"fast","id":"h","width":3}],"live_ranges":[{"end":2,"frame":"s","start":0},{"end":4,"frame":"s","start":2}],"scratch":[{"class":"fast","id":"s","state":"clean","width":{"args":[2,{"var":"c"}],"op":"+"}}],"slots":[{"class":"fast","id":"mut:0","role":"mut","width":2},{"class":"fast","id":"in:0","role":"in","width":1}]}
+```
+
+At `c = 2`, the slot widths total 3, scratch width is 4, retained
+history width is 3, borrow width is 1 and scheme ancilla width is 2.
+The two half-open uses of `s` meet at 2 and do not overlap. This is a
+schema/arithmetic witness; a real certificate must also bind the
+expansion and target defining `controlled-x`. Its canonical UTF-8
+bytes exclude the code-fence LF.
+Frame SHA-256: `f314eeef24a5a65a9c72f91e062aa3c83556358eaca166e689571700a72083ff`.
 
 ## 10. Launch ABI (launch 0.9)
 
@@ -2058,7 +2117,8 @@ remove only operations the library marks removable.
 
 **Topology placement.** With a §8.3 topology, `interface_vertices`
 lists one vertex array per root interface slot in §9.4 slot order,
-including inherited controls first; array elements follow bit order
+with inherited control wires first as individual width-one arrays, then
+source interface slots; array elements follow bit order
 (and region cell address then bit order). A callee inherits its actual
 operand placements. `alloc.vertices`, when present, assigns every bit
 of that allocation in bit order. These arrays MUST have the declared
@@ -2408,7 +2468,7 @@ A `proof` label requires the domain to equal D; otherwise the claim is
 ```
   versions; bindings { object_hash, interface_hash, closure_hash (required), reference_program_hash, dialect_mapping_version, target_hash, schedule_hash?, invocation? (K13) }
   producer { name, version, materialisation { llvm_version, pipeline, normaliser_version } }
-  regions { <closure_hash>: { kind, signature, bounds, estimate? (K12), frame (§9.4), resources { name: decimal }, gates_used { gate: { count, scheme?, epsilon? } },
+  regions { <closure_hash>: { kind, signature, bounds, estimate? (K12), frame (required typed-record descriptor, §9.4), resources { name: decimal }, gates_used { gate: { count, scheme?, epsilon? } },
             claims: [ <claim> … ], verification: { oracle: i, borrow_frames: [i], inverse_pairs: [ { g, ginv, claim: i, budget: [B,heap,stack,depth], arg_tokens?: { "<arg>": [B,heap,stack,depth] } } ], unitary: [i], channel: [i],
                                                    fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
             cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },

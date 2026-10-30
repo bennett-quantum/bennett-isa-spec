@@ -44,3 +44,46 @@ fn grid_topology_bytes_hash_and_adjacency() {
 fn checked_document_case(path: &Path) -> Json {
     json::parse(&fs::read_to_string(path).unwrap()).unwrap()
 }
+
+fn width(expr: &Json, c: u64) -> u64 {
+    match expr {
+        Json::Num(n) => { assert!(*n >= 0.0 && n.fract() == 0.0); *n as u64 },
+        Json::Obj(m) if m.contains_key("var") => {
+            assert_eq!(m.len(), 1);
+            assert_eq!(expr.get("var").and_then(Json::as_str), Some("c")); c
+        },
+        _ => {
+            assert_eq!(expr.get("op").and_then(Json::as_str), Some("+"));
+            let args = expr.get("args").unwrap().as_arr().unwrap();
+            assert_eq!(args.len(), 2);
+            width(&args[0], c) + width(&args[1], c)
+        }
+    }
+}
+#[test]
+fn typed_frame_bytes_widths_and_disjoint_lifetimes() {
+    let dir = cases_dir().join("F/F-frame-records-09");
+    let doc = checked_document(&dir.join("frame.json"));
+    let case = checked_document_case(&dir.join("case.json"));
+    checked_hash(&dir.join("frame.json"), case.at_path("expected_outcome.frame_hash").unwrap().as_str().unwrap());
+    for (category, expected) in [("slots", 3), ("scratch", 4), ("history", 3), ("borrow", 1), ("ancillae", 2)] {
+        let records = doc.get(category).unwrap().as_arr().unwrap();
+        let actual: u64 = records.iter().map(|r| width(r.get("width").unwrap(), 2)).sum();
+        assert_eq!(actual, expected);
+        assert_eq!(case.get("expected_outcome").unwrap().get(category), Some(&Json::Num(expected as f64)));
+    }
+    let ranges = doc.get("live_ranges").unwrap().as_arr().unwrap();
+    for (i, a) in ranges.iter().enumerate() {
+        let start = width(a.get("start").unwrap(), 2);
+        let end = width(a.get("end").unwrap(), 2);
+        assert!(start < end);
+        for b in &ranges[i+1..] {
+            if a.get("frame") == b.get("frame") {
+                assert!(end <= width(b.get("start").unwrap(), 2) || width(b.get("end").unwrap(), 2) <= start);
+            }
+        }
+    }
+    let draft = fs::read_to_string(cases_dir().parent().unwrap().parent().unwrap().join("spec/Bennett-ISA-Spec-0.9-draft.md")).unwrap();
+    assert!(draft.contains(&doc.to_string()));
+    assert!(draft.contains(case.at_path("expected_outcome.frame_hash").unwrap().as_str().unwrap()));
+}

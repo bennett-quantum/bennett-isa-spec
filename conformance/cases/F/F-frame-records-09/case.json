@@ -1,0 +1,27 @@
+{
+  "id": "F-frame-records-09",
+  "suite": "F",
+  "spec": "\u00a79.1 unknown fields; \u00a79.4 typed frame records; \u00a712.3 region frame",
+  "derivation": "At inherited c=2 the scratch width 2+c is 4, scheme ancilla width c is 2; slots total 3, history 3, borrow 1. Half-open uses [0,2) and [2,4) of s are disjoint. Canonical ASCII/integer JSON bytes exclude LF.",
+  "scenario": {
+    "frame": "frame.json",
+    "c": 2,
+    "unknown_field": "reject",
+    "unbound_variable": "eps"
+  },
+  "expected_outcome": {
+    "frame_hash": "f314eeef24a5a65a9c72f91e062aa3c83556358eaca166e689571700a72083ff",
+    "slots": 3,
+    "scratch": 4,
+    "history": 3,
+    "borrow": 1,
+    "ancillae": 2,
+    "shared_lifetimes": "disjoint",
+    "unknown_field": "reject",
+    "eps_variable": "reject"
+  },
+  "unavailable": {
+    "deliverable": 11,
+    "reason": "unavailable pending 0.9: b-isa-spec-2c9 (ratified B5; circuits 4fa); typed-record frame schema replaces 0.8 class maps"
+  }
+}
