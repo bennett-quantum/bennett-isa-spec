@@ -10,8 +10,8 @@ never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
 | Blocker ids | RED test | Status | Commit |
 |---|---|---|---|
-| SOL-R6-B01 / codex R6-B02 | r6_sol_boundary_exact; r6_codex_boundary_exact; CLI equivalents | exact witnesses green | dceaa22 |
-| SOL-R6-B02 / codex R6-B01 | r6_zero_trip_exact; r6_changing_width_exact; CLI equivalents | exact witnesses green | dceaa22 |
+| SOL-R6-B01 / codex R6-B02 | r6_sol_boundary_exact; r6_codex_boundary_exact; CLI equivalents | resolved; variants/families green | dceaa22, 32ef2e6 |
+| SOL-R6-B02 / codex R6-B01 | r6_zero_trip_exact; r6_changing_width_exact; CLI equivalents | resolved; variants/families green | dceaa22, 32ef2e6 |
 
 RED: library 0/2 + 0/2 and CLI 0/4, all four reported diagnostics
 reproduced (qreturn restoration, released wire not clean, missing consumed
@@ -52,11 +52,29 @@ unchanged Python seed (2 example objects, 2 printed envelopes).
 Fresh affected ignored sweeps so far: 17-wire execution **1 passed / 0 failed**,
 131,072 entries, 138.73 s; checked certificate **1 passed / 0 failed**,
 262,144 domain elements, subject and expected program, 357.91 s. The 200,000
-program discipline sweep remains running; its observed acceptance counts must
-be recorded before handoff. Standalone conformance: **445 pass / 0 fail /
+program discipline sweep passed **1 test / 0 failed**, **64,717 accepted (all
+exactly clean) / 135,283 rejected**, 624.80 s. Three affected ignored tests
+passed in total; the unrelated division and recursive-prefix sweeps were not
+rerun. Commands (with the absolute manifest above, headless and offline):
+`cargo test --test r1_borrow -- --ignored codex_b14_seventeen_wire_swap_identity_frame_exhaustive --nocapture`,
+`cargo test --test r1_certificates -- --ignored b14_seventeen_wire_frame_with_checked_claim --nocapture`,
+`cargo test --test r1_fuzz_discipline -- --ignored accepted_random_actions_run_exactly_clean_sweep --nocapture`.
+Full exact commands and RED/targeted counts are in the council round-6 response.
+Logs: `reference-interpreter/.tmp/r6-*.log`; actual TMPDIR for all gates:
+`/home/tobias/Projects/bennett-workspace/bennett-isa-spec/.tmp`.
+Standalone conformance: **445 pass / 0 fail /
 48 unavailable / 493**, exit 2. Its current read-only checkout adds two explicit
 unavailable contract-gap cases since the review's 491-case snapshot; no
 unavailable case is counted as passed. No new ISA reading was needed.
+
+Implementation commits: dceaa22 (shared core fixes/exact pins), 32ef2e6
+(variants/C7/C8), 0d12ff1 (fresh borrow/certificate evidence and obsolete comment
+removal). Tracking bead b-isa-spec-7dd is complete. No semantic source change
+followed the passing normal and ignored suites; fmt/strict Clippy were rerun
+after the comment removal. Only owned interpreter paths are committed; the
+Beads CLI's automatic .beads/issues.jsonl export is left for the maintainer.
+No push; accepted spec hash remains
+90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e.
 
 ## Council round 5, codex/muse second pass (2026-10-30)
 
