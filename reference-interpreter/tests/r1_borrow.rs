@@ -641,3 +641,37 @@ fn r6_codex_boundary_exact() {
     o.check_hashes().unwrap();
     support::r6_map(&o, true);
 }
+
+#[test]
+fn r6_boundary_variants_retain_clean_controls_and_reject_dirty_frames() {
+    for (body, bounds, h) in [
+        ("c = qalloc any 1\nb = qborrow any 1\nh t\ncx c b\nqreturn b\nh t\nqfree c", vec![], false),
+        ("c = qalloc any 1\nh t\nb = qborrow any 1\nx b\nx b\nqreturn b\nqfree c", vec![], true),
+        ("c = qalloc any 1\nqloop 3 {\nh t\nb = qborrow any 1\ncx c b\nqreturn b\nh t\n}\nqfree c", vec![3], false),
+        ("c = qalloc any 1\nh t\nb = qborrow any 1\ncx c b\nqreturn b\nqfree c\nh t", vec![], false),
+        // Facts about c are invalidated by H c: this valid cleanup uses H c
+        // again, but borrowed restoration is independent of that unknown c.
+        ("c = qalloc any 1\nh c\nb = qborrow any 1\nx b\nx b\nqreturn b\nh c\nqfree c", vec![], false),
+    ] {
+        let text = support::borrow_lifetime_object(body, &bounds).replace("perm_action", "action");
+        let o = support::rehash(&text);
+        o.check_hashes().unwrap();
+        support::r6_map(&o, h);
+    }
+    for body in [
+        "c = qalloc any 1\nx c\nh t\nb = qborrow any 1\ncx c b\nqreturn b\nh t\nx c\nqfree c",
+        "c = qalloc any 1\nh t\nb = qborrow any 1\nx b\nqreturn b\nh t\nqfree c",
+        "c = qalloc any 1\nh t\nb = qborrow any 1\nqreturn b\nx c\nqfree c",
+        "c = qalloc any 1\nh c\nb = qborrow any 1\ncx c b\nqreturn b\nh c\nqfree c",
+    ] {
+        for certified in [false, true] {
+            let text = if certified {
+                support::certified_borrow_identity_kind(body, &[], "action")
+            } else {
+                support::borrow_lifetime_object(body, &[]).replace("perm_action", "action")
+            };
+            let e = Object::parse(&text).unwrap_err().to_string();
+            assert!(e.contains("§5.6") || e.contains("§6.2"), "{e}");
+        }
+    }
+}

@@ -387,3 +387,30 @@ fn r6_changing_width_exact() {
     o.check_hashes().unwrap();
     support::r6_map(&o, false);
 }
+
+#[test]
+fn r6_structured_lifetime_variants_match_independent_identity() {
+    let mut cases = vec![
+        ("d = qalloc any 1\nqloop 0 {\nqloop 2 {\nqfree d\nd = qalloc any 2\n}\n}\nqfree d".into(), vec![0,2]),
+        ("d = qalloc any 1\nqloop 2 {\nqloop 0 {\nqfree d\n}\n}\nqfree d".into(), vec![2,0]),
+        ("d = qcopy t\nqloop 0 {\nquncopy t d\nd = qcopy t\n}\nquncopy t d".into(), vec![0]),
+        ("d = qborrow any 1\nqloop 0 {\nqreturn d\nd = qborrow any 2\n}\nqreturn d".into(), vec![0]),
+        ("qregion r 1 2\na = qalloc any 1\nd = qload r a\nqloop 0 {\nqunload r a d\nd = qload r a\n}\nqunload r a d\nqfree a".into(), vec![0]),
+        ("d0 = qalloc any 1\nqfree d0\nd1 = qalloc any 2\nx d1[1]\nx d1[1]\nqfree d1\nd2 = qalloc any 2\nx d2[1]\nx d2[1]\nqfree d2".into(), vec![]),
+    ];
+    for n in [1, 2, 3, 128] {
+        for borrow in [false, true] {
+            let (alloc, free) = if borrow {
+                ("qborrow", "qreturn")
+            } else {
+                ("qalloc", "qfree")
+            };
+            cases.push((format!("d = {alloc} any 1\nqloop {n} {{\n{free} d\nd = {alloc} any 2\nx d[1]\nx d[1]\n}}\n{free} d"), vec![n]));
+        }
+    }
+    for (body, bounds) in cases {
+        let text = support::borrow_lifetime_object(&body, &bounds);
+        let o = Object::parse(&text).unwrap_or_else(|e| panic!("{e}\n{body}"));
+        support::r6_map(&o, false);
+    }
+}

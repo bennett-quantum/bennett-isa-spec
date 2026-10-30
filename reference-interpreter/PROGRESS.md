@@ -10,8 +10,8 @@ never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
 | Blocker ids | RED test | Status | Commit |
 |---|---|---|---|
-| SOL-R6-B01 / codex R6-B02 | r6_sol_boundary_exact; r6_codex_boundary_exact; CLI equivalents | exact witnesses green | this green-step commit |
-| SOL-R6-B02 / codex R6-B01 | r6_zero_trip_exact; r6_changing_width_exact; CLI equivalents | exact witnesses green | this green-step commit |
+| SOL-R6-B01 / codex R6-B02 | r6_sol_boundary_exact; r6_codex_boundary_exact; CLI equivalents | exact witnesses green | dceaa22 |
+| SOL-R6-B02 / codex R6-B01 | r6_zero_trip_exact; r6_changing_width_exact; CLI equivalents | exact witnesses green | dceaa22 |
 
 RED: library 0/2 + 0/2 and CLI 0/4, all four reported diagnostics
 reproduced (qreturn restoration, released wire not clean, missing consumed
@@ -28,7 +28,28 @@ plan indexed by sequence position and loop entry width map, sharing recurring
 width environments as cycles. Zero trips have no lifetime effects; inverse
 iteration j uses forward iteration j's matched release. Reverse quantum period
 skipping leaves transient prefix iterations to execute explicitly. No trip cap.
-C7 families, ignored sweeps and final gates follow in the next green step.
+Additional pins: `r6_boundary_variants_retain_clean_controls_and_reject_dirty_frames`
+(5 positive variants, 8 certified/uncertified negatives) and
+`r6_structured_lifetime_variants_match_independent_identity` (14 positives,
+including nested zero trips, dead copy/load/borrow changes, renamed unrolling,
+and qalloc/qborrow width changes at 1/2/3/128 trips).
+`r6_map` now checks all 16 t/three-wire-pool basis entries plus superposition
+and a borrowed wire entangled with an external reference, each direction
+independently followed by exact reversal and no remaining workspace.
+
+C7: separate deterministic families
+`generated_r6_disjoint_h_boundaries_match_identity_and_renamed_unrollings`
+(**48 accepted cases**) and
+`generated_r6_dynamic_width_lifetimes_match_identity_and_renamed_unrollings`
+(**96 accepted cases**). They cover trips 0/1/2/3, nesting, disjoint H placement,
+qalloc/qborrow, widths 1/2/3 and alpha-renamed unrolling. Identity is derived
+from c=0, H²=I and within-lifetime X²=I, not from another interpreter run.
+Original RNG code/distribution/seeds are unchanged. Both family tests pass.
+Fresh normal suite: **274 passed / 0 failed / 5 ignored** (270 integration,
+4 unit, 0 doctests; 29.53 s summed runner time under concurrent sweeps).
+All-target strict Clippy and fmt --check pass (0 tests executed), as does the
+unchanged Python seed (2 example objects, 2 printed envelopes).
+Affected ignored sweeps are running; their fresh counts follow separately.
 
 ## Council round 5, codex/muse second pass (2026-10-30)
 
@@ -126,8 +147,9 @@ entry using doubling, preserving clean invariants without aggregate cancellation
 Trips 1/2/3/2^40, nesting, renamed unrolling, d=1 negatives and a second-entry
 toggle pin pass. Borrow/certificate/generator targets: 32 pass, 0 fail, 3 ignored.
 SOL-R5-B03 resolved after independent CLI/library RED witnesses. Workspace
-widths now bind to each producing/consuming instruction lifetime, including
-inverse releases. Exact hashes, basis/superposition, mixed qcopy/qload/qborrow,
+widths were verified on the tested straight-line and self-contained loop
+producing/consuming lifetimes, including inverse releases. Round-6 evidence
+above extends this to zero-trip and loop-carried width changes. Exact hashes, basis/superposition, mixed qcopy/qload/qborrow,
 alpha-renamed counterparts, nested loops and entangled references pass in both
 directions; quantum/CLI targets: 42 pass, 0 fail. SOL-R5-B04 resolved after
 RED on the exact two-wire sparse observer. A projection marker normalizes

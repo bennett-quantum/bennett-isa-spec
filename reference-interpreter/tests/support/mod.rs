@@ -302,18 +302,18 @@ pub fn r6_witness(which: &str) -> (String, &'static str, &'static str) {
 /// Each direction starts independently at entry; workspace cannot escape.
 pub fn r6_map(o: &Object, hadamard: bool) {
     use bennett_isa_ref::{QuantumBindings, QuantumState};
-    for input in 0..6 {
+    for input in 0..18 {
         let mut q = QuantumState::new();
-        let w = q.allocate(4).unwrap();
-        for (bit, wire) in w[..3].iter().enumerate() {
-            if input >= 4 {
+        let w = q.allocate(5).unwrap();
+        for (bit, wire) in w[..4].iter().enumerate() {
+            if input >= 16 {
                 q.gate("h", &[*wire], None, &[]).unwrap();
             } else if input >> bit & 1 == 1 {
                 q.gate("x", &[*wire], None, &[]).unwrap();
             }
         }
-        if input == 5 {
-            q.gate("cx", &[w[1], w[3]], None, &[]).unwrap();
+        if input == 17 {
+            q.gate("cx", &[w[1], w[4]], None, &[]).unwrap();
         }
         let entry = q.clone();
         let mut expected = q.clone();
@@ -322,7 +322,7 @@ pub fn r6_map(o: &Object, hadamard: bool) {
         }
         let mut b = QuantumBindings::default();
         b.bundles.insert("t".into(), vec![w[0]]);
-        b.borrowed.push(w[1..3].to_vec());
+        b.borrowed.push(w[1..4].to_vec());
         for adjoint in [false, true] {
             let mut actual = entry.clone();
             o.execute_action("a", &mut actual, &b, adjoint, &[])

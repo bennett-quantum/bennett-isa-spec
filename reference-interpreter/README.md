@@ -332,11 +332,21 @@ composition and adjoints: each return proves restoration and independence before
 repetitions compose. A borrow spanning a loop may be restored by the whole loop;
 a later borrowing cannot restore an earlier completed lifetime. Loop proofs
 compose per-return obligations on reachable entries, retaining known-clean
-workspace invariants. Certificates cannot override definite lifetime or
+workspace invariants. At unrelated non-permutation boundaries, established
+facts about untouched live workspace survive; touched outputs become fresh
+unknowns without merging frames or waiving any return. Round-6 exact pins cover
+H before and after qborrow, loop-wrapped lifetimes, and untouched entangled
+references. Certificates cannot override definite lifetime or
 non-permutation failures; their exhaustive replay checks restoration and output
-independence at each completed return. Workspace widths belong to individual
-producing/consuming instructions, including inverse releases, so a consumed
-spelling may be reused at another width.
+independence at each completed return. Workspace widths follow executed
+producing/consuming lifetimes: zero-trip bodies have no lifetime effects (lexical
+qregions are still hoisted), and every inverse loop visit recreates its own
+matched producer's width. Structured width plans share repeated entry maps as
+cycles without a trip-count limit. Round-6 pins include nested dead bodies,
+qcopy/qload/qborrow variants, changing-width qalloc/qborrow loops and
+alpha-renamed unrollings. Round-5 width evidence covers its tested straight-line
+and self-contained loop lifetimes; the round-6 pins extend that evidence to
+loop-carried width changes.
 Matched lifted oracle calls preserve all tuple
 boundaries and account for every possible numeric `qjumpr` destination.
 

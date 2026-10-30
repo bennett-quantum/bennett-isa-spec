@@ -868,3 +868,103 @@ fn generated_r5_one_iteration_cleanup_and_nonpermutation_certificates() {
     }
     assert_eq!((accepted, rejected), (8, 20));
 }
+
+#[test]
+fn generated_r6_disjoint_h_boundaries_match_identity_and_renamed_unrollings() {
+    // c=0 throughout; CX(c,beta_j)=I for every fresh beta_j. H_t^2=I.
+    // Move H across allocation/borrow, also inside loop lifetimes. No RNG use.
+    let mut accepted = 0;
+    for trips in 0..=3 {
+        for position in 0..3 {
+            for nested in [false, true] {
+                for unrolled in [false, true] {
+                    let lifetime = |name: &str| {
+                        let (before, after) = if position == 2 {
+                            ("", "h t\n")
+                        } else {
+                            ("h t\n", "")
+                        };
+                        format!("{before}{name} = qborrow any 1\n{after}cx c {name}\nqreturn {name}\nh t\n")
+                    };
+                    let (mut body, mut bounds) = if unrolled {
+                        (
+                            (0..trips)
+                                .map(|j| lifetime(&format!("b{j}")))
+                                .collect::<String>(),
+                            vec![],
+                        )
+                    } else {
+                        (
+                            format!("qloop {trips} {{\n{}}}\n", lifetime("b")),
+                            vec![trips],
+                        )
+                    };
+                    if body.is_empty() {
+                        body = "x t\nx t\n".into();
+                    }
+                    if nested {
+                        body = format!("qloop 2 {{\n{body}}}\n");
+                        bounds.insert(0, 2);
+                    }
+                    body = format!("c = qalloc any 1\n{body}qfree c");
+                    if position == 0 {
+                        // An additional pair commuted outside allocation gives
+                        // a boundary before c exists as well as the inner ones.
+                        body = format!("h t\n{body}\nh t");
+                    }
+                    let text = support::borrow_lifetime_object(&body, &bounds)
+                        .replace("perm_action", "action");
+                    let o = Object::parse(&text).unwrap_or_else(|e| panic!("{e}\n{body}"));
+                    support::r6_map(&o, false);
+                    accepted += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(accepted, 48);
+}
+
+#[test]
+fn generated_r6_dynamic_width_lifetimes_match_identity_and_renamed_unrollings() {
+    // Every allocation is zero (or an independently restored borrowed factor);
+    // X on the last wire occurs twice in the same lifetime. Zero trips leave
+    // the original width-1 d live. Renamed unrolling defines the same identity.
+    let mut accepted = 0;
+    for trips in 0..=3 {
+        for width in 1..=3 {
+            for borrowed in [false, true] {
+                for nested in [false, true] {
+                    for unrolled in [false, true] {
+                        let (alloc, free) = if borrowed {
+                            ("qborrow", "qreturn")
+                        } else {
+                            ("qalloc", "qfree")
+                        };
+                        let (body, bounds) = if unrolled {
+                            let mut body = format!("d0 = {alloc} any 1\n");
+                            let total = trips * if nested { 2 } else { 1 };
+                            for j in 0..total {
+                                body.push_str(&format!("{free} d{j}\nd{} = {alloc} any {width}\nx d{}[{}]\nx d{}[{}]\n",j+1,j+1,width-1,j+1,width-1));
+                            }
+                            body.push_str(&format!("{free} d{total}"));
+                            (body, vec![])
+                        } else {
+                            let mut body=format!("qloop {trips} {{\n{free} d\nd = {alloc} any {width}\nx d[{}]\nx d[{}]\n}}",width-1,width-1);
+                            let mut bounds = vec![trips];
+                            if nested {
+                                body = format!("qloop 2 {{\n{body}\n}}");
+                                bounds.insert(0, 2);
+                            }
+                            (format!("d = {alloc} any 1\n{body}\n{free} d"), bounds)
+                        };
+                        let o = Object::parse(&support::borrow_lifetime_object(&body, &bounds))
+                            .unwrap_or_else(|e| panic!("{e}\n{body}"));
+                        support::r6_map(&o, false);
+                        accepted += 1;
+                    }
+                }
+            }
+        }
+    }
+    assert_eq!(accepted, 96);
+}
