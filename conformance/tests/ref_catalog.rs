@@ -437,7 +437,7 @@ fn independent_canonical_bytes_and_envelope_hashes() {
             "-I",
             concat!(env!("CARGO_MANIFEST_DIR"), "/tools/ref_catalog.py"),
             "--families",
-            "4",
+            "5",
             "--check",
         ])
         .output()
@@ -639,4 +639,57 @@ fn allocation_and_call_flags_full_domain() {
         "allocator {} and call {} full-domain flag tuples",
         counts[0], counts[1]
     );
+}
+#[test]
+fn address_dispatch_full_domain() {
+    let c = catalog();
+    let mut count = 0;
+    for n in 1..=4u32 {
+        let size = 1u64 << n;
+        let mask = size - 1;
+        for op in ["copy", "store", "exchange"] {
+            let m = Machine::compile(
+                &c.expand(&format!("dispatch.{op}.a1"), &[n as i64]).unwrap(),
+                &[("a", 1), ("cells", 2 * n as usize), ("v", n as usize)],
+            )
+            .unwrap();
+            let mut batch = Vec::new();
+            for a in 0..2 {
+                for cells in 0..size * size {
+                    for v in 0..size {
+                        for en in [false, true] {
+                            let old = (cells >> (a * n)) & mask;
+                            let (next, result) = if en {
+                                match op {
+                                    "copy" => (cells, v ^ old),
+                                    "store" => (cells ^ (v << (a * n)), v),
+                                    "exchange" => {
+                                        ((cells & !(mask << (a * n))) | (v << (a * n)), old)
+                                    }
+                                    _ => unreachable!(),
+                                }
+                            } else {
+                                (cells, v)
+                            };
+                            batch.push((
+                                vec![("a", a as u64), ("cells", cells), ("v", v)],
+                                en,
+                                vec![("a", a as u64), ("cells", next), ("v", result)],
+                            ));
+                            if batch.len() == 64 {
+                                packed(&m, &batch);
+                                batch.clear();
+                            }
+                            count += 1;
+                        }
+                    }
+                }
+            }
+            if !batch.is_empty() {
+                packed(&m, &batch);
+            }
+        }
+    }
+    assert_eq!(count, 56160);
+    println!("two-cell address dispatch widths 1..4: {count} tuples");
 }

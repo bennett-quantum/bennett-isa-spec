@@ -1,0 +1,26 @@
+{
+  "id": "E-ref-09-address-dispatch",
+  "suite": "E",
+  "spec": "\u00a711.1 address dispatch and multiplexers; \u00a74.6 qload/qunload/qstore/qexchm gate patterns",
+  "derivation": "For every one-bit address, complete two-cell memory and arbitrary value target, execute equality-selected XOR copy/store/exchange in address order; Rust integer cell extraction and bit masks provide independent outcomes. Widths 1\u20134, both ambient controls, immediate equality uncompute and full original ordinal reversal. This is a primitive checkpoint, not a claim of generic mapped-region or row binding.",
+  "scenario": {
+    "family": 5,
+    "catalog": "spec/ref-0.9-draft.json",
+    "checker": "address_dispatch_full_domain"
+  },
+  "expected_outcome": {
+    "recipes": 3,
+    "cell_widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "address_width": 1,
+    "tuples": 56160
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-8r4; complete catalog and binding repair b-isa-spec-cbk required"
+  }
+}

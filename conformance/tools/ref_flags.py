@@ -8,11 +8,12 @@ def family(api):
             return ('or',wire('atop'),wire('atop',1)) if i==0 else wire('atop',1)
         for op in ['inrange','free.flag']:
             c=Circuit();fold=c.temp()
-            if op=='inrange':
-                px=c.temp(plus(n,1));nx=c.temp(plus(n,1))
-                c.body += [loop('i',n,[gate('cx',wire('p','i'),wire(px,'i')),gate('cx',wire('n','i'),wire(nx,'i'))])]
-                endp,_,_=c.ripple(lambda i:wire(px,i),lambda i:wire(nx,i),plus(n,1))
             for entry in range(entries):
+                nxt=c.temp();entry_start=len(c.body)
+                if op=='inrange':
+                    px=c.temp(plus(n,1));nx=c.temp(plus(n,1))
+                    c.body += [loop('i',n,[gate('cx',wire('p','i'),wire(px,'i')),gate('cx',wire('n','i'),wire(nx,'i'))])]
+                    endp,_,_=c.ripple(lambda i:wire(px,i),lambda i:wire(nx,i),plus(n,1))
                 base=lambda i:wire('base',plus(times(entry,n),i))
                 if op=='inrange':
                     bx=c.temp(plus(n,1));sx=c.temp(plus(n,1))
@@ -27,7 +28,10 @@ def family(api):
                     c.body[start:]=[loop('i',n,c.body[start:])]
                     match=('and',('and',active(entry),wire(eq,n)),('not',wire('pinned',entry)))
                     pred=('and',match,wire('live',entry))
-                nxt=c.temp();c.boolean(('or',wire(fold),pred),wire(nxt));fold=nxt
+                entry_value=c.temp();c.boolean(pred,wire(entry_value))
+                entry_compute=c.body[entry_start:]
+                c.boolean(('or',wire(fold),wire(entry_value)),wire(nxt))
+                c.body.append(inv(entry_compute));fold=nxt
             result=c.temp();c.boolean(wire(fold) if op=='inrange' else ('not',wire(fold)),wire(result))
             compute=c.body[:];c.body += [gate('cx',wire(result),wire('t')),inv(compute)]
             out.append(c.recipe('value.'+op+'.'+tag,['N'] if n=='N' else [],'0.8 §4.2: inrange(p,n) = exists i < atop: live_i and base_i <= p and p+n <= base_i+size_i, no wrap; free match_i includes not pinned_i; §17 item 7: linear inrange scans.'))

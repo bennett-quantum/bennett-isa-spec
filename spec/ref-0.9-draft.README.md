@@ -101,3 +101,13 @@ All configurations enumerate arbitrary predicate targets and both controls.
 Counts: inrange 1,318,144; free flag 24,704; alloc flag 149,760; call flag
 1,123,328. Wider table configurations and general call records remain open;
 these helpers do not implement allocator writes or activation operations.
+
+Address dispatch: `dispatch.copy.a1`, `dispatch.store.a1`,
+`dispatch.exchange.a1`, parameter W. `a` is one bit, `cells` has 2W bits
+in address/bit order, and `v` has W bits. Equality scratch is recomputed
+and cleared for each address in numeric order. Controlled exchange uses
+CX v cell; CCX equality cell v; CX v cell, with no private Fredkin leaf.
+Widths W=1–4: 56,160 full-domain tuples. Generic mapped-region, multi-byte
+load/store, and stack/location selectors remain blocked with the row bindings.
+The linear scan checkpoint now uncomputes entry scratch immediately after
+each ordered OR fold; no cross-entry arithmetic computation is shared.

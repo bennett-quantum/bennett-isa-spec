@@ -116,7 +116,7 @@ def witness():
     w=json.loads(text.split('**ISA-REF-LIB witness**')[1].split('```json\n')[1].split('\n```')[0])
     assert hashlib.sha256(('isa=0.9\nexpansion=ref\nversion=0.9\n'+jcs(w)+'\n').encode()).hexdigest()=='299510fd67cc626fdcbcc10adcd40730f9af294ba596d86fb25fd31be08a5c7f'
 if __name__=='__main__':
-    p=argparse.ArgumentParser(); p.add_argument('--families',type=int,default=1); p.add_argument('--check',action='store_true'); a=p.parse_args()
+    p=argparse.ArgumentParser(); p.add_argument('--families',type=int,choices=range(1,6),default=5); p.add_argument('--check',action='store_true'); a=p.parse_args()
     witness(); raw=jcs(build(a.families)).encode(); path=ROOT/'spec/ref-0.9-draft.json'
     if a.check: assert path.read_bytes()==raw
     else: path.write_bytes(raw)
