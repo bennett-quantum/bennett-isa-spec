@@ -745,7 +745,7 @@ Rejected: the previous interface/class-map/scheme_ancillae/retained_history
 encoding, and per-class expression maps with role annotations.
 SPEC-QUESTIONS 11's frame-encoding question is closed for 0.9; its 0.8
 reading remains unchanged in the interpreter-owned file.
-| A5 / draw ordering | §4.1 (K17) | A-measure-draw-order-09 | Applied, pending accepted 0.9 | commit containing this row |
+| A5 / draw ordering | §4.1 (K17) | A-measure-draw-order-09 | Applied, pending accepted 0.9 | `ed044ecb6017ecd41fb98b4f8d3271eac7c40945` |
 
 Step 7: FIFO dynamic measurement consumption, wire-first lexicographic
 outcomes and strict cumulative threshold match README, --draws handling,
@@ -755,3 +755,13 @@ and independent Rust integer arithmetic verify both ordering distinctions.
 The fixture hashes use complete independent 0.8 envelopes; 0.9 example
 hashes remain placeholders. SPEC-QUESTIONS 29 is closed for 0.9.
 Rejected: reverse draw consumption and integer-order CDF enumeration.
+| A4 / Q14; A5 / EPS-DECADE, BLOCK-IMAGE, ISA-7, Q1–Q13 | §0 (K9/K10/K5/K18), Q14 confirmation | F-ratified-confirmations-09; retained §16.3 examples and boundary/sector witnesses | Applied, pending accepted 0.9 | commit containing this row |
+
+Step 8: all confirmations marked decided. Existing operative sentences
+already match ratification and stay unchanged; no new numerical values
+are introduced. Q12 continues to gate draft example hashes on the 0.9
+precheck. Rejected Q14 reading: a captured/readable argument environment
+instead of explicit token/classical/mapped-region forwarding. Historical
+Q1–Q13 choices remain applied; this pass does not reopen them. The new
+staged case names the confirmation beads; independent existing witness
+checks remain green.

@@ -1,0 +1,29 @@
+{
+  "id": "F-ratified-confirmations-09",
+  "suite": "F",
+  "spec": "\u00a70 confirmations; \u00a73.7/\u00a74.2 Q14; \u00a77.3 BLOCK-IMAGE; \u00a78.1 EPS-DECADE; \u00a74.9/\u00a75.4 ISA-7",
+  "derivation": "Ratification confirms existing drafted rules without changing their witnesses. The independent draft checks retain exact decade-boundary and complete-sector checks; the lproc header carries explicit token/classical/mem groups, and fault C retains its terminal effective cause. This case tracks accepted-0.9 availability, not an implemented checker.",
+  "scenario": {
+    "confirmations": [
+      "Q14",
+      "EPS-DECADE",
+      "BLOCK-IMAGE",
+      "ISA-7",
+      "Q1\u2013Q13"
+    ],
+    "witnesses": [
+      "\u00a716.3 example 10",
+      "EPS-DECADE witness",
+      "BLOCK-IMAGE witness",
+      "\u00a716.3 example 8"
+    ]
+  },
+  "expected_outcome": {
+    "decision_status": "ratified as applied",
+    "example_hashes": "placeholders pending 0.9 precheck"
+  },
+  "unavailable": {
+    "deliverable": 11,
+    "reason": "unavailable pending 0.9: b-isa-spec-2c9; Q14 b-isa-spec-7u6, EPS-DECADE b-isa-spec-f31, BLOCK-IMAGE b-isa-spec-0d0, ISA-7 b-isa-spec-221"
+  }
+}
