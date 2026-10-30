@@ -612,3 +612,75 @@ fn sol_r5_b01_library_replay_checks_boundaries_even_when_region_map_is_identity(
         support::borrow_identity(&o);
     }
 }
+
+#[test]
+fn sol_r5_b01_certificate_return_checks_keep_quantum_surrounding_state() {
+    // Each borrowed frame is identity even though t is a superposition at
+    // qreturn. Auditing the classical values of all other wires would narrow
+    // this valid action; compare their exact quantum state instead.
+    for body in [
+        "h t\nb = qborrow any 1\nx b\nx b\nqreturn b\nh t",
+        "b = qborrow any 1\nx b\nx b\nh t\nh t\nx b\nx b\nqreturn b",
+    ] {
+        let o = Object::parse(&support::certified_borrow_identity_kind(
+            body,
+            &[],
+            "action",
+        ))
+        .unwrap();
+        assert_eq!(
+            o.verify_certificate().unwrap()[0].verdict,
+            ClaimVerdict::Proof
+        );
+        support::borrow_identity(&o);
+    }
+}
+
+#[test]
+fn sol_r5_b01_library_replay_checks_frames_before_nonpermutation_boundaries() {
+    for gate in ["x b", "cx b t"] {
+        let body = format!("b = qborrow any 1\n{gate}\nh t\nh t\n{gate}\nqreturn b");
+        let invalid = support::certified_borrow_identity_kind(&body, &[], "action");
+        let valid = support::borrow_lifetime_object(
+            &format!("b = qborrow any 1\n{gate}\n{gate}\nh t\nh t\n{gate}\n{gate}\nqreturn b"),
+            &[],
+        )
+        .replace("perm_action", "action");
+        let mut o = Object::parse(&valid).unwrap();
+        let f = o.functions.get_mut("a").unwrap();
+        f.blocks[0].instructions.remove(6);
+        f.blocks[0].instructions.remove(2);
+        f.lines = invalid
+            .split("section functions\n")
+            .nth(1)
+            .unwrap()
+            .split("\n\nsection certificate")
+            .next()
+            .unwrap()
+            .lines()
+            .map(str::to_string)
+            .collect();
+        o.metadata.insert(
+            "symbols".into(),
+            json(
+                invalid
+                    .split("section symbols\n")
+                    .nth(1)
+                    .unwrap()
+                    .lines()
+                    .next()
+                    .unwrap(),
+            ),
+        );
+        o.metadata
+            .insert("certificate".into(), json(invalid.lines().last().unwrap()));
+        o.text = invalid;
+        let closure = o.identity().unwrap().closure_hashes["a"].clone().unwrap();
+        assert_eq!(o.verify_claim(&closure, 0).unwrap(), ClaimVerdict::Proof);
+        assert!(o
+            .verify_certificate()
+            .unwrap_err()
+            .to_string()
+            .contains("§5.6"));
+    }
+}

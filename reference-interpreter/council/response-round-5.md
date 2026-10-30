@@ -17,8 +17,9 @@ hash/check (exit 1, empty stdout, §5.6).
 `borrow.rs` distinguishes a definite Boolean/non-permutation failure from an
 unresolved opaque-function identity. Only the latter can invoke the library
 route. `claims.rs::check_borrow_independence` additionally audits every actual
-qreturn during full-domain replay, including inlined/nested action calls.
-`quantum.rs` retains opt-in basis observations: the returned factor must equal
+qreturn and each non-permutation frame boundary during full-domain replay,
+including inlined/nested action calls.
+`quantum.rs` retains opt-in exact-state observations: the returned factor must equal
 its entry, and every other live wire must be independent of that entry at that
 boundary. Comparisons hold all other input bits fixed. Prior completed frames
 have already restored their independent entries, so subsequent physical pool
@@ -122,3 +123,14 @@ accepted subject preserves all basis/superposed/entangled-reference states;
 every accepted certificate verifies. `generated_r5_alpha_renaming_consumed_workspace_preserves_widths`
 adds **18 positive cases**, reused/renamed consumed widths 1..3 in loops 1..3,
 with the same exact full-state checks in both directions.
+
+Further audit control: `sol_r5_b01_certificate_return_checks_keep_quantum_surrounding_state`
+was RED on the first audit implementation: basis-reading all surviving wires
+incorrectly rejected an identity with t in superposition at return. Audits now
+compare the exact surviving quantum state (including phase), requiring only
+the borrowed entry to be restored, and do not narrow quantum action contexts.
+`sol_r5_b01_library_replay_checks_frames_before_nonpermutation_boundaries`
+isolates verify_certificate on X/CX maps that cancel across two H gates:
+verify_claim sees the region identity, but frame auditing rejects the earlier
+invalid frame before the non-permutation boundary. Valid frames surrounding
+such gates still certify and preserve superposition/entangled references.

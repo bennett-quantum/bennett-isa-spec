@@ -357,6 +357,9 @@ impl Object {
             let context = e.controls(inherited);
             let op = i.op.as_str();
             if gate(op) {
+                if !matches!(op, "x" | "cx" | "ccx" | "mcx" | "swap") {
+                    q.audit_frame()?;
+                }
                 let mut wires = Vec::new();
                 let mut angle = None;
                 if op == "mcx" {
@@ -537,9 +540,10 @@ impl Object {
                                 "designated idle set lacks requested borrowed wires",
                             );
                         }
-                        let wires = indices.iter().map(|i| pool[*i]).collect();
+                        let wires: Vec<_> = indices.iter().map(|i| pool[*i]).collect();
                         e.borrow_used.extend(&indices);
                         e.borrowed.insert(name.into(), indices);
+                        q.audit_borrow(&wires);
                         e.produce(name, wires)?;
                     } else {
                         q.audit_return(&e.bundle(name)?)?;

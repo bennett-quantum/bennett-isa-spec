@@ -30,6 +30,13 @@ sparse conditional diagnostics with extended exponents while retaining raw
 exact shadows and caller-supplied input scale. Tiny entangled residuals and
 subsequent Born results pass; quantum/register/CLI targets: 54 pass, 0 fail.
 All four received SOL blockers are resolved; final complete gates follow.
+Additional deterministic coverage: 128 certified/uncertified lifetime and clean
+context cases (64 accept / 64 reject), plus 18 reused/renamed-width positives.
+Direct certificate verification rejects invalid internal returns and frames
+even when the whole-region claim proves identity. An additional RED control
+found that basis-only audit observations narrowed valid superposed contexts;
+audits now compare exact surviving quantum states and observe non-permutation
+frame boundaries as well as returns. Original random distribution is unchanged.
 
 Correction to round-4 evidence: the original X/CX rejection pins lacked
 certificate-adorned subjects, and generic-body proof discarded clean entry

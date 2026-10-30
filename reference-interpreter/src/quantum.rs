@@ -110,11 +110,12 @@ enum State {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Content(Vec<Wire>, Vec<(Key, Amplitude)>);
-pub(crate) type BorrowObservation = (Vec<Wire>, Vec<bool>, Vec<(Wire, bool)>);
+pub(crate) type BorrowObservation = (Vec<Wire>, Vec<bool>, Content);
 #[derive(Clone, Debug)]
 struct BorrowAudit {
     entry: BTreeMap<Wire, bool>,
     returns: Vec<BorrowObservation>,
+    live: BTreeSet<Wire>,
 }
 #[derive(Clone, Debug)]
 pub struct QuantumState {
@@ -284,19 +285,49 @@ impl QuantumState {
         self.borrow_audit = Some(BorrowAudit {
             entry,
             returns: Vec::new(),
+            live: BTreeSet::new(),
         });
         Ok(())
     }
     pub(crate) fn auditing_borrows(&self) -> bool {
         self.borrow_audit.is_some()
     }
+    pub(crate) fn audit_borrow(&mut self, wires: &[Wire]) {
+        if let Some(audit) = &mut self.borrow_audit {
+            audit.live.extend(wires);
+        }
+    }
+    pub(crate) fn audit_frame(&mut self) -> Result<()> {
+        if let Some(audit) = &self.borrow_audit {
+            let wires: Vec<_> = audit.live.iter().copied().collect();
+            if !wires.is_empty() {
+                self.audit_borrow_boundary(&wires)?;
+            }
+        }
+        Ok(())
+    }
     pub(crate) fn audit_return(&mut self, wires: &[Wire]) -> Result<()> {
+        self.audit_borrow_boundary(wires)?;
+        if let Some(audit) = &mut self.borrow_audit {
+            for w in wires {
+                audit.live.remove(w);
+            }
+        }
+        Ok(())
+    }
+    fn audit_borrow_boundary(&mut self, wires: &[Wire]) -> Result<()> {
         let Some(audit) = &self.borrow_audit else {
             return Ok(());
         };
         for w in wires {
-            if audit.entry.get(w).copied() != Some(self.read_basis(&[*w])? != 0) {
-                return err("§5.6", "qreturn does not restore its borrowed entry");
+            if audit.entry.get(w).copied()
+                != Some(
+                    self.read_basis(&[*w]).map_err(|_| {
+                        Error("§5.6: qreturn/frame borrowed entry is not restored".into())
+                    })? != 0,
+                )
+            {
+                return err("§5.6", "qreturn/frame does not restore its borrowed entry");
             }
         }
         let rest = audit
@@ -305,12 +336,20 @@ impl QuantumState {
             .filter(|(w, _)| !wires.contains(w))
             .map(|(_, v)| *v)
             .collect();
-        let output = self
-            .ids
-            .iter()
-            .filter(|w| !wires.contains(w))
-            .map(|w| Ok((*w, self.read_basis(&[*w])? != 0)))
-            .collect::<Result<_>>()?;
+        let remove: Vec<_> = self.ids.iter().map(|w| wires.contains(w)).collect();
+        let content = self.content();
+        let output = Content(
+            content
+                .0
+                .into_iter()
+                .filter(|w| !wires.contains(w))
+                .collect(),
+            content
+                .1
+                .into_iter()
+                .map(|(k, e)| (compress(&k, &remove), e))
+                .collect(),
+        );
         if let Some(audit) = &mut self.borrow_audit {
             audit.returns.push((wires.to_vec(), rest, output));
         }
