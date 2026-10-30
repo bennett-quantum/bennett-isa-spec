@@ -684,7 +684,7 @@ Existing Fraction/Decimal witness checks independently reproduce every row.
 Rejected alternatives (retained historically above): separate bound-request
 entry, class-aware accessor, selectable precision/rounding. No alternative
 remains in §10.1. No new numerical example was needed.
-| A3 / CLAIM-REPLAY | §9.2, §12.1–§12.3 (K13) | D-sampled-relation-invocation; CLAIM-BINDING (retained) | Applied, pending accepted 0.9 | commit containing this row |
+| A3 / CLAIM-REPLAY | §9.2, §12.1–§12.3 (K13) | D-sampled-relation-invocation; CLAIM-BINDING (retained) | Applied, pending accepted 0.9 | `0e72b63adaa5ee5f446706f0ef628f1165d4e57a` |
 
 Step 2: expected is mandatory, standalone invocations are per claim,
 scheduled roots use bindings.invocation, and complete positional tuple
@@ -695,3 +695,17 @@ XOR outcomes, coverage, wide args, signed zero and canonical args hashes.
 Rejected: omitted expected defaulting to oracle; shared invocation registry
 or region-level inheritance; named or sample-only keyed tables. The
 region-inheritance parenthesis was removed to match ratification literally.
+| A1 / ISA-REF-LIB; B6 | §11.1, §17 item 7 (K11) | E-ref-09-qxor-witness; retained qxor envelope | Applied, pending accepted 0.9 | commit containing this row |
+
+Step 3: schema, envelope hash, ordinals, scratch identity, empty removable
+sets and the complete deterministic decomposition families are decided.
+The catalog is a separate b-isa-spec-8r4 job; no ref/ publication occurs
+before acceptance. Existing independent Python checks enumerate every qxor
+pair and reversal and recompute the envelope hash. New pending witness
+adds one unavailable case. Rejected alternatives: a different hash rule,
+optimized/CSE recipes or a different initial decomposition set; later
+libraries require their own version. SPEC-QUESTIONS 21's library-related
+realisation gate remains a delivery dependency, not an undecided contract.
+Gate note: raw unified diffs contain space-only context lines by design;
+git diff --check covers source/progress/conformance, and the diff artifact
+is verified by regeneration rather than stripping its context bytes.

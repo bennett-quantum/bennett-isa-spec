@@ -2,6 +2,7 @@
 #[test]
 fn draft_contract_witnesses() {
     let result = std::process::Command::new("python3")
+        .arg("-I")
         .arg(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/tests/draft_witnesses.py"

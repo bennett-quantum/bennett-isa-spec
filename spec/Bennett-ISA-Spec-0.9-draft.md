@@ -122,7 +122,7 @@ north star §3.1 requires).
 | K8 | §16.3, §15 | Examples 4–9 (one per new family, hand-derived results) and the suite rows for every new instruction and fault | brief | E | new |
 | K9 | §8.1 | **EPS-DECADE**: exact zero-based decimal accuracy bucket, domain and exact-entry prohibition; boundary witness | bennett-vm-cxg; b-isa-spec-f31 | S | – |
 | K10 | §7.3 | **BLOCK-IMAGE**: contiguous complete 512-byte sectors, byte order, partial-image rejection at device initialisation; witness | bennett-vm-47i; b-isa-spec-0d0 | S | – |
-| K11 | §11.1, §17 item 7 | **ISA-REF-LIB (from bennett-vm-47t): maintainer decision required**. Proposed serialization, envelope hash, ordinals, scratch/removable rules and decomposition set; witness only, publication gated on accepted 0.9 | bennett-vm-47t; b-isa-spec-8r4 (open) | S | new |
+| K11 | §11.1, §17 item 7 | **ISA-REF-LIB (ratified A1)**. Decided serialization, envelope hash, ordinals, scratch/removable rules and decomposition set; witness only, publication gated on accepted 0.9 | bennett-vm-47t; b-isa-spec-8r4 (open) | S | new |
 | K12 | §10, §10.1, §12.3 | **LAUNCH-ESTIMATE (ratified A2)**. Resolved parameters, class-preserving resource keys, upward decimal encoding and exact certificate binding; witness | bennett-vm-hsd; b-isa-spec-c15 (open) | S | – |
 | K13 | §9.2, §12.1–§12.3 | **CLAIM-REPLAY (ratified A3)**. Mandatory sampled expected relation, standalone invocation binding, canonical parameter and full-table tuple encoding; witness; sampling stays evidence | bennett-vm-clw; b-isa-spec-9uy (open) | S | – |
 
@@ -2048,19 +2048,18 @@ scheduler version. A consumer validates every binding and every path
 against the object and executes verbatim or rejects (`E_SCHEDULE_
 INFEASIBLE`).
 
-### 11.1 Proposed reference-library contract (K11)
+### 11.1 Reference-library contract (K11)
 
-**ISA-REF-LIB (from bennett-vm-47t): maintainer decision required**
-(b-isa-spec-8r4). This subsection proposes the missing contract for 0.9;
-it is not a published library or a retroactive definition for 0.8.
-The maintainer must approve the decomposition set and hash rule below
-before publication, and 0.9 must be accepted before the `ref/` directory
-is created. Until then, consumers lacking the bound library continue
-to reject as §11 requires; staged conformance cases remain unavailable
-and cite b-isa-spec-8r4. No ordinal count or full-library hash is claimed.
+**ISA-REF-LIB** (K11; b-isa-spec-8r4, from bennett-vm-47t).
+This is the decided 0.9 contract. The complete serialized constructor
+catalog `spec/ref-0.9-draft.json` is produced by a separate job under
+b-isa-spec-8r4; `ref/` is published after 0.9 acceptance. Until the
+bound library is available, consumers report `E_SCHEDULE_INFEASIBLE`
+as §11 requires; staged conformance cases remain unavailable naming
+b-isa-spec-8r4. The witness below is not a full-library hash.
 
-**Serialization and identity (proposal).** Publish `ref/README.md` and
-`ref/ref-0.9.json` after that gate. The JSON file is RFC 8785 canonical
+**Serialization and identity.** Publish `ref/README.md` and
+`ref/ref-0.9.json` after acceptance. The JSON file is RFC 8785 canonical
 UTF-8, with no trailing LF, containing exactly `isa`, `name`, `version`
 and `recipes`. The first three are strings `0.9`, `ref`, `0.9`.
 `recipes` is an array in bytewise `kind` order, then increasing parameter
@@ -2097,7 +2096,7 @@ envelope ... every part ends with LF". A changed recipe, source, scratch
 name or ordering changes the library hash; no schedule/certificate can
 silently inherit that change (§12.1's realised-subject binding).
 
-**Expansion and ordinals (proposal).** Recipe bodies are ordered arrays
+**Expansion and ordinals.** Recipe bodies are ordered arrays
 of constructors: a gate (`gate`, ordered `wires`, optional `params`), an
 allocation (`alloc`, `width`, `class`, `state`), release (`release`),
 classical event (`classical`, `point`), counted loop (`for`, `from`,
@@ -2127,14 +2126,14 @@ expansion path, allocation ordinal, bit index)`; allocations in repeated
 bodies have their expanded occurrence path. All library scratch is
 clean, allocated unconditionally and released in reverse allocation
 order after uncomputation; borrowed user operands remain borrowed.
-`removable` is an explicit array of leaf ordinals, empty by default;
-the proposed initial set is empty for every recipe. No transformation
+`removable` is an explicit array of leaf ordinals and MUST be empty
+for every recipe in `ref` version 0.9. No transformation
 may infer extra permission from a zero-valued basis input. Motivation
 (0.8 §11): "MUST keep the ordinals of the operations they keep and MAY
 remove only operations the library marks removable"; §17 item 7:
 "clean scratch released in reverse order".
 
-**Decomposition set (proposal, not an assertion of 0.8 choices).** Bit
+**Decomposition set.** The §17 item 7 defaults are made explicit below. Bit
 loops below increase from the least-significant bit. To make Boolean
 recipes deterministic, use no common-subexpression elimination: visit
 every Boolean expression tree in left-to-right postorder, giving each
@@ -2150,7 +2149,7 @@ controls apply to the resulting semantic gates, not allocations; scratch
 computations may be unconditional provided their compute/uncompute pair
 is balanced when the external control is false (§3.5, §4.3).
 
-| Family | Proposed ordered expansion | Motivating 0.8 sentence |
+| Family | Ordered expansion | Motivating 0.8 sentence |
 |---|---|---|
 | Copy, XOR, exchange; native gates | `qxor`: CX s[i] t[i]; `qcopy`: allocate then the same; `quncopy`: the same then release; `qexch`: SWAP a[i] b[i]. Keep each §4.4 gate as a leaf; target schemes expand later. | §4.5: "`cx s[i] t[i]`" and "`swap a[i] b[i]`"; §8.3: "Every template gate MUST itself match a gates entry". |
 | Ripple add/sub and comparisons | c[0]=0; p[i]=a[i] XOR b[i]; sum[i]=p[i] XOR c[i]; c[i+1]=(a[i] AND b[i]) XOR (p[i] AND c[i]); compute each bit in this order, XOR sums out, reverse scratch. Subtraction adds bitwise NOT b with c[0]=1. Unsigned a<b is NOT the final subtraction carry; equality is the AND of NOT(a[i] XOR b[i]) in increasing-bit left-associated order. `ule` is OR(ult,eq); signed comparison selects sign(a) if signs differ, else ult. | §17 item 7: "ripple-carry adders and comparators"; §4.1: "wrap"; §3.7: prospective sums use "no wrap" (retain the extra carry for those). |
@@ -2159,11 +2158,11 @@ is balanced when the external control is false (§3.5, §4.3).
 | Address dispatch and multiplexers | Scan every address i in increasing numeric order; compute equality to i, copy/exchange cell bits in increasing order under that bit, uncompute equality before the next i. Lifted memory chooses the §7.2 mapped region in address order and scans its cells in increasing address order; captures use old addresses before exchanged counters. | §4.6: "for each cell i: under a == i"; §17 item 7: "one-hot address dispatch"; §3.7 C1–C5/R1–R5. |
 | Row, oracle and structure | Compose these recipes in the printed §3.6 step order, §4.2 slot order, §3.7 activation order, §5.2 allocate/forward/commit/reverse/release order. `qif`, loops, local-region image X gates and `qinplace` use the literal sequences of §4.5–§4.6, incorporating 0.9's explicit parameters. Cleanup `reverse` adjoints that sequence; `recompute` follows §6.4. | §11: "Above gate level the order is fixed by §3.6, §4.2, §4.5–§4.6 and §5.2"; §5.2: "run the inverse step for t = B..1, then release (1)". |
 
-These algorithms propose exact permutation circuits, preserving every
+These algorithms define exact permutation circuits, preserving every
 input and cleaning scratch; circuit correctness must still be checked
 against full-domain T3 witnesses and §5.7, not inferred from costs or
-names. The full catalog and its hash remain uncomputed until the two
-maintainer decisions and acceptance gate above. In particular this is
+names. The separate catalog job computes the full catalog and its hash
+under this contract; publication follows acceptance. In particular this is
 not permission to publish a partial library that omits division, stack,
 coherent control, memory or any instruction.
 
@@ -3125,8 +3124,11 @@ the item is revised. Items 1–5 are asserted non-semantic.
    (ripple-carry adders and comparators, linear `inrange` scans,
    one-hot address dispatch, clean scratch released in reverse order);
    a schedule that names no `expansion` binds `ref` at the ISA's own
-   version. Publishing `ref`'s bytes, ordinals and hash (round-8
-   suggestion zsw.14), and the worked controlled-action
+   version; §11.1 fixes its schema, hash, ordinals, scratch identities,
+   empty removable sets and deterministic decomposition algorithms.
+   Serialization as `spec/ref-0.9-draft.json` is a separate job under
+   b-isa-spec-8r4; publication in `ref/` follows 0.9 acceptance. The
+   worked controlled-action
    target/schedule/certificate fixture bound to it (zsw.4), are pending;
    until then two consumers agree on every order fixed above gate level
    (§11).

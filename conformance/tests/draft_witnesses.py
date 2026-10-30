@@ -58,7 +58,7 @@ payload = json.dumps(lib, sort_keys=True, separators=(",", ":"), ensure_ascii=Fa
 envelope = "isa=0.9\nexpansion=ref\nversion=0.9\n" + payload + "\n"
 hash_value = hashlib.sha256(envelope.encode()).hexdigest()
 assert "Witness envelope SHA-256: `" + hash_value + "`." in draft
-assert "ISA-REF-LIB (from bennett-vm-47t): maintainer decision required" in draft
+assert "### 11.1 Reference-library contract (K11)" in draft
 assert not (root / "ref").exists(), "publication is gated on accepted 0.9"
 print("draft witnesses: eps boundaries, block sectors, 16 qxor tuples, ordinals/hash; unchanged 0.8")
 

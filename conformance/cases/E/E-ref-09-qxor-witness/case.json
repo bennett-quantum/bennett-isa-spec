@@ -1,0 +1,22 @@
+{
+  "id": "E-ref-09-qxor-witness",
+  "suite": "E",
+  "spec": "\u00a711.1 reference-library envelope, ordinals and qxor; \u00a717 item 7",
+  "derivation": "Two bitwise CX leaves implement (s,t XOR s); reversing leaves restores all sixteen two-bit input pairs. The witness envelope binds all recipe bytes, not the complete catalog.",
+  "scenario": {
+    "draft_witness": "ISA-REF-LIB witness"
+  },
+  "expected_outcome": {
+    "tuples": 16,
+    "ordinals": [
+      0,
+      1
+    ],
+    "removable": [],
+    "envelope_hash": "299510fd67cc626fdcbcc10adcd40730f9af294ba596d86fb25fd31be08a5c7f"
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-8r4; complete catalog is a separate job and ref publication follows acceptance"
+  }
+}
