@@ -718,3 +718,116 @@ fn codex_r5_b01_exact_three_certified_lifetime_witnesses() {
         }
     }
 }
+
+fn codex_r5_install_subject(invalid: &str, body: &str) -> Object {
+    // Parse a legal shape, then reconstruct public fields to isolate the
+    // certificate API's checks from load-time admission.
+    let valid = support::borrow_lifetime_object(body, &[]).replace("perm_action", "action");
+    let mut o = Object::parse(&valid.replace("cz b ", "x ")).unwrap();
+    for i in &mut o.functions.get_mut("a").unwrap().blocks[0].instructions {
+        if i.op == "x" {
+            i.op = "cz".into();
+            i.operands.insert(0, "b".into());
+        }
+    }
+    o.functions.get_mut("a").unwrap().lines = invalid
+        .split("section functions\n")
+        .nth(1)
+        .unwrap()
+        .split("\n\nsection certificate")
+        .next()
+        .unwrap()
+        .lines()
+        .map(str::to_string)
+        .collect();
+    o.metadata.insert(
+        "symbols".into(),
+        json(
+            invalid
+                .split("section symbols\n")
+                .nth(1)
+                .unwrap()
+                .lines()
+                .next()
+                .unwrap(),
+        ),
+    );
+    o.metadata
+        .insert("certificate".into(), json(invalid.lines().last().unwrap()));
+    o.text = invalid.into();
+    o
+}
+
+#[test]
+fn codex_r5_b02_exact_cz_certificate_cannot_admit_a_nonpermutation_frame() {
+    let body = "b = qborrow any 1\ncz b t\nqreturn b";
+    let exact = support::certified_borrow_identity_kind(body, &[], "action");
+    let cert = json(exact.lines().last().unwrap());
+    let bindings = cert.get("bindings").unwrap();
+    assert_eq!(
+        bindings.get("interface_hash").unwrap().string().unwrap(),
+        "26374c7b2da2747a9a755d48da06130bfa53e8ba67102e4749fa1cb8adc2f1a0"
+    );
+    assert_eq!(
+        bindings.get("object_hash").unwrap().string().unwrap(),
+        "2340cad379662fdcec0e7664aa161a667d77294eee1da295bced60916553158d"
+    );
+    for (i, text) in [
+        exact.split("\nsection certificate").next().unwrap(),
+        &exact,
+        &exact.replace("\"borrow_frames\":[0]", "\"borrow_frames\":[]"),
+    ]
+    .iter()
+    .enumerate()
+    {
+        support::reject_cli(text, "§5.6", &format!("codex-r5-b02-{i}"));
+    }
+    // Public API: a full tuple claim alone is not a T3 proof. Even a pair of
+    // illegal phase touches which cancels in the final unitary must fail the
+    // mandatory permutation-only gate-boundary premise, independently of replay.
+    for body in [
+        body,
+        "b = qborrow any 1\ncz b t\ncz b t\nqreturn b",
+        "c = qalloc any 1\nb = qborrow any 1\ncz b c\ncz b c\nqfree c\nqreturn b",
+    ] {
+        let invalid = support::certified_borrow_identity_kind(body, &[], "action");
+        let o = codex_r5_install_subject(&invalid, body);
+        let error = o
+            .verify_certificate()
+            .expect_err("nonpermutation borrow frame certified");
+        assert!(error.to_string().contains("§5.6"), "{error}");
+    }
+    // Quantum phase witness, not integer basis labels: CZ|++> has -1/2 at 11.
+    let o = codex_r5_install_subject(&exact, body);
+    let mut q = bennett_isa_ref::QuantumState::new();
+    let w = q.allocate(2).unwrap();
+    for wire in &w {
+        q.gate("h", &[*wire], None, &[]).unwrap();
+    }
+    let mut b = bennett_isa_ref::QuantumBindings::default();
+    b.bundles.insert("t".into(), vec![w[0]]);
+    b.borrowed.push(vec![w[1]]);
+    o.execute_action("a", &mut q, &b, false, &[]).unwrap();
+    for (bits, (re, im)) in q.exact_support() {
+        assert_eq!(re, if bits == [true, true] { -0.5 } else { 0.5 });
+        assert_eq!(im, 0.0);
+    }
+    // Non-permutation gates on unrelated wires remain legal, including when
+    // t is superposed at the frame's entry or return.
+    for body in [
+        "h t\nb = qborrow any 1\nx b\nx b\nqreturn b\nh t",
+        "b = qborrow any 1\nh t\nx b\nx b\nh t\nqreturn b",
+    ] {
+        let o = Object::parse(&support::certified_borrow_identity_kind(
+            body,
+            &[],
+            "action",
+        ))
+        .unwrap();
+        assert_eq!(
+            o.verify_certificate().unwrap()[0].verdict,
+            ClaimVerdict::Proof
+        );
+        support::borrow_identity(&o);
+    }
+}

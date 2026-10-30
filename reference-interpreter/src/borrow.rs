@@ -853,6 +853,21 @@ impl Evaluation<'_> {
         Ok(())
     }
 }
+fn check_permutation_touches(nodes: &[Node], borrowed: &BTreeSet<String>) -> Result<()> {
+    for node in nodes {
+        if let Node::Repeat(n, body) = node {
+            if *n != 0 {
+                check_permutation_touches(body, borrowed)?;
+            }
+        } else if !node.permutation() && touches(node, borrowed) {
+            return err(
+                "§5.6",
+                "borrowed wire touched by a non-permutation instruction",
+            );
+        }
+    }
+    Ok(())
+}
 fn touches(node: &Node, borrowed: &BTreeSet<String>) -> bool {
     let mut w = BTreeSet::new();
     node.wires(&mut w);
@@ -1214,6 +1229,15 @@ impl Object {
         }
         Ok(())
     }
+    /// The §5.6 gate-boundary premise is structural, not an exhaustive tuple
+    /// obligation. Check it independently for public certificate verification,
+    /// which can also be called on an Object assembled through public fields.
+    pub(crate) fn check_borrow_frame_structure(&self, f: &Function) -> Result<()> {
+        let mut compiler = self.borrow_compiler(f)?;
+        let mut nodes = Vec::new();
+        compiler.compile_function(f, &[], &mut nodes)?;
+        check_permutation_touches(&nodes, &compiler.borrowed)
+    }
     pub(crate) fn validate_borrow_frames(&self, f: &Function) -> Result<()> {
         fn has_borrow(seq: &[Instruction]) -> bool {
             seq.iter()
@@ -1226,6 +1250,7 @@ impl Object {
         let mut nodes = Vec::new();
         compiler.compile_function(f, &[], &mut nodes)?;
         let borrowed = compiler.borrowed;
+        check_permutation_touches(&nodes, &borrowed)?;
         match self.decide_frames(&nodes, &borrowed) {
             Ok(()) => Ok(()),
             // The library route of §5.6: verified certificate borrow_frames claims.

@@ -197,3 +197,42 @@ well as returns; `sol_r5_b02_clean_surrounding_loop_controls_are_reachable_invar
 also pins later iterations and 2^40 without a trip cap. §4.3's “n clean wires”,
 §14.2's “qalloc tensors |0⟩” and §4.6's “body n times” decide the reading.
 No certificate is needed. No decline, partial or new ambiguity.
+
+## Codex R5-B02 — resolved (existing parse fix plus public-API hardening)
+
+First re-ran the exact published CZ signature, interface hash and object hash:
+parse/hash/check already reject with §5.6 after d0f7dbb/738b233, with the
+exhaustive borrow_frames claim, with borrow_frames=[], and without metadata.
+Existing exact-state replay also rejects the isolated public-API CZ witness
+and CZ;CZ on arbitrary t. New pin:
+`r1_certificates::codex_r5_b02_exact_cz_certificate_cannot_admit_a_nonpermutation_frame`.
+Its phase-sensitive |++⟩ execution checks the three +1/2 coefficients and the
+−1/2 coefficient at 11, independently of integer basis tuple comparisons.
+
+The additional public-API control CZ b c; CZ b c with known-clean c was RED:
+verify_certificate returned Proof because no reachable replay state sees a
+phase. This still violates the gate-boundary structural premise. Added
+`borrow.rs::check_borrow_frame_structure` and the shared recursive
+`check_permutation_touches`, applied during parse validation and before
+`claims.rs::check_borrow_independence` replay. They compile/in-line the actual
+subject and inspect borrowed touches, including nested loops and calls;
+non-permutation touches are errors independently of tuple/phase cancellation.
+Zero-trip bodies remain unexecuted. This guard never calls certificate
+admission recursively and does not require an entire action to be a permutation.
+
+§12.1's structural checker obligation is “check the rule's side conditions
+syntactically against the object and the subclaims' results”. Its exhaustive
+obligation is “re-execute every domain element … compare full tuples”, not
+permission to waive another claim's premise. §5.6 requires “maximal contiguous
+permutation-only subcircuits”; §14.3 T3 begins “If the realised unitary V … is a
+permutation matrix”. CZ = diag(1,1,1,−1) (§4.4) fails that premise even if
+particular reachable inputs hide its phase. Tuple Proof alone is not a borrow
+proof; verification.borrow_frames now explicitly checks the premise in both
+admission surfaces.
+
+GREEN: targeted borrow/certificate tests 31 passed, 0 failed, 2 ignored; full
+normal suite 256 passed, 0 failed, 5 ignored. Positive actions with H only on
+unrelated t and a valid permutation frame certify and preserve all basis,
+superposition and entangled-reference states. Legitimate unresolved black-box
+claim routes remain covered. README documents per-frame/per-return admission.
+No decline, partial or genuine new ambiguity; reading 20 is unchanged.

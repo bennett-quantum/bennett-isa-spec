@@ -700,6 +700,10 @@ impl Object {
         Ok(true)
     }
     fn check_borrow_independence(&self, f: &Function, closure: &str, index: usize) -> Result<()> {
+        // §12.1 tuple replay does not prove the §14.3 T3 permutation premise.
+        // Require permutation-only borrowed touches even when phases happen to
+        // cancel, or are invisible on a known-clean auxiliary wire.
+        self.check_borrow_frame_structure(f)?;
         let certificate = self
             .section("certificate")
             .ok_or_else(|| Error("§12: object has no certificate".into()))?;

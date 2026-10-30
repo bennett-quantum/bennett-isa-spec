@@ -20,6 +20,15 @@ CLI check/run/reverse, full basis, superposition and entangled-reference pins.
 X-before-free negatives still reject. New pin
 `codex_r5_b03_one_iteration_release_matches_unrolled_clean_entry`: 1 passed.
 
+Codex R5-B02: exact certified CZ already rejects at parse/hash/check on HEAD.
+An additional public-API CZ pair against a clean auxiliary was RED (Proof),
+then fixed: certificate borrow proofs now independently require permutation-only
+borrowed touches, not just final tuples or reachable phase comparisons.
+The full exact witness and phase-sensitive |++> pin, borrow_frames=[] negative,
+and unrelated-H positive certify the intended boundary. Targeted tests:
+31 pass / 0 fail / 2 ignored; normal suite: 256 pass / 0 fail / 5 ignored.
+No decline, partial or new ambiguity. README records mandatory frame/return checks.
+
 ## Council round 5, SOL first pass (2026-10-30)
 
 SOL-R5-B01 resolved after RED on the exact correctly bound certificate witness.
