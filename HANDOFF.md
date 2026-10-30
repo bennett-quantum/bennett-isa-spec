@@ -1,3 +1,10 @@
+State (2026-10-31 ~22:26Z, resumed evening session): reference-interpreter/ at **338 tests + 5 sweeps green** after
+council rounds 9-10 (one sol editor each; briefs docs/briefs/2026-10-30-isa-ref-round-{9,10}-fixes.md); **round 11
+prepared** on snapshot 45475a1 (worktree ../bennett-isa-spec-review, packet ../bennett/docs/council/isa-ref-2026-10-29/
+packet-round-11.md), sol reviewing; astra next, then aggregate; the engine drew no new finding in round 10, so an accept
+is plausible. Ref library job still paused at fcea698 (held for pace); main still on origin/wip/ref-library-2026-10-30.
+Read ../bennett/HANDOFF.md first.
+
 State (2026-10-30 ~14:30Z, maintainer pause): reference-interpreter/ at 315 tests + 5 sweeps green after council
 rounds 6-8 (one sol editor per round; round 8 completed the per-wire fact-transfer engine); **round 9 prepared** on
 snapshot 4796970 (worktree ../bennett-isa-spec-review, packet ../bennett/docs/council/isa-ref-2026-10-29/packet-round-9.md,
