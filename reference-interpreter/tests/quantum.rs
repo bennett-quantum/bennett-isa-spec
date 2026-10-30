@@ -165,12 +165,14 @@ fn sol_r4_b01_tiny_projection_preserves_entangled_residual_and_second_born_weigh
         assert_eq!(first.len(), 2);
         assert_eq!(first[0].bits, [false]);
         let residual = &first[0].state;
+        sparse_matches_normalized_dense(residual);
         let amps = residual.amplitudes().unwrap();
         assert!(amps.iter().all(|a| a.re.is_finite() && a.im.is_finite()));
         assert!((amps.iter().map(|a| a.re * a.re + a.im * a.im).sum::<f64>() - 1.0).abs() < 1e-12);
         let second = residual.measurement_branches(&[w[1]]).unwrap();
         assert_eq!(second.len(), 2);
         for branch in second {
+            sparse_matches_normalized_dense(&branch.state);
             assert!((branch.probability - 0.5).abs() < 1e-12);
             assert_eq!(
                 branch.state.read_basis(&[w[2]]).unwrap(),
@@ -196,12 +198,14 @@ fn sol_r4_b01_projection_recovers_amplitudes_below_binary64_range() {
     let branches = q.measurement_branches(&w[..2]).unwrap();
     assert_eq!(branches.len(), 4);
     let mut rare = branches[0].state.clone();
+    sparse_matches_normalized_dense(&rare);
     for a in rare.amplitudes().unwrap() {
         assert!((a.re.abs() - std::f64::consts::FRAC_1_SQRT_2).abs() < 1e-12);
         assert!(a.im.abs() < 1e-12);
     }
     rare.gate("h", &[w[2]], None, &[]).unwrap();
     assert_eq!(rare.read_basis(&[w[2]]).unwrap(), 0);
+    sparse_matches_normalized_dense(&rare);
     rare.release(&[w[2]]).unwrap();
 }
 
@@ -277,4 +281,63 @@ fn sol_r5_b03_consumed_workspace_names_keep_their_own_widths() {
         &[]
     ))
     .is_err());
+}
+
+fn sparse_matches_normalized_dense(q: &QuantumState) {
+    let dense = q.amplitudes().unwrap();
+    let sparse = q.exact_support();
+    let mut norm = 0.0;
+    for (bits, (re, im)) in sparse {
+        assert!(re.is_finite() && im.is_finite());
+        let index = bits
+            .iter()
+            .enumerate()
+            .fold(0, |x, (i, b)| x | (usize::from(*b) << i));
+        close(Complex::new(re, im), dense[index]);
+        norm += re * re + im * im;
+    }
+    assert!((norm - 1.0).abs() < 1e-12, "sparse conditional norm={norm}");
+}
+
+#[test]
+fn sol_r5_b04_sparse_observer_reports_the_conditional_state() {
+    let mut q = QuantumState::new();
+    let w = q.allocate(2).unwrap();
+    q.gate("h", &[w[0]], None, &[]).unwrap();
+    for mut branch in q.measurement_branches(&[w[0]]).unwrap() {
+        assert!((branch.probability - 0.5).abs() < 1e-12);
+        assert_eq!(
+            branch.state.exact_support(),
+            vec![(vec![false], (1.0, 0.0))]
+        );
+        sparse_matches_normalized_dense(&branch.state);
+        branch.state.gate("h", &[w[1]], None, &[]).unwrap();
+        sparse_matches_normalized_dense(&branch.state);
+        for (_, (re, im)) in branch.state.exact_support() {
+            close(
+                Complex::new(re, im),
+                Complex::new(std::f64::consts::FRAC_1_SQRT_2, 0.0),
+            );
+        }
+    }
+    // set_state_vector's contract leaves normalization to the caller.
+    q.set_state_vector(&[(vec![false, false], Complex::new(2.0, 2.0))])
+        .unwrap();
+    assert_eq!(q.exact_support(), vec![(vec![false, false], (2.0, 2.0))]);
+    q.gate("h", &[w[1]], None, &[]).unwrap();
+    let norm: f64 = q
+        .exact_support()
+        .iter()
+        .map(|(_, (r, i))| r * r + i * i)
+        .sum();
+    assert!((norm - 8.0).abs() < 1e-12);
+    // A basis projection also returns its normalized conditional global phase.
+    q.gate("h", &[w[1]], None, &[]).unwrap();
+    let branch = q.measurement_branches(&[w[0]]).unwrap().remove(0);
+    sparse_matches_normalized_dense(&branch.state);
+    let mut reset = branch.state;
+    reset
+        .set_state_vector(&[(vec![false], Complex::new(3.0, 0.0))])
+        .unwrap();
+    assert_eq!(reset.exact_support(), vec![(vec![false], (3.0, 0.0))]);
 }

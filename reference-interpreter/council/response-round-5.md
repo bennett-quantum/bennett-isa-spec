@@ -76,3 +76,24 @@ check, forward/adjoint at t=0/1, exact state output and equals_entry reversal,
 plus a complex superposition. GREEN: quantum/CLI targets **42 passed, 0 failed**.
 No ambiguity: §§4.3/5.1 fix each producer's width and cleanup, and §5.3 explicitly
 renumbers versions under adjoints.
+
+## SOL-R5-B04 — resolved
+
+RED: `quantum::sol_r5_b04_sparse_observer_reports_the_conditional_state`
+reported (1/sqrt(2),0) for the exact two-wire witness instead of (1,0).
+`QuantumState` now marks projected conditional states. `exact_support` retains
+exact support and emits normalized amplitudes through the extended-exponent,
+refined evaluator already used by projection's dense cache. Gates/allocation/
+clean release retain the marker, and `set_state_vector` explicitly resets it
+without imposing normalization. Basis-only projection also normalizes its
+conditional phase. Exact shadows remain unnormalised for support, cleanliness
+and subsequent Born ratios; no probability floor or reversal rule changed.
+
+The exact two outcomes report (1,0) and agree with dense output; H on the
+survivor reports two amplitudes 1/sqrt(2). Existing tiny entangled-residual and
+below-binary64-range tests now also check finite sparse amplitudes, unit norm,
+dense agreement before/after gates, and unchanged subsequent Born outcomes.
+Unnormalised user vectors retain their supplied scale, including replacing a
+previously projected state. GREEN: quantum/register/CLI targets **54 passed,
+0 failed**. No ambiguity: §14.2 specifies conditional projective measurement
+with Born probabilities.

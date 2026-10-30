@@ -24,7 +24,12 @@ SOL-R5-B03 resolved after independent CLI/library RED witnesses. Workspace
 widths now bind to each producing/consuming instruction lifetime, including
 inverse releases. Exact hashes, basis/superposition, mixed qcopy/qload/qborrow,
 alpha-renamed counterparts, nested loops and entangled references pass in both
-directions; quantum/CLI targets: 42 pass, 0 fail. B04 remains in progress.
+directions; quantum/CLI targets: 42 pass, 0 fail. SOL-R5-B04 resolved after
+RED on the exact two-wire sparse observer. A projection marker normalizes
+sparse conditional diagnostics with extended exponents while retaining raw
+exact shadows and caller-supplied input scale. Tiny entangled residuals and
+subsequent Born results pass; quantum/register/CLI targets: 54 pass, 0 fail.
+All four received SOL blockers are resolved; final complete gates follow.
 
 Correction to round-4 evidence: the original X/CX rejection pins lacked
 certificate-adorned subjects, and generic-body proof discarded clean entry

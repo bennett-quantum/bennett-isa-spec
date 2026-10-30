@@ -122,11 +122,15 @@ pub struct QuantumState {
     next: Wire,
     state: State,
     borrow_audit: Option<BorrowAudit>,
+    // Exact shadows of conditional states retain their projection scale for
+    // support and Born ratios. Both amplitude observers emit the normalized
+    // conditional vector; arbitrary set_state_vector input keeps its own scale.
+    projected: bool,
 }
 impl PartialEq for QuantumState {
     /// Exact equality of the states (binary64 values are not compared).
     fn eq(&self, other: &Self) -> bool {
-        if self.ids != other.ids || self.next != other.next {
+        if self.ids != other.ids || self.next != other.next || self.projected != other.projected {
             return false;
         }
         let support = |s: &State| -> BTreeMap<Key, Amplitude> {
@@ -248,6 +252,7 @@ impl QuantumState {
     pub fn new() -> Self {
         Self {
             borrow_audit: None,
+            projected: false,
             ids: Vec::new(),
             next: 0,
             state: State::Basis {
@@ -422,6 +427,7 @@ impl QuantumState {
                 return err("§14.2", "duplicate state component");
             }
         }
+        self.projected = false;
         if amplitudes.len() == 1 {
             let (bits, amp) = &components[0];
             let (_, exact) = amplitudes.into_values().next().expect("one component");
@@ -438,13 +444,23 @@ impl QuantumState {
     /// The exact support as (basis bits, approximate amplitude), for diagnostics.
     pub fn exact_support(&self) -> Vec<(Vec<bool>, (f64, f64))> {
         let n = self.ids.len();
-        match &self.state {
-            State::Basis { bits, exact, .. } => vec![(bits.clone(), exact.approximate())],
+        let entries: Vec<_> = match &self.state {
+            State::Basis { bits, exact, .. } => vec![(bits.clone(), exact.clone())],
             State::Vector { amplitudes } => amplitudes
                 .iter()
-                .map(|(k, (_, e))| (key_bits(k, n), e.approximate()))
+                .map(|(k, (_, e))| (key_bits(k, n), e.clone()))
                 .collect(),
-        }
+        };
+        let values = if self.projected {
+            exact::normalized(&entries.iter().map(|(_, e)| e.clone()).collect::<Vec<_>>())
+        } else {
+            entries.iter().map(|(_, e)| e.approximate()).collect()
+        };
+        entries
+            .into_iter()
+            .zip(values)
+            .map(|((bits, _), value)| (bits, value))
+            .collect()
     }
     /// The value of `wires` when it is the same on every component of the
     /// exact state; otherwise an error.
@@ -728,7 +744,7 @@ impl QuantumState {
             .enumerate()
             .filter_map(|(p, w)| (!remove[p]).then_some(*w))
             .collect();
-        if let State::Basis { bits, phase, exact } = &self.state {
+        if let State::Basis { bits, exact, .. } = &self.state {
             let mut state = self.clone();
             let result = positions.iter().map(|p| bits[*p]).collect();
             let kept: Vec<_> = bits
@@ -737,9 +753,11 @@ impl QuantumState {
                 .filter_map(|(p, b)| (!remove[p]).then_some(*b))
                 .collect();
             state.ids = kept_ids;
+            state.projected = true;
+            let (re, im) = exact::normalized(std::slice::from_ref(exact))[0];
             state.state = State::Basis {
                 bits: kept,
-                phase: *phase,
+                phase: Complex::new(re, im),
                 exact: exact.clone(),
             };
             return Ok(vec![MeasurementBranch {
@@ -784,6 +802,7 @@ impl QuantumState {
             }
             let mut state = self.clone();
             state.ids = kept_ids.clone();
+            state.projected = true;
             state.state = State::Vector { amplitudes: group };
             branches.push(MeasurementBranch {
                 probability,
