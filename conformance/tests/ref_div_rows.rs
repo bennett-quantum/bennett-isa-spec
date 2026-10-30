@@ -22,18 +22,25 @@ fn division_rows_preserve_arbitrary_destinations_and_fault_entries() {
                 ("code", 4),
             ];
             let args = json::parse(&format!(
-                r#"[{n},"a","b","slot","w","flag","faulted","code"]"#
+                r#"[{n},4,"a","b","slot","w","flag","faulted","code"]"#
             ))
             .unwrap();
-            let m = Machine::compile(
-                &permutation(
-                    &e.expand(&format!("lift.{op}"), args.as_arr().unwrap(), &bundles)
-                        .unwrap(),
-                )
-                .unwrap(),
-                &bundles,
-            )
-            .unwrap();
+            let leaves = e
+                .expand(&format!("lift.{op}"), args.as_arr().unwrap(), &bundles)
+                .unwrap();
+            let first_flag = leaves
+                .iter()
+                .position(|l| l.wires.last().is_some_and(|w| w.0 == "flag"))
+                .unwrap();
+            let first_value = leaves
+                .iter()
+                .position(|l| l.wires.last().is_some_and(|w| w.0 == "slot"))
+                .unwrap();
+            assert!(
+                first_flag < first_value,
+                "§3.6 flag precedes out-of-place value computation"
+            );
+            let m = Machine::compile(&permutation(&leaves).unwrap(), &bundles).unwrap();
             let mut packed = m.packed_state();
             let mut expected = Vec::new();
             let mut enables = 0;
@@ -125,4 +132,54 @@ fn division_rows_preserve_arbitrary_destinations_and_fault_entries() {
     }
     assert_eq!(count, 4 * 64 * (8 + 64 + 512 + 4096));
     println!("division assignment rows: {count} tuples");
+}
+
+#[test]
+fn wider_fault_entries_factor_as_identity_on_high_bits() {
+    let mut e = Expander::new(
+        include_str!("../../spec/ref-0.9-draft.json"),
+        Registry::new(),
+    )
+    .unwrap();
+    for n in 1..=4 {
+        for op in ["udiv", "urem", "sdiv", "srem"] {
+            let mut leaves = Vec::new();
+            for f in [4, 8] {
+                let args = json::parse(&format!(
+                    r#"[{n},{f},"a","b","slot","w","flag","faulted","code"]"#
+                ))
+                .unwrap();
+                leaves.push(
+                    e.expand(
+                        &format!("lift.{op}"),
+                        args.as_arr().unwrap(),
+                        &[
+                            ("a", n),
+                            ("b", n),
+                            ("slot", n),
+                            ("w", n),
+                            ("flag", 1),
+                            ("faulted", 1),
+                            ("code", f),
+                        ],
+                    )
+                    .unwrap(),
+                );
+            }
+            assert_eq!(leaves[0], leaves[1]);
+            assert!(leaves[1].iter().all(|l| l
+                .wires
+                .iter()
+                .chain(&l.controls)
+                .all(|(name, bit)| name != "code" || *bit < 4)));
+        }
+    }
+    // Equality of the entire abstract circuit plus absence of every high bit
+    // proves U_low tensor I_high for all high-bit inputs, including entangled
+    // references. The 1,198,080 exhaustive low domains therefore cover this
+    // additional F=8 domain without sampling its 16 high-bit assignments.
+    println!(
+        "F=8 division domains: {} tuples by exact tensor-identity extension",
+        1198080u64 * 16
+    );
 }

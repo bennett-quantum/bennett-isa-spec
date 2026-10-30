@@ -17,6 +17,7 @@ pub struct Leaf {
     pub angles: Vec<u64>,
     pub allocation: Option<(String, usize, String, String)>,
     pub event: Option<Json>,
+    pub scratch: bool,
 }
 #[derive(Clone, Default)]
 struct Context {
@@ -28,6 +29,7 @@ struct Context {
     events: BTreeMap<String, Json>,
     controls: Vec<Wire>,
     legacy: bool,
+    scratch_names: BTreeSet<String>,
     declarations: BTreeMap<String, Json>,
     allocations: BTreeMap<String, (String, usize, String, String)>,
 }
@@ -84,8 +86,6 @@ fn wires(j: &Json, c: &Context) -> Result<Vec<Wire>, String> {
             let (n, i) = index(v, &c.ints)?;
             if let Some(ws) = c.wires.get(&n) {
                 Ok(vec![ws.get(i).ok_or("wire index out of range")?.clone()])
-            } else if c.legacy {
-                Ok(vec![(n, i)])
             } else {
                 Err(format!("unbound wire {n}"))
             }
@@ -114,6 +114,7 @@ pub struct Expander {
 }
 impl Expander {
     pub fn new(bytes: &str, registry: Registry) -> Result<Self, String> {
+        crate::ref_catalog::Catalog::parse(bytes)?;
         let d = json::parse(bytes)?;
         keys(&d, &["isa", "name", "version", "recipes"])?;
         for (k, v) in [("isa", "0.9"), ("name", "ref"), ("version", "0.9")] {
@@ -130,6 +131,57 @@ impl Expander {
             }
             previous = Some(name.clone());
             recipes.insert(name, r.clone());
+        }
+        // Check declared dependencies through all literal actual syntax too.
+        // Resetting the chain at a finite caller splice must never hide a
+        // recipe whose declaration recursively recreates that same actual.
+        fn collect(j: &Json, deps: &mut BTreeSet<String>) -> Result<(), String> {
+            match j {
+                Json::Obj(m) => {
+                    if let Some(k) = m.get("invoke") {
+                        deps.insert(s(k)?.into());
+                    }
+                    for v in m.values() {
+                        collect(v, deps)?;
+                    }
+                }
+                Json::Arr(v) => {
+                    for j in v {
+                        collect(j, deps)?;
+                    }
+                }
+                _ => {}
+            }
+            Ok(())
+        }
+        fn visit(
+            k: &str,
+            graph: &BTreeMap<String, BTreeSet<String>>,
+            active: &mut BTreeSet<String>,
+            done: &mut BTreeSet<String>,
+        ) -> Result<(), String> {
+            if done.contains(k) {
+                return Ok(());
+            }
+            if !active.insert(k.into()) {
+                return Err("cyclic declared invoke".into());
+            }
+            for dep in graph.get(k).ok_or_else(|| format!("unbound recipe {k}"))? {
+                visit(dep, graph, active, done)?;
+            }
+            active.remove(k);
+            done.insert(k.into());
+            Ok(())
+        }
+        let mut graph = BTreeMap::new();
+        for (k, r) in &recipes {
+            let mut deps = BTreeSet::new();
+            collect(f(r, "body")?, &mut deps)?;
+            graph.insert(k.clone(), deps);
+        }
+        let mut done = BTreeSet::new();
+        for k in graph.keys() {
+            visit(k, &graph, &mut BTreeSet::new(), &mut done)?;
         }
         Ok(Self {
             recipes,
@@ -158,6 +210,20 @@ impl Expander {
         }
         let mut out = Vec::new();
         self.invoke(kind, args, &caller, &[], false, &mut Vec::new(), &mut out)?;
+        let mut lifetimes = Vec::new();
+        for leaf in &out {
+            if let Some((name, _, _, _)) = &leaf.allocation {
+                if leaf.gate == "alloc" {
+                    lifetimes.push((name.clone(), leaf.scratch));
+                } else if lifetimes.pop().as_ref().map(|v| v.0.as_str()) != Some(name.as_str()) {
+                    return Err("release is not reverse allocation order".into());
+                }
+            }
+        }
+        if lifetimes.iter().any(|(_, scratch)| *scratch) {
+            return Err("unreleased library scratch".into());
+        }
+
         Ok(out)
     }
     fn bind(&self, r: &Json, args: &[Json], caller: &Context) -> Result<Context, String> {
@@ -167,12 +233,27 @@ impl Expander {
         }
         let mut c = Context {
             controls: caller.controls.clone(),
+            legacy: ps.iter().all(|p| matches!(p, Json::Str(_))),
             ..Context::default()
         };
+        if let Some(names) = r.get("scratch") {
+            for name in a(names)? {
+                c.scratch_names.insert(s(name)?.into());
+            }
+        }
         let mut names = BTreeSet::new();
         for (p, v) in ps.iter().zip(args) {
+            if !matches!(p, Json::Str(_)) {
+                keys(
+                    p,
+                    if s(f(p, "type")?)? == "wire" {
+                        &["name", "type", "width"]
+                    } else {
+                        &["name", "type"]
+                    },
+                )?;
+            }
             let (name, ty) = if let Json::Str(n) = p {
-                c.legacy = true;
                 (n.as_str(), "integer")
             } else {
                 (s(f(p, "name")?)?, s(f(p, "type")?)?)
@@ -333,6 +414,7 @@ impl Expander {
                 angles: vec![],
                 allocation: None,
                 event: None,
+                scratch: false,
             };
             if let Some(g) = j.get("gate") {
                 keys(
@@ -370,14 +452,13 @@ impl Expander {
                 {
                     return Err("gate angle arity".into());
                 }
-                let target =
-                    if matches!(leaf.gate.as_str(), "cz" | "s" | "sdg" | "t" | "tdg" | "rz") {
-                        None
-                    } else {
-                        leaf.wires.last()
-                    };
-                if target.is_some_and(|t| leaf.controls.contains(t)) {
-                    return Err("control is target".into());
+                let targets = if leaf.gate == "swap" {
+                    leaf.wires.as_slice()
+                } else {
+                    &leaf.wires[leaf.wires.len() - 1..]
+                };
+                if targets.iter().any(|w| leaf.controls.contains(w)) {
+                    return Err("effective control is a gate target".into());
                 }
                 leaf.controls.sort();
                 leaf.controls.dedup();
@@ -393,6 +474,7 @@ impl Expander {
                 )?;
                 let allocating = j.get("alloc").is_some() != rev;
                 let name = s(j.get("alloc").or_else(|| j.get("release")).unwrap())?;
+                leaf.scratch = c.scratch_names.contains(name);
                 if allocating {
                     let declaration = if j.get("alloc").is_some() {
                         j
@@ -492,7 +574,10 @@ impl Expander {
                 captured.controls.extend(c.controls.clone());
                 captured.controls.sort();
                 captured.controls.dedup();
-                self.body(&b, &mut captured, path, rev, chain, out)?;
+                // A captured actual is finite caller syntax, not a declared
+                // dependency of the higher-order callee. Nested qloop(qloop)
+                // is legal; recursive invokes within either body still reject.
+                self.body(&b, &mut captured, path, rev, &mut Vec::new(), out)?;
             } else if let Some(ws) = j.get("under") {
                 keys(j, &["under", "body"])?;
                 let old = c.controls.clone();

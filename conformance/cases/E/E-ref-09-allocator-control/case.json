@@ -1,0 +1,35 @@
+{
+  "id": "E-ref-09-allocator-control",
+  "suite": "E",
+  "spec": "\u00a74.2 allocator/control rows; \u00a73.6 slot/flag order; \u00a75.4 effective causes; 0.9 E17.13 pinned free",
+  "derivation": "All allocator values are captured before any destination exchange; the inverse restores atop before selecting the old entry. Full symbolic domains retain arbitrary old destinations, entries, code/faulted, and both ambient controls. C=0 becomes cause4; pinned free entries stay live. Repeated source locations are captured distinctly.",
+  "scenario": {
+    "operand_widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "capacities": [
+      2,
+      4
+    ],
+    "fault_widths": [
+      4,
+      5,
+      8
+    ],
+    "checker": "ref_alloc_row.rs, ref_control_rows.rs, ref_rows.rs and ref_div_rows.rs"
+  },
+  "expected_outcome": {
+    "allocator_tuples": "1512125731994490556645376",
+    "control_successor_tuples": 22120,
+    "indirect_jump_tuples": 138880,
+    "wide_cause_tuples": 14592,
+    "wider_division_tuples": 19169280
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-8r4; complete catalog and accepted binding language required"
+  }
+}

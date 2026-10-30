@@ -2,7 +2,7 @@
   "id": "E-ref-09-generic-memory",
   "suite": "E",
   "spec": "\u00a74.2 no-wrap inrange/free/boundscheck; \u00a74.6 qstore/qexchm; \u00a711.1 ordered dispatch",
-  "derivation": "ROBDD canonical function equality quantifies the full legal input domain at every configuration, including arbitrary cells, predicates and fault entries. Lifetime boundaries are zero functions and reverse execution restores the entry functions. Pointer/length widths vary independently.",
+  "derivation": "ROBDD canonical function equality quantifies the full legal input domain at every configuration, including arbitrary cells, predicates and fault entries. Lifetime boundaries are zero functions and reverse execution restores the entry functions. Pointer/length widths vary independently. Free mutation excludes pinned matches, including when a size-zero pinned entry shares the heap entry base (E17.13).",
   "scenario": {
     "pointer_widths": [
       1,

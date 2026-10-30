@@ -439,7 +439,7 @@ fn independent_canonical_bytes_and_envelope_hashes() {
             "-I",
             concat!(env!("CARGO_MANIFEST_DIR"), "/tools/ref_catalog.py"),
             "--families",
-            "8",
+            "9",
             "--check",
         ])
         .output()
@@ -716,7 +716,7 @@ fn invoke_inverse_and_closed_schema_boundaries() {
         }
     }
     packed(&m, &tuples); // Mixed enable masks agree with the scalar machine.
-                         // The current contract supplies integer actuals, not body or wire bindings.
+                         // This legacy integer API rejects body/wire actuals; K19 binding is checked in ref_language.rs.
     for actual in [r#""actual[0]""#, r#"[{"gate":"x","wires":["a[0]"]}]"#] {
         let bad = text.replace(r#""args":["M"]"#, &format!(r#""args":[{actual}]"#));
         assert!(Catalog::parse(&bad).unwrap().expand("root", &[2]).is_err());

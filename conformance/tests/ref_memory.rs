@@ -112,7 +112,8 @@ fn generic_scans_full_symbolic_domains() {
                     if row {
                         bundles.extend([("faulted", 1), ("code", 4)]);
                     }
-                    let args=json::parse(&format!(r#"[{n},{length_width},{},{cells},{t},"p","n","base","size","live","pinned","atop","{target}"{}]"#,n.max(length_width)+1,if row{",\"faulted\",\"code\""}else{""})).unwrap();
+                    let f_arg = if row { ",4" } else { "" };
+                    let args=json::parse(&format!(r#"[{n},{length_width},{},{cells},{t}{f_arg},"p","n","base","size","live","pinned","atop","{target}"{}]"#,n.max(length_width)+1,if row{",\"faulted\",\"code\""}else{""})).unwrap();
                     let m = Machine::compile(
                         &permutation(&e.expand(op, args.as_arr().unwrap(), &bundles).unwrap())
                             .unwrap(),
@@ -215,6 +216,8 @@ fn generic_scans_full_symbolic_domains() {
                             let eq = b.equal(&p, &base);
                             let active_entry = b.less(&Bdd::constant(entry, t), &atop);
                             let matched = b.and(eq, active_entry);
+                            let unpinned = b.not(old[m.inputs["pinned"][entry]]);
+                            let matched = b.and(matched, unpinned);
                             let flip = b.and(success, matched);
                             let id = m.inputs["live"][entry];
                             expected[id] = b.xor(expected[id], flip);

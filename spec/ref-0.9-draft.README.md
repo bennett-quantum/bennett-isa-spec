@@ -188,3 +188,62 @@ T=1/2). Each helper covers **6,239,116,800 tuples**; each row covers
 The exact domain per helper is (C+1)*2^(P+L+2CP+2C+2); the rows replace
 an arbitrary predicate target by clean flag plus arbitrary faulted/code,
 giving exponent +4. Largest dispatch configuration is 2^73 basis tuples.
+
+### Structured bodies
+
+Generic memory commit aa9448f; 54 Rust tests and harness 445/0/63.
+Six structured recipes: qif, qloop, qloop.while, qpred.scope, ctl, adj.
+Predicate scopes group matching qpred/qunpred pairs as §3.5 lexical scopes.
+Bounds 0,1,2,3,17 at widths 1–4, full input domains, including every
+17-bit while condition vector and ambient control: 7,865,220 tuples per
+loop recipe. qif and nested fixpoint compositions each add 120 tuples.
+Exact Q(√2,i) witnesses: 270 coherent scope/qif/adjoint matrix columns,
+plus 600 Hadamard-loop columns (qloop bounds through 17; while bounds 0–3).
+The large while bound has an exact permutation witness over its entire
+basis; non-permutation leaf matrices and coherent scoped composition are
+checked independently, not called basis permutations.
+168 total recipes. Step/construction are blocked on b-isa-spec-lph:
+whole-body capture-free splices cannot select heterogeneous row templates
+or rebind the current frame. Generic call/activation interfaces remain
+b-isa-spec-1a4; allocation/class outputs b-isa-spec-3xe; images afi.
+
+### Ratified corrections, control rows, allocator and aliases
+
+Current count before the native family: 178 recipes. Added qjump/qbranch/
+qjumpr and successor.literal/flagged/dynamic, plus lift.alloc and positional
+copy/exchange/select adapters. Branch/successor witnesses: 22,120 tuples;
+qjumpr: 138,880 tuples over every nonempty function interval at widths 1–4.
+Wide effective-cause witnesses: 14,592 tuples at F=4,5,8. Cause C=0 maps
+to 4, including under faultif; core fault tests now cover all C=0..15
+(3,072 tuples). These supplement, not replace, the available 0.8 harness.
+
+All four allocator assignment values precede all four exchanges; inverse
+restores atop before addressing table[atop]. Eight exact BDD configurations:
+N=1–4, H=N+2, P=max(N+2,5), capacities 2/4, T=2/3, Base=16,
+Limit=2^N, F=4; **1,512,125,731,994,490,556,645,376 tuples**. Domain per configuration:
+(C+1)*2^(N+H+C*(2P+2)+P+F+2), legal atop 0..C. Packed entries are
+base[P], size[P], live, pinned. E=max(H,N)+1; K=min(P,H), J=min(P,N).
+These are derived width parameters; successful allocation sizes fit P.
+Selectors may be wider than log2(C): only the C physical entries are
+scanned, and bounds are checked before mutation.
+
+Pinned free entries are excluded from both the validity predicate and the
+mutation match (0.9 E17.13). Division computes frame.flag before any value
+slot write (§3.6), then success-only assignment and fault writes. F≥4 is
+an explicit parameter: the complete F=8 division circuit equals the F=4
+circuit and touches no high code bit, proving exact tensor identity on all
+high inputs and an additional **19,169,280** tuples. Both regressions were
+observed red before their fixes. Strict cast widths exclude M=N (the old
+value-helper checkpoint also tested identity-width mathematical extensions).
+Updated core assignment/fault witness count: 1,318,032 tuples; repeated
+location/destination aliases add 540, positional copy/exchange 1,360.
+Input captures are distinct, so aliasing location reads cannot create an
+invalid coincident-control CCX. All declared library scratch is balanced;
+every release is now checked against reverse allocation order. Diagonal
+and both swap targets obey §3.3 effective-control disjointness.
+
+Additional blockers: b-isa-spec-1oa (typed mapped-region layout descriptors
+for arbitrary lift.load/store); b-isa-spec-82x (qinplace's printed t/f
+release order conflicts with §11.1 reverse allocation order). Neither is
+silently replaced by a partial specialization. Complete-library hash/count
+remain withheld while these and afi/1a4/3xe/lph are open.

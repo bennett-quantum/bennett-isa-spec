@@ -827,3 +827,20 @@ bytes/hash/widths/lifetimes, and FIFO/lexicographic CDF ties. Python runs
 with -I and imports no interpreter or VM implementation. Raw diff bytes
 are regenerated immediately before every commit; accepted 0.8 SHA-256
 remains 90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e.
+
+K19 structured witness clarification: finite nested actual syntax may invoke
+the same higher-order recipe (qloop(3,qloop(2,B)) is six B occurrences).
+Rejecting any repeated recipe name on the runtime expansion stack conflates
+finite source nesting with recursive declared dependencies. Captured actual
+expansion starts its own dependency audit; direct and mutual cycles still
+reject. Structured full-domain/fixpoint tests reproduced this error before
+the expander fix. No qxor witness bytes changed.
+
+K19 validation also enforces §3.3 controls versus diagonal/swap targets,
+closed formal keys, declared dependency cycles through literal actual
+syntax, and scratch LIFO/balance. The six remaining source-binding/order
+gaps are afi, 1a4, 3xe, lph, 1oa and 82x; details and affected rows are
+recorded in ref progress and bd. No partial-library hash is inserted at
+the complete-catalog marker. The arbitrary-image and qinplace-order fixes
+would exceed the explicitly scoped constructor additions, so are raised
+for a separate contract decision rather than guessed.

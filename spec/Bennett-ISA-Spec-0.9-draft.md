@@ -2311,8 +2311,9 @@ its wires to that set (set union, repeated controls counted once).
 Exactly `{ "under": actual, "body": [...] }` adds controls for its lexical
 body and restores the outer set afterwards. Controls apply to semantic
 gates only, never allocation/release or classical events (§3.5/§4.3).
-A control may coincide with a gate's explicit control or diagonal operand,
-but never with a changed target. Gate operands must otherwise be distinct.
+A control may coincide with a gate's explicit control, but never with a
+target (including a diagonal-gate target), as §3.3 requires. Gate operands
+must otherwise be distinct.
 
 An `event` actual is exactly `{ "instruction": text, "point": text }`,
 or an event formal name. `instruction` is one complete canonical §9.1
@@ -2328,10 +2329,14 @@ retained §7.4 history and is not a quantum-library matrix witness.
 Consumers MUST reject the library document on arity/type/width mismatch,
 unbound name or closure hash, invalid wire range, duplicate formal,
 nonfinite angle, unknown constructor/key/gate, invalid gate arity,
-coincident changed target/control, unmatched allocation/release, or cyclic
+coincident target/control, unmatched allocation/release, or cyclic
 `invoke`/symbol expansion. Static integer bounds must yield finite
 expansion; validation is repeated for every actual parameter tuple before
 its expansion can be used. There are no implicit bindings or defaults.
+Acyclicity concerns declared
+recipe/symbol dependencies, not repetition of a higher-order recipe name
+inside finite captured actual syntax: qloop(3, qloop(2, B)) expands to six
+copies of B. Consumers expand finite actual bodies to a constructor fixpoint.
 
 **Angles and quantum witnesses (K20).** An `angle` actual is a bound angle
 formal or a finite binary64 value. Reusing §12.3's bit-pattern encoding:

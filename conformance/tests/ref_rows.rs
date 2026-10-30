@@ -176,10 +176,12 @@ fn cast_select_mov_and_parallel_alias_rows() {
     for n in 1..=4 {
         let size = 1u64 << n;
         for dest in 1..=4 {
-            for op in if dest >= n {
+            for op in if dest > n {
                 vec!["zext", "sext"]
-            } else {
+            } else if dest < n {
                 vec!["trunc"]
+            } else {
+                vec![]
             } {
                 let bundles = [("a", n), ("slot", dest), ("w", dest)];
                 let args = json::parse(&format!(r#"[{n},{dest},"a","slot","w"]"#)).unwrap();
@@ -330,7 +332,7 @@ fn cast_select_mov_and_parallel_alias_rows() {
             }
         }
     }
-    assert_eq!(count, 23800);
+    assert_eq!(count, 22440);
     println!("cast/select/mov/retval/parmov rows: {count} tuples");
 }
 
@@ -341,12 +343,12 @@ fn fault_rows_full_domain() {
     let mut e = Expander::new(bytes, Registry::new()).unwrap();
     let mut count = 0;
     for op in ["fault", "lift.faultif"] {
-        for c in 1..=9 {
+        for c in 0..16 {
             let bundles = [("p", 1), ("flag", 1), ("faulted", 1), ("code", 4)];
             let args = if op == "fault" {
-                format!(r#"[{c},"faulted","code"]"#)
+                format!(r#"[4,{c},"faulted","code"]"#)
             } else {
-                format!(r#"[{c},"p","flag","faulted","code"]"#)
+                format!(r#"[4,{c},"p","flag","faulted","code"]"#)
             };
             let args = json::parse(&args).unwrap();
             let m = Machine::compile(
@@ -366,7 +368,18 @@ fn fault_rows_full_domain() {
                             let old = s.clone();
                             m.run(&mut s, en, false).unwrap();
                             assert_eq!(m.get(&s, "faulted"), f ^ u64::from(active));
-                            assert_eq!(m.get(&s, "code"), code ^ if active { c } else { 0 });
+                            assert_eq!(
+                                m.get(&s, "code"),
+                                code ^ if active {
+                                    if c == 0 {
+                                        4
+                                    } else {
+                                        c
+                                    }
+                                } else {
+                                    0
+                                }
+                            );
                             assert_eq!(m.get(&s, "flag"), u64::from(op != "fault" && active));
                             m.run(&mut s, en, true).unwrap();
                             assert_eq!(s, old);
@@ -377,6 +390,133 @@ fn fault_rows_full_domain() {
             }
         }
     }
-    assert_eq!(count, 1728);
+    assert_eq!(count, 3072);
     println!("fault rows: {count} tuples");
+}
+
+#[test]
+fn repeated_location_sources_and_destination_aliases() {
+    let mut e = Expander::new(
+        include_str!("../../spec/ref-0.9-draft.json"),
+        Registry::new(),
+    )
+    .unwrap();
+    let mut count = 0;
+    for n in 1..=4 {
+        let size = 1u64 << n;
+        for op in [
+            "add", "sub", "mul", "and", "or", "xor", "shl", "lshr", "ashr",
+        ] {
+            let bundles = [("w", n), ("slot", n)];
+            let args = json::parse(&format!(r#"[{n},"w","w","slot","w"]"#)).unwrap();
+            let m = Machine::compile(
+                &bennett_isa_conformance::ref_language::permutation(
+                    &e.expand(&format!("lift.{op}"), args.as_arr().unwrap(), &bundles)
+                        .unwrap(),
+                )
+                .unwrap(),
+                &bundles,
+            )
+            .unwrap();
+            for w in 0..size {
+                for en in [false, true] {
+                    let v = match op {
+                        "add" => (w + w) & (size - 1),
+                        "sub" | "xor" => 0,
+                        "mul" => (w * w) & (size - 1),
+                        "and" | "or" => w,
+                        "shl" => {
+                            if w < n as u64 {
+                                w << w & (size - 1)
+                            } else {
+                                0
+                            }
+                        }
+                        "lshr" => {
+                            if w < n as u64 {
+                                w >> w
+                            } else {
+                                0
+                            }
+                        }
+                        "ashr" => {
+                            if w < n as u64 {
+                                ((((w << (64 - n)) as i64) >> (64 - n)) >> w) as u64 & (size - 1)
+                            } else {
+                                0
+                            }
+                        }
+                        _ => unreachable!(),
+                    };
+                    let mut s = m.state();
+                    m.set(&mut s, "w", w);
+                    let old = s.clone();
+                    m.run(&mut s, en, false).unwrap();
+                    assert_eq!(m.get(&s, "w"), if en { v } else { w });
+                    assert_eq!(m.get(&s, "slot"), if en { w } else { 0 });
+                    m.run(&mut s, en, true).unwrap();
+                    assert_eq!(s, old);
+                    count += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(count, 540);
+    println!("repeated/assigned location aliases: {count} tuples");
+}
+
+#[test]
+fn positional_copy_exchange_bindings_full_domains() {
+    use bennett_isa_conformance::ref_bdd::Bdd;
+    let mut e = Expander::new(
+        include_str!("../../spec/ref-0.9-draft.json"),
+        Registry::new(),
+    )
+    .unwrap();
+    let mut count = 0;
+    for n in 1..=4 {
+        for kind in ["bind.qxor", "bind.qexch"] {
+            let args = json::parse(&format!(r#"[{n},"left","right"]"#)).unwrap();
+            let bundles = [("left", n), ("right", n)];
+            let m = Machine::compile(
+                &bennett_isa_conformance::ref_language::permutation(
+                    &e.expand(kind, args.as_arr().unwrap(), &bundles).unwrap(),
+                )
+                .unwrap(),
+                &bundles,
+            )
+            .unwrap();
+            let mut b = Bdd::new();
+            let mut s = m.symbolic_state();
+            for name in ["left", "right"] {
+                for id in &m.inputs[name] {
+                    s[*id] = b.variable();
+                }
+            }
+            let enabled = b.variable();
+            let old = s.clone();
+            let mut expected = old.clone();
+            for bit in 0..n {
+                let a = m.inputs["left"][bit];
+                let t = m.inputs["right"][bit];
+                let flip = if kind == "bind.qxor" {
+                    b.and(enabled, old[a])
+                } else {
+                    let d = b.xor(old[a], old[t]);
+                    b.and(enabled, d)
+                };
+                expected[t] = b.xor(expected[t], flip);
+                if kind == "bind.qexch" {
+                    expected[a] = b.xor(expected[a], flip);
+                }
+            }
+            m.run_symbolic(&mut b, &mut s, enabled, false, 1).unwrap();
+            assert_eq!(s, expected);
+            m.run_symbolic(&mut b, &mut s, enabled, true, 1).unwrap();
+            assert_eq!(s, old);
+            count += 1 << (2 * n + 1);
+        }
+    }
+    assert_eq!(count, 1360);
+    println!("positional copy/exchange adapters: {count} full-domain tuples");
 }

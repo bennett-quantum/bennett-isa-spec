@@ -1,0 +1,32 @@
+{
+  "id": "E-ref-09-structured-bodies",
+  "suite": "E",
+  "spec": "\u00a74.6 qif/qloop/while; \u00a73.5 lexical predicates; \u00a74.7 adj/ctl; \u00a711.1 K19/K20",
+  "derivation": "Literal predicate-flip arms, bounded while prefix flags and inverse cleanup are checked on full BDD domains. Bounds 0/1/2/3/17 include nested finite bodies to expansion fixpoint. Exact dyadic-sqrt2 complex columns check coherent H/S/T composition and adjoints separately.",
+  "scenario": {
+    "widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "bounds": [
+      0,
+      1,
+      2,
+      3,
+      17
+    ],
+    "checker": "ref_structure.rs"
+  },
+  "expected_outcome": {
+    "loop_tuples_each": 7865220,
+    "qif_tuples": 120,
+    "nested_tuples": 120,
+    "exact_matrix_columns": 870
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-8r4; complete catalog and accepted K19/K20 required"
+  }
+}

@@ -4,6 +4,19 @@ use bennett_isa_conformance::{
 };
 
 fn doc(recipes: &str) -> String {
+    let mut recipes = json::parse(recipes).unwrap();
+    if let json::Json::Arr(rs) = &mut recipes {
+        for r in rs {
+            if let json::Json::Obj(m) = r {
+                m.entry("scratch".into()).or_insert(json::Json::Arr(vec![]));
+                m.insert("removable".into(), json::Json::Arr(vec![]));
+                m.insert(
+                    "source".into(),
+                    json::Json::Str("§11.1 independent binding witness".into()),
+                );
+            }
+        }
+    }
     format!(r#"{{"isa":"0.9","name":"ref","version":"0.9","recipes":{recipes}}}"#)
 }
 #[test]
@@ -154,8 +167,13 @@ fn bound_classical_catalog_preserves_every_event_operand_byte() {
         for n in 1..=4 {
             for a in 0..1 << n {
                 for b in 0..1 << n {
+                    let opcode = if op == "measure.iN" {
+                        format!("measure.i{n}")
+                    } else {
+                        op.to_string()
+                    };
                     let event = json::parse(&format!(
-                        r#"{{"instruction":"{op} {a} {b}","point":"block.0.row.{n}"}}"#
+                        r#"{{"instruction":"{opcode} {a} {b}","point":"block.0.row.{n}"}}"#
                     ))
                     .unwrap();
                     let leaves = expander
@@ -171,4 +189,58 @@ fn bound_classical_catalog_preserves_every_event_operand_byte() {
     }
     assert_eq!(count, 48 * (4 + 16 + 64 + 256));
     println!("classical bound event byte-preservation: {count} configurations (not classical execution witnesses)");
+}
+
+#[test]
+fn cyclic_typed_invokes_and_nonfinite_angles_reject() {
+    let d = doc(r#"[{"kind":"root","parameters":[],"body":[{"invoke":"root","args":[]}]}]"#);
+    assert!(Expander::new(&d, Registry::new()).is_err());
+    let d = doc(
+        r#"[{"kind":"qloop","parameters":[{"name":"B","type":"body"}],"body":[{"splice":"B"}]},{"kind":"root","parameters":[],"body":[{"invoke":"qloop","args":[[{"invoke":"root","args":[]}]]}]}]"#,
+    );
+    assert!(Expander::new(&d, Registry::new()).is_err());
+    for angle in [
+        "0x7ff0000000000000",
+        "0x7ff8000000000001",
+        "0xBFF0000000000000",
+    ] {
+        let d = doc(&format!(
+            r#"[{{"kind":"r","parameters":[{{"name":"a","type":"wire","width":1}}],"body":[{{"gate":"rx","wires":["a"],"params":["{angle}"]}}]}}]"#
+        ));
+        let args = json::parse(r#"["a"]"#).unwrap();
+        assert!(Expander::new(&d, Registry::new())
+            .unwrap()
+            .expand("r", args.as_arr().unwrap(), &[("a", 1)])
+            .is_err());
+    }
+}
+
+#[test]
+fn effective_controls_are_disjoint_from_diagonal_and_swap_targets() {
+    for (g, ws) in [("s", r#"["a"]"#), ("swap", r#"["a","b"]"#)] {
+        let d = doc(&format!(
+            r#"[{{"kind":"g","parameters":[{{"name":"a","type":"wire","width":1}},{{"name":"b","type":"wire","width":1}}],"body":[{{"under":"a","body":[{{"gate":"{g}","wires":{ws}}}]}}]}}]"#
+        ));
+        let args = json::parse(r#"["a","b"]"#).unwrap();
+        assert!(Expander::new(&d, Registry::new())
+            .unwrap()
+            .expand("g", args.as_arr().unwrap(), &[("a", 1), ("b", 1)])
+            .is_err());
+    }
+}
+
+#[test]
+fn library_scratch_requires_reverse_release_and_balanced_lifetimes() {
+    for body in [
+        r#"[{"alloc":"a","width":1,"class":"any","state":"clean"}]"#,
+        r#"[{"alloc":"a","width":1,"class":"any","state":"clean"},{"alloc":"b","width":1,"class":"any","state":"clean"},{"release":"a"},{"release":"b"}]"#,
+    ] {
+        let d = doc(&format!(
+            r#"[{{"kind":"bad","parameters":[],"scratch":["a","b"],"body":{body}}}]"#
+        ));
+        assert!(Expander::new(&d, Registry::new())
+            .unwrap()
+            .expand("bad", &[], &[])
+            .is_err());
+    }
 }

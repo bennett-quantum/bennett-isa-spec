@@ -37,16 +37,32 @@ def family(api):
         out.append(c.recipe('scan.'+op,params,'§4.2: ordered linear table scan; entry i<atop, live, widened no-wrap range/free predicate; §11.1 ordered OR fold with immediate entry scratch uncomputation.'))
     # Row effects on existing frame/state wires. Generic allocation results,
     # mapped byte layout interfaces and image initialization remain separate.
-    flagparams=[I('P'),I('L'),I('E'),I('C'),I('T'),W('p','P'),W('n','L'),W('base',times('C','P')),W('size',times('C','P')),W('live','C'),W('pinned','C'),W('atop','T'),W('flag',1),W('faulted',1),W('code',4)]
+    flagparams=[I('P'),I('L'),I('E'),I('C'),I('T'),I('F'),W('p','P'),W('n','L'),W('base',times('C','P')),W('size',times('C','P')),W('live','C'),W('pinned','C'),W('atop','T'),W('flag',1),W('faulted',1),W('code','F')]
     flagargs=['P','L','E','C','T','p','n','base','size','live','pinned','atop','flag']
-    out.append(recipe('lift.boundscheck',flagparams,[gate('x',wire('flag')),call('scan.inrange',*flagargs),gate('cx',wire('flag'),wire('faulted')),{'under':'flag','body':[call('value.literal',4,7,'code')]}],'§4.2 lift.boundscheck: flag=not inrange(p,n), then code ^= flag*7 and faulted ^= flag.'))
+    out.append(recipe('lift.boundscheck',flagparams,[gate('x',wire('flag')),call('scan.inrange',*flagargs),gate('cx',wire('flag'),wire('faulted')),{'under':'flag','body':[call('value.literal','F',7,'code')]}],'§4.2 lift.boundscheck: flag=not inrange(p,n), then code ^= flag*7 and faulted ^= flag.'))
     c=Circuit();counter=c.temp('T');active=c.temp();eq=c.temp();hit=c.temp();start=len(c.body)
     base=rg('base',times('entry','P'),times(plus('entry',1),'P'))
     c.body.extend([call('bind.value.icmp.ult','T',counter,'atop',active),call('bind.value.icmp.eq','P','p',base,eq)])
-    c.boolean(('and',wire(active),wire(eq)),wire(hit));match=c.body[start:]
+    c.boolean(('and',('and',wire(active),wire(eq)),('not',wire('pinned','entry'))),wire(hit));match=c.body[start:]
     c.body.extend([gate('ccx',wire('flag'),wire(hit),wire('live','entry')),inv(match),inc(counter,'T')]);c.body[start:]=[loop('entry','C',c.body[start:])]
     c.body.extend([inv([loop('entry','C',[inc(counter,'T')])]),release(hit),release(eq),release(active),release(counter)])
-    body=[call('scan.free.flag',*flagargs),gate('x',wire('flag'))]+c.body+[gate('x',wire('flag')),gate('cx',wire('flag'),wire('faulted')),{'under':'flag','body':[call('value.literal',4,7,'code')]}]
-    out.append(recipe('lift.free',flagparams,body,'§4.2 lift.free: old-state free flag first; under not flag toggle every live_i whose i<atop and base_i=p; uncompute match scratch and apply fault writes.',c.scratch))
+    body=[call('scan.free.flag',*flagargs),gate('x',wire('flag'))]+c.body+[gate('x',wire('flag')),gate('cx',wire('flag'),wire('faulted')),{'under':'flag','body':[call('value.literal','F',7,'code')]}]
+    out.append(recipe('lift.free',flagparams,body,'§4.2 lift.free: old-state free flag first; under not flag toggle every live_i whose i<atop, base_i=p and not pinned_i; uncompute match scratch and apply fault writes.',c.scratch))
+    # All four assignment values are computed from old counters before any
+    # exchange. Record cells pack base[P], size[P], live, pinned, in that order.
+    params=[I(n) for n in ['P','N','H','T','E','K','J','C','Base','Limit','F']]+[W('n','N'),W('used','H'),W('atop','T'),W('table',times('C',plus(times(2,'P'),2))),W('w','P'),W('dp','P'),W('de',plus(times(2,'P'),2)),W('du','H'),W('da','T'),W('flag',1),W('faulted',1),W('code','F')]
+    def prospective(c):
+        used=c.temp('E');mx=c.temp('E');zero=c.temp('N');iszero=c.temp();total=c.temp('E')
+        c.body.extend([loop('bit','H',[gate('cx',wire('used','bit'),wire(used,'bit'))]),loop('bit','N',[gate('cx',wire('n','bit'),wire(mx,'bit'))]),call('bind.value.icmp.eq','N','n',zero,iszero),gate('cx',wire(iszero),wire(mx)),call('bind.value.add','E',used,mx,total)])
+        return total
+    c=Circuit();total=prospective(c);limit=c.temp('E');capacity=c.temp('T');heapok=c.temp();tableok=c.temp();c.body.extend([call('value.literal','E','Limit',limit),call('value.literal','T','C',capacity),call('bind.value.icmp.ule','E',total,limit,heapok),call('bind.value.icmp.ult','T','atop',capacity,tableok)]);flagcompute=c.body[:]
+    c.boolean(('or',('not',wire(heapok)),('not',wire(tableok))),wire('flag'));c.body.append(inv(flagcompute))
+    d=Circuit();d.serial=c.serial;total=prospective(d);base=d.temp('P');used=d.temp('P');one=d.temp('T');d.body.extend([call('value.literal','P','Base',base),loop('bit','K',[gate('cx',wire('used','bit'),wire(used,'bit'))]),call('value.literal','T',1,one)]);setup=d.body[:]
+    d.body.extend([call('bind.value.add','P',base,used,'dp'),call('bind.value.add','P',base,used,rg('de',0,'P')),loop('bit','J',[gate('cx',wire('n','bit'),wire('de',plus('P','bit')))]),gate('x',wire('de',times(2,'P'))),loop('bit','H',[gate('cx',wire(total,'bit'),wire('du','bit'))]),call('bind.value.add','T','atop',one,'da'),inv(setup)])
+    def exchange(a,b,n):return loop('bit',n,[gate('swap',wire(a,'bit'),wire(b,'bit'))])
+    d.body.extend([exchange('dp','w','P'),call('dispatch.exchange','T','C',plus(times(2,'P'),2),'atop','table','de'),exchange('du','used','H'),exchange('da','atop','T')])
+    body=c.body+[gate('x',wire('flag')),{'under':'flag','body':d.body},gate('x',wire('flag')),gate('cx',wire('flag'),wire('faulted')),{'under':'flag','body':[call('value.literal','F',2,'code')]}]
+    out.append(recipe('lift.alloc',params,body,'§4.2 lift.alloc: flag from widened prospective heap use and table capacity; compute pointer, packed entry, heap_used and atop slots before exchanges in precisely that order. E=max(H,N)+1, K=min(P,H), J=min(P,N); Base/Limit are resolved layout/budget integers. Inverse restores atop before addressing table[atop].',c.scratch+d.scratch))
     return out
+
 
