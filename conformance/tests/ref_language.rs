@@ -139,3 +139,36 @@ fn full_basis_h_and_phase_witnesses_are_exact() {
         }
     }
 }
+
+#[test]
+fn bound_classical_catalog_preserves_every_event_operand_byte() {
+    let bytes = include_str!("../../spec/ref-0.9-draft.json");
+    let d = json::parse(bytes).unwrap();
+    let mut count = 0;
+    let mut expander = Expander::new(bytes, Registry::new()).unwrap();
+    for r in d.get("recipes").unwrap().as_arr().unwrap() {
+        let kind = r.get("kind").unwrap().as_str().unwrap();
+        let Some(op) = kind.strip_prefix("cc.") else {
+            continue;
+        };
+        for n in 1..=4 {
+            for a in 0..1 << n {
+                for b in 0..1 << n {
+                    let event = json::parse(&format!(
+                        r#"{{"instruction":"{op} {a} {b}","point":"block.0.row.{n}"}}"#
+                    ))
+                    .unwrap();
+                    let leaves = expander
+                        .expand(kind, std::slice::from_ref(&event), &[])
+                        .unwrap();
+                    assert_eq!(leaves.len(), 1);
+                    assert_eq!(leaves[0].event.as_ref(), Some(&event));
+                    assert!(leaves[0].controls.is_empty());
+                    count += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(count, 48 * (4 + 16 + 64 + 256));
+    println!("classical bound event byte-preservation: {count} configurations (not classical execution witnesses)");
+}

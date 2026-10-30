@@ -7,7 +7,7 @@ the draft's full-catalog hash/count edit remain blocked on b-isa-spec-cbk
 rotation/variadic parameters and quantum witnesses). See the progress file.
 
 The top-level schema and closed constructor keys follow draft §11.1.
-Recipes are sorted by bytewise kind; parameters are ordered integer names.
+Recipes are sorted by bytewise kind; parameters use §11.1 typed formals (legacy names abbreviate integers).
 `N >= 1` is a bit width. `i` is a loop variable. Wire subscripts contain an
 integer literal, loop name, or JSON prefix expression. `inverse: true`
 reverses the expanded body and adjoints each leaf. These concrete spellings
@@ -129,3 +129,15 @@ Final headless/offline gate: fmt --check and clippy --all-targets -D warnings
 green; cargo test **40 pass / 0 fail**. Full 0.8 harness **445 pass / 0 fail /
 60 unavailable (505 cases), exit 2**. Six new family cases add unavailable
 only, naming b-isa-spec-8r4. No push.
+
+## Resumption: bound classical events
+
+K19/K20 closed cbk/8sc as language gaps (commit 5a8ec58). The old
+checkpoint dispositions above describe the prior state; subsequent entries
+record the current implementation. `cc.<opcode>` now covers all 48 §4.1
+opcode/predicate spellings in the README, including qreg view/identity,
+measure widths, budget.mint and fault. Every event binds canonical instruction
+bytes and its execution point. The expander rejects opcode mismatches.
+The 16,320 configurations at widths 1–4 check exact event-byte preservation;
+these are binding witnesses, not a second classical interpreter.
+The catalog currently has 102 recipes; its digest is a checkpoint only.

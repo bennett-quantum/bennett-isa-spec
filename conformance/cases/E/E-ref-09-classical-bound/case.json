@@ -1,0 +1,24 @@
+{
+  "id": "E-ref-09-classical-bound",
+  "suite": "E",
+  "spec": "\u00a711.1 K19; \u00a74.1; \u00a78.2 classical points",
+  "derivation": "Each classical instruction is emitted as one bound classical event, preserving canonical instruction operands and execution point bytes; no quantum gate is invented. All two-operand bit-vector combinations at widths 1\u20134 exercise byte preservation, not classical evaluation.",
+  "scenario": {
+    "kinds": 48,
+    "widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "checker": "bound_classical_catalog_preserves_every_event_operand_byte"
+  },
+  "expected_outcome": {
+    "recipes": 48,
+    "configurations": 16320
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-8r4; bound event serialization requires accepted K19 and complete catalog"
+  }
+}

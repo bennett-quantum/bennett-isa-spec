@@ -47,3 +47,12 @@ Final headless/offline gate: fmt --check and clippy --all-targets -D warnings
 green; cargo test **40 pass / 0 fail**. Full 0.8 harness **445 pass / 0 fail /
 60 unavailable (505 cases), exit 2**. Six new family cases add unavailable
 only, naming b-isa-spec-8r4. No push.
+
+## Resumed — Part 1 and §4.1
+
+Part 1 commit: 5a8ec58; cbk/8sc closed with typed-language witnesses.
+Gate: 45 Rust tests, fmt/clippy green, harness 445/0/60.
+Classical family: 48 `cc.*` event bindings added (102 total recipes).
+16,320 event-binding configurations: all two-operand bit-vector pairs at
+widths 1–4 for each event kind. These check binding bytes, not classical
+execution; history and effects remain ISA §4.1/§7.4 events.

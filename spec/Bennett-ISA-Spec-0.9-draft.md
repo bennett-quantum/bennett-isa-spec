@@ -2317,8 +2317,9 @@ but never with a changed target. Gate operands must otherwise be distinct.
 An `event` actual is exactly `{ "instruction": text, "point": text }`,
 or an event formal name. `instruction` is one complete canonical §9.1
 classical instruction with its operand bindings; `point` identifies its
-§8.2 classical execution point. `{ "classical": event_name, "point":
-"bound" }` emits that bound event without executing or substituting its
+§8.2 classical execution point. `{ "classical": opcode, "point":
+event_name }` emits that bound event (its opcode must match, allowing a
+concrete `.iN` width suffix) without executing or substituting its
 instruction text; classical semantics and retained history are §4.1/§7.4.
 Literal classical leaves retain their existing `classical`/`point` form.
 A classical event is not a unitary; an `inverse` containing one requires

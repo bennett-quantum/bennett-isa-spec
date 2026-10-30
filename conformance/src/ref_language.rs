@@ -507,7 +507,28 @@ impl Expander {
                 keys(j, &["classical", "point"])?;
                 leaf.gate = "classical".into();
                 leaf.controls.clear();
-                leaf.event = Some(c.events.get(s(n)?).cloned().unwrap_or_else(|| j.clone()));
+                leaf.event = if let Some(event) = c.events.get(s(f(j, "point")?)?) {
+                    let instruction = s(f(event, "instruction")?)?;
+                    let rhs = instruction
+                        .split_once(" = ")
+                        .map(|(_, v)| v)
+                        .unwrap_or(instruction);
+                    let opcode = rhs
+                        .split_whitespace()
+                        .next()
+                        .ok_or("empty classical instruction")?;
+                    let expected = s(n)?;
+                    let valid = opcode == expected
+                        || opcode.strip_prefix(expected).is_some_and(|tail| {
+                            tail.starts_with(".i") && tail[2..].bytes().all(|b| b.is_ascii_digit())
+                        });
+                    if !valid {
+                        return Err("bound classical opcode mismatch".into());
+                    }
+                    Some(event.clone())
+                } else {
+                    Some(j.clone())
+                };
                 self.emit(leaf, rev, out)?;
             } else {
                 return Err(format!("unknown constructor {j}"));
