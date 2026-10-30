@@ -561,3 +561,59 @@ fn sol_r5_b02_clean_surrounding_loop_controls_are_reachable_invariants() {
         "r5-later-entry",
     );
 }
+
+#[test]
+fn codex_r5_b03_one_iteration_release_matches_unrolled_clean_entry() {
+    for (i, (body, bounds, hash)) in [
+        (
+            "c = qalloc any 1\nb = qborrow any 1\nqloop 1 {\nqfree c\n}\nqreturn b",
+            vec![1],
+            "a42079194137127e703185faaeb6b5bc85c6941ccc03988eb67c19c14481e8df",
+        ),
+        (
+            "c = qalloc any 1\nb = qborrow any 1\nqfree c\nqreturn b",
+            vec![],
+            "77ec83b71a86ed5ecff50d17e3eafe79fc371da7ff553ab53eb2de7a19abd218",
+        ),
+        (
+            "c = qalloc any 1\nqloop 1 {\nb = qborrow any 1\nqfree c\nqreturn b\n}",
+            vec![1],
+            "1f7845d8ea763f50cbd05294dacce1f1c8de52f18a506a240ffee4b909ce7712",
+        ),
+    ]
+    .iter()
+    .enumerate()
+    {
+        // c is exactly zero, so freeing it once is legal; b never changes.
+        let o = support::rehash(&support::borrow_lifetime_object(body, bounds));
+        assert_eq!(o.identity().unwrap().interface_hashes["a"], *hash);
+        o.check_hashes().unwrap();
+        support::borrow_identity(&o);
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join(format!(".tmp/codex-r5-b03-{i}.bisa"));
+        std::fs::write(&path, &o.text).unwrap();
+        for cmd in ["hash", "check", "run-action", "reverse"] {
+            for t in ["0", "1"] {
+                let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_bennett-isa-ref"));
+                command.arg(cmd).arg(&path);
+                if matches!(cmd, "run-action" | "reverse") {
+                    command.args(["a", "--mut", t]);
+                }
+                let out = command.output().unwrap();
+                assert!(out.status.success(), "{cmd}, {out:?}");
+                if cmd == "run-action" {
+                    let result = support::json(std::str::from_utf8(&out.stdout).unwrap());
+                    assert_eq!(
+                        result.get("state").unwrap().canonical(),
+                        format!("{{\"{t}\":[1,0]}}")
+                    );
+                } else if cmd == "reverse" {
+                    assert!(String::from_utf8_lossy(&out.stdout).contains("\"equals_entry\":true"));
+                }
+            }
+        }
+        // The same release with c=1 is unclean, irrespective of the wrapper.
+        let dirty = body.replace("c = qalloc any 1", "c = qalloc any 1\nx c");
+        assert!(Object::parse(&support::borrow_lifetime_object(&dirty, bounds)).is_err());
+    }
+}

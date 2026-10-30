@@ -180,3 +180,20 @@ retain the independent public-API checks; certified carried/doubled-gate
 positives retain full basis, superposition and external entangled-reference
 checks. §§4.3/5.1 require each matched return after its frame; §5.6 requires
 P_F = P′ ⊗ I_B. No decline, partial, new ambiguity or scope change.
+
+## Codex R5-B03 — resolved-by e205f93 (SOL-R5-B02)
+
+Re-ran both exact one-iteration qfree variants and the unrolled form against
+HEAD before production edits. New pin
+`r1_borrow::codex_r5_b03_one_iteration_release_matches_unrolled_clean_entry`
+checks all three published interface hashes, parse/hash/check, run-action and
+reverse at t=0/1. All accept and act as identity; reverse reports equals_entry.
+Full basis entries, superposition and an external entangled borrowed reference
+are preserved in each direction. Adding X c before release remains rejected.
+GREEN on HEAD: 1 test passed. No additional production fix was necessary.
+
+SOL's reachable-entry obligation substitution covers this free obligation as
+well as returns; `sol_r5_b02_clean_surrounding_loop_controls_are_reachable_invariants`
+also pins later iterations and 2^40 without a trip cap. §4.3's “n clean wires”,
+§14.2's “qalloc tensors |0⟩” and §4.6's “body n times” decide the reading.
+No certificate is needed. No decline, partial or new ambiguity.

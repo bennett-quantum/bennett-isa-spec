@@ -14,6 +14,12 @@ production edits; straight-line/nested certificate forms reject too. New pin
 `codex_r5_b01_exact_three_certified_lifetime_witnesses`: 1 passed. The
 appendable response records the SOL proof/audit pins and positive controls.
 
+Codex R5-B03 resolved-by e205f93: both exact one-iteration qfree placements
+and the unrolled form already pass, with all three published interface hashes,
+CLI check/run/reverse, full basis, superposition and entangled-reference pins.
+X-before-free negatives still reject. New pin
+`codex_r5_b03_one_iteration_release_matches_unrolled_clean_entry`: 1 passed.
+
 ## Council round 5, SOL first pass (2026-10-30)
 
 SOL-R5-B01 resolved after RED on the exact correctly bound certificate witness.
