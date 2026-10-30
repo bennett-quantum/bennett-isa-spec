@@ -1,5 +1,6 @@
 //! Council round 1: codex B18 (a fixture audit that audits every fixture), and
 //! fable's suggestion that the §16.3 fixtures equal the spec text byte for byte.
+mod support;
 use bennett_isa_ref::Object;
 use std::path::PathBuf;
 
@@ -626,4 +627,27 @@ fn fixture_identities_are_pinned_as_literals() {
         })
         .sum();
     assert_eq!(checked, total, "every fixture symbol is pinned");
+}
+
+#[test]
+fn r10_independent_effective_control_and_grammar_pins() {
+    for tag in ["controls", "duplicate", "cc", "r", "omitted-bounds"] {
+        support::r10_pin(tag);
+    }
+    // Rejected objects still retain their literal byte digests. They must not
+    // be silently rewritten into legal objects before hashing.
+    for tag in [
+        "bare-cc",
+        "bare-r",
+        "empty-bounds",
+        "fn-oracle",
+        "inc-empty-bounds",
+        "empty-lhs",
+    ] {
+        let c = support::r10_case(tag);
+        assert_eq!(
+            bennett_isa_ref::sha256_hex(support::r10_text(tag).as_bytes()),
+            c.get("object_hash").unwrap().string().unwrap()
+        );
+    }
 }

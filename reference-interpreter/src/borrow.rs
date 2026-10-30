@@ -286,7 +286,7 @@ impl Node {
                     out.push(x);
                 }
             }
-            out
+            crate::controls::EffectiveControls::new(out).into_literals()
         };
         match self {
             Self::Flip(c, t) => Self::Flip(cs(c), w(t)),
@@ -665,8 +665,12 @@ impl Compiler<'_> {
                         c.push(e.clone());
                     }
                 }
-                c
+                crate::controls::EffectiveControls::new(c).into_literals()
             };
+            // Keep predicate as the lexical stack; nodes receive only its
+            // canonical semantic set, after resolving every physical wire.
+            let effective =
+                crate::controls::EffectiveControls::new(predicate.clone()).into_literals();
             match op {
                 "qalloc" | "qborrow" => {
                     let n = crate::object::host_count(&a[1], "allocation width")? as usize;
@@ -720,7 +724,7 @@ impl Compiler<'_> {
                 }
                 "qexch" => {
                     for (s, t) in self.bundle(&a[0])?.into_iter().zip(self.bundle(&a[1])?) {
-                        out.push(Node::Swap(predicate.clone(), s, t));
+                        out.push(Node::Swap(effective.clone(), s, t));
                     }
                 }
                 "qif" => {
@@ -787,7 +791,7 @@ impl Compiler<'_> {
                 }
                 "oracle_call" | "action_call" | "adj" | "ctl" => {
                     let call = normalize_call(i)?;
-                    let mut c = predicate.clone();
+                    let mut c = effective.clone();
                     if let Some(w) = &call.control {
                         c = with(&[(self.scalar(w)?, true)], &c);
                     }
@@ -906,7 +910,7 @@ impl Compiler<'_> {
                     out.push(Node::Opaque {
                         key: format!("qinplace:{:?}", (&a[0], &a[1], self.classical(&a[2])?)),
                         inverse: format!("qinplace:{:?}", (&a[1], &a[0], self.classical(&a[2])?)),
-                        controls: predicate.clone(),
+                        controls: effective.clone(),
                         inputs: x.clone(),
                         outputs: x,
                         assign: true,
@@ -914,7 +918,7 @@ impl Compiler<'_> {
                 }
                 _ if gate(op) => {
                     let (controls, targets, diagonal, other) = gate_operands(i)?;
-                    let mut c = predicate.clone();
+                    let mut c = effective.clone();
                     for control in &controls {
                         c = with(&[(self.scalar(control)?, true)], &c);
                     }

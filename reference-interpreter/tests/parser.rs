@@ -210,3 +210,50 @@ fn r3_normalized_cc_controls_are_typed_and_disjoint_at_load() {
         support::reject_cli(&text, "§3.3", &format!("cc-ctl-{tag}"));
     }
 }
+
+#[test]
+fn r10_function_header_prefix_matches_kind() {
+    let failures: Vec<_> = support::r10_bad_headers()
+        .iter()
+        .enumerate()
+        .filter_map(|(n, text)| {
+            let result = Object::parse(text).err().map(|e| e.to_string());
+            println!("header {n}: {result:?}");
+            (!result.is_some_and(|e| e.contains("§16.2"))).then_some(n)
+        })
+        .collect();
+    assert!(
+        failures.is_empty(),
+        "headers without §16.2 rejection: {failures:?}"
+    );
+}
+#[test]
+fn r10_present_bounds_requires_an_integer() {
+    rejects(&support::r10_text("empty-bounds"), "§16.2");
+    support::r10_pin("omitted-bounds");
+}
+#[test]
+fn r10_exact_fhead_and_nonempty_optional_productions() {
+    let failures: Vec<_> = ["fn-oracle", "inc-empty-bounds", "empty-lhs"]
+        .into_iter()
+        .filter(|tag| {
+            let result = Object::parse(&support::r10_text(tag))
+                .err()
+                .map(|e| e.to_string());
+            println!("{tag}: {result:?}");
+            !result.is_some_and(|e| e.contains("§16.2"))
+        })
+        .collect();
+    assert!(failures.is_empty(), "{failures:?}");
+    rejects(
+        &support::r10_text("cc").replace("\nret\n", "\n() = ret\n"),
+        "§16.2",
+    );
+    // Nonempty tuple LHS and empty operand lists remain legal.
+    Object::parse(&INC.replace("r = lift.add", "(r) = lift.add")).unwrap();
+    for tag in ["cc", "r", "omitted-bounds"] {
+        support::r10_pin(tag);
+    }
+    let sig = r#"{"abi":"0.8","args":[],"bounds":[1],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
+    Object::parse(&support::object(&[("a",sig,"action @a (t:wire mut) () () () ()\nregs {  } bounds {1}\n^entry():\nqloop 1 {\nx t\n}")],"{}","")).unwrap();
+}

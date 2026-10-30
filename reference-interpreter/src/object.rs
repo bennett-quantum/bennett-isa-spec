@@ -584,7 +584,11 @@ fn instruction(lines: &[(usize, &str)], pos: &mut usize) -> Result<Instruction> 
     *pos += 1;
     let (lhs, rhs) = if let Some((a, b)) = raw.split_once(" = ") {
         let lhs = if a.starts_with('(') {
-            list(a)?
+            let names = list(a)?;
+            if names.is_empty() || names.iter().any(|n| !name(n)) {
+                return err("§16.2", "result list requires at least one NAME");
+            }
+            names
         } else if name(a) {
             vec![a.into()]
         } else {
@@ -824,21 +828,11 @@ impl Object {
             let start = pos;
             let ts = tokens(lines[pos])?;
             pos += 1;
-            let (kind, offset) = if ts.first().is_some_and(|s| s == "fn") {
-                (ts.get(1).map(String::as_str).unwrap_or(""), 2)
-            } else {
-                (ts.first().map(String::as_str).unwrap_or(""), 1)
-            };
-            if !matches!(
-                kind,
-                "cc" | "r" | "oracle" | "action" | "perm_action" | "lproc"
-            ) || ts.len() != offset + 6
-            {
-                return err(
-                    "§16.2",
-                    "invalid function header or number of parameter lists",
-                );
-            }
+            let (kind, offset) = fhead_prefix(&ts)
+                .filter(|(_, offset)| ts.len() == offset + 6)
+                .ok_or_else(|| {
+                    Error("§16.2: invalid function header or number of parameter lists".into())
+                })?;
             let n = ts[offset]
                 .strip_prefix('@')
                 .filter(|s| name(s))
@@ -873,12 +867,13 @@ impl Object {
                         .strip_prefix(" bounds {")
                         .and_then(|s| s.strip_suffix('}'))
                         .ok_or_else(|| Error("§16.2: malformed bounds".into()))?;
-                    if !bs.is_empty() {
-                        f.bounds = bs
-                            .split(", ")
-                            .map(|s| host_count(s, "loop bound"))
-                            .collect::<Result<_>>()?;
+                    if bs.is_empty() {
+                        return err("§16.2", "present bounds clause requires an integer");
                     }
+                    f.bounds = bs
+                        .split(", ")
+                        .map(|s| host_count(s, "loop bound"))
+                        .collect::<Result<_>>()?;
                 }
                 pos += 1;
             }
@@ -899,9 +894,10 @@ impl Object {
                     params: params(ps)?,
                     instructions: Vec::new(),
                 };
-                let end = (pos..lines.len())
-                    .find(|i| lines[*i].starts_with('^') || is_head(lines[*i]))
-                    .unwrap_or(lines.len());
+                let mut end = pos;
+                while end < lines.len() && !lines[end].starts_with('^') && !is_head(lines[end])? {
+                    end += 1;
+                }
                 let numbered: Vec<_> = lines[pos..end]
                     .iter()
                     .enumerate()
@@ -1565,17 +1561,33 @@ impl Object {
     }
 }
 
-fn is_head(s: &str) -> bool {
-    [
-        "fn cc @",
-        "fn r @",
-        "oracle @",
-        "lproc @",
-        "action @",
-        "perm_action @",
-    ]
-    .iter()
-    .any(|p| s.starts_with(p))
+/// The §16.2 alternatives couple the prefix and kind; never normalize bytes.
+fn fhead_prefix(ts: &[String]) -> Option<(&str, usize)> {
+    match ts.first().map(String::as_str)? {
+        "fn" => match ts.get(1)?.as_str() {
+            kind @ ("cc" | "r") => Some((kind, 2)),
+            _ => None,
+        },
+        kind @ ("oracle" | "action" | "perm_action" | "lproc") => Some((kind, 1)),
+        _ => None,
+    }
+}
+fn is_head(s: &str) -> Result<bool> {
+    let ts = tokens(s)?;
+    if fhead_prefix(&ts)
+        .is_some_and(|(_, offset)| ts.get(offset).is_some_and(|t| t.starts_with('@')))
+    {
+        return Ok(true);
+    }
+    // A malformed later definition must report the same grammar error as a
+    // first definition, before semantic opcode validation of the earlier body.
+    if ts.first().is_some_and(|t| t == "fn") && ts.get(1).is_none_or(|t| t != "=")
+        || (ts.first().is_some_and(|t| matches!(t.as_str(), "cc" | "r"))
+            && ts.get(1).is_some_and(|t| t.starts_with('@')))
+    {
+        return err("§16.2", "invalid function header prefix/kind");
+    }
+    Ok(false)
 }
 pub(crate) fn is_binop(op: &str) -> bool {
     [

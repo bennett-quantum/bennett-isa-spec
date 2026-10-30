@@ -6,6 +6,53 @@ under `reference-interpreter/`; commit own paths
 (`git add -A -- reference-interpreter && git commit -- reference-interpreter`),
 never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
+## Round-10 fixes (2026-10-30)
+
+Tracking b-isa-spec-eka. Sole implementer; owned interpreter and external
+round-10 response only. Baseline normal suite: 327/0/5 (13.40 s; log .tmp/r10-baseline.log).
+Independent tests/support/r10_pins.py reproduces every supplied malformed,
+positive-control and effective-control H/object pin exactly, with no correction.
+Exact LF bytes are retained in tests/support/r10_cases.json, including invalid
+objects (kept outside the valid .bisa fixture audit).
+
+| Blocker | RED tests | Status | Commit |
+|---|---|---|---|
+| SOL-R10-B01/B02 ≡ R10-B01 | r10_function_header_prefix_matches_kind; r10_present_bounds_requires_an_integer; r10_exact_fhead_and_nonempty_optional_productions; CLI counterparts | resolved; full gate GREEN | pending |
+| R10-B02 | r10_equivalent_control_sets_preserve_opaque_inverse; CLI counterpart | resolved; full gate GREEN | pending |
+
+Exact RED: parser 0/3, CLI 1/2 (positive control passed), library 0/1.
+Both controls and duplicate witnesses rejected §6.2; all 12 header positions,
+the three inc8 mutations and 152 CLI invocations were exercised, including
+later-position forms already rejecting §16.2. No existing correct rejection
+is claimed as a new RED. Exact GREEN: 7 passed / 0 failed (3 CLI, 3 parser,
+1 library). Baseline: 327 passed / 0 failed / 5 ignored.
+
+Design: strict fhead alternatives share recognition with function boundaries;
+present bounds and LHS are nonempty; legal empty operands/omitted bounds stay.
+Lexical predicate stacks preserve push/pop ordering. Operation keys instead
+use sorted, deduplicated physical scalar literals retaining polarity and full
+current version snapshots. Both static passes share EffectiveControls.
+Borrow nodes canonicalize after physical resolution and after instantiation;
+all-operand histories, ABI operand order, token/callee identities, frame
+boundaries and every-return obligations remain mandatory. No count cap.
+
+No spec/conformance/Python-seed changes, pushes, semantic caps or scope reductions.
+Implementation and deterministic families are GREEN. Full suites: 334/0/5
+after exact witnesses, then 338/0/5 after families. Targeted extended families
+and pins: 4/0; extended CLI positive controls: 3/0. Families: 102/6 effective
+controls, 9/1 cleanup contexts, 7/16 grammar (accepted/rejected). All small
+control positives execute independent identities on 32 full t,p,q,b,R basis
+entries, a control superposition and a Bell-paired bR entry, both directions;
+oracle B=0/1, qinplace B=1. No semantic source changes followed the full gate.
+Nonsemantic test additions subsequently pin one-trip and tuple-LHS CLI controls;
+targeted 3/0. Final verification rerun and ignored sweeps follow.
+Fmt --check and strict all-target Clippy passed (0 warnings).
+One initial implementation build caught an accidental lexical-stack edit;
+it was corrected before GREEN. Extended pin-target compilation initially
+lacked mod support; corrected before the 4/0 run. Neither is semantic RED.
+The initial 2-family run was 2/0, 109 accepted / 22 rejected; final 3-family
+run was 3/0, 118 accepted / 23 rejected. RNG/seeds unchanged.
+
 ## Round-9 fixes (2026-10-30)
 
 Tracking b-isa-spec-82k. Sole implementer; owned crate and external round-9 response only.

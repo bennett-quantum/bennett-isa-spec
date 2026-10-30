@@ -293,7 +293,7 @@ impl Object {
                         closures: s
                             .closures(&versions.iter().map(|(w, _)| w.clone()).collect::<Vec<_>>()),
                         versions,
-                        controls: s.predicates.clone(),
+                        controls: s.effective_controls()?,
                     };
                     s.produce(&i.lhs[0], Type::Wire(wires.len() as u64), c)?;
                 }
@@ -308,7 +308,7 @@ impl Object {
                     if c.kind != "qcopy"
                         || c.sources != vec![a[0].clone()]
                         || c.versions != s.read_snapshot(&s.wires(&a[0])?)?
-                        || c.controls != s.predicates
+                        || c.controls != s.effective_controls()?
                         || s.wires(&a[1])?
                             .iter()
                             .any(|w| !s.versions.get(w).is_none_or(Vec::is_empty))
@@ -341,7 +341,7 @@ impl Object {
                                     &versions.iter().map(|(w, _)| w.clone()).collect::<Vec<_>>(),
                                 ),
                                 versions,
-                                controls: s.predicates.clone(),
+                                controls: s.effective_controls()?,
                             }
                         })?;
                     } else {
@@ -359,7 +359,7 @@ impl Object {
                             deps.push(format!("{}[*]", a[0]));
                             if c.kind != "qload"
                                 || c.sources != a[..2]
-                                || c.controls != s.predicates
+                                || c.controls != s.effective_controls()?
                                 || c.versions != s.read_snapshot(&deps)?
                                 || s.wires(&a[2])?
                                     .iter()
@@ -381,7 +381,7 @@ impl Object {
                                 "{op}:{}:{:?}:{:?}",
                                 a.join(" "),
                                 s.read_snapshot(&reads)?,
-                                s.predicates
+                                s.effective_controls()?
                             );
                             if op == "qexchm" {
                                 s.check_target(&a[2], false)?;
@@ -489,7 +489,7 @@ impl Object {
                             "oracle_call:{}:{:?}:{:?}",
                             ca.join(" "),
                             s.read_snapshot(&reads)?,
-                            s.predicates
+                            s.effective_controls()?
                         )
                     } else {
                         format!(
@@ -498,7 +498,7 @@ impl Object {
                             if call.adjoint { "adj" } else { "fwd" },
                             ca.join(" "),
                             s.read_snapshot(&reads)?,
-                            s.predicates
+                            s.effective_controls()?
                         )
                     };
                     if call.instruction.op == "action_call" {
@@ -571,7 +571,7 @@ impl Object {
                                 .collect::<Result<Vec<_>>>()?
                                 .concat()
                         )?,
-                        s.predicates
+                        s.effective_controls()?
                     );
                     let reads = controls
                         .iter()
@@ -611,8 +611,8 @@ impl Object {
                         let key = format!(
                             "{op}:{}:{:?}:{:?}",
                             normalized.join(" "),
-                            s.snapshot(&phase_reads),
-                            s.predicates
+                            s.read_snapshot(&phase_reads)?,
+                            s.effective_controls()?
                         );
                         if !operands.is_empty() {
                             s.note_reads(&key, &operands)?;
@@ -642,7 +642,7 @@ impl Object {
                             "qexch:{}:{:?}:{:?}",
                             a.join(" "),
                             s.read_snapshot(&[])?,
-                            s.predicates
+                            s.effective_controls()?
                         );
                         s.exchange(&wires, version, &[])?;
                         continue;
@@ -655,7 +655,7 @@ impl Object {
                         } else {
                             s.read_snapshot(&[])?
                         },
-                        s.predicates
+                        s.effective_controls()?
                     );
                     let reads = if op == "qxor" {
                         s.wires(&a[0])?
@@ -1371,7 +1371,7 @@ struct Creation {
     kind: String,
     sources: Vec<String>,
     versions: Vec<(String, Vec<String>)>,
-    controls: Vec<String>,
+    controls: Vec<(String, bool, Vec<String>)>,
     /// Closure counts of the dependency wires at the computation.
     closures: Vec<(String, u64)>,
 }
@@ -1510,6 +1510,28 @@ impl Discipline {
             })
             .collect()
     }
+    /// Resolve the lexical stack to a semantic set, preserving polarity and
+    /// full captured version stacks (interned collision-free IDs, not digests).
+    fn effective_controls(&self) -> Result<Vec<(String, bool, Vec<String>)>> {
+        let mut literals = Vec::new();
+        for p in &self.predicates {
+            for wire in self.wires(p)? {
+                literals.push((wire, !p.starts_with('!')));
+            }
+        }
+        let controls = crate::controls::EffectiveControls::new(literals);
+        Ok(controls
+            .literals()
+            .iter()
+            .map(|(w, positive)| {
+                (
+                    w.clone(),
+                    *positive,
+                    self.snapshot(std::slice::from_ref(w))[0].1.clone(),
+                )
+            })
+            .collect())
+    }
     fn read_snapshot(&self, wires: &[String]) -> Result<Vec<(String, Vec<String>)>> {
         let mut reads = wires.to_vec();
         for p in &self.predicates {
@@ -1636,7 +1658,10 @@ impl Discipline {
     ) -> Result<()> {
         let other = force_other || wires.iter().any(|w| self.wire_is_other(w));
         let context = self.read_snapshot(extra_reads)?;
-        let base = format!("{version}:context{context:?}:polarity{:?}", self.predicates);
+        let base = format!(
+            "{version}:context{context:?}:polarity{:?}",
+            self.effective_controls()?
+        );
         let prior = wires
             .first()
             .and_then(|w| self.versions.get(w))
@@ -1712,7 +1737,7 @@ impl Discipline {
         let original = version;
         let version = format!(
             "{original}:context{context:?}:polarity{:?}",
-            self.predicates
+            self.effective_controls()?
         );
         let reads = self.reads.get(&original).cloned().unwrap_or(context);
         self.reads.insert(version.clone(), reads);

@@ -902,3 +902,22 @@ fn r9_qinplace_repeated_pairs_on_clean_workspace() {
         )],
     );
 }
+
+#[test]
+fn r10_equivalent_control_sets_preserve_opaque_inverse() {
+    let errors: Vec<_> = ["controls", "duplicate"]
+        .into_iter()
+        .filter_map(|tag| {
+            Object::parse(&support::r10_text(tag))
+                .err()
+                .map(|e| format!("{tag}: {e}"))
+        })
+        .collect();
+    assert!(errors.is_empty(), "{errors:?}");
+    for tag in ["controls", "duplicate"] {
+        let o = support::r10_pin(tag);
+        for steps in [0, 1] {
+            support::r10_identity(&o, steps);
+        }
+    }
+}

@@ -1611,3 +1611,172 @@ fn generated_r9_loop_bindings_match_independent_identity() {
     accepted += 1;
     eprintln!("R9 loop bindings: {accepted} accepted / {rejected} rejected");
 }
+
+#[test]
+fn generated_r10_effective_control_sets_match_independent_identity() {
+    // Each O/O† pair is identity under conjunction; neither stack ordering nor
+    // duplicate spelling changes that conjunction. ABI argument order stays fixed.
+    let stacks: &[&[&str]] = &[
+        &["p", "q"],
+        &["q", "p"],
+        &["p", "p", "q"],
+        &["q", "p", "q"],
+        &["p[0]", "q[0]"],
+    ];
+    let mut accepted = 0;
+    for first in stacks {
+        for second in stacks {
+            for mode in 0..4 {
+                let (op, inv) = match mode {
+                    2 => (
+                        "action_call @child (c, d, f) (p, q) () (tk)",
+                        "adj action_call @child (c, d, f) (p, q) () (tk)",
+                    ),
+                    3 => ("qinplace @o @oi tk c", "qinplace @oi @o tk c"),
+                    _ => (support::R10_ORACLE, support::R10_ORACLE),
+                };
+                let pair = support::r10_context(first, op) + &support::r10_context(second, inv);
+                let middle = if mode == 1 {
+                    format!("qloop 1 {{\nqloop 1 {{\n{pair}}}\n}}\n")
+                } else {
+                    pair
+                };
+                let bounds: &[u64] = if mode == 1 { &[1, 1] } else { &[] };
+                let o =
+                    support::rehash(&support::r10_object(&middle, bounds, mode == 2, mode == 3));
+                for steps in if mode == 3 { &[1][..] } else { &[0, 1][..] } {
+                    support::r10_identity(&o, *steps);
+                }
+                accepted += 1;
+            }
+        }
+    }
+    // Duplicate-only sets, with a differently spelled scalar alias.
+    for second in [&["p", "p"][..], &["p[0]", "p"][..]] {
+        let middle = support::r10_context(&["p"], support::R10_ORACLE)
+            + &support::r10_context(second, support::R10_ORACLE);
+        let o = support::rehash(&support::r10_object(&middle, &[], false, false));
+        for b in [0, 1] {
+            support::r10_identity(&o, b);
+        }
+        accepted += 1;
+    }
+    let first = support::r10_context(&["p", "q"], support::R10_ORACLE);
+    let same = support::r10_context(&["q", "p"], support::R10_ORACLE);
+    let absent = support::r10_context(&["p"], support::R10_ORACLE);
+    let opposite = format!(
+        "qpred q\nqif p {{\nx t\nx t\n}} {{\n{}\n}}\nqunpred q\n",
+        support::R10_ORACLE
+    );
+    let mut rejected = 0;
+    for (tag, middle, bounds) in [
+        ("absent", first.clone() + &absent, vec![]),
+        ("polarity", first.clone() + &opposite, vec![]),
+        (
+            "token",
+            first.clone() + &same.replace("@o tk", "@o other"),
+            vec![],
+        ),
+        ("version", first.clone() + "x p\n" + &same + "x p\n", vec![]),
+        (
+            "operand-order",
+            first.clone() + &same.replace("(c) d f", "(d) c f"),
+            vec![],
+        ),
+        (
+            "callee",
+            first.clone() + &same.replace("@o tk", "@oi tk"),
+            vec![],
+        ),
+    ] {
+        let mut text = support::r10_object(&middle, &bounds, false, tag == "callee");
+        if tag == "token" {
+            text = text
+                .replace("(tk:token) ()", "(tk:token, other:token) ()")
+                .replace(r#""args":["token"]"#, r#""args":["token","token"]"#);
+        }
+        if tag == "version" {
+            text = text
+                .replace(
+                    "(t:wire mut) (p:wire in, q:wire in)",
+                    "(t:wire mut, p:wire mut) (q:wire in)",
+                )
+                .replace(r#""in":[1,1]"#, r#""in":[1]"#)
+                .replace(r#""mut":[1]"#, r#""mut":[1,1]"#);
+        }
+        support::reject_cli(&text, "§6.2", &format!("r10-{tag}"));
+        rejected += 1;
+    }
+    println!("R10 effective controls: {accepted} accepted / {rejected} rejected");
+}
+#[test]
+fn generated_r10_grammar_mutations_reject_without_normalization() {
+    let mut rejected = 0;
+    for text in support::r10_bad_headers() {
+        support::reject_cli(&text, "§16.2", &format!("r10-generated-head-{rejected}"));
+        rejected += 1;
+    }
+    for tag in ["fn-oracle", "inc-empty-bounds", "empty-lhs", "empty-bounds"] {
+        support::reject_cli(&support::r10_text(tag), "§16.2", tag);
+        rejected += 1;
+    }
+    // Header-like NAMEs are legal SSA names, not definition boundaries.
+    let sig = r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
+    let mut accepted = 0;
+    for name in ["fn", "cc", "r", "oracle", "action", "perm_action", "lproc"] {
+        let body = format!(
+            "action @a (t:wire mut) () () () ()\n^entry():\n{name} = qalloc any 1\nqfree {name}"
+        );
+        support::rehash(&support::object(&[("a", sig, &body)], "{}", ""));
+        accepted += 1;
+    }
+    println!("R10 grammar: {accepted} accepted / {rejected} rejected");
+}
+
+#[test]
+fn generated_r10_context_keys_cover_all_cleanup_families() {
+    let mut accepted = 0;
+    for (forward, inverse, memory) in [
+        ("v = qcopy t", "quncopy t v", false),
+        ("v = qload region addr", "qunload region addr v", true),
+        ("qstore region addr t", "qstore region addr t", true),
+        ("qexchm region addr t", "qexchm region addr t", true),
+        ("qexch d t", "qexch d t", false),
+        ("h d", "h d", false),
+        ("s t", "sdg t", false),
+        ("x d", "x d", false),
+    ] {
+        let prefix = if memory {
+            "qregion region 1 1\naddr = qalloc any 1\n"
+        } else {
+            ""
+        };
+        let suffix = if memory { "qfree addr\n" } else { "" };
+        let middle = format!(
+            "{prefix}{}{}{suffix}",
+            support::r10_context(&["p", "q"], forward),
+            support::r10_context(&["q[0]", "p", "p[0]"], inverse)
+        );
+        let o = support::rehash(&support::r10_object(&middle, &[], false, false));
+        support::r10_identity(&o, 1);
+        accepted += 1;
+    }
+    // Both operations in the negative-polarity arm use the same semantic set.
+    let one = support::r10_context(&["q"], support::R10_ORACLE);
+    let two = support::r10_context(&["q[0]", "q"], support::R10_ORACLE);
+    let middle = format!("qif p {{\nx t\nx t\n}} {{\n{one}{two}}}\n");
+    let o = support::rehash(&support::r10_object(&middle, &[], false, false));
+    for b in [0, 1] {
+        support::r10_identity(&o, b);
+    }
+    accepted += 1;
+    // A wrongly ordered pop remains invalid even though a semantic set agrees.
+    let bad = support::r10_object(
+        "qpred p\nqpred q\nx t\nqunpred p\nqunpred q\n",
+        &[],
+        false,
+        false,
+    );
+    support::reject_cli(&bad, "§3.5", "r10-lexical-pop");
+    println!("R10 cleanup contexts: {accepted} accepted / 1 rejected");
+}

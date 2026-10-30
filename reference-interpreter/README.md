@@ -336,7 +336,19 @@ a later borrowing cannot restore an earlier completed lifetime. Loop proofs
 compose per-return obligations on reachable entries, retaining known-clean
 workspace invariants.
 
-**Design (round 9).** Per-wire ANF basis facts follow every gate: diagonal
+**Design (round 10).** The §16.2 parser couples `fn` exclusively to CC/R
+and uses the same header recognizer at function boundaries; Q kinds are bare.
+A present bounds clause and an explicit LHS each require a nonempty list;
+omitted bounds and empty operand lists remain legal. Exact source bytes are
+hashed without normalization. Lexical predicate stacks retain their push/pop
+order, while operation identities use a separate semantic effective-control
+set: resolved scalar physical wires with polarity, sorted and deduplicated.
+The §6 pass retains complete current version/dependency snapshots; borrow nodes
+canonicalize after physical resolution and again after callee instantiation.
+ABI input/output order, callee/token identity and all-operand LIFO matching
+remain significant.
+
+**Design (fact engine).** Per-wire ANF basis facts follow every gate: diagonal
 operands and read-only controls retain their values, permutations transform
 their ANFs, and non-diagonal targets become independent unknowns. Per-wire
 operation stacks preserve nested compute/adjoint history: an exact adjoint

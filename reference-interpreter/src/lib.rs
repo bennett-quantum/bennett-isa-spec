@@ -6,6 +6,7 @@ mod call_discipline;
 mod certificate;
 mod claims;
 mod classical;
+mod controls;
 mod exact;
 mod handle_validation;
 mod identity;

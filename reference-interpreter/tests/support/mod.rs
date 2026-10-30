@@ -491,3 +491,158 @@ pub fn r9_opaque_object(body: &str, bounds: &[u64], child: Option<&str>) -> Stri
     functions.push(("a", &ac, &action));
     object(&functions, "{}", "")
 }
+
+pub fn r10_case(tag: &str) -> Json {
+    json(include_str!("r10_cases.json"))
+        .get(tag)
+        .unwrap()
+        .clone()
+}
+pub fn r10_text(tag: &str) -> String {
+    r10_case(tag).get("text").unwrap().string().unwrap().into()
+}
+pub fn r10_pin(tag: &str) -> Object {
+    let c = r10_case(tag);
+    let text = c.get("text").unwrap().string().unwrap();
+    let o = Object::parse(text).unwrap();
+    o.check_hashes().unwrap();
+    let id = o.identity().unwrap();
+    assert_eq!(
+        id.object_hash,
+        c.get("object_hash").unwrap().string().unwrap()
+    );
+    for (name, h) in c.get("hashes").unwrap().object().unwrap() {
+        assert_eq!(id.interface_hashes[name], h.string().unwrap());
+        assert_eq!(
+            id.closure_hashes[name].as_deref(),
+            Some(h.string().unwrap())
+        );
+    }
+    o
+}
+/// Every forbidden prefix at both definition positions, including aliases of
+/// otherwise valid minimal function bodies. No hash normalization is involved.
+pub fn r10_bad_headers() -> Vec<String> {
+    let mut cases = vec![];
+    let cc = r10_text("cc");
+    for kind in ["cc", "r", "oracle", "action", "perm_action", "lproc"] {
+        let (sig, body, bad) = match kind {
+            "cc" | "r" => {
+                let text = r10_text(if kind == "cc" { "cc" } else { "r" });
+                let o = Object::parse(&text).unwrap();
+                (o.functions["a"].signature().canonical(),
+                 text.split("section functions\n").nth(1).unwrap().to_string(),
+                 kind.to_string())
+            }
+            "oracle" => (r#"{"abi":"0.8","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}"#.into(),
+                include_str!("../fixtures/inc8.bisa").split("section functions\n").nth(1).unwrap().replace("@inc8", "@a"),
+                "fn oracle".into()),
+            "lproc" => (r#"{"abi":"0.8","kind":"lproc","params":[8],"result":8,"tier":"q"}"#.into(),
+                "lproc @a (x:reg[8]) (r:reg[8]) () () ()\n^entry():\nlift.ret x\n".into(), "fn lproc".into()),
+            _ => (format!(r#"{{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"{kind}","mem":[],"mut":[1],"tier":"q"}}"#),
+                format!("{kind} @a (t:wire mut) () () () ()\n^entry():\nx t\n"), format!("fn {kind}")),
+        };
+        let first_space = body.find(" @").unwrap();
+        let mutated = format!("{bad}{}", &body[first_space..]);
+        cases.push(object(&[("a", &sig, &mutated)], "{}", ""));
+        let cc_o = Object::parse(&cc).unwrap();
+        let cc_sig = cc_o.functions["a"].signature().canonical();
+        let cc_body = cc
+            .split("section functions\n")
+            .nth(1)
+            .unwrap()
+            .replace("@a", "@first");
+        cases.push(object(
+            &[("first", &cc_sig, &cc_body), ("a", &sig, &mutated)],
+            "{}",
+            "",
+        ));
+    }
+    cases
+}
+
+/// Independent identity on t,p,q and the arbitrary borrowed b/reference R.
+/// Each direction starts from the original state; equality includes allocator.
+pub fn r10_identity(o: &Object, steps: u64) {
+    use bennett_isa_ref::{Argument, Budget, QuantumBindings, QuantumState};
+    for input in 0..34 {
+        let mut q = QuantumState::new();
+        let w = q.allocate(5).unwrap();
+        if input < 32 {
+            for (bit, wire) in w.iter().enumerate() {
+                if input >> bit & 1 == 1 {
+                    q.gate("x", &[*wire], None, &[]).unwrap();
+                }
+            }
+        } else {
+            for wire in &w[..4] {
+                q.gate("h", &[*wire], None, &[]).unwrap();
+            }
+            if input == 33 {
+                q.gate("cx", &[w[3], w[4]], None, &[]).unwrap();
+            }
+        }
+        let mut bindings = QuantumBindings::default();
+        for (name, wire) in [("t", w[0]), ("p", w[1]), ("q", w[2])] {
+            bindings.bundles.insert(name.into(), vec![wire]);
+        }
+        bindings.borrowed.push(vec![w[3]]);
+        bindings
+            .args
+            .insert("tk".into(), Argument::Token(Budget::steps(steps)));
+        for adjoint in [false, true] {
+            let mut actual = q.clone();
+            o.execute_action("a", &mut actual, &bindings, adjoint, &[])
+                .unwrap();
+            assert_eq!(actual, q, "input={input} adjoint={adjoint} B={steps}");
+            o.execute_action("a", &mut actual, &bindings, !adjoint, &[])
+                .unwrap();
+            assert_eq!(actual, q);
+        }
+    }
+}
+
+pub fn r10_context(stack: &[&str], op: &str) -> String {
+    let push: String = stack.iter().map(|p| format!("qpred {p}\n")).collect();
+    let pop: String = stack
+        .iter()
+        .rev()
+        .map(|p| format!("qunpred {p}\n"))
+        .collect();
+    format!("{push}{op}\n{pop}")
+}
+pub const R10_ORACLE: &str = "oracle_call @o tk (c) d f () ()";
+pub fn r10_object(middle: &str, bounds: &[u64], child: bool, inverse: bool) -> String {
+    let pinned = r10_text("controls");
+    let sigs = json(pinned.lines().nth(3).unwrap());
+    let os = sigs.get("0").unwrap().get("signature").unwrap().canonical();
+    let mut sig = sigs.get("1").unwrap().get("signature").unwrap().clone();
+    if let Json::Object(map) = &mut sig {
+        map.insert("bounds".into(), json(&format!("{bounds:?}")));
+    }
+    let oracle = "oracle @o (x:wire in) (t:wire) (f:wire[4]) () ()\n^entry():\nlift.retval x";
+    let bound_text = bounds
+        .iter()
+        .map(u64::to_string)
+        .collect::<Vec<_>>()
+        .join(", ");
+    let regs = if bounds.is_empty() {
+        String::new()
+    } else {
+        format!("regs {{  }} bounds {{{bound_text}}}\n")
+    };
+    let action = format!("action @a (t:wire mut) (p:wire in, q:wire in) () (tk:token) ()\n{regs}^entry():\nc = qalloc any 1\nd = qalloc any 1\nf = qalloc any 4\nh c\n{middle}h c\nb = qborrow any 1\ncx c b\nqreturn b\nqfree f\nqfree d\nqfree c");
+    let child_sig = r#"{"abi":"0.8","args":["token"],"bounds":[],"in":[1,1],"kind":"action","mem":[],"mut":[1,1,4],"tier":"q"}"#;
+    let child_body = "action @child (c:wire mut, d:wire mut, f:wire[4] mut) (p:wire in, q:wire in) () (tk:token) ()\n^entry():\nqpred q\nqpred p\noracle_call @o tk (c) d f () ()\nqunpred p\nqunpred q";
+    let oi = oracle.replace("@o ", "@oi ");
+    let a_sig = sig.canonical();
+    let mut funcs = vec![("o", os.as_str(), oracle)];
+    if child {
+        funcs.push(("child", child_sig, child_body));
+    }
+    if inverse {
+        funcs.push(("oi", os.as_str(), oi.as_str()));
+    }
+    funcs.push(("a", a_sig.as_str(), action.as_str()));
+    object(&funcs, "{}", "")
+}

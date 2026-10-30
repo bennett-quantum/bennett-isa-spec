@@ -1668,3 +1668,140 @@ fn r9_cli_qinplace_adjoint_restores_borrow_control() {
 fn r9_cli_mixed_loop_threads_reallocated_bindings() {
     r9_cli_identity("loop", &[""]);
 }
+
+#[test]
+fn r10_cli_rejects_exact_grammar_witnesses_before_execution() {
+    let mut cases = support::r10_bad_headers();
+    for tag in [
+        "bare-cc",
+        "bare-r",
+        "empty-bounds",
+        "fn-oracle",
+        "inc-empty-bounds",
+        "empty-lhs",
+    ] {
+        cases.push(support::r10_text(tag));
+    }
+    cases.push(support::r10_text("cc").replace("\nret\n", "\n() = ret\n"));
+    let mut failures = vec![];
+    for (i, text) in cases.iter().enumerate() {
+        let path = tmp_file(&format!("r10-grammar-{i}.bisa"), text);
+        let mut commands = vec![vec!["hash", path.as_str()], vec!["check", path.as_str()]];
+        for budget in ["0", "1", "3"] {
+            commands.push(vec!["run-cc", &path, "a", "--budget", budget]);
+            commands.push(vec![
+                "run-oracle",
+                &path,
+                "inc8",
+                "--input",
+                "255",
+                "--budget",
+                budget,
+            ]);
+        }
+        for args in commands {
+            let out = cli(&args);
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            let pass =
+                out.status.code() == Some(1) && out.stdout.is_empty() && stderr.contains("§16.2");
+            println!(
+                "case={i} args={args:?} exit={:?} stdout={} stderr={stderr}",
+                out.status.code(),
+                String::from_utf8_lossy(&out.stdout)
+            );
+            if !pass {
+                failures.push((i, args[0].to_string()));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{failures:?}");
+}
+#[test]
+fn r10_cli_pinned_grammar_positive_controls() {
+    for tag in ["cc", "r", "omitted-bounds"] {
+        let o = support::r10_pin(tag);
+        let path = tmp_file(&format!("r10-{tag}.bisa"), &o.text);
+        for cmd in ["check", "hash"] {
+            let v = ok(&[cmd, &path]);
+            assert_eq!(text(&v, "object_hash"), o.identity().unwrap().object_hash);
+        }
+        let v = ok(&["run-cc", &path, "a", "--budget", "1"]);
+        assert_eq!(text(&v, "status"), "COMPLETED");
+        assert_eq!(uint(&v, "steps"), 1);
+        assert!(array(&v, "results").is_empty());
+    }
+    for tag in ["one-trip", "tuple-lhs"] {
+        let o = support::r10_pin(tag);
+        let path = tmp_file(&format!("r10-{tag}.bisa"), &o.text);
+        for cmd in ["check", "hash"] {
+            ok(&[cmd, &path]);
+        }
+        if tag == "one-trip" {
+            let v = ok(&["run-action", &path, "a", "--mut", "0"]);
+            assert_eq!(field(&v, "state"), &support::json(r#"{"1":[1,0]}"#));
+            let v = ok(&["reverse", &path, "a", "--mut", "0"]);
+            assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
+        } else {
+            let v = ok(&[
+                "run-oracle",
+                &path,
+                "inc8",
+                "--input",
+                "255",
+                "--budget",
+                "3",
+            ]);
+            assert_eq!(uint(&v, "code"), 0);
+            assert_eq!(uint(&v, "payload"), 0);
+            assert_eq!(uint(&v, "steps"), 3);
+        }
+    }
+}
+
+#[test]
+fn r10_cli_equivalent_control_sets_preserve_opaque_inverse() {
+    for tag in ["controls", "duplicate"] {
+        let c = support::r10_case(tag);
+        let path = tmp_file(&format!("r10-{tag}.bisa"), &support::r10_text(tag));
+        for cmd in ["check", "hash"] {
+            let v = ok(&[cmd, &path]);
+            assert_eq!(field(&v, "object_hash"), c.get("object_hash").unwrap());
+        }
+        for token in ["token:0,0,0,0", "token:1,0,0,0"] {
+            for adjoint in [false, true] {
+                let mut args = vec![
+                    "run-action",
+                    &path,
+                    "a",
+                    "--mut",
+                    "0",
+                    "--in",
+                    "1,1",
+                    "--arg",
+                    token,
+                ];
+                if adjoint {
+                    args.push("--adjoint");
+                }
+                let v = ok(&args);
+                assert_eq!(uint(&v, "wires"), 3);
+                assert_eq!(field(&v, "state"), &support::json(r#"{"011":[1,0]}"#));
+            }
+            let v = ok(&[
+                "reverse", &path, "a", "--mut", "0", "--in", "1,1", "--arg", token,
+            ]);
+            assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
+            let state = "000=0.5;010=0.5;001=0.5;111=0,0.5";
+            for cmd in ["run-action", "reverse"] {
+                let v = ok(&[cmd, &path, "a", "--state", state, "--arg", token]);
+                if cmd == "reverse" {
+                    assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
+                }
+                assert_eq!(
+                    field(&v, "state"),
+                    &support::json(r#"{"000":[0.5,0],"010":[0.5,0],"001":[0.5,0],"111":[0,0.5]}"#)
+                );
+            }
+        }
+    }
+}
