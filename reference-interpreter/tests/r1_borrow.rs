@@ -752,3 +752,12 @@ fn r7_reject_rotate_8() {
     let e = Object::parse(&text).unwrap_err().to_string();
     assert!(e.contains("§5.6"), "{e}");
 }
+
+#[test]
+fn r7_zero_trip_is_not_an_intervening_inverse_operand_touch() {
+    // No instruction in the zero-trip body executes; H/H therefore restores c.
+    let body = "c = qalloc any 1\nh c\nqloop 0 {\nx c\n}\nh c\nb = qborrow any 1\ncx c b\nqreturn b\nqfree c";
+    let text = support::borrow_lifetime_object(body, &[0]).replace("perm_action", "action");
+    let o = Object::parse(&text).unwrap();
+    support::r6_map(&o, false);
+}

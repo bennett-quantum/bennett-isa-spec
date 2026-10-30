@@ -107,9 +107,10 @@ enum Node {
     Flip(Vec<(String, bool)>, String),
     /// Controlled exchange of two wires.
     Swap(Vec<(String, bool)>, String, String),
-    /// `n` repetitions of a permutation-only body. Internal Borrow/Return
-    /// lifetimes must factor on their own entries before its carried-wire map
-    /// may be composed. This includes borrowing inside inlined child calls.
+    /// The actual `n` repetitions of a structured body. Permutation bodies
+    /// compose carried maps AND return obligations by squaring; mixed bodies
+    /// transfer gate facts per visit or under a proved invariant. This includes
+    /// borrowing inside inlined child calls.
     Repeat(u64, Vec<Node>),
     /// A black-box function of `inputs` XORed (or, for qinplace, assigned)
     /// into `outputs`, keyed by the callee: oracle calls and qinplace.
@@ -1043,6 +1044,9 @@ impl Facts<'_> {
     fn sequence(&mut self, nodes: &[Node]) -> std::result::Result<(), FrameFailure> {
         for node in nodes {
             if let Node::Repeat(n, body) = node {
+                if *n == 0 {
+                    continue; // §4.6: no dynamic gate, touch, frame or lifetime.
+                }
                 if !node.permutation() {
                     self.repeat(*n, body)?;
                     continue;

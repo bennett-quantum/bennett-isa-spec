@@ -66,6 +66,20 @@ Read-only standalone conformance: **445 pass / 0 fail / 60 unavailable / 505**,
 exit 2; concurrent conformance additions are outside this implementation.
 Fresh five-sweep run and final 296-test gate are recorded below when complete.
 
+Final audit RED: `r7_zero_trip_is_not_an_intervening_inverse_operand_touch`
+failed with §5.6 released wire not clean: a zero-trip body was invalidating an
+H inverse despite having no dynamic touches. `Facts::sequence` now skips a
+zero Repeat before any fact/frame transfer. GREEN: 8 R7 borrow tests passed.
+This additional zero-trip guard and the corrected Repeat comment are committed
+separately. The completed normal gate before this audit was **296 passed /
+0 failed / 5 ignored**, 7 unit + 289 integration, 206.19 s summed runner time.
+The initial debug sweeps completed division (16.64 s), 17-wire execution
+(97.84 s), certificate (492.05 s), each 1 passed / 0 failed; the fourth
+200,000-program run was stopped without a result so all five can be rerun
+in sequence after the final source change. The final gate uses
+`CARGO_PROFILE_TEST_OPT_LEVEL=1` (same tests, domains, assertions and overflow
+checks) to avoid repeating these long unoptimized runs. Final counts follow.
+
 The borrow engine now walks structured nodes with per-wire ANF basis facts.
 Unknown is a fresh independent symbol, never zero. Permutations transform facts;
 diagonal gates and read-only controls retain them; non-diagonal targets become
