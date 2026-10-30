@@ -111,3 +111,21 @@ Widths W=1–4: 56,160 full-domain tuples. Generic mapped-region, multi-byte
 load/store, and stack/location selectors remain blocked with the row bindings.
 The linear scan checkpoint now uncomputes entry scratch immediately after
 each ordered OR fold; no cross-entry arithmetic computation is shared.
+
+The row/oracle/structure family is recorded by staged case
+`E-ref-09-structure-blocked`. The expander tests integer invoke composition,
+loop expansion, inverse order, cycle rejection, and rejection of invented
+wire/body actuals and private conditionals. These are schema boundary tests,
+not semantic certification of the absent structured recipes.
+
+Final checkpoint: 54 recipes and 3,386,812 family tuples. Rust SHA-256 and
+Python -I hashlib agree on the **checkpoint-only** four-line envelope hash:
+`3a99ce3028e1ecc421b3991e3b5b7423ee33323badc5ca3ce1e61088a5e5055d`.
+No completed-library hash/count was inserted into draft §11.1. Its unchanged
+diff remains checked against the accepted text. All missing instructions,
+activation/step/oracle sequences and native quantum leaves remain in scope.
+
+Final headless/offline gate: fmt --check and clippy --all-targets -D warnings
+green; cargo test **40 pass / 0 fail**. Full 0.8 harness **445 pass / 0 fail /
+60 unavailable (505 cases), exit 2**. Six new family cases add unavailable
+only, naming b-isa-spec-8r4. No push.

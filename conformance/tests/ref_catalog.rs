@@ -318,6 +318,7 @@ fn other_arithmetic_full_domain() {
             }
         }
     }
+    assert_eq!(count, 664560);
     println!("other arithmetic widths 1..4: {count} tuples");
 }
 #[test]
@@ -399,6 +400,7 @@ fn casts_and_select_full_domain() {
             }
         }
     }
+    assert_eq!(count, 21760);
     println!("casts and select widths 1..4: {count} tuples");
 }
 #[test]
@@ -548,6 +550,7 @@ fn linear_scan_full_domain() {
             }
         }
     }
+    assert_eq!(counts, [1318144, 24704]);
     println!(
         "linear scans: inrange {} and free flag {} full-domain tuples",
         counts[0], counts[1]
@@ -635,6 +638,7 @@ fn allocation_and_call_flags_full_domain() {
             println!("{op} flag width {n} done");
         }
     }
+    assert_eq!(counts, [149760, 1123328]);
     println!(
         "allocator {} and call {} full-domain flag tuples",
         counts[0], counts[1]
@@ -692,4 +696,45 @@ fn address_dispatch_full_domain() {
     }
     assert_eq!(count, 56160);
     println!("two-cell address dispatch widths 1..4: {count} tuples");
+}
+#[test]
+fn invoke_inverse_and_closed_schema_boundaries() {
+    let text = r#"{"isa":"0.9","name":"ref","version":"0.9","recipes":[{"kind":"child","parameters":["N"],"body":[{"for":"i","from":0,"to":"N","body":[{"gate":"cx","wires":["a[i]","b[i]"]}]}],"scratch":[],"removable":[],"source":"0.8 §4.5"},{"kind":"root","parameters":["M"],"body":[{"invoke":"child","args":["M"]},{"inverse":true,"body":[{"invoke":"child","args":["M"]}]}],"scratch":[],"removable":[],"source":"0.8 §5.3"}]}"#;
+    let leaves = Catalog::parse(text).unwrap().expand("root", &[2]).unwrap();
+    assert_eq!(leaves.len(), 4);
+    assert!(leaves.iter().enumerate().all(|(i, l)| i == l.ordinal));
+    assert_eq!(leaves[0].operation, leaves[3].operation);
+    let m = Machine::compile(&leaves, &[("a", 2), ("b", 2)]).unwrap();
+    let mut tuples = Vec::new();
+    for a in 0..4 {
+        for b in 0..4 {
+            for en in [false, true] {
+                let v = vec![("a", a), ("b", b)];
+                check(&m, &v, en, &v);
+                tuples.push((v.clone(), en, v));
+            }
+        }
+    }
+    packed(&m, &tuples); // Mixed enable masks agree with the scalar machine.
+                         // The current contract supplies integer actuals, not body or wire bindings.
+    for actual in [r#""actual[0]""#, r#"[{"gate":"x","wires":["a[0]"]}]"#] {
+        let bad = text.replace(r#""args":["M"]"#, &format!(r#""args":[{actual}]"#));
+        assert!(Catalog::parse(&bad).unwrap().expand("root", &[2]).is_err());
+    }
+    let private = text.replace(
+        r#"{"invoke":"child","args":["M"]}"#,
+        r#"{"if":"a[0]","then":[],"else":[]}"#,
+    );
+    assert!(Catalog::parse(&private)
+        .unwrap()
+        .expand("root", &[2])
+        .is_err());
+    let cycle = text.replace(
+        r#""body":[{"for":"i","from":0,"to":"N","body":[{"gate":"cx","wires":["a[i]","b[i]"]}]}]"#,
+        r#""body":[{"invoke":"root","args":["N"]}]"#,
+    );
+    assert!(Catalog::parse(&cycle)
+        .unwrap()
+        .expand("root", &[2])
+        .is_err());
 }

@@ -1,0 +1,28 @@
+{
+  "id": "E-ref-09-structure-blocked",
+  "suite": "E",
+  "spec": "\u00a711.1 closed constructors, integer scalars, invoke args; \u00a73.6 step; \u00a73.7 activation; \u00a74.5\u20134.7 structure; \u00a75.2 oracle construction",
+  "derivation": "The finite closed schema has integer parameters and no formal/actual wire, callee, heterogeneous row or body binding rule. It cannot deterministically splice an arbitrary then/else/loop/callee stream under inherited control solely from these bytes. Native rotations and variable-arity control lists also lack their parameter encoding. Independent boundary tests reject invented body/wire actuals and private if constructors, and verify the defined integer-only invoke/inverse subset. This is a blocked obligation, not an implementation or a zero-cost/identity recipe.",
+  "scenario": {
+    "family": 6,
+    "blocked_sentences": [
+      "named recipe expansion (invoke, ordered args)",
+      "Scalars are integer literals, parameter names, or prefix arrays",
+      "Constructor objects have exactly those keys"
+    ],
+    "beads": [
+      "b-isa-spec-cbk",
+      "b-isa-spec-8sc"
+    ],
+    "checker": "invoke_inverse_and_closed_schema_boundaries"
+  },
+  "expected_outcome": {
+    "complete_catalog": false,
+    "step_activation_oracle_certified": false,
+    "publication_allowed": false
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-8r4; contract repairs b-isa-spec-cbk / b-isa-spec-8sc required before complete row/oracle/structure serialization"
+  }
+}
