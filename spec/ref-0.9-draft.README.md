@@ -71,3 +71,9 @@ legal tuples; fixed native permutation gates, 36 tuples (counts include
 both ambient control values). `qcopy` has a clean allocated destination;
 `quncopy`'s legal domain is the matching copied destination, not arbitrary
 dirty inputs. `qxor`/exchange enumerate arbitrary source and target entries.
+
+Ripple value helpers: `value.add`, `value.sub`, `value.icmp.eq/ne/ult/ule/slt/sle`.
+They XOR the arithmetic result into arbitrary `t`, preserving separate `a,b`
+bundles and cleaning all fresh Boolean-node scratch. These are value helpers,
+not a claim to have encoded the lifted assignment/frame/successor rows.
+Full domains at widths 1–4: 26,880 tuples including both controls.

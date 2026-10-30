@@ -1,0 +1,25 @@
+{
+  "id": "E-ref-09-ripple",
+  "suite": "E",
+  "spec": "\u00a711.1 ripple family; \u00a74.1 wrap and comparisons; \u00a74.2 lifted value computation",
+  "derivation": "Ripple add/sub and unsigned/equality/signed comparator value helpers independently expanded and compared with plain integer wrap and signed comparisons; every a,b,target and both controls at widths 1\u20134. Every scratch release checked, then original leaf ordinals reversed to restore complete entry tuple. Assignment/frame/successor composition remains blocked on schema, not omitted from scope.",
+  "scenario": {
+    "family": 2,
+    "catalog": "spec/ref-0.9-draft.json",
+    "checker": "ripple_full_domain"
+  },
+  "expected_outcome": {
+    "recipes": 8,
+    "widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "tuples": 26880
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-8r4; complete catalog and b-isa-spec-cbk binding repair required"
+  }
+}

@@ -135,3 +135,61 @@ fn expander_rejects_unknown_constructors_and_unbound_parameters() {
     let bad = BYTES.replace("\"gate\":\"cx\"", "\"private_gate\":\"cx\"");
     assert!(Catalog::parse(&bad).unwrap().expand("qxor", &[1]).is_err());
 }
+fn signed(v: u64, n: u32) -> i64 {
+    ((v << (64 - n)) as i64) >> (64 - n)
+}
+#[test]
+fn ripple_full_domain() {
+    let c = catalog();
+    let mut count = 0u64;
+    for n in 1..=4u32 {
+        let size = 1u64 << n;
+        let mask = size - 1;
+        for op in [
+            "add", "sub", "icmp.eq", "icmp.ne", "icmp.ult", "icmp.ule", "icmp.slt", "icmp.sle",
+        ] {
+            let tw = if op.starts_with("icmp") {
+                1
+            } else {
+                n as usize
+            };
+            let m = Machine::compile(
+                &c.expand(&format!("value.{op}"), &[n as i64]).unwrap(),
+                &[("a", n as usize), ("b", n as usize), ("t", tw)],
+            )
+            .unwrap();
+            for enabled in [false, true] {
+                for a in 0..size {
+                    for b in 0..size {
+                        for t in 0..1 << tw {
+                            let result = match op {
+                                "add" => (a + b) & mask,
+                                "sub" => a.wrapping_sub(b) & mask,
+                                "icmp.eq" => u64::from(a == b),
+                                "icmp.ne" => u64::from(a != b),
+                                "icmp.ult" => u64::from(a < b),
+                                "icmp.ule" => u64::from(a <= b),
+                                "icmp.slt" => u64::from(signed(a, n) < signed(b, n)),
+                                "icmp.sle" => u64::from(signed(a, n) <= signed(b, n)),
+                                _ => unreachable!(),
+                            };
+                            check(
+                                &m,
+                                &[("a", a), ("b", b), ("t", t)],
+                                enabled,
+                                &[
+                                    ("a", a),
+                                    ("b", b),
+                                    ("t", t ^ if enabled { result } else { 0 }),
+                                ],
+                            );
+                            count += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert_eq!(count, 26880);
+    println!("ripple widths 1..4: {count} tuples");
+}

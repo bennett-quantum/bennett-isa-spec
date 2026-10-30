@@ -8,8 +8,8 @@ No reference-interpreter source was read or copied.
 
 | §11.1 family, in required order | Recipes completed | Widths / tuples verified | Commit |
 |---|---:|---|---|
-| Copy/XOR/exchange/native | 8 (rotation/variadic/quantum subset blocked: 8sc) | 1–4 / 1,480; native / 36 | First family commit containing this entry |
-| Ripple add/sub/comparisons | Not yet checkpointed | None | — |
+| Copy/XOR/exchange/native | 8 (rotation/variadic/quantum subset blocked: 8sc) | 1–4 / 1,480; native / 36 | 5663477 |
+| Ripple add/sub/comparisons | 8 value helpers; row binding still cbk | 1–4 / 26,880 | Family commit containing this entry |
 | Other arithmetic/casts/select | Not yet checkpointed | None | — |
 | Linear inrange/flags | Not yet checkpointed | None | — |
 | Address dispatch/multiplexers | Not yet checkpointed | None | — |
