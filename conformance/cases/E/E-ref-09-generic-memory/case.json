@@ -1,0 +1,46 @@
+{
+  "id": "E-ref-09-generic-memory",
+  "suite": "E",
+  "spec": "\u00a74.2 no-wrap inrange/free/boundscheck; \u00a74.6 qstore/qexchm; \u00a711.1 ordered dispatch",
+  "derivation": "ROBDD canonical function equality quantifies the full legal input domain at every configuration, including arbitrary cells, predicates and fault entries. Lifetime boundaries are zero functions and reverse execution restores the entry functions. Pointer/length widths vary independently.",
+  "scenario": {
+    "pointer_widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "length_widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "capacities": [
+      1,
+      2
+    ],
+    "dispatch_address_widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "cell_widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "checker": "ref_memory.rs"
+  },
+  "expected_outcome": {
+    "dispatch_tuples": "47224025124923801776800",
+    "scan_helper_tuples_each": "6239116800",
+    "row_tuples_each": "99825868800"
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-8r4; generic typed catalog pending complete binding library"
+  }
+}

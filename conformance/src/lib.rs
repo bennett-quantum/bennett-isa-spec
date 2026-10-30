@@ -18,6 +18,7 @@
 
 pub mod json;
 pub mod ref_amplitudes;
+pub mod ref_bdd;
 pub mod ref_catalog;
 pub mod ref_hash;
 pub mod ref_language;

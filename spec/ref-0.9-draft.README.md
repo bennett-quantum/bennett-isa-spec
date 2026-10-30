@@ -159,3 +159,32 @@ including arbitrary displacement destinations, signed overflow, zero divisors,
 all four-bit code entries, both faulted states, controls and full reversal.
 Generic nested interfaces, output allocations/classes and nonzero region
 images remain blocked on 1a4/3xe/afi respectively; costs are not exclusions.
+
+### Generic scans and memory wire operations
+
+Row commit: 0bc8426. Generic `dispatch.copy/store/exchange`, `qstore`,
+`qexchm`, `scan.inrange`, `scan.free.flag`, `lift.boundscheck`, `lift.free`
+replace fixed-capacity-only coverage. 162 total recipes. Scan parameters:
+P=pointer/base/size width, L=length width, E=max(P,L)+1, C=table capacity,
+T=atop counter width; 0<=atop<=C. Separate pointer and length widths are
+retained, and every prospective endpoint has the required extra bit.
+Unused n/size formals for free can bind existing source bundles; they do
+not affect operations or the free predicate. Dispatch uses selector width
+A, cell count C=2^A, cell width W, address-order packed cells.
+
+The independent reduced ordered BDD checker executes every Boolean input
+simultaneously, comparing canonical Boolean functions to separately built
+unsigned arithmetic/range/multiplexer semantics. Zero difference under the
+legal atop domain is an exact full-domain proof, not random sampling.
+Every lifetime boundary and complete reverse restoration is checked.
+The BDD engine's own four-bit add/order/equality truth tables are exhaustive.
+
+Dispatch: 80 configurations (five recipes, A and W independently 1–4),
+**47,224,025,124,923,801,776,800 tuples** total; each configuration has
+2^(A+2^A*W+W+1) tuples, including ambient control.
+Scans: 32 configurations per recipe (P and L independently 1–4; C=1/2,
+T=1/2). Each helper covers **6,239,116,800 tuples**; each row covers
+**99,825,868,800 tuples**. Four recipes total **212,129,971,200 tuples**.
+The exact domain per helper is (C+1)*2^(P+L+2CP+2C+2); the rows replace
+an arbitrary predicate target by clean flag plus arbitrary faulted/code,
+giving exponent +4. Largest dispatch configuration is 2^73 basis tuples.

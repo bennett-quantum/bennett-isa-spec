@@ -451,3 +451,60 @@ impl Machine {
         Ok(())
     }
 }
+
+impl Machine {
+    pub fn symbolic_state(&self) -> Vec<usize> {
+        vec![0; self.bits]
+    }
+    /// A reduced ordered BDD denotes every input tuple simultaneously. Equality
+    /// under domain is exact: a nonzero difference has a concrete counterexample.
+    pub fn run_symbolic(
+        &self,
+        b: &mut crate::ref_bdd::Bdd,
+        s: &mut [usize],
+        enabled: usize,
+        reverse: bool,
+        domain: usize,
+    ) -> Result<(), String> {
+        let apply = |(_, ins): &(usize, Instruction),
+                     b: &mut crate::ref_bdd::Bdd,
+                     s: &mut [usize]|
+         -> Result<(), String> {
+            match ins {
+                Instruction::Gate(g, w) => {
+                    if g == "swap" {
+                        let d = b.xor(s[w[0]], s[w[1]]);
+                        let d = b.and(d, enabled);
+                        s[w[0]] = b.xor(s[w[0]], d);
+                        s[w[1]] = b.xor(s[w[1]], d);
+                    } else {
+                        let mut mask = enabled;
+                        for i in &w[..w.len() - 1] {
+                            mask = b.and(mask, s[*i]);
+                        }
+                        let t = *w.last().unwrap();
+                        s[t] = b.xor(s[t], mask);
+                    }
+                }
+                Instruction::Alloc(w) | Instruction::Release(w) => {
+                    for i in w {
+                        if b.and(domain, s[*i]) != 0 {
+                            return Err("symbolically dirty lifetime boundary".into());
+                        }
+                    }
+                }
+            }
+            Ok(())
+        };
+        if reverse {
+            for i in self.instructions.iter().rev() {
+                apply(i, b, s)?;
+            }
+        } else {
+            for i in &self.instructions {
+                apply(i, b, s)?;
+            }
+        }
+        Ok(())
+    }
+}
