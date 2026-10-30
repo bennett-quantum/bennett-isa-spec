@@ -17,6 +17,47 @@ Tracking bead b-isa-spec-lto. Sole interpreter implementer; no push.
 | R7-B02 | r7_diagonal_basis, r7_readonly_control; CLI counterparts | exact witnesses green | 1caa062 |
 | SOL-R7-B03 | r7_dyadic_scaled_conversion_boundary_rounding_and_subnormals; r7_cli_bounded_5000_h_t_reports_finite_amplitudes | exact witness and rounding/cancellation checks green | 51d45dc |
 
+### Final round-7 verification
+
+All four blockers are resolved; no declines or partials. Commits **1caa062**
+(gate facts/structured loop proofs), **51d45dc** (scaled dyadics/algebraic
+cancellation), **6152d25** (families, literal pins, epoch cycle equivalence),
+**516052b** (zero-trip fact transfer). Only owned paths committed; no push.
+Tracking b-isa-spec-lto is complete; performance follow-up b-isa-spec-436
+remains open, without a semantic count limit or new ISA gap.
+
+Final sequential gates after all semantic source changes, headless with
+TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/.tmp,
+absolute manifest, offline, CARGO_PROFILE_TEST_OPT_LEVEL=1 (same domains,
+assertions and overflow checks):
+
+| Gate | Observed result |
+|---|---|
+| fmt --check | pass, 0 tests executed |
+| strict all-target Clippy | pass, 0 warnings, 0 tests executed |
+| normal suite | **297 passed / 0 failed / 5 ignored**, 7 unit + 290 integration, 0 doctests; 40.69 s summed runner time |
+| all ignored sweeps | **5 passed / 0 failed**, 143.52 s summed runner time |
+| read-only standalone conformance | **445 pass / 0 fail / 62 unavailable / 507**, exit 2 for explicit staging |
+| owned git diff --check | clean |
+
+| Sweep | Domain | Observed result / runner time |
+|---|---|---|
+| u8 division/remainder | 65,536 pairs × 4 ops = 262,144 executions | 1 passed / 0 failed; 1.10 s |
+| 17-wire borrow | 131,072 entries | 1 passed / 0 failed; 5.93 s |
+| checked borrow certificate | 262,144 elements, subject and expected program | 1 passed / 0 failed; 30.31 s |
+| §6 differential | 200,000 programs: **64,717 accepted (all exactly clean) / 135,283 rejected** | 1 passed / 0 failed; 102.22 s |
+| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 1 passed / 0 failed; 3.96 s |
+
+Final logs: repository `.tmp/r7-verified-{fmt,clippy,tests,sweeps,conformance}.log`.
+The current read-only conformance harness added unavailable contract cases
+concurrently: its earlier pass in this session was 445/0/60/505; neither run
+counts unavailable cases as passes. Accepted 0.8 SHA-256 remains
+90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e.
+No semantic source changes followed these final gates. Full commands, RED
+witnesses, retained negatives, pinned hashes and Design are in the council
+round-7 response. Beads auto-export is outside the owned commit paths and is
+left for the maintainer.
+
 RED before source edits: library 0 passed / 7 failed; CLI 0 passed / 7
 failed. Both bad-loop admissions and all four erroneous rejections reproduced.
 GREEN targeted: 14 passed / 0 failed. Normal suite: 288 passed / 0 failed /
@@ -64,7 +105,7 @@ Normal suite after families: **295 passed / 0 failed / 5 ignored** (6 unit,
 Strict all-target Clippy and fmt --check passed before that test-only addition.
 Read-only standalone conformance: **445 pass / 0 fail / 60 unavailable / 505**,
 exit 2; concurrent conformance additions are outside this implementation.
-Fresh five-sweep run and final 296-test gate are recorded below when complete.
+The completed final gate and sweeps are recorded above.
 
 Final audit RED: `r7_zero_trip_is_not_an_intervening_inverse_operand_touch`
 failed with §5.6 released wire not clean: a zero-trip body was invalidating an
@@ -76,9 +117,9 @@ separately. The completed normal gate before this audit was **296 passed /
 The initial debug sweeps completed division (16.64 s), 17-wire execution
 (97.84 s), certificate (492.05 s), each 1 passed / 0 failed; the fourth
 200,000-program run was stopped without a result so all five can be rerun
-in sequence after the final source change. The final gate uses
+in sequence after the final source change. The completed final gate uses
 `CARGO_PROFILE_TEST_OPT_LEVEL=1` (same tests, domains, assertions and overflow
-checks) to avoid repeating these long unoptimized runs. Final counts follow.
+checks) to avoid repeating these long unoptimized runs. Final counts are recorded above.
 
 The borrow engine now walks structured nodes with per-wire ANF basis facts.
 Unknown is a fresh independent symbol, never zero. Permutations transform facts;
