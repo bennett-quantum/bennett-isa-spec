@@ -101,6 +101,53 @@ static **1/1**. Intermediate joint-only family run was **3 passed / 0 failed**,
 0 warnings, 0 tests executed (Clippy 2.84 s). All semantic changes are frozen
 for the final full suite and five sweeps.
 
+### Final round-8 verification
+
+All four S0 findings resolved. Implementation commits: **366a711** (nested
+stacks and unsigned arithmetic), **b11b43f** (executed zero-trip bindings),
+**5ad0555** (memoised calls), **b658ac9** (families and version-aware readers),
+**0b70157** (complete version prefixes, joint readers and opaque histories).
+Only owned crate paths committed; no push. Council response is the separately
+owned `bennett/docs/council/isa-ref-2026-10-29/round-8/response.md`.
+
+Final gates use absolute manifest, headless/offline, TMPDIR at the repository's
+`.tmp`, CARGO_PROFILE_TEST_OPT_LEVEL=1 (same assertions/domains/overflow checks).
+
+| Gate | Observed result |
+|---|---|
+| fmt --check | pass, 0 tests executed; comment-only rerun also passes |
+| strict all-target Clippy | pass, 0 warnings, 0 tests executed; 2.84 s; comment-only rerun 1.29 s |
+| normal suite | **315 passed / 0 failed / 5 ignored**, 8 unit + 307 integration, 0 doctests; 21.07 s summed runner time |
+| all ignored sweeps | **5 passed / 0 failed**, 109.73 s summed runner time |
+| R8 deterministic families | **4 passed / 0 failed**, **139 accepted / 26 rejected** (90/6 nested, 33/10 zero, 15/9 local call, 1/1 static import) |
+| read-only standalone conformance | **445 pass / 0 fail / 65 unavailable / 510**, exit 2 for explicit staging |
+| unchanged Python seed | 2 example objects and 2 printed envelopes verified; execution as stated |
+| owned diff --check | clean |
+
+| Sweep | Domain | Result / runner time |
+|---|---|---|
+| u8 division/remainder | 65,536 pairs × 4 operations = 262,144 executions | 1 passed / 0 failed; 0.70 s |
+| 17-wire borrow | 131,072 entries | 1 passed / 0 failed; 4.31 s |
+| checked borrow certificate | 262,144 claim elements, subject and expected program | 1 passed / 0 failed; 22.04 s |
+| §6 differential | 200,000 programs: **70,930 accepted (all exactly clean) / 129,070 rejected** | 1 passed / 0 failed; 80.30 s |
+| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 1 passed / 0 failed; 2.38 s |
+
+Acceptance improved from the historical 64,717/135,283 with unchanged RNG
+code/distribution/seeds; every newly accepted sampled program is independently
+executed for exact cleanup. Conformance's concurrently maintained checkout
+adds explicitly unavailable contract cases; none is counted as passed.
+Logs: repository `.tmp/r8-complete-{fmt,clippy,tests,sweeps,conformance,seed}.log`
+and `.tmp/r8-comment-{fmt,clippy}.log`. Only a comment explaining the equivalent
+controlled-image conjugation in cached proof templates changed after the final
+semantic tests; fmt and strict Clippy were rerun. Execution's unconditional
+image preparation is unchanged. No semantic source changes followed the gates.
+
+No new ISA 0.8 gap or proposed spec change is needed. Existing SPEC-QUESTIONS
+20/25/28/30 and staged deliverables 8–11 remain; no semantic cap or frame waiver.
+Accepted 0.8 SHA-256 remains
+`90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e`.
+Beads' automatic export is outside owned commit paths and left for the maintainer.
+
 ## Round-7 fixes (2026-10-30)
 
 Tracking bead b-isa-spec-lto. Sole interpreter implementer; no push.

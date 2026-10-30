@@ -255,7 +255,9 @@ impl Node {
 
 impl Node {
     /// Instantiate a cached callee transfer, adding inherited controls only to
-    /// gates. Allocation, borrowing, image preparation and release stay unconditional.
+    /// gates. Allocation, borrowing and release stay unconditional. Paired local
+    /// image flips are controlled together in this proof template:
+    /// C(P†) C(U) C(P) = C(P† U P). Execution prepares images unconditionally.
     fn instantiate(&self, wires: &BTreeMap<String, String>, context: &[(String, bool)]) -> Self {
         let w = |s: &String| wires[s].clone();
         let ws = |v: &[String]| v.iter().map(w).collect();
