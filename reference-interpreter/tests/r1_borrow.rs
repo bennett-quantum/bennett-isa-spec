@@ -761,3 +761,22 @@ fn r7_zero_trip_is_not_an_intervening_inverse_operand_touch() {
     let o = Object::parse(&text).unwrap();
     support::r6_map(&o, false);
 }
+
+#[test]
+fn r8_compound_adjoint_restores_borrow_control() {
+    r8_identity("nested-x");
+}
+#[test]
+fn r8_diagonal_nested_adjoint_restores_borrow_control() {
+    r8_identity("nested-s");
+}
+fn r8_identity(case: &str) {
+    let (text, h, oh) = support::r8_witness(case);
+    let o = Object::parse(&text).unwrap();
+    let id = o.identity().unwrap();
+    assert_eq!(id.interface_hashes["a"], h);
+    assert_eq!(id.closure_hashes["a"].as_deref(), Some(h));
+    assert_eq!(id.object_hash, oh);
+    o.check_hashes().unwrap();
+    support::r6_map(&o, false);
+}

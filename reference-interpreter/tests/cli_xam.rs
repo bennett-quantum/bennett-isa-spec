@@ -1520,3 +1520,50 @@ fn r7_cli_bounded_5000_h_t_reports_finite_amplitudes() {
     assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
     assert_eq!(uint(&v, "wires"), 1);
 }
+
+#[test]
+fn r8_cli_compound_x() {
+    r8_cli_identity("nested-x");
+}
+#[test]
+fn r8_cli_compound_s() {
+    r8_cli_identity("nested-s");
+}
+fn r8_cli_identity(case: &str) {
+    let (body, h, oh) = support::r8_witness(case);
+    let path = tmp_file(&format!("r8-{case}.bisa"), &body);
+    let hashes = ok(&["hash", &path]);
+    assert!(hashes.canonical().contains(h));
+    if !oh.is_empty() {
+        assert!(hashes.canonical().contains(oh));
+    }
+    ok(&["check", &path]);
+    for (flag, input) in [
+        ("--mut", "0"),
+        ("--mut", "1"),
+        ("--state", "0=0.6,0;1=0,0.8"),
+    ] {
+        for adj in [false, true] {
+            let mut args = vec!["run-action", &path, "a", flag, input];
+            if adj {
+                args.push("--adjoint");
+            }
+            let v = ok(&args);
+            assert_eq!(uint(&v, "wires"), 1);
+            let state = field(&v, "state").object().unwrap();
+            if flag == "--mut" {
+                assert_eq!(
+                    field(&v, "state").canonical(),
+                    format!("{{\"{input}\":[1,0]}}")
+                );
+            } else {
+                assert_eq!(state.len(), 2);
+                r6_amplitude(&state["0"], 0.6, 0.0);
+                r6_amplitude(&state["1"], 0.0, 0.8);
+            }
+        }
+        let v = ok(&["reverse", &path, "a", flag, input]);
+        assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
+        assert_eq!(uint(&v, "wires"), 1);
+    }
+}

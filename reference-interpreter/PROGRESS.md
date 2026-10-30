@@ -6,6 +6,31 @@ under `reference-interpreter/`; commit own paths
 (`git add -A -- reference-interpreter && git commit -- reference-interpreter`),
 never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
+## Round-8 fixes (2026-10-30)
+
+Tracking b-isa-spec-41i; sole interpreter implementer, no push.
+
+| Blocker | RED test | Status | Commit |
+|---|---|---|---|
+| SOL-R8-B01 ≡ R8-B02 | r8_compound_adjoint_restores_borrow_control, r8_diagonal_nested_adjoint_restores_borrow_control; r8_cli_compound_x/s | exact nested X/S witnesses green | this step |
+| SOL-R8-B02 ≡ R8-B01 | exact zero-trip binding and borrowed H/S subjects | implementation follows | — |
+| R8-B03 | exact disabled controlled action call | implementation follows | — |
+| SOL-R8-B03 | r8_unsigned_decimal_multiplication; r8_unsigned_multiplicity_composition | exact unsigned boundary and composition green | this step |
+
+RED: nested library **0 passed / 2 failed**, CLI **0 passed / 2 failed**,
+§5.6 released wire not clean. Numeric unit **0 passed / 1 failed** at
+2^127 (negative); linking **0 passed / 1 failed** (zero instead of 2^128).
+Targeted GREEN `cargo test --offline ... r8_ -- --nocapture`: **6 passed /
+0 failed**, 1 unit + 5 integration. Logs `.tmp/r8-{red-*,green-stack-numeric}.log`.
+
+Design: every reversible gate is recorded on each operand's operation stack.
+An exact adjoint pops only when the same entry tops every operand stack;
+nested/disjoint computation therefore restores in LIFO order, while an
+outstanding entangling reader prevents an outer restoration. Saved ANFs retain
+correlations. Opaque/lifetime barriers invalidate the connected history.
+Quantum frame boundaries, full touched sets and every return equation remain.
+`BigInt::from_u128` constructs all unsigned limbs, with no signed narrowing.
+
 ## Round-7 fixes (2026-10-30)
 
 Tracking bead b-isa-spec-lto. Sole interpreter implementer; no push.

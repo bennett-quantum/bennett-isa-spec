@@ -357,3 +357,46 @@ pub fn r7_witness(case: &str) -> (String, &'static str, &'static str) {
     }
     (text, h, oh)
 }
+
+/// Exact round-8 member objects. Pins are independently supplied council hashes.
+pub fn r8_witness(case: &str) -> (String, &'static str, &'static str) {
+    let (body, bounds, h, oh): (&str, &[u64], &str, &str) = match case {
+        "nested-x" => ("c = qalloc any 1\nh c\nx c\nx c\nh c\nb = qborrow any 1\ncx c b\nqreturn b\nqfree c", &[], "0fd6d6eadcb219457ce3d9aa091a2176d38ce9f81551235799dae7cabe6e0e2f", "5eff1283a8f71dcce612e1802e510fdcae30c609395686311962bd630f01461c"),
+        "nested-s" => ("c = qalloc any 1\nh c\ns c\nsdg c\nh c\nb = qborrow any 1\ncx c b\nqreturn b\nqfree c", &[], "a8a4f90c95a1995df9a28afe4369f3455239ae54b6c22b5c8133df7a60253401", "535f274d3c7328e13cfd99e8785751ec3874e4d3090da3544e781855ca35439f"),
+        "zero-wide" => ("c = qalloc any 1\nqloop 0 {\nqfree c\nc = qalloc any 2\n}\nb = qborrow any 1\ncx c b\nqreturn b\nqfree c", &[0], "c9cbc01c190e4454e37b553e1d7e8e9eeea856631a6ab397029577447b053b87", "708531c08cb63447ea2bbaa966c69562300ab1bc89e07efb9c3278799c54922d"),
+        "zero-same" => ("c = qalloc any 1\nqloop 0 {\nqfree c\nc = qalloc any 1\n}\nb = qborrow any 1\ncx c b\nqreturn b\nqfree c", &[0], "d607c1df25e3a4d8f4e730501cf13a04a62cfa6adbeae5c36133a4f140f406bd", "568f2a4ee6c4cb927cafe4bd54414def5e91257186832704e6be7abfe99fd1bc"),
+        "zero-h" => ("b = qborrow any 1\nqloop 0 {\nqreturn b\nb = qalloc any 1\n}\nh b\nqreturn b", &[0], "90cbbcb904bff3ae413e3aaa3ec398173654dc1690354777bcb3837881098080", "60865de88a18adc53e2ecb23ab54d86f44836e4895cb7fb54e3ac78c0c879280"),
+        "zero-s" => ("b = qborrow any 1\nqloop 0 {\nqreturn b\nb = qalloc any 1\n}\ns b\nqreturn b", &[0], "1c0599e2f06674ccbc34f0017d5d158af1588d7d54982aa1adfebddc4262fa58", "fd5167fefabbbc72d9cd486e6cf036119f2ba5088558cccb155f898eaa7285ec"),
+        "call" => ("c = qalloc any 1\nctl c action_call @u (t) () () ()\nb = qborrow any 1\ncx c b\nqreturn b\nqfree c", &[], "63ae90bc9af75ebe3e958956282567f52129b0097651a445c08f7c5f2845ac79", "c4a3c1adad250d856a334556766f0cc398a71b6c65df3ce5f81adf86d07f968e"),
+        _ => panic!("unknown round-8 witness"),
+    };
+    let text = if case == "call" {
+        let sig = r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
+        object(
+            &[
+                (
+                    "u",
+                    sig,
+                    "action @u (v:wire mut) () () () ()\n^entry():\nh v",
+                ),
+                (
+                    "a",
+                    sig,
+                    &format!("action @a (t:wire mut) () () () ()\n^entry():\n{body}"),
+                ),
+            ],
+            "{}",
+            "",
+        )
+        .replacen(
+            &"0".repeat(64),
+            "c0c51a4bf1e9713e237601daaf342134f91eae5fd7143f8638595157d33db5b6",
+            1,
+        )
+    } else {
+        borrow_lifetime_object(body, bounds).replace("perm_action", "action")
+    };
+    let text = text.replace(&"0".repeat(64), h);
+    assert_eq!(bennett_isa_ref::sha256_hex(text.as_bytes()), oh);
+    (text, h, oh)
+}

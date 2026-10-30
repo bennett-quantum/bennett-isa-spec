@@ -27,14 +27,20 @@ impl BigInt {
         Self::default()
     }
     pub fn from_i128(v: i128) -> Self {
-        let negative = v < 0;
-        let mut m = v.unsigned_abs();
+        let mut result = Self::from_u128(v.unsigned_abs());
+        result.negative = v < 0;
+        result
+    }
+    pub fn from_u128(mut m: u128) -> Self {
         let mut limbs = Vec::new();
         while m != 0 {
             limbs.push(m as u32);
             m >>= 32;
         }
-        Self { negative, limbs }
+        Self {
+            negative: false,
+            limbs,
+        }
     }
     pub fn is_zero(&self) -> bool {
         self.limbs.is_empty()
@@ -705,7 +711,7 @@ impl Decimal {
     }
     pub fn mul_int(&self, n: u128) -> Self {
         Self {
-            m: self.m.mul(&BigInt::from_i128(n as i128)),
+            m: self.m.mul(&BigInt::from_u128(n)),
             e: self.e,
         }
     }
@@ -784,5 +790,25 @@ mod r7_tests {
             1.0f64.to_bits() + 2
         );
         assert_eq!(dyadic_from_f64(f64::MAX).unwrap().to_f64(), f64::MAX);
+    }
+}
+
+#[cfg(test)]
+mod r8_tests {
+    use super::*;
+    #[test]
+    fn r8_unsigned_decimal_multiplication() {
+        for (n, text) in [
+            (0, "0"),
+            (i128::MAX as u128, "170141183460469231731687303715884105727"),
+            (1u128 << 127, "170141183460469231731687303715884105728"),
+            (u128::MAX, "340282366920938463463374607431768211455"),
+        ] {
+            assert_eq!(Decimal::parse("1").unwrap().mul_int(n).to_text(), text);
+        }
+        assert_eq!(
+            Decimal::parse("0.1").unwrap().mul_int(u128::MAX).to_text(),
+            "34028236692093846346337460743176821145.5"
+        );
     }
 }

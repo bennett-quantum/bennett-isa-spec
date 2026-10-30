@@ -987,8 +987,9 @@ impl From<Error> for FrameFailure {
         Self::Invalid(e)
     }
 }
-/// A saved inverse is usable only until any operand is touched. Keeping the
-/// old polynomial also keeps correlations; an unknown result never invents zero.
+/// One causal operation, present on every operand stack. It cancels only when
+/// it is on top of ALL its operand stacks, preserving outstanding readers.
+/// Saved polynomials preserve correlations; unknown never invents zero.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct InverseFact {
     gate: Node,
@@ -997,7 +998,7 @@ struct InverseFact {
 struct Facts<'a> {
     e: Evaluation<'a>,
     borrowed: &'a BTreeSet<String>,
-    inverses: Vec<InverseFact>,
+    inverses: BTreeMap<String, Vec<InverseFact>>,
     frame: Vec<Node>,
     unresolved: Option<Error>,
 }
@@ -1008,11 +1009,62 @@ impl Facts<'_> {
         self.e.state.insert(w.into(), Poly::var(id));
     }
     fn forget_inverses(&mut self, touched: &BTreeSet<String>) {
-        self.inverses.retain(|fact| {
-            let mut operands = BTreeSet::new();
-            fact.gate.wires(&mut operands);
-            operands.is_disjoint(touched)
-        });
+        // An opaque/lifetime touch is a causal barrier. Invalidate the whole
+        // connected history, including ancestors reached through another operand.
+        let mut affected = touched.clone();
+        loop {
+            let old = affected.len();
+            for w in affected.clone() {
+                if let Some(stack) = self.inverses.get(&w) {
+                    for fact in stack {
+                        fact.gate.wires(&mut affected);
+                    }
+                }
+            }
+            if old == affected.len() {
+                break;
+            }
+        }
+        for w in affected {
+            self.inverses.remove(&w);
+        }
+    }
+    fn reversible(&mut self, node: &Node, touched: &BTreeSet<String>) -> bool {
+        let saved = touched
+            .iter()
+            .next()
+            .and_then(|w| self.inverses.get(w))
+            .and_then(|stack| stack.last())
+            .cloned();
+        if let Some(saved) = saved {
+            if saved.gate.adjoint() == *node
+                && touched
+                    .iter()
+                    .all(|w| self.inverses.get(w).and_then(|s| s.last()) == Some(&saved))
+            {
+                for w in touched {
+                    let stack = self.inverses.get_mut(w).unwrap();
+                    stack.pop();
+                    if stack.is_empty() {
+                        self.inverses.remove(w);
+                    }
+                }
+                self.e.state.extend(saved.before);
+                return true;
+            }
+        }
+        let before = touched.iter().map(|w| (w.clone(), self.e.var(w))).collect();
+        let fact = InverseFact {
+            gate: node.clone(),
+            before,
+        };
+        for w in touched {
+            self.inverses
+                .entry(w.clone())
+                .or_default()
+                .push(fact.clone());
+        }
+        false
     }
     fn flush(&mut self) -> std::result::Result<(), FrameFailure> {
         if self.frame.iter().any(|n| touches(n, self.borrowed)) {
@@ -1047,7 +1099,9 @@ impl Facts<'_> {
                 if *n == 0 {
                     continue; // §4.6: no dynamic gate, touch, frame or lifetime.
                 }
-                if !node.permutation() {
+                let mut wires = BTreeSet::new();
+                node.wires(&mut wires);
+                if !node.permutation() || wires.iter().any(|w| self.inverses.contains_key(w)) {
                     self.repeat(*n, body)?;
                     continue;
                 }
@@ -1068,24 +1122,13 @@ impl Facts<'_> {
                     if self.e.condition(controls) == Poly::zero() {
                         continue;
                     }
-                    if let Some(index) =
-                        self.inverses.iter().position(|f| f.gate.adjoint() == *node)
-                    {
-                        let saved = self.inverses.remove(index);
-                        self.forget_inverses(&touched);
-                        self.e.state.extend(saved.before);
+                    if self.reversible(node, &touched) {
                         continue;
                     }
-                    self.forget_inverses(&touched);
                     if !diagonal {
-                        let before = targets.iter().map(|w| (w.clone(), self.e.var(w))).collect();
                         for w in targets {
                             self.unknown(w);
                         }
-                        self.inverses.push(InverseFact {
-                            gate: node.clone(),
-                            before,
-                        });
                     }
                 } else {
                     self.forget_inverses(&touched);
@@ -1094,8 +1137,23 @@ impl Facts<'_> {
                     }
                 }
             } else {
-                self.forget_inverses(&touched);
-                if let Err(error) = self.e.apply(node) {
+                let gate = matches!(node, Node::Flip(..) | Node::Swap(..));
+                if gate
+                    && self.e.condition(match node {
+                        Node::Flip(c, _) | Node::Swap(c, _, _) => c,
+                        _ => unreachable!(),
+                    }) == Poly::zero()
+                {
+                    self.frame.push(node.clone());
+                    continue;
+                }
+                let restored = if gate {
+                    self.reversible(node, &touched)
+                } else {
+                    self.forget_inverses(&touched);
+                    false
+                };
+                if let Err(error) = if restored { Ok(()) } else { self.e.apply(node) } {
                     if self.e.opaque_seen {
                         self.unresolved.get_or_insert(error);
                     } else {
@@ -1496,7 +1554,7 @@ impl Object {
         let mut facts = Facts {
             e,
             borrowed,
-            inverses: Vec::new(),
+            inverses: BTreeMap::new(),
             frame: Vec::new(),
             unresolved: None,
         };

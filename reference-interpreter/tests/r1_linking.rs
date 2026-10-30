@@ -128,3 +128,47 @@ fn interface_region_names_cannot_alias_symbols() {
     let e = Object::parse(&text).unwrap_err().to_string();
     assert!(e.contains("§9.2"), "{e}");
 }
+
+#[test]
+fn r8_unsigned_multiplicity_composition() {
+    let callee = certify(
+        INC,
+        "inc8",
+        &format!(
+            r#""ROOT":{}"#,
+            region(
+                INC_SIG,
+                r#"{"forward:0":{"local":{"diamond":1},"inclusive":{"diamond":1}}}"#
+            )
+        ),
+        "",
+        "test.1",
+    );
+    let client = certify(
+        &client_text(),
+        "client",
+        &format!(
+            r#""ROOT":{}"#,
+            region(
+                CLIENT_SIG,
+                r#"{"forward:0":{"local":{"diamond":1},"inclusive":{"diamond":"340282366920938463463374607431768211456"}}}"#
+            )
+        ),
+        &format!(r#""{INC_HASH}:forward:0":"340282366920938463463374607431768211455""#),
+        "test.1",
+    );
+    let linked = Object::link(&[client, callee]).unwrap();
+    assert_eq!(
+        linked
+            .section("certificate")
+            .unwrap()
+            .get("composition")
+            .unwrap()
+            .get("epsilon_total")
+            .unwrap()
+            .get("diamond")
+            .unwrap(),
+        &Json::String("340282366920938463463374607431768211456".into())
+    );
+    linked.check_hashes().unwrap();
+}
