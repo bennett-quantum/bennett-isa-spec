@@ -617,3 +617,27 @@ fn codex_r5_b03_one_iteration_release_matches_unrolled_clean_entry() {
         assert!(Object::parse(&support::borrow_lifetime_object(&dirty, bounds)).is_err());
     }
 }
+
+#[test]
+fn r6_sol_boundary_exact() {
+    let (text, h, oh) = support::r6_witness("sol-boundary");
+    let o = Object::parse(&text).unwrap();
+    let id = o.identity().unwrap();
+    assert_eq!(id.interface_hashes["a"], h);
+    assert_eq!(id.closure_hashes["a"].as_deref(), Some(h));
+    assert_eq!(id.object_hash, oh);
+    o.check_hashes().unwrap();
+    support::r6_map(&o, false);
+}
+
+#[test]
+fn r6_codex_boundary_exact() {
+    let (text, h, oh) = support::r6_witness("codex-boundary");
+    let o = Object::parse(&text).unwrap();
+    let id = o.identity().unwrap();
+    assert_eq!(id.interface_hashes["a"], h);
+    assert_eq!(id.closure_hashes["a"].as_deref(), Some(h));
+    assert_eq!(id.object_hash, oh);
+    o.check_hashes().unwrap();
+    support::r6_map(&o, true);
+}

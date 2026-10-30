@@ -10,7 +10,6 @@ use std::collections::{BTreeMap, BTreeSet};
 
 struct Environment {
     bindings: QuantumBindings,
-    widths: BTreeMap<usize, usize>,
     predicates: Vec<Wire>,
     borrowed: BTreeMap<String, Vec<usize>>,
     borrow_used: BTreeSet<usize>,
@@ -261,7 +260,6 @@ impl Object {
         }
         let mut env = Environment {
             bindings: bindings.clone(),
-            widths: BTreeMap::new(),
             predicates: Vec::new(),
             borrowed: BTreeMap::new(),
             borrow_used: BTreeSet::new(),
@@ -309,15 +307,13 @@ impl Object {
             .iter()
             .map(|(n, w)| (n.clone(), w.len()))
             .collect();
-        for b in &f.blocks {
-            infer_widths(&b.instructions, &mut env, &mut live_widths)?;
-        }
         let instructions: Vec<_> = f
             .blocks
             .iter()
             .flat_map(|b| b.instructions.iter().cloned())
             .collect();
-        self.action_sequence(&instructions, q, &mut env, adjoint, controls)?;
+        let widths = infer_widths(&instructions, &env, &mut live_widths)?;
+        self.action_sequence(&instructions, &widths, q, &mut env, adjoint, controls)?;
         if !env.predicates.is_empty() || !env.borrowed.is_empty() {
             return err("§5.1", "action exited with unclosed predicate/borrow frame");
         }
@@ -341,6 +337,7 @@ impl Object {
     fn action_sequence(
         &self,
         sequence: &[Instruction],
+        widths: &[LifetimeWidths],
         q: &mut QuantumState,
         e: &mut Environment,
         adjoint: bool,
@@ -353,6 +350,7 @@ impl Object {
         };
         for index in indices {
             let i = &sequence[index];
+            let width = &widths[index];
             let a = &i.operands;
             let context = e.controls(inherited);
             let op = i.op.as_str();
@@ -416,11 +414,11 @@ impl Object {
                     // Reverse the complete §4.6 expansion, including its
                     // unconditional lifetime operations (SPEC-QUESTIONS 28).
                     if adjoint {
-                        self.action_sequence(&i.bodies[1], q, e, true, &no)?;
-                        self.action_sequence(&i.bodies[0], q, e, true, &yes)?;
+                        self.action_sequence(&i.bodies[1], &width.bodies[1], q, e, true, &no)?;
+                        self.action_sequence(&i.bodies[0], &width.bodies[0], q, e, true, &yes)?;
                     } else {
-                        self.action_sequence(&i.bodies[0], q, e, false, &yes)?;
-                        self.action_sequence(&i.bodies[1], q, e, false, &no)?;
+                        self.action_sequence(&i.bodies[0], &width.bodies[0], q, e, false, &yes)?;
+                        self.action_sequence(&i.bodies[1], &width.bodies[1], q, e, false, &no)?;
                     }
                 }
                 "qloop" => {
@@ -434,13 +432,24 @@ impl Object {
                         let entry = (q.content(), e.bindings.bundles.clone());
                         let mut done = 0usize;
                         while done < n {
-                            self.action_sequence(&i.bodies[0], q, e, adjoint, &context)?;
+                            let iteration = if adjoint { n - 1 - done } else { done };
+                            self.action_sequence(
+                                &i.bodies[0],
+                                width.iteration(iteration),
+                                q,
+                                e,
+                                adjoint,
+                                &context,
+                            )?;
                             done += 1;
-                            if done < n
+                            // Reverse traversal must execute the transient prefix
+                            // separately, even if a steady iteration is identity.
+                            let periodic_end = if adjoint { n - width.cycle_start } else { n };
+                            if done < periodic_end
                                 && !q.auditing_borrows()
                                 && (q.content(), e.bindings.bundles.clone()) == entry
                             {
-                                done += (n - done) / done * done;
+                                done += (periodic_end - done) / done * done;
                             }
                         }
                     } else {
@@ -463,7 +472,14 @@ impl Object {
                             for j in (0..n).rev() {
                                 let mut c = context.clone();
                                 c.push((flags[j], true));
-                                self.action_sequence(&i.bodies[0], q, e, true, &c)?;
+                                self.action_sequence(
+                                    &i.bodies[0],
+                                    width.iteration(j),
+                                    q,
+                                    e,
+                                    true,
+                                    &c,
+                                )?;
                             }
                         } else {
                             for j in 0..n {
@@ -480,7 +496,14 @@ impl Object {
                                 )?;
                                 let mut c = context.clone();
                                 c.push((flags[j], true));
-                                self.action_sequence(&i.bodies[0], q, e, false, &c)?;
+                                self.action_sequence(
+                                    &i.bodies[0],
+                                    width.iteration(j),
+                                    q,
+                                    e,
+                                    false,
+                                    &c,
+                                )?;
                             }
                         }
                         for j in (0..n).rev() {
@@ -503,9 +526,8 @@ impl Object {
                     let allocate = (op == "qalloc") ^ adjoint;
                     let name = if op == "qalloc" { &i.lhs[0] } else { &a[0] };
                     if allocate {
-                        let n = *e
-                            .widths
-                            .get(&i.line)
+                        let n = width
+                            .produced
                             .ok_or_else(|| Error("§4.3: missing matched lifetime width".into()))?;
                         let w = q.allocate(n)?;
                         e.produce(name, w)?;
@@ -519,9 +541,8 @@ impl Object {
                     let borrow = (op == "qborrow") ^ adjoint;
                     let name = if op == "qborrow" { &i.lhs[0] } else { &a[0] };
                     if borrow {
-                        let n = *e
-                            .widths
-                            .get(&i.line)
+                        let n = width
+                            .produced
                             .ok_or_else(|| Error("§4.3: missing matched lifetime width".into()))?;
                         let pool = e
                             .bindings
@@ -916,12 +937,33 @@ fn gather_regions<'a>(seq: &'a [Instruction], out: &mut Vec<&'a Instruction>) {
 /// Source-order lifetime resolution. A release records the width of its
 /// matching producer, so inverse traversal never consults a later definition
 /// with the same spelling. Instruction line identities survive body cloning.
+/// A structured execution plan, indexed by sequence position and dynamic
+/// loop entry, never by static source line. Width environments are finite
+/// deterministic maps: repeated entries share a cycle, with no trip-count cap.
+#[derive(Default)]
+struct LifetimeWidths {
+    produced: Option<usize>,
+    bodies: Vec<Vec<LifetimeWidths>>,
+    cycle_start: usize,
+}
+impl LifetimeWidths {
+    fn iteration(&self, index: usize) -> &[LifetimeWidths] {
+        let index = if index < self.bodies.len() {
+            index
+        } else {
+            self.cycle_start + (index - self.cycle_start) % (self.bodies.len() - self.cycle_start)
+        };
+        &self.bodies[index]
+    }
+}
 fn infer_widths(
     seq: &[Instruction],
-    e: &mut Environment,
+    e: &Environment,
     live: &mut BTreeMap<String, usize>,
-) -> Result<()> {
+) -> Result<Vec<LifetimeWidths>> {
+    let mut plan = Vec::new();
     for i in seq {
+        let mut step = LifetimeWidths::default();
         let width = match i.op.as_str() {
             "qalloc" | "qborrow" => Some(
                 i.operands[1]
@@ -945,8 +987,10 @@ fn infer_widths(
             _ => None,
         };
         if let Some(width) = width {
-            live.insert(i.lhs[0].clone(), width);
-            e.widths.insert(i.line, width);
+            if live.insert(i.lhs[0].clone(), width).is_some() {
+                return err("§3.3", "live bundle produced twice");
+            }
+            step.produced = Some(width);
         }
         let consumed = match i.op.as_str() {
             "qfree" | "qreturn" => Some(&i.operands[0]),
@@ -955,16 +999,38 @@ fn infer_widths(
             _ => None,
         };
         if let Some(name) = consumed {
-            let width = live
-                .remove(name)
-                .ok_or_else(|| Error("§3.3: missing consumed lifetime width".into()))?;
-            e.widths.insert(i.line, width);
+            step.produced = Some(
+                live.remove(name)
+                    .ok_or_else(|| Error("§3.3: missing consumed lifetime width".into()))?,
+            );
         }
-        for b in &i.bodies {
-            infer_widths(b, e, live)?;
+        if i.op == "qloop" {
+            let n = i.operands[0]
+                .parse::<usize>()
+                .map_err(|_| Error("§4.6: loop bound exceeds host index space".into()))?;
+            let mut seen = BTreeMap::new();
+            let mut entries: Vec<BTreeMap<String, usize>> = Vec::new();
+            while step.bodies.len() < n {
+                if let Some(&start) = seen.get(live) {
+                    step.cycle_start = start;
+                    let period = step.bodies.len() - start;
+                    *live = entries[start + (n - start) % period].clone();
+                    break;
+                }
+                seen.insert(live.clone(), step.bodies.len());
+                entries.push(live.clone());
+                step.bodies.push(infer_widths(&i.bodies[0], e, live)?);
+                step.cycle_start = step.bodies.len();
+            }
+            // n=0 has no lifetime effects. Lexical qregions were hoisted above.
+        } else {
+            for body in &i.bodies {
+                step.bodies.push(infer_widths(body, e, live)?);
+            }
         }
+        plan.push(step);
     }
-    Ok(())
+    Ok(plan)
 }
 fn bundle_xor(
     q: &mut QuantumState,

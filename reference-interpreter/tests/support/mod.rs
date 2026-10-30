@@ -255,3 +255,82 @@ pub fn certified_borrow_identity_kind(body: &str, bounds: &[u64], kind: &str) ->
     ));
     format!("{text}\nsection certificate\n{}\n", cert.canonical())
 }
+
+/// Literal round-6 subjects and independently published interface/object pins.
+pub fn r6_witness(which: &str) -> (String, &'static str, &'static str) {
+    let (body, bounds, kind, h, oh) = match which {
+        "sol-boundary" => (
+            "c = qalloc any 1\nh t\nb = qborrow any 1\ncx c b\nqreturn b\nh t\nqfree c",
+            vec![],
+            "action",
+            "ba813954a842962eecd96263d6dbe2f549f7f8d4c99241c660f0a3c7626cf10a",
+            "db747f53ae732bd2cef0eeeaed48b8bb2a523dc74f53b38d2876601a3760445f",
+        ),
+        "codex-boundary" => (
+            "c = qalloc any 1\nh t\nb = qborrow any 1\nqreturn b\nqfree c",
+            vec![],
+            "action",
+            "6c7101e365eccc827653aa5dc596d68fefae112b9e4b6df00b5078f5639bf7d3",
+            "e5517c39c82f32f9c006828c6b9535d899dad9c0a7b59339ba9fabea3672fc3f",
+        ),
+        "zero-trip" => (
+            "d = qalloc any 1\nqloop 0 {\nqfree d\n}\nqfree d",
+            vec![0],
+            "perm_action",
+            "9a453b6720abda445235294c98c6288e616dc5bc1907c78af1755104b3a2e48a",
+            "1e9a003077d2afd78e6f14384902f031c6aa140bebaf14702889de13d4cd814a",
+        ),
+        "changing-width" => (
+            "d = qalloc any 1\nqloop 2 {\nqfree d\nd = qalloc any 2\nx d[1]\nx d[1]\n}\nqfree d",
+            vec![2],
+            "perm_action",
+            "de76a9295cf8233d97909660d48c9f6ed82abe593735257858457d35a0c0557e",
+            "128fa2a938dfbdcccdd255aafd128d125737a4a00fb63e9aef791a1f405bfb1a",
+        ),
+        _ => panic!("unknown witness"),
+    };
+    (
+        borrow_lifetime_object(body, &bounds)
+            .replace("perm_action", kind)
+            .replace(&"0".repeat(64), h),
+        h,
+        oh,
+    )
+}
+
+/// Full H_t tensor I_bR map, including basis, superposed and entangled inputs.
+/// Each direction starts independently at entry; workspace cannot escape.
+pub fn r6_map(o: &Object, hadamard: bool) {
+    use bennett_isa_ref::{QuantumBindings, QuantumState};
+    for input in 0..6 {
+        let mut q = QuantumState::new();
+        let w = q.allocate(4).unwrap();
+        for (bit, wire) in w[..3].iter().enumerate() {
+            if input >= 4 {
+                q.gate("h", &[*wire], None, &[]).unwrap();
+            } else if input >> bit & 1 == 1 {
+                q.gate("x", &[*wire], None, &[]).unwrap();
+            }
+        }
+        if input == 5 {
+            q.gate("cx", &[w[1], w[3]], None, &[]).unwrap();
+        }
+        let entry = q.clone();
+        let mut expected = q.clone();
+        if hadamard {
+            expected.gate("h", &[w[0]], None, &[]).unwrap();
+        }
+        let mut b = QuantumBindings::default();
+        b.bundles.insert("t".into(), vec![w[0]]);
+        b.borrowed.push(w[1..3].to_vec());
+        for adjoint in [false, true] {
+            let mut actual = entry.clone();
+            o.execute_action("a", &mut actual, &b, adjoint, &[])
+                .unwrap();
+            assert_eq!(actual, expected, "input={input}, adjoint={adjoint}");
+            o.execute_action("a", &mut actual, &b, !adjoint, &[])
+                .unwrap();
+            assert_eq!(actual, entry);
+        }
+    }
+}

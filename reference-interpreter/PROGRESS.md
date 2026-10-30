@@ -6,6 +6,30 @@ under `reference-interpreter/`; commit own paths
 (`git add -A -- reference-interpreter && git commit -- reference-interpreter`),
 never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
+## Round-6 fixes (2026-10-30)
+
+| Blocker ids | RED test | Status | Commit |
+|---|---|---|---|
+| SOL-R6-B01 / codex R6-B02 | r6_sol_boundary_exact; r6_codex_boundary_exact; CLI equivalents | exact witnesses green | this green-step commit |
+| SOL-R6-B02 / codex R6-B01 | r6_zero_trip_exact; r6_changing_width_exact; CLI equivalents | exact witnesses green | this green-step commit |
+
+RED: library 0/2 + 0/2 and CLI 0/4, all four reported diagnostics
+reproduced (qreturn restoration, released wire not clean, missing consumed
+lifetime width, wire index out of range). GREEN: exact targets 8 passed;
+full normal suite 270 passed / 0 failed / 5 ignored, including retained R4/R5
+certificate and structural negatives. Pinned interface/closure/object hashes
+are unchanged. Independent forward/adjoint maps include basis, superposition,
+borrowed-reference entanglement, exact reversal and no escaping workspace.
+
+`borrow.rs::factorises` replays the established prefix as entry context,
+forgetting only outputs touched by non-permutation gates; previous return
+obligations remain separate. `action.rs::infer_widths` produces a structured
+plan indexed by sequence position and loop entry width map, sharing recurring
+width environments as cycles. Zero trips have no lifetime effects; inverse
+iteration j uses forward iteration j's matched release. Reverse quantum period
+skipping leaves transient prefix iterations to execute explicitly. No trip cap.
+C7 families, ignored sweeps and final gates follow in the next green step.
+
 ## Council round 5, codex/muse second pass (2026-10-30)
 
 Codex R5-B01 resolved-by d0f7dbb and 738b233. Exact three certified witnesses

@@ -363,3 +363,27 @@ fn codex_r5_bell_projection_diagnostics_are_conditional_amplitudes() {
         sparse_matches_normalized_dense(&branch.state);
     }
 }
+
+#[test]
+fn r6_zero_trip_exact() {
+    let (text, h, oh) = support::r6_witness("zero-trip");
+    let o = Object::parse(&text).unwrap();
+    let id = o.identity().unwrap();
+    assert_eq!(id.interface_hashes["a"], h);
+    assert_eq!(id.closure_hashes["a"].as_deref(), Some(h));
+    assert_eq!(id.object_hash, oh);
+    o.check_hashes().unwrap();
+    support::r6_map(&o, false);
+}
+
+#[test]
+fn r6_changing_width_exact() {
+    let (text, h, oh) = support::r6_witness("changing-width");
+    let o = Object::parse(&text).unwrap();
+    let id = o.identity().unwrap();
+    assert_eq!(id.interface_hashes["a"], h);
+    assert_eq!(id.closure_hashes["a"].as_deref(), Some(h));
+    assert_eq!(id.object_hash, oh);
+    o.check_hashes().unwrap();
+    support::r6_map(&o, false);
+}

@@ -1302,3 +1302,81 @@ fn sol_r5_b03_reused_workspace_widths_run_and_reverse() {
         &Json::Bool(true)
     );
 }
+
+#[test]
+fn r6_cli_sol_boundary_exact() {
+    r6_cli_map("sol-boundary");
+}
+
+#[test]
+fn r6_cli_codex_boundary_exact() {
+    r6_cli_map("codex-boundary");
+}
+
+#[test]
+fn r6_cli_zero_trip_exact() {
+    r6_cli_map("zero-trip");
+}
+
+#[test]
+fn r6_cli_changing_width_exact() {
+    r6_cli_map("changing-width");
+}
+
+fn r6_cli_map(case: &str) {
+    let (body, h, oh) = support::r6_witness(case);
+    let path = tmp_file(&format!("r6-{case}.bisa"), &body);
+    let hashes = ok(&["hash", &path]);
+    assert!(hashes.canonical().contains(h));
+    assert!(hashes.canonical().contains(oh));
+    ok(&["check", &path]);
+    for (flag, input) in [
+        ("--mut", "0"),
+        ("--mut", "1"),
+        ("--state", "0=0.6,0;1=0,0.8"),
+    ] {
+        for adj in [false, true] {
+            let mut args = vec!["run-action", &path, "a", flag, input];
+            if adj {
+                args.push("--adjoint");
+            }
+            let v = ok(&args);
+            assert_eq!(uint(&v, "wires"), 1);
+            let state = field(&v, "state").object().unwrap();
+            if case != "codex-boundary" {
+                if flag == "--mut" {
+                    assert_eq!(
+                        field(&v, "state").canonical(),
+                        format!("{{\"{input}\":[1,0]}}")
+                    );
+                } else {
+                    let expected = [("0", (0.6, 0.0)), ("1", (0.0, 0.8))];
+                    for (bits, (re, im)) in expected {
+                        r6_amplitude(&state[bits], re, im);
+                    }
+                }
+            } else {
+                // H|0>, H|1>, and H(0.6|0>+0.8i|1>), derived directly.
+                let s = std::f64::consts::FRAC_1_SQRT_2;
+                let (a, b) = if flag == "--state" {
+                    ((0.6 * s, 0.8 * s), (0.6 * s, -0.8 * s))
+                } else {
+                    ((s, 0.0), (if input == "0" { s } else { -s }, 0.0))
+                };
+                assert_eq!(state.len(), 2);
+                r6_amplitude(&state["0"], a.0, a.1);
+                r6_amplitude(&state["1"], b.0, b.1);
+            }
+        }
+        let v = ok(&["reverse", &path, "a", flag, input]);
+        assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
+        assert_eq!(uint(&v, "wires"), 1);
+    }
+}
+fn r6_amplitude(v: &Json, re: f64, im: f64) {
+    let a = v.array().unwrap();
+    for (n, expected) in a.iter().zip([re, im]) {
+        let actual: f64 = n.canonical().parse().unwrap();
+        assert!((actual - expected).abs() < 1e-12, "{actual} != {expected}");
+    }
+}

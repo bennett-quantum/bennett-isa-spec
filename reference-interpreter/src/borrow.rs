@@ -940,11 +940,12 @@ impl From<Error> for FrameFailure {
     }
 }
 fn factorises(
+    prefix: &[Node],
     frame: &[Node],
     borrowed: &BTreeSet<String>,
 ) -> std::result::Result<(), FrameFailure> {
     let mut wires = BTreeSet::new();
-    for n in frame {
+    for n in prefix.iter().chain(frame) {
         n.wires(&mut wires);
     }
     let vars: BTreeMap<String, u32> = wires
@@ -957,6 +958,7 @@ fn factorises(
         .filter(|(w, _)| borrowed.contains(*w))
         .map(|(_, v)| *v)
         .collect();
+    let no_borrowed = BTreeSet::new();
     let mut e = Evaluation {
         opaque_seen: false,
         obligations: BTreeMap::new(),
@@ -967,8 +969,25 @@ fn factorises(
         vars,
         opaque: BTreeMap::new(),
         applications: BTreeMap::new(),
-        borrowed: &borrowed_vars,
+        borrowed: &no_borrowed,
     };
+    // Replay the established entry context without re-proving earlier frames.
+    // At a quantum boundary only the touched outputs become unconstrained;
+    // untouched polynomials (in particular qalloc's zero) remain valid. Old
+    // variables stay available to describe correlations among surviving wires.
+    for n in prefix {
+        if let Node::Other(touched) = n {
+            for w in touched {
+                let id = (e.vars.len() + e.opaque.len()) as u32;
+                e.vars.insert(format!("boundary_{id}"), id);
+                e.state.insert(w.clone(), Poly::var(id));
+            }
+        } else {
+            e.apply(n)?;
+        }
+    }
+    e.obligations.clear();
+    e.borrowed = &borrowed_vars;
     let failure = |e: &Evaluation<'_>, error| {
         if e.opaque_seen {
             FrameFailure::NeedsClaim(error)
@@ -1288,7 +1307,7 @@ impl Object {
                     // Keep surrounding allocation/cleanup when evaluating
                     // lifetime boundaries; the cropped gate frame alone may
                     // omit a clean allocation consumed before a qreturn.
-                    match factorises(&nodes[start..end], borrowed) {
+                    match factorises(&nodes[..start], &nodes[start..end], borrowed) {
                         Ok(()) => {}
                         Err(FrameFailure::Invalid(e)) => return Err(FrameFailure::Invalid(e)),
                         Err(FrameFailure::NeedsClaim(e)) => {
