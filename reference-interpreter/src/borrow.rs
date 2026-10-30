@@ -1351,7 +1351,7 @@ impl Facts<'_> {
                 controls,
                 modified,
                 body,
-                ..
+                touched,
             } = node
             {
                 self.flush()?; // preserve the physical call boundary
@@ -1360,7 +1360,9 @@ impl Facts<'_> {
                         self.sequence(body)?;
                         self.flush()?;
                     } else {
-                        self.forget_inverses(&modified.iter().cloned().collect());
+                        // Read-only values survive, but opaque entangling readers
+                        // are a barrier to restoring any ancestor quantum history.
+                        self.forget_inverses(&touched.iter().cloned().collect());
                         for w in modified {
                             self.unknown(w);
                         }

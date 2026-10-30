@@ -1216,6 +1216,14 @@ fn generated_r8_nested_causal_adjoint_stacks() {
         r7_case("c = qalloc any 1\nd = qalloc any 1\nh c\nrx 0.25 d\ns c\nx d\nsdg c\nx d\nh c\nrx -0.25 d\nb = qborrow any 1\ncx c b\ncx d b\nqreturn b\nqfree d\nqfree c", &[], true, certified);
         accepted += 1;
     }
+    for certified in [false, true] {
+        r7_case("c = qalloc any 1\nd = qalloc any 1\nh c\nswap c t\nswap c d\nswap c d\nswap c t\nh c\nb = qborrow any 1\ncx c b\ncx d b\nqreturn b\nqfree d\nqfree c", &[], true, certified);
+        accepted += 1;
+    }
+    for certified in [false, true] {
+        r7_case("c = qalloc any 1\nh c\nswap c t\nh c\nh c\nswap c t\nh c\nb = qborrow any 1\ncx c b\nqreturn b\nqfree c", &[], true, certified);
+        accepted += 1;
+    }
     let mut rejected = 0;
     for inner in ["s c", "cx c t", "swap c t"] {
         let inverse = if inner == "s c" { "sdg c" } else { inner };
@@ -1383,4 +1391,31 @@ fn generated_r8_calls_transfer_per_wire_through_callee_chains() {
         }
     }
     eprintln!("R8 call transfer: {accepted} accepted / {rejected} rejected");
+}
+
+#[test]
+fn generated_r8_import_transfer_keeps_readonly_facts_but_blocks_history() {
+    let sig = r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
+    let imports = format!(
+        r#"{{"u":{{"pinned_closure_hash":"{}","signature":{sig}}}}}"#,
+        "1".repeat(64)
+    );
+    let build = |body: &str| {
+        support::object(
+            &[(
+                "a",
+                sig,
+                &format!("action @a (t:wire mut) () () () ()\n^entry():\n{body}"),
+            )],
+            &imports,
+            "",
+        )
+    };
+    // Static only: imports have no executable definition yet. A disabled call
+    // preserves c=0. An opaque reader of an unknown c cannot preserve its H
+    // restoration history, even though c itself is a read-only call control.
+    Object::parse(&build("c = qalloc any 1\nctl c action_call @u (t) () () ()\nb = qborrow any 1\ncx c b\nqreturn b\nqfree c")).unwrap();
+    let e = Object::parse(&build("c = qalloc any 1\nh c\nctl c action_call @u (t) () () ()\nh c\nb = qborrow any 1\ncx c b\nqreturn b\nh c\nctl c adj action_call @u (t) () () ()\nh c\nqfree c")).unwrap_err().to_string();
+    assert!(e.contains("§5.6"), "{e}");
+    eprintln!("R8 import transfer (static): 1 accepted / 1 rejected");
 }

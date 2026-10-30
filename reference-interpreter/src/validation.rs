@@ -1673,21 +1673,21 @@ impl Discipline {
         if other {
             self.other_versions.insert(complete.clone());
         }
-        let reads_group = |v: &String| {
-            self.reads
-                .get(v)
-                .is_some_and(|r| r.iter().any(|(w, _)| wires.contains(w)))
+        // Compare complete captured stack prefixes: repeated gates can share
+        // an operation ID but still be distinct nested computing events.
+        let reads_current = |reads: &[(String, Vec<String>)]| {
+            reads
+                .iter()
+                .any(|(w, log)| wires.contains(w) && self.reads_current(w, log))
         };
+        let reads_group = |v: &String| self.reads.get(v).is_some_and(|r| reads_current(r));
         let blocked = other
             && (self.phases.iter().any(reads_group)
                 || self
                     .versions
                     .iter()
                     .any(|(w, log)| !wires.contains(w) && log.iter().any(reads_group))
-                || self
-                    .created
-                    .values()
-                    .any(|c| c.versions.iter().any(|(w, _)| wires.contains(w))));
+                || self.created.values().any(|c| reads_current(&c.versions)));
         for w in wires {
             self.update_log(w, &complete, blocked);
         }
@@ -1724,20 +1724,12 @@ impl Discipline {
             if other {
                 *self.closed.entry(w.clone()).or_default() += 1;
             }
-            // Only a read of THIS outstanding computation blocks its inverse.
-            // An earlier reader of an ancestor version must not block a nested
-            // compute/adjoint pair (e.g. swap; Rx; Rx†; swap).
-            let current = self
-                .versions
-                .get(&w)
-                .and_then(|v| v.last())
-                .and_then(|v| self.value_ids.get(v));
+            // Older reads of an ancestor cannot block a nested pair. Match
+            // the complete current version prefix, not merely a reused gate ID.
             let reads_current = |reads: &Vec<(String, Vec<String>)>| {
-                current.is_some_and(|id| {
-                    reads
-                        .iter()
-                        .any(|(source, log)| source == &w && log.contains(id))
-                })
+                reads
+                    .iter()
+                    .any(|(source, log)| source == &w && self.reads_current(&w, log))
             };
             let blocked = needs_adjoint
                 && (self
@@ -1754,6 +1746,16 @@ impl Discipline {
             self.update_log(&w, &version, blocked);
         }
         Ok(())
+    }
+    fn reads_current(&self, wire: &str, snapshot: &[String]) -> bool {
+        self.versions.get(wire).is_some_and(|current| {
+            !current.is_empty()
+                && snapshot.len() >= current.len()
+                && current
+                    .iter()
+                    .zip(snapshot)
+                    .all(|(v, id)| self.value_ids.get(v) == Some(id))
+        })
     }
     fn update_log(&mut self, wire: &str, version: &str, blocked: bool) {
         let next = self.value_ids.len();

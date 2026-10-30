@@ -77,6 +77,30 @@ First completed normal gate after variants: **314 passed / 0 failed /
 found one map-entry style violation, corrected without a behavior change.
 Final gates and all five ignored sweeps follow after that correction.
 
+Final causal audit: nested two-output SWAP pairs reproduced §6.2 rejection
+(**0 passed / 1 failed**) and now use the same reader rule as single-wire
+changes. `reads_current` compares the complete captured version-stack prefix,
+not only the top gate ID: repeated H gates can share an operation identity
+while naming different nested events. Added repeated-H/SWAP positives.
+An imported unknown-control reader exposed the distinction between preserving
+a read-only wire's current fact and preserving its ancestor inverse history.
+The new static import test first rejected at §6.2 (**0/1**); after correcting
+version-prefix matching it exposed the unsound borrow admission (**0/1**).
+Opaque imported calls now invalidate connected history across ALL touched
+operands, while assigning fresh unknowns ONLY to modified outputs. Disabled
+imports remain fact no-ops. Local calls retain their analysed transfers.
+The test explicitly marks its unlinked positive as static-only evidence.
+S-only pre-fix replay from isolated 366a711 beneath `.tmp`: **0/1**, library
+accepted and CLI check exit 0/status ok with the exact published H/object pins.
+No shared source checkout was rewound.
+
+Final variant GREEN: **4 passed / 0 failed**, **139 accepted / 26 rejected**:
+nested **90/6**, zero-trip **33/10**, local-call **15/9**, imported-call
+static **1/1**. Intermediate joint-only family run was **3 passed / 0 failed**,
+**136/25** (88/6 nested). Final source fmt and strict all-target Clippy pass,
+0 warnings, 0 tests executed (Clippy 2.84 s). All semantic changes are frozen
+for the final full suite and five sweeps.
+
 ## Round-7 fixes (2026-10-30)
 
 Tracking bead b-isa-spec-lto. Sole interpreter implementer; no push.

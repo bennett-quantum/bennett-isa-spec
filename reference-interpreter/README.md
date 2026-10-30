@@ -348,15 +348,16 @@ traversal: zero-trip bodies publish none of them; static validation and lexical
 qregion hoisting still apply. Local action calls reuse a memoised per-wire
 structured transfer per callee/classical specialization, instantiated on actual
 wires and effective controls. Known-false controls disable fact transfer;
-imports leave modified outputs unknown and preserve read-only facts. Existing
+imports leave modified outputs unknown and preserve read-only facts, while
+invalidating inverse history across all opaque readers. Existing
 SCC validation excludes action recursion. Every quantum gate and non-permutation
 call retains its physical frame boundary and full borrowed-touch guard, even
 when disabled. Mixed loops visit every actual fact entry, skip repeated full
 analysis states, or prove an inductive unknown-top invariant; pure permutation
 loops compose exact maps and return obligations by squaring. Every return still
 proves restoration and output independence. Certificates cannot override
-definite lifetime or non-permutation failures. §6 cleanup readers use captured
-version identities, so older readers do not block a nested exact adjoint.
+definite lifetime or non-permutation failures. §6 cleanup readers use complete captured
+version-stack prefixes, so older readers do not block a nested exact adjoint.
 Round-8 literal pins and deterministic families retain all round 4–7 negatives
 and add nested adjoints, dead bindings and controlled callee chains.
 
