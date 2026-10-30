@@ -799,3 +799,8 @@ fn r8_zero_trip_cannot_hide_borrowed_quantum_touches() {
             .contains("§5.6"));
     }
 }
+
+#[test]
+fn r8_action_call_preserves_readonly_control() {
+    r8_identity("call");
+}

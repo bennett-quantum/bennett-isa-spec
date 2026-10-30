@@ -22,7 +22,11 @@ use crate::{
     validation::{gate, gate_operands, normalize_call},
     Error, Function, Instruction, Object, Result, Type,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, BTreeSet},
+    rc::Rc,
+};
 
 pub fn validate_translation_lemma(
     v: &[Instruction],
@@ -124,6 +128,14 @@ enum Node {
     /// A non-permutation operation (non-diagonal or diagonal gate, measurement-free
     /// non-permutation call): it ends a frame and may not touch a borrowed wire.
     Other(Vec<String>),
+    /// A physical non-permutation call boundary, with its full structural touch
+    /// set separate from the role-aware transfer. None is an unresolved import.
+    Call {
+        touched: Vec<String>,
+        controls: Vec<(String, bool)>,
+        modified: Vec<String>,
+        body: Option<Vec<Node>>,
+    },
     /// Known gate action, separate from its FULL touched set used by §5.6.
     Quantum {
         key: String,
@@ -142,6 +154,14 @@ enum Node {
 impl Node {
     fn wires(&self, out: &mut BTreeSet<String>) {
         match self {
+            Self::Call { touched, body, .. } => {
+                out.extend(touched.iter().cloned());
+                if let Some(body) = body {
+                    for n in body {
+                        n.wires(out);
+                    }
+                }
+            }
             Self::Flip(c, t) => {
                 out.extend(c.iter().map(|(w, _)| w.clone()));
                 out.insert(t.clone());
@@ -175,7 +195,7 @@ impl Node {
     }
     fn permutation(&self) -> bool {
         match self {
-            Self::Other(_) | Self::Quantum { .. } => false,
+            Self::Other(_) | Self::Quantum { .. } | Self::Call { .. } => false,
             Self::Repeat(n, body) => *n == 0 || body.iter().all(Self::permutation),
             _ => true,
         }
@@ -211,6 +231,19 @@ impl Node {
                 targets: targets.clone(),
                 diagonal: *diagonal,
             },
+            Self::Call {
+                touched,
+                controls,
+                modified,
+                body,
+            } => Self::Call {
+                touched: touched.clone(),
+                controls: controls.clone(),
+                modified: modified.clone(),
+                body: body
+                    .as_ref()
+                    .map(|b| b.iter().rev().map(Self::adjoint).collect()),
+            },
             Self::Alloc(w) => Self::Free(w.clone()),
             Self::Free(w) => Self::Alloc(w.clone()),
             Self::Borrow(w) => Self::Return(w.clone()),
@@ -220,6 +253,89 @@ impl Node {
     }
 }
 
+impl Node {
+    /// Instantiate a cached callee transfer, adding inherited controls only to
+    /// gates. Allocation, borrowing, image preparation and release stay unconditional.
+    fn instantiate(&self, wires: &BTreeMap<String, String>, context: &[(String, bool)]) -> Self {
+        let w = |s: &String| wires[s].clone();
+        let ws = |v: &[String]| v.iter().map(w).collect();
+        let cs = |c: &[(String, bool)]| {
+            let mut out = context.to_vec();
+            for (s, p) in c {
+                let x = (w(s), *p);
+                if !out.contains(&x) {
+                    out.push(x);
+                }
+            }
+            out
+        };
+        match self {
+            Self::Flip(c, t) => Self::Flip(cs(c), w(t)),
+            Self::Swap(c, a, b) => Self::Swap(cs(c), w(a), w(b)),
+            Self::Repeat(n, b) => Self::Repeat(
+                *n,
+                b.iter().map(|n| n.instantiate(wires, context)).collect(),
+            ),
+            Self::Quantum {
+                key,
+                inverse,
+                controls,
+                targets,
+                diagonal,
+            } => Self::Quantum {
+                key: key.clone(),
+                inverse: inverse.clone(),
+                controls: cs(controls),
+                targets: ws(targets),
+                diagonal: *diagonal,
+            },
+            Self::Opaque {
+                key,
+                controls,
+                inputs,
+                outputs,
+                assign,
+            } => Self::Opaque {
+                key: key.clone(),
+                controls: cs(controls),
+                inputs: ws(inputs),
+                outputs: ws(outputs),
+                assign: *assign,
+            },
+            Self::Call {
+                touched,
+                controls,
+                modified,
+                body,
+            } => Self::Call {
+                touched: context
+                    .iter()
+                    .map(|(w, _)| w.clone())
+                    .chain(ws(touched))
+                    .collect(),
+                controls: cs(controls),
+                modified: ws(modified),
+                body: body
+                    .as_ref()
+                    .map(|b| b.iter().map(|n| n.instantiate(wires, context)).collect()),
+            },
+            Self::Other(v) => Self::Other(ws(v)),
+            Self::Alloc(v) => Self::Alloc(ws(v)),
+            Self::Free(v) => Self::Free(ws(v)),
+            Self::Borrow(v) => Self::Borrow(ws(v)),
+            Self::Return(v) => Self::Return(ws(v)),
+        }
+    }
+}
+#[derive(Clone)]
+struct CallTransfer {
+    bundles: BTreeMap<String, Vec<String>>,
+    regions: BTreeMap<String, (u64, Vec<Vec<String>>)>,
+    body: Vec<Node>,
+    borrowed: BTreeSet<String>,
+}
+type CallCache = Rc<RefCell<BTreeMap<(String, Vec<String>), CallTransfer>>>;
+
 #[derive(Clone)]
 struct Trace {
     bundles: BTreeMap<String, Vec<String>>,
@@ -227,6 +343,7 @@ struct Trace {
     nodes: Vec<Node>,
 }
 struct Compiler<'a> {
+    calls: CallCache,
     trace: Option<BTreeMap<usize, Vec<Trace>>>,
     live_borrowed: BTreeSet<String>,
     object: &'a Object,
@@ -337,6 +454,83 @@ impl Compiler<'_> {
         }
         out.extend(exit);
         Ok(())
+    }
+    fn call_transfer(
+        &mut self,
+        f: &Function,
+        args: &[String],
+        controls: &[(String, bool)],
+        adjoint: bool,
+    ) -> Result<Vec<Node>> {
+        let classical = list(&args[4])?
+            .iter()
+            .map(|n| self.classical(n))
+            .collect::<Result<Vec<_>>>()?;
+        let key = (f.name.clone(), classical.clone());
+        let cached = self.calls.borrow().get(&key).cloned();
+        let transfer = if let Some(t) = cached {
+            t
+        } else {
+            // §5.1 action cycles have already been excluded by SCC validation.
+            // Compile each callee once per classical specialization, in canonical
+            // wire coordinates, then reuse its per-wire structured transfer.
+            let mut child = self.object.borrow_compiler(f)?;
+            child.calls = self.calls.clone();
+            for (p, v) in f.params[3].iter().zip(classical) {
+                child.classical.insert(p.name.clone(), v);
+            }
+            let bundles = child.bundles.clone();
+            let regions = child.regions.clone();
+            let mut body = Vec::new();
+            child.compile_function(f, &[], &mut body)?;
+            let t = CallTransfer {
+                bundles,
+                regions,
+                body,
+                borrowed: child.borrowed,
+            };
+            self.calls.borrow_mut().insert(key, t.clone());
+            t
+        };
+        let mut wires = BTreeMap::new();
+        for group in [0, 1] {
+            for (p, n) in f.params[group].iter().zip(list(&args[group + 1])?) {
+                for (from, to) in transfer.bundles[&p.name].iter().zip(self.bundle(&n)?) {
+                    wires.insert(from.clone(), to);
+                }
+            }
+        }
+        for (p, n) in f.params[2].iter().zip(list(&args[3])?) {
+            for (from, to) in transfer.regions[&p.name]
+                .1
+                .iter()
+                .flatten()
+                .zip(self.regions[&n].1.iter().flatten())
+            {
+                wires.insert(from.clone(), to.clone());
+            }
+        }
+        let mut all = BTreeSet::new();
+        for n in &transfer.body {
+            n.wires(&mut all);
+        }
+        for from in all {
+            if !wires.contains_key(&from) {
+                wires.insert(from, self.fresh(1).remove(0));
+            }
+        }
+        self.borrowed
+            .extend(transfer.borrowed.iter().map(|w| wires[w].clone()));
+        let body: Vec<_> = transfer
+            .body
+            .iter()
+            .map(|n| n.instantiate(&wires, controls))
+            .collect();
+        Ok(if adjoint {
+            body.iter().rev().map(Node::adjoint).collect()
+        } else {
+            body
+        })
     }
     fn compile(
         &mut self,
@@ -523,6 +717,7 @@ impl Compiler<'_> {
                         // Inline the exact permutation (the call graph is acyclic).
                         let f = &self.object.functions[&callee.name];
                         let mut child = Compiler {
+                            calls: self.calls.clone(),
                             trace: None,
                             live_borrowed: BTreeSet::new(),
                             object: self.object,
@@ -568,7 +763,26 @@ impl Compiler<'_> {
                             })?;
                             touched.extend(cells.iter().flatten().cloned());
                         }
-                        out.push(Node::Other(touched));
+                        let mut modified = Vec::new();
+                        for n in list(&ca[1])? {
+                            modified.extend(self.bundle(&n)?);
+                        }
+                        for (p, n) in callee.params[2].iter().zip(list(&ca[3])?) {
+                            if p.role.as_deref() == Some("mut") {
+                                modified.extend(self.regions[&n].1.iter().flatten().cloned());
+                            }
+                        }
+                        let body = if let Some(f) = self.object.functions.get(&callee.name) {
+                            Some(self.call_transfer(f, ca, &c, call.adjoint)?)
+                        } else {
+                            None
+                        };
+                        out.push(Node::Call {
+                            touched,
+                            controls: c,
+                            modified,
+                            body,
+                        });
                     }
                 }
                 "qinplace" => {
@@ -901,7 +1115,7 @@ impl Evaluation<'_> {
                     self.state.insert(w, value);
                 }
             }
-            Node::Other(_) | Node::Quantum { .. } => {
+            Node::Other(_) | Node::Quantum { .. } | Node::Call { .. } => {
                 return err("§5.6", "non-permutation operation inside a frame")
             }
         }
@@ -912,6 +1126,16 @@ fn check_permutation_touches(nodes: &[Node], borrowed: &BTreeSet<String>) -> Res
     for node in nodes {
         if let Node::Repeat(n, body) = node {
             if *n != 0 {
+                check_permutation_touches(body, borrowed)?;
+            }
+        } else if let Node::Call { touched, body, .. } = node {
+            if touched.iter().any(|w| borrowed.contains(w)) {
+                return err(
+                    "§5.6",
+                    "borrowed wire touched by a non-permutation instruction",
+                );
+            }
+            if let Some(body) = body {
                 check_permutation_touches(body, borrowed)?;
             }
         } else if !node.permutation() && touches(node, borrowed) {
@@ -1125,6 +1349,27 @@ impl Facts<'_> {
                     continue;
                 }
             }
+            if let Node::Call {
+                controls,
+                modified,
+                body,
+                ..
+            } = node
+            {
+                self.flush()?; // preserve the physical call boundary
+                if self.e.condition(controls) != Poly::zero() {
+                    if let Some(body) = body {
+                        self.sequence(body)?;
+                        self.flush()?;
+                    } else {
+                        self.forget_inverses(&modified.iter().cloned().collect());
+                        for w in modified {
+                            self.unknown(w);
+                        }
+                    }
+                }
+                continue;
+            }
             let mut touched = BTreeSet::new();
             node.wires(&mut touched);
             if !node.permutation() {
@@ -1293,6 +1538,7 @@ fn check_factorisation(
 impl Object {
     fn borrow_compiler<'a>(&'a self, f: &Function) -> Result<Compiler<'a>> {
         let mut compiler = Compiler {
+            calls: Rc::default(),
             trace: None,
             live_borrowed: BTreeSet::new(),
             object: self,

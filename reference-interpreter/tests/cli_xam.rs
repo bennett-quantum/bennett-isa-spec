@@ -1586,3 +1586,8 @@ fn r8_cli_zero_borrowed_quantum_touches() {
         }
     }
 }
+
+#[test]
+fn r8_cli_call() {
+    r8_cli_identity("call");
+}

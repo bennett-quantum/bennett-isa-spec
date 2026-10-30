@@ -13,8 +13,8 @@ Tracking b-isa-spec-41i; sole interpreter implementer, no push.
 | Blocker | RED test | Status | Commit |
 |---|---|---|---|
 | SOL-R8-B01 ≡ R8-B02 | r8_compound_adjoint_restores_borrow_control, r8_diagonal_nested_adjoint_restores_borrow_control; r8_cli_compound_x/s | exact nested X/S witnesses green | 366a711 |
-| SOL-R8-B02 ≡ R8-B01 | r8_zero_trip_lifetime_environment_does_not_escape, r8_zero_trip_surviving_fact, r8_zero_trip_cannot_hide_borrowed_quantum_touches; CLI counterparts | exact witnesses green | this step |
-| R8-B03 | exact disabled controlled action call | implementation follows | — |
+| SOL-R8-B02 ≡ R8-B01 | r8_zero_trip_lifetime_environment_does_not_escape, r8_zero_trip_surviving_fact, r8_zero_trip_cannot_hide_borrowed_quantum_touches; CLI counterparts | exact witnesses green | b11b43f |
+| R8-B03 | r8_action_call_preserves_readonly_control; r8_cli_call | exact disabled controlled-H witness green | this step |
 | SOL-R8-B03 | r8_unsigned_decimal_multiplication; r8_unsigned_multiplicity_composition | exact unsigned boundary and composition green | 366a711 |
 
 RED: nested library **0 passed / 2 failed**, CLI **0 passed / 2 failed**,
@@ -44,6 +44,18 @@ An early full-suite run overlapped test authoring, observed the new zero-trip
 REDs and was stopped during a needless history expansion; it is not final gate
 evidence. Basis-only permutations now retain exact ANFs without recording
 history unless touching an existing quantum history; the huge test passes.
+
+Call RED: library and CLI each **0 passed / 1 failed**, §5.6 released
+wire not clean. GREEN combined R8 borrow/CLI targets: **12 passed / 0 failed**.
+Local non-permutation calls now have memoised canonical structured transfers,
+instantiated on actual wires and inherited controls. Cache keys include exact
+classical bindings; summaries are reused per callee specialization. The §5.1
+SCC validator excludes action recursion before this pass. Unresolved imports
+make only mut wires/mut cells unknown. Known-false call controls disable fact
+transfer; read-only operands keep their facts. The independent call boundary
+guard retains FULL actual touched sets, including disabled borrowed controls;
+callee-internal borrowed touches are checked recursively. Every physical call
+and quantum gate still delimits frames.
 
 ## Round-7 fixes (2026-10-30)
 
