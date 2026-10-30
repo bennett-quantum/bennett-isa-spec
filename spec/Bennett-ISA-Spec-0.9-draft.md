@@ -123,6 +123,8 @@ north star §3.1 requires).
 | K9 | §8.1 | **EPS-DECADE**: exact zero-based decimal accuracy bucket, domain and exact-entry prohibition; boundary witness | bennett-vm-cxg; b-isa-spec-f31 | S | – |
 | K10 | §7.3 | **BLOCK-IMAGE**: contiguous complete 512-byte sectors, byte order, partial-image rejection at device initialisation; witness | bennett-vm-47i; b-isa-spec-0d0 | S | – |
 | K11 | §11.1, §17 item 7 | **ISA-REF-LIB (from bennett-vm-47t): maintainer decision required**. Proposed serialization, envelope hash, ordinals, scratch/removable rules and decomposition set; witness only, publication gated on accepted 0.9 | bennett-vm-47t; b-isa-spec-8r4 (open) | S | new |
+| K12 | §10, §10.1, §12.3 | **LAUNCH-ESTIMATE: maintainer decision required**. Resolved parameters, class-preserving resource keys, upward decimal encoding and exact certificate binding; witness | bennett-vm-hsd; b-isa-spec-c15 (open) | S | – |
+| K13 | §9.2, §12.1–§12.3 | **CLAIM-REPLAY: maintainer decision required**. Sampled expected relation, standalone invocation binding, canonical parameter and full-table tuple encoding; witness; sampling stays evidence | bennett-vm-clw; b-isa-spec-9uy (open) | S | – |
 
 **Applied Q14 (2026-10-29, b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -1667,7 +1669,8 @@ hash = SHA-256 over the ASCII bytes of `<scc_hash hex>:<decimal index>`.
 `schedule`, `certificate` and `coverage` sections deleted together with
 the blank line preceding each. `reference_program_hash` = the oracle's
 interface hash. `params_hash` = SHA-256 of the JCS array of classical
-parameter values; `schedule_hash` = SHA-256 of the schedule's JCS bytes.
+parameter values (the typed encoding of §12.3, K13); `schedule_hash` =
+SHA-256 of the schedule's JCS bytes.
 **Program-point id** = `(symbol interface hash, block name, instruction
 ordinal within the block counting nested lines in text order)`.
 Executable certificates and caches bind to **closure hashes** (required,
@@ -1833,13 +1836,134 @@ const uint8_t* bennett_request_payload(const bennett_request_t*, size_t* len);  
 bennett_status bennett_tape_open(bennett_program_t*, bennett_run_id, bennett_tape_iter_t** out);
 bennett_status bennett_tape_next(bennett_tape_iter_t*, const char** dev, const char** op, const uint8_t** args, size_t* alen);
 void           bennett_tape_free(bennett_tape_iter_t*);
-bennett_status bennett_estimate_run(bennett_program_t*, const char* region, bennett_token, bennett_estimate_t** out);
+/* K12 proposal: resolved classical parameter values, not live register ids. */
+bennett_status bennett_estimate_run(bennett_program_t*, const char* region, bennett_token,
+                                    const char* variant, uint32_t inherited_controls,
+                                    const uint8_t* params_jcs, size_t params_len, bennett_estimate_t** out);
 size_t         bennett_estimate_nresources(const bennett_estimate_t*);
 bennett_status bennett_estimate_get(const bennett_estimate_t*, size_t i, const char** name, const char** value_decimal);
 const uint8_t* bennett_estimate_certificate(const bennett_estimate_t*, size_t* len);   void bennett_estimate_free(bennett_estimate_t*);
 bennett_status bennett_coverage_get(bennett_program_t*, bennett_coverage_t** out);
 const uint8_t* bennett_coverage_jcs(const bennett_coverage_t*, size_t* len);   void bennett_coverage_free(bennett_coverage_t*);
 ```
+
+### 10.1 Proposed launch-estimate contract (K12)
+
+**LAUNCH-ESTIMATE (from bennett-vm-hsd): maintainer decision required**
+(b-isa-spec-c15). This is proposed 0.9 text, not an interpretation of
+0.8's argument-free request. The API and decimal policy alternatives
+are recorded in `isa-0.9.PROGRESS.md`; neither removes parametrised
+estimates, padded oracle estimates or any target resource.
+
+**Resolved request (proposal).** `bennett_estimate_run` MUST copy and
+validate `params_jcs`, the JCS array of **all** classical arguments in
+signature order, encoded as §12.3 specifies. The separately supplied
+valid token of that program fixes `[B,heap,stack,depth]`; token-typed
+arguments fix their own tuples, never the outer tuple by default.
+Host- and live device-minted tokens are both admitted (§5.4); the
+request copies the tuple while valid, so later revocation cannot
+retarget an already returned estimate.
+An empty array binds an empty signature only; no argument is implicitly
+zero, inferred from a hash, or taken from an earlier run. A missing,
+extra, mistyped or out-of-range argument is `E_ARG` before producing an
+estimate. Every well-typed resolved argument vector is supported; the
+interface bundles, arbitrary target/fault entries, dirty wires and
+interface cells remain quantum inputs, not chosen basis values.
+
+The caller supplies a nonempty `variant` and `inherited_controls` as
+in §11; these are part of the request, not inferred from a different
+invocation. The request denotes that region/variant/control count at
+its declared accuracy and those resolved parameters and budget.
+It uses the object's schedule exactly when every §5.4/§11 binding
+matches, otherwise the §11 defaults. The estimator MUST resolve the
+complete generated realisation and aggregate its scheduled leaf events
+and wire live intervals by §8.2; running one basis input, counting only
+executed oracle rows instead of all padded B steps, or silently changing
+parameters, budget, target, expansion library or cleanup is not an
+estimate of that request. A consumer lacking the selected expansion
+library reports `E_SCHEDULE_INFEASIBLE` as §11 requires (b-isa-spec-8r4);
+this postpones mechanics, not the estimate capability.
+
+**Resource rows (proposal).** `estimate_nresources` counts scalar rows,
+not target resource declarations. A `count` or `time` resource has one
+row named by its escaped resource name. Each `occupancy` or `peak`
+resource has one row **for every target class**, including unused classes with value
+zero, named `escape(resource)[escape(class)]`; no sum across classes is
+substituted. `escape` percent-encodes the UTF-8 bytes except ASCII
+letters, digits, `-._~`, using uppercase hex (including `%`, `[` and
+`]`). Scalar resource names use the same escape. Rows are enumerated
+by increasing bytewise encoded name. Thus names are injective even when
+target names contain delimiters; `name` and `value_decimal` remain
+ordinary NUL-terminated strings with §10's ownership lifetime.
+
+**Decimal values (proposal).** Aggregation is exact rational arithmetic;
+rounding occurs only at the accessor boundary. `value_decimal` is the
+least nonnegative decimal with at most **34 significant digits** that
+is ≥ the exact resource value. For q > 0 let e be the unique integer
+with 10^e ≤ q < 10^(e+1); return
+`ceil(q / 10^(e−33)) × 10^(e−33)`. Zero is `0`. The canonical spelling
+uses ASCII digits and an optional decimal point, no exponent, plus
+sign, leading integer zeros (except `0`), trailing fractional zeros or
+negative zero. Exact integers and terminating rationals that fit are
+unchanged. This is an upper enclosure, not a fabricated exact value for
+1/3; capacity, matching, objective comparison and certificate checking
+MUST use the exact rationals, never the rounded display.
+
+**Certificate binding (proposal).** The estimate's certificate MUST bind
+object, interface, closure, target and effective schedule hashes, root
+variant/controls, accuracy, expansion identity and the resolved
+`bindings.invocation` (§12.3). Even a default-only realisation has an
+explicit empty-entries schedule document with those bindings, hence a
+schedule hash. Its root region has `estimate: { precision_digits: 34,
+exact_resources: { "<encoded row name>": { numerator: "<integer>",
+denominator: "<positive integer>" } } }`; fractions are reduced,
+nonnegative and decimal-string encoded, zero is 0/1. `resources` uses
+the identical encoded keys and canonical decimal strings returned by
+`estimate_get`. A checker MUST rebuild the bound realisation, recompute
+all exact rows and their upward decimal encodings, and reject any
+binding, key, rational or display mismatch. A producer's resource map
+alone is not verification.
+
+**LAUNCH-ESTIMATE witness**
+
+```json
+{
+  "variant":"forward","inherited_controls":0,
+  "binding": {"args":["2"],"budget":["2","0","0","0"]},
+  "precision_digits": 34,
+  "classes": ["A","B]","idle"],
+  "live": [
+    {"class":"A","count":2,"start":"0","end":"1/3"},
+    {"class":"B]","count":1,"start":"0","end":"1/3"}
+  ],
+  "rows": [
+    ["peak_qubits[A]","2"],
+    ["peak_qubits[B%5D]","1"],
+    ["peak_qubits[idle]","0"],
+    ["qubit_second[A]","0.6666666666666666666666666666666667"],
+    ["qubit_second[B%5D]","0.3333333333333333333333333333333334"],
+    ["qubit_second[idle]","0"],
+    ["time","0.3333333333333333333333333333333334"]
+  ],
+  "decimal_checks": [
+    {"rational":"0","decimal":"0"},
+    {"rational":"2","decimal":"2"},
+    {"rational":"1/8","decimal":"0.125"},
+    {"rational":"1/3","decimal":"0.3333333333333333333333333333333334"},
+    {"rational":"2/3","decimal":"0.6666666666666666666666666666666667"},
+    {"rational":"1/30","decimal":"0.03333333333333333333333333333333334"},
+    {"rational":"10/3","decimal":"3.333333333333333333333333333333334"}
+  ]
+}
+```
+
+This **aggregation witness** assumes the displayed scheduled intervals,
+unit class rates and no other events; it does not assert an unbound
+oracle gate count. A permitted cost expression `1 / 3` produces that
+makespan. The exact class peaks are 2 and 1, not a replacement scalar 3;
+occupancies are 2/3 and 1/3, and the idle class is present. Changing the
+argument `2` to `1` denotes a different request, even at the same budget.
+No 0.8 request can transmit that distinction through §10's signature.
 
 ## 11. Scheduling interface (sched 0.9)
 
@@ -2068,10 +2192,91 @@ Witness envelope SHA-256: `299510fd67cc626fdcbcc10adcd40730f9af294ba596d86fb25fd
 | kind | payload | checker obligation |
 |---|---|---|
 | `exhaustive` | `domain` (§12.2); `expected`: `"oracle"` \| `{ "table": [...] }` \| `{ "program": closure_hash }` \| `"inverse_pair"` | re-execute every domain element on the reference interpreter / expected program; compare full tuples. For `"inverse_pair"` (the claim of an `inverse_pairs` entry, §12.3): for every element (x, ins, mem cells, args) run g and ginv at the entry's tuple, token-typed arguments at their `arg_tokens` tuples, and require both fault-free, ginv(g(x)) = x and g(ginv(x)) = x; the bundles and regions components MUST be the full domain of g's `in` and `mem` slots (the `args` component lists the covered classical values) |
-| `sampled` | `domain`; `sampler`: `{ "algorithm": "xoshiro256**", "seed": [4 decimal strings, not all zero], "count": n }` | replay; **evidence** |
+| `sampled` | `domain`; `expected`: `"oracle"` \| `{ "table": [...] }` \| `{ "program": closure_hash }`; `subject` and invocation binding as below (K13); `sampler`: `{ "algorithm": "xoshiro256**", "seed": [4 decimal strings, not all zero], "count": n }` | independently replay both sides of the declared relation on every sampled element; compare full tuples; always **evidence**, even if every element is drawn |
 | `structural` | `{ "rule": "translation_lemma" \| "inverse_pair_library" \| "adjoint_table", "subclaims": [indices], "witness": … }`; for `translation_lemma`: `{ "V": [points], "W": [points], "X": [wires], "B": [wires], "frame": [first point, last point] }`; for `inverse_pair_library`: `{ "library_closure_hash", "claim_index" }`; for `adjoint_table`: `{}` | check the rule's side conditions syntactically against the object and the subclaims' results |
 | `numerical` | `{ "subject": { "closure_hash", "variant", "inherited_controls", "schedule_hash" }, "metric": "operator_norm", "precision_bits": n, "bound": decimal }` | **checker-computed, for every invocation context of the subject** (below): build the realised unitary U of that invocation (the region's realisation under the root schedule at that path, with its resolved classical arguments, budget, epsilon shares and cleanup choices, and `inherited_controls` control wires prepended) and the reference unitary V (the region's §5.3 semantics with the same arguments, controlled on the same wires) at the subject's signature widths in interval arithmetic at `precision_bits` (basis order = allocation order, controls first), form interval enclosures of `V†U − I` entrywise, derive the operator-norm bound as the Frobenius-norm upper bound in interval arithmetic, and verify it is ≤ `bound`; the claim holds iff it holds for every context |
 | `channel` | `{ "subject": as above, "metric": "diamond", "precision_bits", "bound", "dual": [ { "Y": interval Hermitian matrix, "mu": decimal } … ] }` | for every invocation context of the subject, in enumeration order, verify its dual witness for the **diamond-norm SDP** below in interval arithmetic and `mu` ≤ `bound` (one witness per context; too few witnesses: reject) |
+
+**CLAIM-REPLAY (K13; from bennett-vm-clw): maintainer decision required**
+(b-isa-spec-9uy). The following comparison/binding/tuple encoding is a
+0.9 proposal. It supplies the relation missing from 0.8's `sampled`
+payload; it does not promote sampled observations to proof.
+
+**Comparison relation (proposal).** `exhaustive` and `sampled` claims
+MUST name their `subject: { closure_hash, variant, inherited_controls,
+schedule_hash? }` and an explicit `expected`; there is no implicit
+self-comparison or default expected relation. Without a schedule the
+left side is the subject's reference semantics at the bound invocation;
+with one it is that invocation's realised operation. `expected: "oracle"`
+compares the realised operation to §5.2's reference oracle map and
+requires `schedule_hash`. `expected: {program: H}` independently runs
+the reference semantics of linked closure H at the **same** arguments,
+budget and interface tuple; its signature MUST be compatible.
+`expected: {table: rows}` compares to the explicit full-tuple rows
+below. The checker MUST compare every interface output, preserve inputs
+and borrowed systems, and verify clean workspace and exact +1 basis
+phase for a permutation assertion (T3); matching a target or fault
+projection alone, or a producer's claimed verdict, is insufficient.
+For a non-permutation realisation, use the existing numerical/channel
+claims rather than labeling basis observations a permutation proof.
+K4's `expected: "inverse_pair"` retains its separate two-composition
+relation and entry/domain bindings; it is not a sampled proof option.
+
+**Table tuples (proposal).** Each table row is `{ before: tuple,
+after: tuple }`. A tuple is `{ bundles: ["<unsigned integer>", …],
+borrowed: ["<unsigned integer>", …], regions: [["<cell>", …], …] }`.
+`bundles` lists inherited control wires first (each width 1), then all
+signature bundles in operand order, **including arbitrary initial
+oracle target and fault bundles**. `borrowed` lists dirty bundles in
+allocation order, with widths fixed by the checked borrow lifetimes;
+`regions` lists interface regions in signature order, every cell in
+increasing address order, each as an unsigned W-bit integer. All
+integers use canonical decimal strings, within the declared widths;
+no cells, inputs or unchanged components may be omitted. Workspace is
+not an interface component and MUST finish zero. Rows are in domain
+enumeration order, one per distinct declared domain element (including
+for `sampled`); duplicate/missing/out-of-range rows reject. This favors
+an explicit table; `{program: H}` provides the compact relation when a
+full table is large. Sampling draws with replacement using the existing
+sampler; coverage counts distinct drawn elements, not draws. A mismatch
+rejects; success is always `evidence` with that distinct covered fraction
+of D, including when the draws happen to cover all of D.
+
+**CLAIM-REPLAY witness**
+
+```json
+{
+  "invocation":{"args":["2"],"budget":["2","0","0","0"]},
+  "row":{
+    "before":{"bundles":["1","2","3"],"borrowed":["1"],"regions":[["2","1"]]},
+    "after":{"bundles":["1","1","3"],"borrowed":["1"],"regions":[["2","1"]]}
+  },
+  "wrong_row":{
+    "before":{"bundles":["1","2","3"],"borrowed":["1"],"regions":[["2","1"]]},
+    "after":{"bundles":["1","2","3"],"borrowed":["1"],"regions":[["2","1"]]}
+  },
+  "changed_arg_after":{"bundles":["1","0","3"],"borrowed":["1"],"regions":[["2","1"]]},
+  "short_budget_after":{"bundles":["1","2","2"],"borrowed":["1"],"regions":[["2","1"]]},
+  "sampler":{"algorithm":"xoshiro256**","seed":["1","0","0","0"],"count":4},
+  "sample_count":4,"distinct_samples":1,"covered_fraction":"1/2048","verdict":"evidence"
+}
+```
+
+The subject is a two-row oracle body `r = lift.add x a;`
+`lift.retval r`, widths x = target = fault = a = 2, with a preserved
+one-bit dirty bundle and an unused two-cell, two-bit `in` interface
+region; no inherited controls. The **body** does not access memory;
+the interface cells remain part of D. The reference payload is
+(1 + 2) mod 4 = 3: target 2 XOR 3 = 1 and fault 3 XOR 0 = 3.
+The singleton declared domain is precisely `row.before`, within the
+full 11-bit D. Four samples of singleton components draw no generator
+words and cover one of 2048 full tuples. An identity implementation
+would agree with itself but MUST fail against `row`; using `wrong_row`
+also MUST fail. At argument 1 the target is 2 XOR 2 = 0; at B = 1 the
+payload is zero and fault is 3 XOR 1 = 2. A certificate for argument 2,
+B = 2 cannot be replayed as either of those invocations. The printed
+rows illustrate the relation; bound closure/object hashes still have
+to be supplied in an actual certificate, not invented for this witness.
 
 **Invocation contexts.** A subject denotes the set of invocations of
 the region `closure_hash`, with the given `variant` and `inherited_
@@ -2129,8 +2334,10 @@ arithmetic** at `precision_bits`
 means every operation rounds outward to `precision_bits`-bit binary
 rationals; transcendental entries (`rx ry rz`) are enclosed by a Taylor
 series with the Lagrange remainder bound (§17 item 8 fixes the term
-count). The subject's `schedule_hash` is required: an executable claim
-names the realisation it is about.
+count). A `numerical` or `channel` subject's `schedule_hash` is required:
+it names the realisation the claim is about. K13 also requires it for
+`expected: "oracle"`; standalone reference relations use the explicit
+invocation binding instead.
 
 **Sampling.** For each domain component with range size R = hi − lo + 1,
 assemble m = ⌈⌈log₂ R⌉/64⌉ consecutive generator words (least-significant
@@ -2151,9 +2358,9 @@ A `proof` label requires the domain to equal D; otherwise the claim is
 ### 12.3 Schema and composition
 
 ```
-  versions; bindings { object_hash, interface_hash, closure_hash (required), reference_program_hash, dialect_mapping_version, target_hash, schedule_hash? }
+  versions; bindings { object_hash, interface_hash, closure_hash (required), reference_program_hash, dialect_mapping_version, target_hash, schedule_hash?, invocation? (K13) }
   producer { name, version, materialisation { llvm_version, pipeline, normaliser_version } }
-  regions { <closure_hash>: { kind, signature, bounds, frame (§9.4), resources { name: decimal }, gates_used { gate: { count, scheme?, epsilon? } },
+  regions { <closure_hash>: { kind, signature, bounds, invocation? (K13), estimate? (K12), frame (§9.4), resources { name: decimal }, gates_used { gate: { count, scheme?, epsilon? } },
             claims: [ <claim> … ], verification: { oracle: i, borrow_frames: [i], inverse_pairs: [ { g, ginv, claim: i, budget: [B,heap,stack,depth], arg_tokens?: { "<arg>": [B,heap,stack,depth] } } ], unitary: [i], channel: [i],
                                                    fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
             cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },
@@ -2161,6 +2368,58 @@ A `proof` label requires the domain to equal D; otherwise the claim is
             definedness_assumptions: [ids] } }
   composition { multiplicities: { "<hash>:<variant>:<inherited_controls>": n (from the realised schedule) }, epsilon_total: { "diamond": v }, method: "sum_over_multiplicities" }
 ```
+
+**Invocation binding (K13 proposal).** An invocation is
+`{ args: [value, …], budget: [B,heap,stack,depth] }`, with every value
+resolved before replay and all four budget components explicit even
+when zero. `args` is in signature order: `iN` and `ptr` values are
+canonical **unsigned decimal strings** of exactly that bit-vector
+value (ptr has `ptr_width` bits); `f64` is `0x` followed by exactly 16
+lowercase hex digits of its IEEE 754 binary64 bit pattern, most
+significant nibble first (so −0 and NaN payloads are not lost); a token
+is its four-component tuple of canonical nonnegative decimal strings,
+not a process-local token id. Budget components are also canonical
+nonnegative decimal strings. Signature types disambiguate encodings;
+widths/ranges and every tuple MUST pass §5.4 validation. `params_hash`
+is SHA-256 of the UTF-8 JCS **args array**, no trailing LF (§9.2), not
+of the whole invocation. Thus equal token tuples have equal parameter
+hashes regardless of ids, while +0 and −0 `f64` parameters differ.
+
+A standalone table/program/structural claim MUST carry `invocation`
+(or inherit an explicit `regions.<closure_hash>.invocation`); it binds
+**every** classical argument and budget. Missing values have no implicit
+zero/default. Claims with no arguments still bind `args: []` and their
+budget. K4 inverse-pair claims instead bind the entry's budget,
+`arg_tokens` and quantified `args` domain as already specified; this
+rule does not replace that quantification by one chosen argument.
+A parameter-uniform structural claim MAY instead bind
+`invocation: { args: "all", budget: "all" }`: its checker MUST discharge
+the rule's side conditions for every well-typed argument vector and
+valid budget, not by replaying a chosen instance. Thus generic library
+and adjoint/translation proofs retain their universal scope.
+A scheduled certificate MUST carry the root `bindings.invocation`;
+its args hash and budget MUST equal the root schedule's bindings, and
+all nested arguments and budgets MUST be resolved at each realised
+invocation context (§12.1), including default-covered contexts.
+Explicit nested bindings, if supplied, MUST equal those resolutions;
+a root binding MUST NOT be silently reused for a different callee.
+A checker MUST reject absent or conflicting bindings before replay,
+and an executor may use a verified result only for the invocation(s)
+it actually covers. Reference table/program/structural claims need no
+schedule; they prove only their reference relation, not a target
+realisation. Scheduled/numerical/channel claims retain the expansion
+library gate and all existing context and composition obligations.
+
+**CLAIM-BINDING witness**
+
+```json
+{"signature":["i128","f64","token"],"args":["18446744073709551617","0x8000000000000000",["2","0","0","0"]],"params_hash":"9f628a694fa7259bf899bfb677aabce1c084e268a738a40f7f643eb6d8c9c093"}
+```
+
+The first argument is > 2^64; the second is binary64 negative zero;
+the third is a token tuple, not an id. Replacing negative zero with
+`0x0000000000000000` changes `params_hash`; replacing the token by
+another valid id of the same tuple does not.
 
 `versions` is the object `{ "isa", "object", "launch", "sched", "cert",
 "coverage", "target" }` of the seven header versions. A **variant** is a
@@ -2178,8 +2437,10 @@ to `diamond` by ×2 once, at the point it is first combined with a
 variants) require `operator_norm` bounds throughout. A controlled
 unitary variant requires a `numerical` claim; an ε > 0 realisation
 compared as a channel requires a `channel` claim. Executable claims
-(`numerical`, `channel`, `exhaustive` with `expected: "oracle"`) bind to
-`schedule_hash` through their subject.
+(`numerical`, `channel`, and `exhaustive` or `sampled` with
+`expected: "oracle"`, plus table/program comparisons of a realised
+operation) bind to `schedule_hash` through their subject. Standalone
+reference relations have only the invocation scope defined above (K13).
 
 ## 13. Coverage (coverage 0.9)
 

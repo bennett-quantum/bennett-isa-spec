@@ -1,0 +1,41 @@
+{
+  "id": "D-sampled-relation-invocation",
+  "suite": "D",
+  "spec": "\u00a712.1 sampled replay/evidence and exhaustive full tuples; \u00a712.2 full D; \u00a712.3 region bounds; \u00a79.2 params_hash",
+  "derivation": "0.8 sampled has domain/sampler but no comparison relation; region bounds do not supply resolved arguments or budget. For a two-row x+a oracle, x=1,a=2,t=2,f=3 at B=2 gives t=1,f=3; a=1 gives t=0 and B=1 gives f=2. These are distinct bindings, and identity self-replay would miss an incorrect map. A relation/tuple interchange cannot be guessed for 0.8.",
+  "unavailable": {
+    "deliverable": 11,
+    "reason": "unavailable pending 0.9: b-isa-spec-9uy (mirror of bennett-vm-clw); accepted 0.8 lacks this contract; no invented CLI probe or 0.9 executor verdict"
+  },
+  "scenario": {
+    "args": [
+      "2"
+    ],
+    "budget": [
+      "2",
+      "0",
+      "0",
+      "0"
+    ],
+    "x": "1",
+    "target": "2",
+    "fault": "3",
+    "seed": [
+      "1",
+      "0",
+      "0",
+      "0"
+    ],
+    "count": 4,
+    "domain": "singleton tuple; one dirty bit and two 2-bit interface cells preserved"
+  },
+  "expected_outcome": {
+    "isa_0_8": "under-specified sampled relation and invocation interchange",
+    "proposed_0_9_witness": "CLAIM-REPLAY witness",
+    "target": "1",
+    "fault": "3",
+    "wrong_identity_relation": "reject",
+    "sampled_success": "evidence",
+    "covered_fraction": "1/2048"
+  }
+}

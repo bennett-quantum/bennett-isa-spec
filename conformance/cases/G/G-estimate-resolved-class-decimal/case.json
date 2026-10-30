@@ -1,0 +1,35 @@
+{
+  "id": "G-estimate-resolved-class-decimal",
+  "suite": "G",
+  "spec": "\u00a710 estimate_run / estimate_get; \u00a78.1 rational division; \u00a78.2 occupancy and peak per class; \u00a79.1 numeric strings",
+  "derivation": "0.8 allows 1/3 costs and distinct class peaks, but has no argument field, vector encoding or decimal rounding rule. No unique 0.8 decimal string is derivable. The proposed 0.9 witness records those choices without changing the 0.8 verdict.",
+  "unavailable": {
+    "deliverable": 8,
+    "reason": "unavailable pending 0.9: b-isa-spec-c15 (mirror of bennett-vm-hsd); accepted 0.8 lacks this contract; no invented CLI probe or 0.9 executor verdict"
+  },
+  "scenario": {
+    "args": [
+      "2"
+    ],
+    "budget": [
+      "2",
+      "0",
+      "0",
+      "0"
+    ],
+    "class_peaks": {
+      "A": 2,
+      "B]": 1,
+      "idle": 0
+    },
+    "exact_time": {
+      "numerator": "1",
+      "denominator": "3"
+    }
+  },
+  "expected_outcome": {
+    "isa_0_8": "under-specified; no executable estimate CLI",
+    "proposed_0_9_witness": "LAUNCH-ESTIMATE witness",
+    "must_preserve": "resolved arguments, exact rational quantities and separate class rows"
+  }
+}

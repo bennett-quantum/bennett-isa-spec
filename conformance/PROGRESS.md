@@ -1,3 +1,46 @@
+# VM hsd/clw contract-gap witnesses — 2026-10-30
+
+Added two 0.8 cases, each explicitly **unavailable pending 0.9**:
+`G-estimate-resolved-class-decimal` names b-isa-spec-c15 / bennett-vm-hsd;
+`D-sampled-relation-invocation` names b-isa-spec-9uy / bennett-vm-clw.
+Their derivations cite the accepted spec's omissions; expected outcomes
+separate the gap from proposed 0.9 witnesses. Neither has an invented
+CLI command or claims a 0.9 implementation pass.
+
+Extended the existing independent draft witness test. RED: the test failed
+at the absent LAUNCH-ESTIMATE witness before draft additions. GREEN:
+Fraction/Decimal independently reconstruct scheduled per-class peaks and
+occupancy, check zero rows and escaped class keys, enclose 1/3 at 34 digits,
+and check exact decimals, decade carry and a >34-digit integer. Full tuple
+XOR checks distinguish the sampled relation from identity and resolve the
+argument/budget witnesses, including unchanged dirty/cell components.
+Singleton replay counts one distinct sample out of 2048 full-domain tuples
+and remains evidence. A separate typed parameter hash checks i128, f64 −0
+and token tuples. No VM/interpreter code is imported or copied.
+
+Headless offline Rust gate: **25 passed, 0 failed/ignored**. Full harness:
+**445 pass, 0 fail, 48 unavailable, 493 total**, exit **2**. D now has
+13 cases (7 pass, 6 unavailable), G has 24 (10 pass, 14 unavailable);
+all other suite counts match the historical table below. Two new
+UNAVAILABLEs are counted, not skipped or promoted. Observed reference
+binary SHA-256 (not rebuilt; council work is off limits):
+`2e67862edb87abc932ce6d10d9609c3b154c64fd1103dd364924958519b0546a`.
+
+Commands (absolute paths, graphical environment unset, project-local TMPDIR):
+
+```sh
+env -u DISPLAY -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u BROWSER TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/.tmp cargo test --offline --manifest-path /home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/Cargo.toml
+env -u DISPLAY -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u BROWSER TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/.tmp /home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/target/debug/bennett-isa-conformance --bin /home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/target/debug/bennett-isa-ref > /home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/.tmp/hsd-clw-suite.log 2>&1
+git -C /home/tobias/Projects/bennett-workspace/bennett-isa-spec diff --check
+sha256sum /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/Bennett-ISA-Spec.md
+```
+
+Accepted 0.8 SHA-256 unchanged:
+`90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e`.
+Draft K12/K13 and the maintainer alternatives are in
+`spec/isa-0.9.PROGRESS.md`; both bug mirrors remain open. The following
+record is historical.
+
 # VM milestone 4 follow-up verification — 2026-10-30
 
 Resumed the inherited uncommitted work after the infrastructure outage.

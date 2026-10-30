@@ -1,5 +1,146 @@
 # ISA 0.9 draft — progress file (resumable)
 
+## VM certificate/estimate contract follow-up — 2026-10-30
+
+Source: `bennett-vm` commit `849f7f7b66e11cbc8c6c56ecbefad9d879fe58ed`,
+read-only `docs/PROGRESS.md` ("Implemented claims and exact obligations",
+"Launch estimate and coverage behavior", and its verification limits),
+and `bd show bennett-vm-hsd` / `bd show bennett-vm-clw` in that repository.
+Read ISA 0.8 §8–§10 and §12, draft §0.2 and the ISA-7, Q14,
+EPS-DECADE, BLOCK-IMAGE and ISA-REF-LIB additions; CLAUDE rules 1, 5,
+8, 10 and 11 apply. No implementation code crosses repository boundaries.
+Only the owned draft, this progress file, conformance and Beads export
+are changed; the committing orchestrator owns its worklog. No interpreter
+source/build, accepted 0.8 edit, ABI header edit, push or remote sync.
+
+### K12 / LAUNCH-ESTIMATE — §10, §10.1, §12.3
+
+Mirror **b-isa-spec-c15**, bug, label `isa-0.9`, source **bennett-vm-hsd**.
+**maintainer decision required: request API, class keys and decimal policy**.
+
+Proposed normative text adds `params_jcs, params_len` to the 0.9 estimate
+request (also carrying explicit variant/inherited controls as in §11),
+with every classical argument resolved in signature order and
+no guessed zero/previous-run/hash default. Token arguments carry their
+own tuples; the outer token fixes the request budget. Host and live
+device-minted tokens are admitted, with tuples copied while valid. Scheduling uses
+matching object bindings or §11 defaults, never a selected basis run in
+place of the padded generated realisation. Every resource is reported:
+scalar count/time and one occupancy/peak row per target class (zero rows
+included), using injective UTF-8 percent-escaped keys. Rational aggregation
+stays exact; display rounds upward to 34 significant digits, with a
+canonical finite decimal spelling. Certificates bind the resolved request
+and effective realisation, contain exact reduced rational rows, and must
+recompute them and their displayed enclosures. The existing expansion
+library gate remains; no end-to-end estimate implementation is claimed.
+
+The maintainer has materially different, non-narrowing choices:
+
+- **API/defaults:** the printed proposal changes the versioned 0.9
+  signature and requires a complete explicit vector (`[]` only for no
+  arguments). Alternatively keep the four-argument function and add a
+  separately named bound-request function or request object carrying
+  concrete parameters; the old entry must resolve a published concrete
+  binding (not invert `params_hash`), or forward to the explicit entry.
+  Both must support every well-typed parameter vector. Neither invents
+  one basis input or drops parameterised estimates.
+- **Class representation:** escaped flat keys preserve `estimate_get`'s
+  pair-of-strings accessors; a class-aware accessor with resource and
+  class returned separately preserves the same vector. These have
+  different ABI/consumer shapes; scalar summation is not an alternative.
+- **Decimal policy:** the printed proposal uses a fixed 34-digit upward
+  enclosure plus exact rational certificate values. A request-selected
+  precision with an explicitly bound rounding/enclosure policy is also
+  sound and supports every rational cost; it produces different bytes
+  and requires an extra request/certificate field. 0.8 chooses neither
+  the precision nor the direction. Fixed nearest rounding would need a
+  separately published error enclosure and could not serve as an upper
+  bound by itself. No policy may call a finite decimal exactly 1/3.
+
+Witness: §10.1 `LAUNCH-ESTIMATE witness` assumes independently specified
+live intervals of duration 1/3: class A peak 2, class B] peak 1, idle
+peak 0, occupancies 2/3, 1/3, 0; separate rows escape B] as B%5D.
+The two nonterminating values round upward at the final digit only.
+This is aggregation arithmetic, not a guessed padded gate count.
+`G-estimate-resolved-class-decimal` records the 0.8 contract gap and is
+**unavailable pending 0.9**, naming both source and mirror beads.
+
+### K13 / CLAIM-REPLAY — §9.2, §12.1–§12.3
+
+Mirror **b-isa-spec-9uy**, bug, label `isa-0.9`, source **bennett-vm-clw**.
+**maintainer decision required: sampled default, invocation and tuple encoding**.
+
+Proposed normative text gives sampled claims an explicit `expected`
+relation (oracle, table or linked reference program) and subject; the
+checker independently computes both sides and compares complete tuples,
+clean workspace and permutation phase where asserted. A reference-only
+claim is distinguished from a schedule-bound realised claim. Canonical
+rows include every interface input/target/fault, dirty bundle and cell.
+Standalone table/program/structural replay binds resolved `args` and
+budget explicitly; parameter-uniform structural claims can bind
+`args: "all", budget: "all"` only with every side condition checked
+universally, retaining generic library/adjoint/translation proofs.
+Scheduled certificates bind the root and resolve all nested contexts,
+including defaults. The exact K4 inverse-pair domain /
+arg_tokens binding remains authoritative and is not replaced by one
+sample argument. Typed unsigned decimal bit-vectors, binary64 bit-pattern
+hex and token tuples give a precise JCS params_hash preimage. Evidence
+coverage counts distinct draws; sampling remains evidence at full coverage.
+
+The maintainer has materially different, non-narrowing choices:
+
+- **Sampled default:** the proposal requires `expected` and supplies no
+  omitted-field default. Alternatively omitted `expected` can mean
+  `"oracle"`, with an explicit schedule-bound subject and the same
+  independent oracle comparison; explicit table/program relations remain
+  available. Both retain sampling and prevent identity self-comparison;
+  they differ on whether the old payload is complete without that field.
+- **Invocation location/encoding:** the proposal puts a resolved invocation
+  on each standalone claim (or its region) and the scheduled root in
+  `bindings.invocation`, hashing the canonical args array. A shared
+  invocation registry with explicit ids and validated immutable records
+  would support the same invocations and avoid repeated vectors; it has
+  different interchange/hash/lookup mechanics. Complete typed little-endian
+  hex values are another lossless parameter encoding. Neither unresolved
+  bounds nor an opaque token id can replace concrete replay bindings.
+- **Tables:** the proposal uses complete positional before/after tuples
+  and a row for every element of the declared domain, even for sampling;
+  the independent program relation remains compact for large domains.
+  Fully named complete tuples, or a keyed table limited to the distinct
+  sampled inputs with mandatory total lookup for those draws, are also
+  non-narrowing relations, with different size/order/coverage contracts.
+  Dropping arbitrary target/fault or dirty/cell components is not sound.
+
+Witness: §12.1 `CLAIM-REPLAY witness` uses x=1, a=2, initial target=2,
+fault=3; the two-row add/retval oracle at B=2 commits payload 3, so the
+final target is 1 and fault remains 3. Identity self-replay would miss
+this difference. a=1 instead gives target 0; B=1 gives fault 2. One
+preserved dirty bit and two preserved two-bit cells remain in the full
+11-bit domain. Four singleton samples consume zero generator words,
+cover one of 2048 tuples, and give evidence. §12.3's additional
+`CLAIM-BINDING witness` hashes an i128 value >2^64, negative-zero f64
+bits and a token tuple; +0 changes the hash, a token id cannot enter it.
+`D-sampled-relation-invocation` is **unavailable pending 0.9**, naming
+both beads, and invents no 0.8 replay CLI or executable certificate.
+
+Both mirrors stay OPEN pending maintainer decisions and accepted 0.9.
+These entries add capability contracts; no NorthStar certificate, @cost,
+full-domain proof or padded SQLite/kernel estimate scope is removed.
+
+Verification: the extended independent witness test failed before the
+LAUNCH-ESTIMATE witness existed, then passed. Python Fraction/Decimal
+checks reconstruct exact class aggregation and upward rounding (including
+decade carry and a >34-digit integer), table XORs, binding-sensitive
+outcomes, distinct coverage and the parameter hash without importing VM
+or interpreter code. Headless offline `cargo test` passes all **25** Rust
+tests; the full 0.8 harness reports **445 pass, 0 fail, 48 unavailable**
+(**493** cases), exit **2**, including the two new contract-gap cases.
+Exact commands and observed binary fingerprint are recorded at the top
+of `conformance/PROGRESS.md`. Draft witnesses are not 0.9 executor conformance.
+
+Accepted 0.8 SHA-256 remains
+`90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e`.
+
 ## VM milestone 4 follow-up — 2026-10-30
 
 Resumed the uncommitted implementation after the infrastructure outage.

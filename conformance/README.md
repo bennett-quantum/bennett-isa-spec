@@ -54,6 +54,14 @@ plus the fixture files it references (shared object texts live in
 
 ### Unavailable cases
 
+`G-estimate-resolved-class-decimal` and
+`D-sampled-relation-invocation` are **unavailable pending 0.9**, naming
+b-isa-spec-c15 / bennett-vm-hsd and b-isa-spec-9uy / bennett-vm-clw.
+Their `spec`/`derivation` document gaps in the accepted 0.8 contract;
+`expected_outcome` distinguishes those gaps from proposed draft witnesses.
+They have no CLI probe, and are counted as unavailable rather than
+asserting that 0.8 prescribes the proposed 0.9 encoding or default.
+
 Where the reference interpreter cannot yet serve a suite (staged
 deliverables: 8 §10 launch library, 9 §8 targets, 10 §11 schedule
 consumer, 11 §12.1 rigorous checker — `reference-interpreter/
