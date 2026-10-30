@@ -18,6 +18,7 @@
 
 pub mod json;
 pub mod ref_catalog;
+pub mod ref_hash;
 
 use json::Json;
 use std::collections::BTreeMap;

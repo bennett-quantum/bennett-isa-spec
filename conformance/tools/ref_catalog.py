@@ -4,6 +4,7 @@ No interpreter imports. Does not publish or update the normative hash marker.
 import argparse
 import hashlib
 import json
+import runpy
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -105,6 +106,7 @@ def arithmetic_family():
 def build(families):
     recipes=copy_family()
     if families>=2: recipes+=arithmetic_family()
+    if families>=3: recipes+=runpy.run_path(str(ROOT/'conformance/tools/ref_arithmetic.py'))['family'](globals())
     recipes.sort(key=lambda r:r['kind'].encode())
     return {'isa':'0.9','name':'ref','version':'0.9','recipes':recipes}
 def witness():

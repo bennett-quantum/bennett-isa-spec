@@ -193,3 +193,261 @@ fn ripple_full_domain() {
     assert_eq!(count, 26880);
     println!("ripple widths 1..4: {count} tuples");
 }
+type Tuple<'a> = (Vec<(&'a str, u64)>, bool, Vec<(&'a str, u64)>);
+fn packed(m: &Machine, tuples: &[Tuple<'_>]) {
+    let mut s = m.packed_state();
+    let mut enable = 0;
+    for (lane, (inputs, en, _)) in tuples.iter().enumerate() {
+        for (n, v) in inputs {
+            m.set_lane(&mut s, n, *v, lane);
+        }
+        if *en {
+            enable |= 1 << lane;
+        }
+    }
+    let before = s.clone();
+    m.run_packed(&mut s, enable, false).unwrap();
+    for (lane, (inputs, en, outputs)) in tuples.iter().enumerate() {
+        for (n, v) in outputs {
+            assert_eq!(m.get_lane(&s, n, lane), *v, "{n}: {inputs:?}, enabled={en}");
+        }
+    }
+    m.run_packed(&mut s, enable, true).unwrap();
+    assert_eq!(s, before, "packed ordinal reversal");
+}
+#[test]
+fn other_arithmetic_full_domain() {
+    let c = catalog();
+    let mut count = 0u64;
+    for n in 1..=4u32 {
+        let size = 1u64 << n;
+        let mask = size - 1;
+        for op in [
+            "and", "xor", "or", "mul", "shl", "lshr", "ashr", "udiv", "urem", "sdiv", "srem",
+        ] {
+            let div = op.ends_with("div") || op.ends_with("rem");
+            let kind = if ["shl", "lshr", "ashr"].contains(&op) {
+                format!("value.{op}.w{n}")
+            } else {
+                format!("value.{op}")
+            };
+            let args = if kind.contains(".w") {
+                vec![]
+            } else {
+                vec![n as i64]
+            };
+            let mut bundles = vec![("a", n as usize), ("b", n as usize), ("t", n as usize)];
+            if div {
+                bundles.push(("f", 4));
+            }
+            let m = Machine::compile(&c.expand(&kind, &args).unwrap(), &bundles).unwrap();
+            let mut batch = Vec::new();
+            for enabled in [false, true] {
+                for a in 0..size {
+                    for b in 0..size {
+                        for t in 0..size {
+                            for f in 0..if div { 16 } else { 1 } {
+                                let code = if div && b == 0 {
+                                    5
+                                } else if op.starts_with('s') && div && a == size / 2 && b == mask {
+                                    6
+                                } else {
+                                    0
+                                };
+                                let v = if code != 0 {
+                                    0
+                                } else {
+                                    match op {
+                                        "and" => a & b,
+                                        "xor" => a ^ b,
+                                        "or" => a | b,
+                                        "mul" => (a * b) & mask,
+                                        "shl" => {
+                                            if b >= n as u64 {
+                                                0
+                                            } else {
+                                                (a << b) & mask
+                                            }
+                                        }
+                                        "lshr" => {
+                                            if b >= n as u64 {
+                                                0
+                                            } else {
+                                                a >> b
+                                            }
+                                        }
+                                        "ashr" => {
+                                            if b >= n as u64 {
+                                                0
+                                            } else {
+                                                (signed(a, n) >> b) as u64 & mask
+                                            }
+                                        }
+                                        "udiv" => a / b,
+                                        "urem" => a % b,
+                                        "sdiv" => (signed(a, n) / signed(b, n)) as u64 & mask,
+                                        "srem" => (signed(a, n) % signed(b, n)) as u64 & mask,
+                                        _ => unreachable!(),
+                                    }
+                                };
+                                let mut inputs = vec![("a", a), ("b", b), ("t", t)];
+                                if div {
+                                    inputs.push(("f", f));
+                                }
+                                let mut outputs = vec![
+                                    ("a", a),
+                                    ("b", b),
+                                    ("t", t ^ if enabled { v } else { 0 }),
+                                ];
+                                if div {
+                                    outputs.push(("f", f ^ if enabled { code } else { 0 }));
+                                }
+                                batch.push((inputs, enabled, outputs));
+                                if batch.len() == 64 {
+                                    packed(&m, &batch);
+                                    batch.clear();
+                                }
+                                count += 1;
+                            }
+                        }
+                    }
+                }
+            }
+            if !batch.is_empty() {
+                packed(&m, &batch);
+            }
+        }
+    }
+    println!("other arithmetic widths 1..4: {count} tuples");
+}
+#[test]
+fn casts_and_select_full_domain() {
+    let c = catalog();
+    let mut count = 0;
+    for n in 1..=4u32 {
+        let size = 1u64 << n;
+        let m = Machine::compile(
+            &c.expand("value.select", &[n as i64]).unwrap(),
+            &[
+                ("a", n as usize),
+                ("b", n as usize),
+                ("p", 1),
+                ("t", n as usize),
+            ],
+        )
+        .unwrap();
+        for en in [false, true] {
+            for a in 0..size {
+                for b in 0..size {
+                    for p in 0..2 {
+                        for t in 0..size {
+                            check(
+                                &m,
+                                &[("a", a), ("b", b), ("p", p), ("t", t)],
+                                en,
+                                &[
+                                    ("a", a),
+                                    ("b", b),
+                                    ("p", p),
+                                    (
+                                        "t",
+                                        t ^ if en {
+                                            if p == 1 {
+                                                a
+                                            } else {
+                                                b
+                                            }
+                                        } else {
+                                            0
+                                        },
+                                    ),
+                                ],
+                            );
+                            count += 1;
+                        }
+                    }
+                }
+            }
+        }
+        for dest in 1..=4u32 {
+            for op in if dest >= n {
+                vec!["zext", "sext"]
+            } else {
+                vec!["trunc"]
+            } {
+                let m = Machine::compile(
+                    &c.expand(&format!("value.{op}"), &[n as i64, dest as i64])
+                        .unwrap(),
+                    &[("a", n as usize), ("t", dest as usize)],
+                )
+                .unwrap();
+                for en in [false, true] {
+                    for a in 0..size {
+                        for t in 0..1 << dest {
+                            let v = if op == "sext" { signed(a, n) as u64 } else { a }
+                                & ((1 << dest) - 1);
+                            check(
+                                &m,
+                                &[("a", a), ("t", t)],
+                                en,
+                                &[("a", a), ("t", t ^ if en { v } else { 0 })],
+                            );
+                            count += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    println!("casts and select widths 1..4: {count} tuples");
+}
+#[test]
+fn independent_canonical_bytes_and_envelope_hashes() {
+    use bennett_isa_conformance::{
+        json,
+        ref_hash::{canonical, envelope_hash, sha256},
+    };
+    assert_eq!(
+        sha256(b""),
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    );
+    assert_eq!(
+        sha256(b"abc"),
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    );
+    let draft = include_str!("../../spec/Bennett-ISA-Spec-0.9-draft.md");
+    let witness = draft
+        .split("**ISA-REF-LIB witness**")
+        .nth(1)
+        .unwrap()
+        .split("```json\n")
+        .nth(1)
+        .unwrap()
+        .split("\n```")
+        .next()
+        .unwrap();
+    assert_eq!(canonical(&json::parse(witness).unwrap()).unwrap(), witness);
+    assert_eq!(
+        envelope_hash(witness),
+        "299510fd67cc626fdcbcc10adcd40730f9af294ba596d86fb25fd31be08a5c7f"
+    );
+    assert_eq!(canonical(&json::parse(BYTES).unwrap()).unwrap(), BYTES);
+    let output = std::process::Command::new("python3")
+        .args([
+            "-I",
+            concat!(env!("CARGO_MANIFEST_DIR"), "/tools/ref_catalog.py"),
+            "--families",
+            "3",
+            "--check",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let hash = envelope_hash(BYTES);
+    assert!(String::from_utf8(output.stdout).unwrap().contains(&hash));
+    println!("Rust and Python CHECKPOINT ONLY envelope SHA-256 {hash}");
+}

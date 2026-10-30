@@ -1,0 +1,26 @@
+{
+  "id": "E-ref-09-other-arithmetic",
+  "suite": "E",
+  "spec": "\u00a711.1 other arithmetic family; \u00a74.1 wrap shifts casts signed division faults; \u00a74.2 div",
+  "derivation": "Independent full-domain Rust integer arithmetic versus expanded Boolean/ripple/restoring-division gates, widths 1\u20134, arbitrary XOR and four-bit fault targets, both ambient control values; all scratch clean and original ordinal reversal restores every bit. 64 packed lanes execute independent basis states with bitwise operations; no sampling. Twelve shift recipes specialize widths 1\u20134; general widths and row compositions remain unfinished.",
+  "scenario": {
+    "family": 3,
+    "catalog": "spec/ref-0.9-draft.json",
+    "checker": "other_arithmetic_full_domain; casts_and_select_full_domain"
+  },
+  "expected_outcome": {
+    "recipes": 24,
+    "widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "arithmetic_tuples": 664560,
+    "cast_select_tuples": 21760
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-8r4; complete catalog, general shifts and binding repair b-isa-spec-cbk required"
+  }
+}

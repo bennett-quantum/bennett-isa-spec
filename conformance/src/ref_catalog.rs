@@ -398,3 +398,56 @@ impl Machine {
         Ok(())
     }
 }
+impl Machine {
+    /// Sixty-four independent basis tuples; each bit position is one lane.
+    pub fn packed_state(&self) -> Vec<u64> {
+        vec![0; self.bits]
+    }
+    pub fn set_lane(&self, s: &mut [u64], name: &str, value: u64, lane: usize) {
+        assert!(lane < 64);
+        for (i, b) in self.inputs[name].iter().enumerate() {
+            s[*b] |= ((value >> i) & 1) << lane;
+        }
+    }
+    pub fn get_lane(&self, s: &[u64], name: &str, lane: usize) -> u64 {
+        self.inputs
+            .get(name)
+            .or_else(|| self.outputs.get(name))
+            .unwrap()
+            .iter()
+            .enumerate()
+            .map(|(i, b)| ((s[*b] >> lane) & 1) << i)
+            .sum()
+    }
+    pub fn run_packed(&self, s: &mut [u64], enabled: u64, reverse: bool) -> Result<(), String> {
+        let apply = |(_, ins): &(usize, Instruction), s: &mut [u64]| -> Result<(), String> {
+            match ins {
+                Instruction::Gate(g, w) => {
+                    if g == "swap" {
+                        let d = (s[w[0]] ^ s[w[1]]) & enabled;
+                        s[w[0]] ^= d;
+                        s[w[1]] ^= d;
+                    } else {
+                        let mask = w[..w.len() - 1].iter().fold(enabled, |v, i| v & s[*i]);
+                        s[w[w.len() - 1]] ^= mask;
+                    }
+                }
+                Instruction::Alloc(w) | Instruction::Release(w) if w.iter().any(|i| s[*i] != 0) => {
+                    return Err("dirty packed lifetime boundary".into())
+                }
+                _ => {}
+            }
+            Ok(())
+        };
+        if reverse {
+            for i in self.instructions.iter().rev() {
+                apply(i, s)?;
+            }
+        } else {
+            for i in &self.instructions {
+                apply(i, s)?;
+            }
+        }
+        Ok(())
+    }
+}

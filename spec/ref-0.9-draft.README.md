@@ -77,3 +77,14 @@ They XOR the arithmetic result into arbitrary `t`, preserving separate `a,b`
 bundles and cleaning all fresh Boolean-node scratch. These are value helpers,
 not a claim to have encoded the lifted assignment/frame/successor rows.
 Full domains at widths 1–4: 26,880 tuples including both controls.
+
+Other arithmetic: `value.and/xor/or/mul/select/zext/sext/trunc/udiv/urem/sdiv/srem`
+and `value.shl/lshr/ashr.w1/w2/w3/w4`. The shifts are explicit width
+specializations; wider shifts remain unfinished. Division uses restoring
+long division at N+1 remainder bits and conditional signed magnitudes,
+XORs code 5/6 into arbitrary four-bit `f`, and leaves `t` unchanged on
+fault. Full domains include signed MIN/-1 and every divisor-zero tuple.
+Widths 1–4: 664,560 arithmetic and 21,760 cast/select tuples.
+Rust std-only SHA-256 and Python hashlib independently agree on the
+checkpoint envelope; both canonicalizers verify the printed qxor witness.
+A checkpoint digest does not identify the complete library.
