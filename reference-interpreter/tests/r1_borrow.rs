@@ -804,3 +804,70 @@ fn r8_zero_trip_cannot_hide_borrowed_quantum_touches() {
 fn r8_action_call_preserves_readonly_control() {
     r8_identity("call");
 }
+
+fn r9_pinned_identity(case: &str, budgets: &[u64]) {
+    let o = Object::parse(support::r9_fixture(case)).unwrap();
+    o.check_hashes().unwrap();
+    assert_eq!(
+        o.identity().unwrap().object_hash,
+        bennett_isa_ref::sha256_hex(o.text.as_bytes())
+    );
+    for steps in budgets {
+        support::r9_identity(
+            &o,
+            &[bennett_isa_ref::Argument::Token(
+                bennett_isa_ref::Budget::steps(*steps),
+            )],
+        );
+    }
+}
+#[test]
+fn r9_opaque_adjoint_restores_borrow_control() {
+    r9_pinned_identity("sol-oracle", &[0, 1]);
+}
+#[test]
+fn r9_matched_opaque_oracle_restores_outer_fact() {
+    r9_pinned_identity("codex-oracle", &[0, 1]);
+}
+#[test]
+fn r9_qinplace_adjoint_restores_borrow_control() {
+    r9_pinned_identity("sol-qinplace", &[1]);
+}
+#[test]
+fn r9_mixed_loop_threads_reallocated_bindings() {
+    let o = Object::parse(support::r9_fixture("loop")).unwrap();
+    o.check_hashes().unwrap();
+    support::r9_identity(&o, &[]);
+}
+
+#[test]
+fn r9_qinplace_zero_budget_rejects_before_mutation() {
+    use bennett_isa_ref::{Argument, Budget};
+    let o = support::rehash(&support::r9_opaque_object("qinplace @o @o tk t", &[], None));
+    for adjoint in [false, true] {
+        let mut q = QuantumState::new();
+        let w = q.allocate(1).unwrap();
+        q.gate("h", &w, None, &[]).unwrap();
+        let entry = q.clone();
+        let mut b = QuantumBindings::default();
+        b.bundles.insert("t".into(), w);
+        b.args
+            .insert("tk".into(), Argument::Token(Budget::steps(0)));
+        let e = o.execute_action("a", &mut q, &b, adjoint, &[]).unwrap_err();
+        assert!(e.to_string().contains("§4.5"), "{e}");
+        assert_eq!(q, entry);
+    }
+    // The exact member subject still checks statically but must reject B=0 at execution.
+    let o = Object::parse(support::r9_fixture("sol-qinplace")).unwrap();
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(".tmp/r9-qinplace-zero.bisa");
+    std::fs::write(&path, &o.text).unwrap();
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_bennett-isa-ref"))
+        .arg("run-action")
+        .arg(&path)
+        .args(["a", "--mut", "0", "--arg", "token:0,0,0,0"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert!(out.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("§4.5"));
+}

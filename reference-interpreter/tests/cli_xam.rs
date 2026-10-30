@@ -1591,3 +1591,67 @@ fn r8_cli_zero_borrowed_quantum_touches() {
 fn r8_cli_call() {
     r8_cli_identity("call");
 }
+
+fn r9_cli_identity(case: &str, tokens: &[&str]) {
+    let text = support::r9_fixture(case);
+    let path = tmp_file(&format!("r9-{case}.bisa"), text);
+    let hashes = ok(&["hash", &path]);
+    assert_eq!(
+        field(&hashes, "object_hash"),
+        &Json::String(bennett_isa_ref::sha256_hex(text.as_bytes()))
+    );
+    ok(&["check", &path]);
+    for token in tokens {
+        for (flag, input) in [
+            ("--mut", "0"),
+            ("--mut", "1"),
+            ("--state", "0=0.6,0;1=0,0.8"),
+        ] {
+            for adj in [false, true] {
+                let mut args = vec!["run-action", &path, "a", flag, input];
+                if !token.is_empty() {
+                    args.extend(["--arg", token]);
+                }
+                if adj {
+                    args.push("--adjoint");
+                }
+                let v = ok(&args);
+                assert_eq!(uint(&v, "wires"), 1);
+                if flag == "--mut" {
+                    assert_eq!(
+                        field(&v, "state").canonical(),
+                        format!("{{\"{input}\":[1,0]}}")
+                    );
+                } else {
+                    let state = field(&v, "state").object().unwrap();
+                    assert_eq!(state.len(), 2);
+                    r6_amplitude(&state["0"], 0.6, 0.0);
+                    r6_amplitude(&state["1"], 0.0, 0.8);
+                }
+            }
+            let mut args = vec!["reverse", &path, "a", flag, input];
+            if !token.is_empty() {
+                args.extend(["--arg", token]);
+            }
+            let v = ok(&args);
+            assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
+            assert_eq!(uint(&v, "wires"), 1);
+        }
+    }
+}
+#[test]
+fn r9_cli_opaque_adjoint_restores_borrow_control() {
+    r9_cli_identity("sol-oracle", &["token:0,0,0,0", "token:1,0,0,0"]);
+}
+#[test]
+fn r9_cli_matched_opaque_oracle_restores_outer_fact() {
+    r9_cli_identity("codex-oracle", &["token:0,0,0,0", "token:1,0,0,0"]);
+}
+#[test]
+fn r9_cli_qinplace_adjoint_restores_borrow_control() {
+    r9_cli_identity("sol-qinplace", &["token:1,0,0,0"]);
+}
+#[test]
+fn r9_cli_mixed_loop_threads_reallocated_bindings() {
+    r9_cli_identity("loop", &[""]);
+}

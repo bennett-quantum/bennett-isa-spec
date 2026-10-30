@@ -6,6 +6,38 @@ under `reference-interpreter/`; commit own paths
 (`git add -A -- reference-interpreter && git commit -- reference-interpreter`),
 never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
+## Round-9 fixes (2026-10-30)
+
+Tracking b-isa-spec-82k. Sole implementer; owned crate and external round-9 response only.
+Independent Python hashlib derivation reproduced all four member H/object pins
+without correction; exact LF bytes live in tests/fixtures/r9-*.bisa and derivation
+in tests/support/r9_pins.py. Exact library/CLI tests added before source changes.
+
+| Blocker | RED tests | Status | Commit |
+|---|---|---|---|
+| SOL-R9-B01 ≡ R9-B01 | r9_opaque_adjoint_restores_borrow_control, r9_matched_opaque_oracle_restores_outer_fact, r9_qinplace_adjoint_restores_borrow_control; CLI counterparts | RED 0/4 library + 0/4 CLI; exact GREEN 8/0 | — |
+| R9-B02 | r9_mixed_loop_threads_reallocated_bindings; CLI counterpart | RED 0/4 library + 0/4 CLI; exact GREEN 8/0 | — |
+
+Exact GREEN: 8/0; first completed full suite 323 passed / 0 failed / 5 ignored.
+The initial baseline run raced the newly added fixture files: its fixture audit
+failed 2 tests, so it is not a baseline pass. A clean git-archive baseline is
+being rerun under the owned ignored .tmp, with the accepted spec read via symlink.
+Initial RED setup also had an Argument-vs-controls API compile error, corrected
+before the semantic REDs. No compile error is counted as a reproduced blocker.
+
+Design: opaque calls carry an explicit adjoint key (oracle self-adjoint;
+qinplace swaps g/ginv) through lowering, instantiation and adjoints. They join
+all-operand LIFO stacks above quantum history; assigning qinplace starts history
+itself because its opaque symbolic assignment loses information. Unmatched
+readers prevent outer pops; lifetime/import barriers invalidate connected stacks.
+Loop lowering consumes released names and resolves each next body against its
+current live entry map. Equal-width, equal-role, nonoverlapping successor
+lifetimes are alpha-renamed to reusable entry slots. Changed environments get
+separate transfers; recurring environments share the exact structured cycle.
+Zero visits publish no binding or fact effects; lexical qregions stay hoisted.
+All physical frame boundaries, complete borrowed-touch guards and per-return
+obligations remain mandatory. No trip cap, expansion sample or scope narrowing.
+
 ## Round-8 fixes (2026-10-30)
 
 Tracking b-isa-spec-41i; sole interpreter implementer, no push.

@@ -400,3 +400,80 @@ pub fn r8_witness(case: &str) -> (String, &'static str, &'static str) {
     assert_eq!(bennett_isa_ref::sha256_hex(text.as_bytes()), oh);
     (text, h, oh)
 }
+
+/// Independent I_t tensor I_bR expectation; each direction starts at entry.
+pub fn r9_identity(o: &Object, args: &[bennett_isa_ref::Argument]) {
+    use bennett_isa_ref::{QuantumBindings, QuantumState};
+    for input in 0..10 {
+        let mut q = QuantumState::new();
+        let w = q.allocate(3).unwrap();
+        for (bit, wire) in w.iter().enumerate() {
+            if input < 8 && input >> bit & 1 == 1 {
+                q.gate("x", &[*wire], None, &[]).unwrap();
+            }
+        }
+        if input >= 8 {
+            q.gate("h", &[w[0]], None, &[]).unwrap();
+            q.gate("h", &[w[1]], None, &[]).unwrap();
+            if input == 9 {
+                q.gate("cx", &[w[1], w[2]], None, &[]).unwrap();
+            }
+        }
+        let entry = q;
+        let mut bindings = QuantumBindings::default();
+        bindings.bundles.insert("t".into(), vec![w[0]]);
+        bindings.borrowed.push(vec![w[1]]);
+        if let Some(arg) = args.first() {
+            bindings.args.insert("tk".into(), arg.clone());
+        }
+        for adjoint in [false, true] {
+            let mut actual = entry.clone();
+            o.execute_action("a", &mut actual, &bindings, adjoint, &[])
+                .unwrap();
+            assert_eq!(actual, entry, "input={input} adjoint={adjoint}");
+            o.execute_action("a", &mut actual, &bindings, !adjoint, &[])
+                .unwrap();
+            assert_eq!(actual, entry);
+        }
+    }
+}
+pub fn r9_fixture(case: &str) -> &'static str {
+    match case {
+        "sol-oracle" => include_str!("../fixtures/r9-sol-oracle.bisa"),
+        "sol-qinplace" => include_str!("../fixtures/r9-sol-qinplace.bisa"),
+        "codex-oracle" => include_str!("../fixtures/r9-codex-oracle.bisa"),
+        "loop" => include_str!("../fixtures/r9-loop.bisa"),
+        _ => panic!("unknown R9 fixture"),
+    }
+}
+
+pub fn r9_opaque_object(body: &str, bounds: &[u64], child: Option<&str>) -> String {
+    let os =
+        r#"{"abi":"0.8","args":[],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#;
+    let ac = format!(
+        r#"{{"abi":"0.8","args":["token"],"bounds":{:?},"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}}"#,
+        bounds
+    );
+    let bound_text = bounds
+        .iter()
+        .map(u64::to_string)
+        .collect::<Vec<_>>()
+        .join(", ");
+    let regs = if bounds.is_empty() {
+        String::new()
+    } else {
+        format!("regs {{  }} bounds {{{bound_text}}}\n")
+    };
+    let action = format!("action @a (t:wire mut) () () (tk:token) ()\n{regs}^entry():\n{body}");
+    let mut functions = vec![(
+        "o",
+        os,
+        "oracle @o (p:wire in) (v:wire) (fr:wire[4]) () ()\n^entry():\nlift.retval p",
+    )];
+    let child_sig = r#"{"abi":"0.8","args":["token"],"bounds":[],"in":[1],"kind":"action","mem":[],"mut":[1,4],"tier":"q"}"#;
+    if let Some(child) = child {
+        functions.push(("child", child_sig, child));
+    }
+    functions.push(("a", &ac, &action));
+    object(&functions, "{}", "")
+}

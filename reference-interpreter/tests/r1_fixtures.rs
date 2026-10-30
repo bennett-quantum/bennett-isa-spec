@@ -567,6 +567,41 @@ fn fixture_identities_are_pinned_as_literals() {
             "id257",
             "0755279a5f665b6bb03930ed4b5a7fb376aafa5bc3cebb737a1b20d3d8139332",
         ),
+        (
+            "r9-sol-oracle",
+            "o",
+            "a8f4a15663aead9ecb6618fe3847deba546cf3172f645ffc7e763f551e529e27",
+        ),
+        (
+            "r9-sol-oracle",
+            "a",
+            "4cabd490b0d1a8dfe31489ec234e91867e66b54c6c4d030eb4e8d1cf6f84bb38",
+        ),
+        (
+            "r9-sol-qinplace",
+            "o",
+            "a8f4a15663aead9ecb6618fe3847deba546cf3172f645ffc7e763f551e529e27",
+        ),
+        (
+            "r9-sol-qinplace",
+            "a",
+            "bc6e5d89276a62eec7074a716d8dbce40e94a2c80c287ad8fc5b5e5c6c756fbf",
+        ),
+        (
+            "r9-codex-oracle",
+            "o",
+            "cab76c914fa09a3fc8237381c6de91e83eeaefbd65cb7f52571ed4020abe8926",
+        ),
+        (
+            "r9-codex-oracle",
+            "a",
+            "be1f0e087e06fecd99df7c3cbb5c3c8c186fde8f814be1f826487e858fa66296",
+        ),
+        (
+            "r9-loop",
+            "a",
+            "bb983f1dc5a8eea46912ea64d1226a9345a05d6cba6cc8452efc9f39b4a17a89",
+        ),
     ];
     let mut checked = 0;
     for (fixture, symbol, hash) in pinned {

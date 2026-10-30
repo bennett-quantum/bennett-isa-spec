@@ -120,6 +120,7 @@ enum Node {
     /// into `outputs`, keyed by the callee: oracle calls and qinplace.
     Opaque {
         key: String,
+        inverse: String,
         controls: Vec<(String, bool)>,
         inputs: Vec<String>,
         outputs: Vec<String>,
@@ -206,17 +207,19 @@ impl Node {
                 Self::Repeat(*n, body.iter().rev().map(Self::adjoint).collect())
             }
             Self::Opaque {
-                assign: true,
                 key,
+                inverse,
                 controls,
                 inputs,
                 outputs,
+                assign,
             } => Self::Opaque {
-                key: format!("inverse({key})"),
+                key: inverse.clone(),
+                inverse: key.clone(),
                 controls: controls.clone(),
                 inputs: inputs.clone(),
                 outputs: outputs.clone(),
-                assign: true,
+                assign: *assign,
             },
             Self::Quantum {
                 key,
@@ -293,12 +296,14 @@ impl Node {
             },
             Self::Opaque {
                 key,
+                inverse,
                 controls,
                 inputs,
                 outputs,
                 assign,
             } => Self::Opaque {
                 key: key.clone(),
+                inverse: inverse.clone(),
                 controls: cs(controls),
                 inputs: ws(inputs),
                 outputs: ws(outputs),
@@ -532,6 +537,97 @@ impl Compiler<'_> {
             body
         })
     }
+    /// Binding-parameterised loop transfers. Newly produced successor bindings
+    /// reuse the entry slot only after that lifetime has ended, at equal width
+    /// and borrow role. This is alpha-renaming, not a quantum exchange. Distinct
+    /// entry environments (e.g. a first-visit width change) get distinct transfers;
+    /// recurring environments share their exact cycle, independently of n.
+    fn compile_repeat(
+        &mut self,
+        n: u64,
+        source: &[Instruction],
+        predicate: &[(String, bool)],
+        out: &mut Vec<Node>,
+    ) -> Result<()> {
+        let mut entries = Vec::new();
+        let mut bodies: Vec<Vec<Node>> = Vec::new();
+        let mut iteration = 0;
+        while iteration < n {
+            let entry = (self.bundles.clone(), self.live_borrowed.clone());
+            if let Some(previous) = entries.iter().position(|e| e == &entry) {
+                let period = bodies.len() - previous;
+                let copies = (n - iteration) / period as u64;
+                if copies > 0 {
+                    out.push(Node::Repeat(copies, bodies[previous..].concat()));
+                    iteration += copies * period as u64;
+                    continue;
+                }
+            }
+            let trace_lengths: BTreeMap<_, _> =
+                self.trace.as_ref().map_or_else(BTreeMap::new, |t| {
+                    t.iter().map(|(line, v)| (*line, v.len())).collect()
+                });
+            let mut body = Vec::new();
+            self.compile(source, predicate, &mut body)?;
+            let entry_wires: BTreeSet<_> = entry.0.values().flatten().cloned().collect();
+            let exit_wires: BTreeSet<_> = self.bundles.values().flatten().cloned().collect();
+            let mut rename = BTreeMap::new();
+            for (name, after) in &self.bundles {
+                if let Some(before) = entry.0.get(name) {
+                    if before.len() == after.len()
+                        && before.iter().all(|w| !exit_wires.contains(w))
+                        && after.iter().all(|w| !entry_wires.contains(w))
+                        && before
+                            .iter()
+                            .zip(after)
+                            .all(|(a, b)| self.borrowed.contains(a) == self.borrowed.contains(b))
+                    {
+                        rename.extend(after.iter().cloned().zip(before.iter().cloned()));
+                    }
+                }
+            }
+            let mut all = BTreeSet::new();
+            for node in &body {
+                node.wires(&mut all);
+            }
+            for w in all {
+                rename.entry(w.clone()).or_insert(w);
+            }
+            let remap = |w: &String| rename.get(w).cloned().unwrap_or_else(|| w.clone());
+            body = body
+                .iter()
+                .map(|node| node.instantiate(&rename, &[]))
+                .collect();
+            for wires in self.bundles.values_mut() {
+                *wires = wires.iter().map(remap).collect();
+            }
+            self.borrowed = self.borrowed.iter().map(remap).collect();
+            self.live_borrowed = self.live_borrowed.iter().map(remap).collect();
+            if let Some(trace) = &mut self.trace {
+                for (line, snapshots) in trace {
+                    for t in snapshots
+                        .iter_mut()
+                        .skip(*trace_lengths.get(line).unwrap_or(&0))
+                    {
+                        for wires in t.bundles.values_mut() {
+                            *wires = wires.iter().map(remap).collect();
+                        }
+                        t.borrowed = t.borrowed.iter().map(remap).collect();
+                        t.nodes = t
+                            .nodes
+                            .iter()
+                            .map(|node| node.instantiate(&rename, &[]))
+                            .collect();
+                    }
+                }
+            }
+            entries.push(entry);
+            bodies.push(body.clone());
+            out.extend(body);
+            iteration += 1;
+        }
+        Ok(())
+    }
     fn compile(
         &mut self,
         seq: &[Instruction],
@@ -569,13 +665,17 @@ impl Compiler<'_> {
                         out.push(Node::Alloc(wires.clone()));
                     }
                 }
-                "qfree" => out.push(Node::Free(self.bundle(&a[0])?)),
+                "qfree" => {
+                    out.push(Node::Free(self.bundle(&a[0])?));
+                    self.bundles.remove(&a[0]);
+                }
                 "qreturn" => {
                     let wires = self.bundle(&a[0])?;
                     for w in &wires {
                         self.live_borrowed.remove(w);
                     }
                     out.push(Node::Return(wires));
+                    self.bundles.remove(&a[0]);
                 }
                 "qpred" => predicate.push((self.scalar(&a[0])?, true)),
                 "qunpred" => {
@@ -601,6 +701,7 @@ impl Compiler<'_> {
                     }
                     if op == "quncopy" {
                         out.push(Node::Free(target));
+                        self.bundles.remove(&a[1]);
                     }
                 }
                 "qexch" => {
@@ -638,9 +739,7 @@ impl Compiler<'_> {
                             self.compile(&i.bodies[0], &with(&c, &predicate), out)?;
                         }
                     } else {
-                        let mut body = Vec::new();
-                        self.compile(&i.bodies[0], &predicate, &mut body)?;
-                        out.push(Node::Repeat(n, body));
+                        self.compile_repeat(n, &i.bodies[0], &predicate, out)?;
                     }
                 }
                 "qregion" => {} // Hoisted once at function entry.
@@ -669,6 +768,7 @@ impl Compiler<'_> {
                     }
                     if op == "qunload" {
                         out.push(Node::Free(value));
+                        self.bundles.remove(&a[2]);
                     }
                 }
                 "oracle_call" | "action_call" | "adj" | "ctl" => {
@@ -694,18 +794,20 @@ impl Compiler<'_> {
                             })?;
                             memory.extend(cells.into_iter().flatten());
                         }
+                        let key = format!(
+                            "oracle:{:?}",
+                            (
+                                &callee.name,
+                                self.classical(&ca[1])?,
+                                list(&ca[6])?
+                                    .iter()
+                                    .map(|n| self.classical(n))
+                                    .collect::<Result<Vec<_>>>()?
+                            )
+                        );
                         out.push(Node::Opaque {
-                            key: format!(
-                                "oracle:{:?}",
-                                (
-                                    &callee.name,
-                                    self.classical(&ca[1])?,
-                                    list(&ca[6])?
-                                        .iter()
-                                        .map(|n| self.classical(n))
-                                        .collect::<Result<Vec<_>>>()?
-                                )
-                            ),
+                            inverse: key.clone(),
+                            key,
                             controls: c,
                             inputs: [inputs, memory].concat(),
                             outputs,
@@ -789,6 +891,7 @@ impl Compiler<'_> {
                     let x = self.bundle(&a[3])?;
                     out.push(Node::Opaque {
                         key: format!("qinplace:{:?}", (&a[0], &a[1], self.classical(&a[2])?)),
+                        inverse: format!("qinplace:{:?}", (&a[1], &a[0], self.classical(&a[2])?)),
                         controls: predicate.clone(),
                         inputs: x.clone(),
                         outputs: x,
@@ -1023,6 +1126,7 @@ impl Evaluation<'_> {
             }
             Node::Opaque {
                 key,
+                inverse: _,
                 controls,
                 inputs,
                 outputs,
@@ -1291,7 +1395,7 @@ impl Facts<'_> {
             Node::Quantum {
                 diagonal: false,
                 ..
-            }
+            } | Node::Opaque { assign: true, .. }
         ) && !touched.iter().any(|w| self.inverses.contains_key(w))
         {
             return false;
@@ -1403,10 +1507,12 @@ impl Facts<'_> {
                     }
                 }
             } else {
-                let gate = matches!(node, Node::Flip(..) | Node::Swap(..));
+                let gate = matches!(node, Node::Flip(..) | Node::Swap(..) | Node::Opaque { .. });
                 if gate
                     && self.e.condition(match node {
-                        Node::Flip(c, _) | Node::Swap(c, _, _) => c,
+                        Node::Flip(c, _)
+                        | Node::Swap(c, _, _)
+                        | Node::Opaque { controls: c, .. } => c,
                         _ => unreachable!(),
                     }) == Poly::zero()
                 {
@@ -1846,6 +1952,7 @@ mod tests {
             Node::Borrow(vec![b.clone()]),
             Node::Opaque {
                 key: "unknown".into(),
+                inverse: "unknown".into(),
                 controls: vec![],
                 inputs: vec![b.clone()],
                 outputs: vec!["t".into()],
