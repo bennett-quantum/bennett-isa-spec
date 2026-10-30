@@ -676,7 +676,7 @@ Baseline: 25 Rust tests green; full 0.8 harness 445 pass / 0 fail /
 
 | Memo item | Section edited | Conformance witness | Status | Commit |
 |---|---|---|---|---|
-| A2 / LAUNCH-ESTIMATE | §10, §10.1, §12.3 (K12) | G-estimate-resolved-class-decimal (retained) | Applied, pending accepted 0.9 | commit containing this row |
+| A2 / LAUNCH-ESTIMATE | §10, §10.1, §12.3 (K12) | G-estimate-resolved-class-decimal (retained) | Applied, pending accepted 0.9 | `2e3ecd2ca4d96008bedfd429fbbf2a30c8e2f8f9` |
 
 Step 1: explicit signature, complete args, escaped flat class keys, exact
 reduced rationals and 34-significant-digit upward enclosure are normative.
@@ -684,3 +684,14 @@ Existing Fraction/Decimal witness checks independently reproduce every row.
 Rejected alternatives (retained historically above): separate bound-request
 entry, class-aware accessor, selectable precision/rounding. No alternative
 remains in §10.1. No new numerical example was needed.
+| A3 / CLAIM-REPLAY | §9.2, §12.1–§12.3 (K13) | D-sampled-relation-invocation; CLAIM-BINDING (retained) | Applied, pending accepted 0.9 | commit containing this row |
+
+Step 2: expected is mandatory, standalone invocations are per claim,
+scheduled roots use bindings.invocation, and complete positional tuple
+arrays retain every input/target/fault/borrowed/cell component. Large
+domains use the program relation. K4 quantified and universally checked
+structural claims retain their scope. Existing independent checks cover
+XOR outcomes, coverage, wide args, signed zero and canonical args hashes.
+Rejected: omitted expected defaulting to oracle; shared invocation registry
+or region-level inheritance; named or sample-only keyed tables. The
+region-inheritance parenthesis was removed to match ratification literally.

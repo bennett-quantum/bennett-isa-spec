@@ -1,5 +1,5 @@
 --- /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/Bennett-ISA-Spec.md	2026-10-28 15:10:07.903399463 +0100
-+++ /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/Bennett-ISA-Spec-0.9-draft.md	2026-10-30 11:18:02.802063433 +0100
++++ /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/Bennett-ISA-Spec-0.9-draft.md	2026-10-30 11:18:35.173431257 +0100
 @@ -1,25 +1,172 @@
 -# Bennett Virtual ISA — Specification, draft 0.8
 +# Bennett Virtual ISA — Specification, draft 0.9
@@ -138,7 +138,7 @@
 +| K10 | §7.3 | **BLOCK-IMAGE**: contiguous complete 512-byte sectors, byte order, partial-image rejection at device initialisation; witness | bennett-vm-47i; b-isa-spec-0d0 | S | – |
 +| K11 | §11.1, §17 item 7 | **ISA-REF-LIB (from bennett-vm-47t): maintainer decision required**. Proposed serialization, envelope hash, ordinals, scratch/removable rules and decomposition set; witness only, publication gated on accepted 0.9 | bennett-vm-47t; b-isa-spec-8r4 (open) | S | new |
 +| K12 | §10, §10.1, §12.3 | **LAUNCH-ESTIMATE (ratified A2)**. Resolved parameters, class-preserving resource keys, upward decimal encoding and exact certificate binding; witness | bennett-vm-hsd; b-isa-spec-c15 (open) | S | – |
-+| K13 | §9.2, §12.1–§12.3 | **CLAIM-REPLAY: maintainer decision required**. Sampled expected relation, standalone invocation binding, canonical parameter and full-table tuple encoding; witness; sampling stays evidence | bennett-vm-clw; b-isa-spec-9uy (open) | S | – |
++| K13 | §9.2, §12.1–§12.3 | **CLAIM-REPLAY (ratified A3)**. Mandatory sampled expected relation, standalone invocation binding, canonical parameter and full-table tuple encoding; witness; sampling stays evidence | bennett-vm-clw; b-isa-spec-9uy (open) | S | – |
 +
 +**Applied Q14 (2026-10-29, b-isa-spec-7u6).** Lprocs take explicit
 +token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -1522,7 +1522,7 @@
  
  ```c
  typedef struct bennett_sched_request_t bennett_sched_request_t;   typedef struct bennett_sched_response_t bennett_sched_response_t;
-@@ -1291,25 +2048,247 @@
+@@ -1291,25 +2048,245 @@
  against the object and executes verbatim or rejects (`E_SCHEDULE_
  INFEASIBLE`).
  
@@ -1676,12 +1676,10 @@
  | `numerical` | `{ "subject": { "closure_hash", "variant", "inherited_controls", "schedule_hash" }, "metric": "operator_norm", "precision_bits": n, "bound": decimal }` | **checker-computed, for every invocation context of the subject** (below): build the realised unitary U of that invocation (the region's realisation under the root schedule at that path, with its resolved classical arguments, budget, epsilon shares and cleanup choices, and `inherited_controls` control wires prepended) and the reference unitary V (the region's §5.3 semantics with the same arguments, controlled on the same wires) at the subject's signature widths in interval arithmetic at `precision_bits` (basis order = allocation order, controls first), form interval enclosures of `V†U − I` entrywise, derive the operator-norm bound as the Frobenius-norm upper bound in interval arithmetic, and verify it is ≤ `bound`; the claim holds iff it holds for every context |
  | `channel` | `{ "subject": as above, "metric": "diamond", "precision_bits", "bound", "dual": [ { "Y": interval Hermitian matrix, "mu": decimal } … ] }` | for every invocation context of the subject, in enumeration order, verify its dual witness for the **diamond-norm SDP** below in interval arithmetic and `mu` ≤ `bound` (one witness per context; too few witnesses: reject) |
  
-+**CLAIM-REPLAY (K13; from bennett-vm-clw): maintainer decision required**
-+(b-isa-spec-9uy). The following comparison/binding/tuple encoding is a
-+0.9 proposal. It supplies the relation missing from 0.8's `sampled`
-+payload; it does not promote sampled observations to proof.
++**CLAIM-REPLAY** (K13; b-isa-spec-9uy, from bennett-vm-clw).
++Sampled observations remain evidence under the following replay contract.
 +
-+**Comparison relation (proposal).** `exhaustive` and `sampled` claims
++**Comparison relation.** `exhaustive` and `sampled` claims
 +MUST name their `subject: { closure_hash, variant, inherited_controls,
 +schedule_hash? }` and an explicit `expected`; there is no implicit
 +self-comparison or default expected relation. Without a schedule the
@@ -1701,7 +1699,7 @@
 +K4's `expected: "inverse_pair"` retains its separate two-composition
 +relation and entry/domain bindings; it is not a sampled proof option.
 +
-+**Table tuples (proposal).** Each table row is `{ before: tuple,
++**Table tuples.** Each table row is `{ before: tuple,
 +after: tuple }`. A tuple is `{ bundles: ["<unsigned integer>", …],
 +borrowed: ["<unsigned integer>", …], regions: [["<cell>", …], …] }`.
 +`bundles` lists inherited control wires first (each width 1), then all
@@ -1778,7 +1776,7 @@
  `error` entry (§12.3) is a **common upper bound over all contexts** of
  its key; the multiplicity composition of §12.3 is sound for that reason.
  
-@@ -1325,7 +2304,10 @@
+@@ -1325,7 +2302,10 @@
  rejects): Y − J(Φ) ⪰ 0, Y + J(Φ) ⪰ 0, mu·I − Tr_out(Y) ⪰ 0 (partial trace
  over the output factor), and mu ≤ `bound`; then ‖Φ‖◇ ≤ mu (the dual of
  Watrous's SDP with Y₀ = Y₁ = Y; this is the diamond norm itself, not
@@ -1790,7 +1788,7 @@
  hi, im_lo, im_hi]` (decimal strings). **Positivity test.** The checker
  proves each of the three matrices **positive definite** by an interval
  Cholesky (or Hermitian LDL†) factorisation in which the interval lower
-@@ -1335,13 +2317,25 @@
+@@ -1335,13 +2315,25 @@
  strictly feasible by replacing Y with Y + δI and mu with mu′ = mu + δ·(d
  + 1) for a small rational δ > 0 (any mu′ > mu + δ·d suffices): then Y ±
  J(Φ) ⪰ δI ≻ 0 and, since Tr_out(Y + δI) = Tr_out(Y) + δ·d·I, mu′·I −
@@ -1819,7 +1817,7 @@
  
  **Sampling.** For each domain component with range size R = hi − lo + 1,
  assemble m = ⌈⌈log₂ R⌉/64⌉ consecutive generator words (least-significant
-@@ -1350,18 +2344,22 @@
+@@ -1350,18 +2342,22 @@
  
  ### 12.2 Domains
  
@@ -1841,16 +1839,16 @@
    producer { name, version, materialisation { llvm_version, pipeline, normaliser_version } }
 -  regions { <closure_hash>: { kind, signature, bounds, frame (§9.4), resources { name: decimal }, gates_used { gate: { count, scheme?, epsilon? } },
 -            claims: [ <claim> … ], verification: { oracle: i, borrow_frames: [i], inverse_pairs: [ { g, ginv, claim: i } ], unitary: [i], channel: [i],
-+  regions { <closure_hash>: { kind, signature, bounds, invocation? (K13), estimate? (K12), frame (§9.4), resources { name: decimal }, gates_used { gate: { count, scheme?, epsilon? } },
++  regions { <closure_hash>: { kind, signature, bounds, estimate? (K12), frame (§9.4), resources { name: decimal }, gates_used { gate: { count, scheme?, epsilon? } },
 +            claims: [ <claim> … ], verification: { oracle: i, borrow_frames: [i], inverse_pairs: [ { g, ginv, claim: i, budget: [B,heap,stack,depth], arg_tokens?: { "<arg>": [B,heap,stack,depth] } } ], unitary: [i], channel: [i],
                                                     fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
              cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },
              error:   { "<variant>:<inherited_controls>": { local: { "operator_norm"?: v, "diamond"?: v }, inclusive: { "operator_norm"?: v, "diamond"?: v } } },
-@@ -1369,6 +2367,63 @@
+@@ -1369,6 +2365,63 @@
    composition { multiplicities: { "<hash>:<variant>:<inherited_controls>": n (from the realised schedule) }, epsilon_total: { "diamond": v }, method: "sum_over_multiplicities" }
  ```
  
-+**Invocation binding (K13 proposal).** An invocation is
++**Invocation binding (K13).** An invocation is
 +`{ args: [value, …], budget: [B,heap,stack,depth] }`, with every value
 +resolved before replay and all four budget components explicit even
 +when zero. `args` is in signature order: `iN` and `ptr` values are
@@ -1866,8 +1864,8 @@
 +of the whole invocation. Thus equal token tuples have equal parameter
 +hashes regardless of ids, while +0 and −0 `f64` parameters differ.
 +
-+A standalone table/program/structural claim MUST carry `invocation`
-+(or inherit an explicit `regions.<closure_hash>.invocation`); it binds
++Each standalone table/program/structural claim MUST carry its own
++`invocation`; it binds
 +**every** classical argument and budget. Missing values have no implicit
 +zero/default. Claims with no arguments still bind `args: []` and their
 +budget. K4 inverse-pair claims instead bind the entry's budget,
@@ -1910,7 +1908,7 @@
  `inclusive(R, key) = local(R, key) + Σ_callees n_c × inclusive(c, key_c)`
  **per metric**, keyed like `cleanup` by `<variant>:<inherited_controls>`
  (the realised error depends on both); every `local` value is a verified
-@@ -1380,27 +2435,41 @@
+@@ -1380,27 +2433,41 @@
  variants) require `operator_norm` bounds throughout. A controlled
  unitary variant requires a `numerical` claim; an ε > 0 realisation
  compared as a channel requires a `channel` claim. Executable claims
@@ -1958,7 +1956,7 @@
  ### 14.2 Quantum state semantics
  
  The state of a Q region is a vector in ⊗ over live wires in allocation
-@@ -1422,10 +2491,20 @@
+@@ -1422,10 +2489,20 @@
  - **T3 (permutation theorem).** If the realised unitary V of a circuit on
    span(D) is a permutation matrix and the final basis tuple equals P(x)
    for every x ∈ D, then V|span(D) = P.
@@ -1983,7 +1981,7 @@
  - **T5.** As §6.3.
  - **T6 (executor agreement).** Two executors conforming to §3–§7 on one
    target with the same schedule produce on every x ∈ D the same final
-@@ -1439,14 +2518,14 @@
+@@ -1439,14 +2516,14 @@
  
  | Suite | Class | Tests |
  |---|---|---|
@@ -2005,7 +2003,7 @@
  
  ## 16. Canonical textual form (normative)
  
-@@ -1458,7 +2537,17 @@
+@@ -1458,7 +2535,17 @@
  `INT := -?(0|[1-9][0-9]*)`; `FLOAT :=` shortest round-trip decimal with
  `.` or exponent, finite; `STRING := "…"` with escapes `\"`, `\\`, `\n`;
  `HEX := ([0-9a-f]{2})*`. Metadata lines are RFC 8785 canonical JSON
@@ -2024,7 +2022,7 @@
  
  ### 16.2 Grammar
  
-@@ -1472,10 +2561,10 @@
+@@ -1472,10 +2559,10 @@
    dataline  := NAME SP HEX NL
    function  := fhead NL regs? block+
    fhead     := ("fn" SP ("cc"|"r") | "oracle" | "action" | "perm_action" | "lproc") SP "@" NAME SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")"
@@ -2038,7 +2036,7 @@
    regs      := "regs" SP "{" SP (NAME ":" type ("," SP NAME ":" type)*)? SP "}" (SP "bounds" SP "{" INT ("," SP INT)* "}")? NL
    block     := "^" NAME "(" plist "):" NL instr+
    instr     := (lhs SP "=" SP)? OPCODE (SP operand)* (SP "{" NL instr+ "}" (SP "{" NL instr+ "}")?)? NL
-@@ -1485,16 +2574,32 @@
+@@ -1485,16 +2572,32 @@
    VER       := INT "." INT
  ```
  
@@ -2074,7 +2072,7 @@
  
  section functions
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
-@@ -1509,9 +2614,9 @@
+@@ -1509,9 +2612,9 @@
  empty and its envelope is exactly these bytes (each line LF-terminated):
  
  ```
@@ -2086,7 +2084,7 @@
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
  regs { one:reg[8], r:reg[8] }
  ^entry():
-@@ -1521,17 +2626,19 @@
+@@ -1521,17 +2624,19 @@
  ```
  
  With B ≥ 3 every x yields `(x + 1 mod 256, 0)` (`result_val` = 0 ⊕ r);
@@ -2109,7 +2107,7 @@
  
  section functions
  oracle @sum_db (n:wire[8] in) (t:wire[8]) (f:wire[4]) (db:region[4,8] in) ()
-@@ -1586,17 +2693,18 @@
+@@ -1586,17 +2691,18 @@
  SCC (its self-reference is written `@$0`, its `@zero` reference is
  replaced by `@` + the `zero` hash, which is its only part-(6) line; its
  closure set is the `zero` global's leaf and image), so its envelope is
@@ -2132,7 +2130,7 @@
  lift.boundscheck zp 1
  zv = lift.load.i8 zp
  z = lift.icmp.eq n zv
-@@ -1615,7 +2723,7 @@
+@@ -1615,7 +2721,7 @@
  lift.ret acc
  data zero 00
  layout globals.zero {"base":16,"image":"zero","size":1}
@@ -2141,7 +2139,7 @@
  ```
  
  `@sum_db`'s envelope includes every layout leaf, the `zero` image, `@` +
-@@ -1623,11 +2731,377 @@
+@@ -1623,12 +2729,378 @@
  line (`@db` is an interface region, not a symbol):
  
  ```
@@ -2158,7 +2156,7 @@
 +**Example 3** (`borrow_demo`): a permutation action with a loop bound
 +and a borrow frame established by the translation lemma (§5.6).
 +
- ```
++```
 +bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
 +
 +section symbols
@@ -2328,8 +2326,8 @@
 +one = lift.const.i8 1
 +r = lift.add x one
 +lift.retval r
-+```
-+
+ ```
+ 
 +`@inc8` is example 1's oracle. With b = 1 the token's tuple is (3, 0, 0,
 +0) and, on basis inputs, t ⊕= (x + 1) mod 256 with f unchanged; with b = 0
 +it is (2, 0, 0, 0): t unchanged, f ⊕= `FAULT_BUDGET_STEPS` (example 1's
@@ -2520,10 +2518,11 @@
 +step 5, so B ≥ 5 gives (0, `FAULT_CALLEE`). The nested fault, stack
 +history, parameters and locations are cleared by prefix reversal; no
 +additional charge arises from forwarding, commit or reversal.
- 
++
  ## 17. Decisions deferred to implementation, with defaults
  
-@@ -1653,7 +3127,11 @@
+ Each item is one an implementer must decide to build; any decision is
+@@ -1653,7 +3125,11 @@
     (ripple-carry adders and comparators, linear `inrange` scans,
     one-hot address dispatch, clean scratch released in reverse order);
     a schedule that names no `expansion` binds `ref` at the ISA's own
@@ -2536,7 +2535,7 @@
  8. **Enclosure procedure for transcendental entries** (§12.1). Default:
     Taylor series of sin and cos to the first term whose Lagrange
     remainder bound is below 2^−(`precision_bits` + 2), argument reduced
-@@ -1669,7 +3147,62 @@
+@@ -1669,7 +3145,62 @@
  13. **Suite sizes** (§15): the exhaustive widths of suite C and the
      sample counts of `sampled` claims. Default: exhaustive for ≤ 16
      interface bits; 2^16 samples above.

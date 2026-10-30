@@ -124,7 +124,7 @@ north star §3.1 requires).
 | K10 | §7.3 | **BLOCK-IMAGE**: contiguous complete 512-byte sectors, byte order, partial-image rejection at device initialisation; witness | bennett-vm-47i; b-isa-spec-0d0 | S | – |
 | K11 | §11.1, §17 item 7 | **ISA-REF-LIB (from bennett-vm-47t): maintainer decision required**. Proposed serialization, envelope hash, ordinals, scratch/removable rules and decomposition set; witness only, publication gated on accepted 0.9 | bennett-vm-47t; b-isa-spec-8r4 (open) | S | new |
 | K12 | §10, §10.1, §12.3 | **LAUNCH-ESTIMATE (ratified A2)**. Resolved parameters, class-preserving resource keys, upward decimal encoding and exact certificate binding; witness | bennett-vm-hsd; b-isa-spec-c15 (open) | S | – |
-| K13 | §9.2, §12.1–§12.3 | **CLAIM-REPLAY: maintainer decision required**. Sampled expected relation, standalone invocation binding, canonical parameter and full-table tuple encoding; witness; sampling stays evidence | bennett-vm-clw; b-isa-spec-9uy (open) | S | – |
+| K13 | §9.2, §12.1–§12.3 | **CLAIM-REPLAY (ratified A3)**. Mandatory sampled expected relation, standalone invocation binding, canonical parameter and full-table tuple encoding; witness; sampling stays evidence | bennett-vm-clw; b-isa-spec-9uy (open) | S | – |
 
 **Applied Q14 (2026-10-29, b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -2195,12 +2195,10 @@ Witness envelope SHA-256: `299510fd67cc626fdcbcc10adcd40730f9af294ba596d86fb25fd
 | `numerical` | `{ "subject": { "closure_hash", "variant", "inherited_controls", "schedule_hash" }, "metric": "operator_norm", "precision_bits": n, "bound": decimal }` | **checker-computed, for every invocation context of the subject** (below): build the realised unitary U of that invocation (the region's realisation under the root schedule at that path, with its resolved classical arguments, budget, epsilon shares and cleanup choices, and `inherited_controls` control wires prepended) and the reference unitary V (the region's §5.3 semantics with the same arguments, controlled on the same wires) at the subject's signature widths in interval arithmetic at `precision_bits` (basis order = allocation order, controls first), form interval enclosures of `V†U − I` entrywise, derive the operator-norm bound as the Frobenius-norm upper bound in interval arithmetic, and verify it is ≤ `bound`; the claim holds iff it holds for every context |
 | `channel` | `{ "subject": as above, "metric": "diamond", "precision_bits", "bound", "dual": [ { "Y": interval Hermitian matrix, "mu": decimal } … ] }` | for every invocation context of the subject, in enumeration order, verify its dual witness for the **diamond-norm SDP** below in interval arithmetic and `mu` ≤ `bound` (one witness per context; too few witnesses: reject) |
 
-**CLAIM-REPLAY (K13; from bennett-vm-clw): maintainer decision required**
-(b-isa-spec-9uy). The following comparison/binding/tuple encoding is a
-0.9 proposal. It supplies the relation missing from 0.8's `sampled`
-payload; it does not promote sampled observations to proof.
+**CLAIM-REPLAY** (K13; b-isa-spec-9uy, from bennett-vm-clw).
+Sampled observations remain evidence under the following replay contract.
 
-**Comparison relation (proposal).** `exhaustive` and `sampled` claims
+**Comparison relation.** `exhaustive` and `sampled` claims
 MUST name their `subject: { closure_hash, variant, inherited_controls,
 schedule_hash? }` and an explicit `expected`; there is no implicit
 self-comparison or default expected relation. Without a schedule the
@@ -2220,7 +2218,7 @@ claims rather than labeling basis observations a permutation proof.
 K4's `expected: "inverse_pair"` retains its separate two-composition
 relation and entry/domain bindings; it is not a sampled proof option.
 
-**Table tuples (proposal).** Each table row is `{ before: tuple,
+**Table tuples.** Each table row is `{ before: tuple,
 after: tuple }`. A tuple is `{ bundles: ["<unsigned integer>", …],
 borrowed: ["<unsigned integer>", …], regions: [["<cell>", …], …] }`.
 `bundles` lists inherited control wires first (each width 1), then all
@@ -2358,7 +2356,7 @@ A `proof` label requires the domain to equal D; otherwise the claim is
 ```
   versions; bindings { object_hash, interface_hash, closure_hash (required), reference_program_hash, dialect_mapping_version, target_hash, schedule_hash?, invocation? (K13) }
   producer { name, version, materialisation { llvm_version, pipeline, normaliser_version } }
-  regions { <closure_hash>: { kind, signature, bounds, invocation? (K13), estimate? (K12), frame (§9.4), resources { name: decimal }, gates_used { gate: { count, scheme?, epsilon? } },
+  regions { <closure_hash>: { kind, signature, bounds, estimate? (K12), frame (§9.4), resources { name: decimal }, gates_used { gate: { count, scheme?, epsilon? } },
             claims: [ <claim> … ], verification: { oracle: i, borrow_frames: [i], inverse_pairs: [ { g, ginv, claim: i, budget: [B,heap,stack,depth], arg_tokens?: { "<arg>": [B,heap,stack,depth] } } ], unitary: [i], channel: [i],
                                                    fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
             cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },
@@ -2367,7 +2365,7 @@ A `proof` label requires the domain to equal D; otherwise the claim is
   composition { multiplicities: { "<hash>:<variant>:<inherited_controls>": n (from the realised schedule) }, epsilon_total: { "diamond": v }, method: "sum_over_multiplicities" }
 ```
 
-**Invocation binding (K13 proposal).** An invocation is
+**Invocation binding (K13).** An invocation is
 `{ args: [value, …], budget: [B,heap,stack,depth] }`, with every value
 resolved before replay and all four budget components explicit even
 when zero. `args` is in signature order: `iN` and `ptr` values are
@@ -2383,8 +2381,8 @@ is SHA-256 of the UTF-8 JCS **args array**, no trailing LF (§9.2), not
 of the whole invocation. Thus equal token tuples have equal parameter
 hashes regardless of ids, while +0 and −0 `f64` parameters differ.
 
-A standalone table/program/structural claim MUST carry `invocation`
-(or inherit an explicit `regions.<closure_hash>.invocation`); it binds
+Each standalone table/program/structural claim MUST carry its own
+`invocation`; it binds
 **every** classical argument and budget. Missing values have no implicit
 zero/default. Claims with no arguments still bind `args: []` and their
 budget. K4 inverse-pair claims instead bind the entry's budget,
