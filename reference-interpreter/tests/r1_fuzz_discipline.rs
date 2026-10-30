@@ -694,3 +694,103 @@ fn generated_nested_calls_with_regions_and_local_borrows_match_boolean_maps() {
     }
     assert_eq!(counts, (96, 32));
 }
+
+#[test]
+fn generated_r5_certificate_and_clean_context_lifetimes_match_independent_maps() {
+    let (mut accepted, mut rejected) = (0, 0);
+    // Independent per-lifetime Boolean equations, irrespective of trip parity:
+    // one X: beta'=beta^1; one CX: beta'=beta^t OR t'=t^beta.
+    // Two identical gates cancel within the SAME lifetime.
+    for n in 1..=4 {
+        for gate in ["x b", "cx b t", "cx t b"] {
+            for repetitions in 1..=2 {
+                for nested in [false, true] {
+                    let gates = vec![gate; repetitions].join("\n");
+                    let inner = format!("qloop {n} {{\nb = qborrow any 1\n{gates}\nqreturn b\n}}");
+                    let (body, bounds) = if nested {
+                        (format!("qloop 2 {{\n{inner}\n}}"), vec![2, n])
+                    } else {
+                        (inner, vec![n])
+                    };
+                    for certified in [false, true] {
+                        let text = if certified {
+                            support::certified_borrow_identity(&body, &bounds)
+                        } else {
+                            support::borrow_lifetime_object(&body, &bounds)
+                        };
+                        if repetitions == 2 {
+                            let o = Object::parse(&text).unwrap();
+                            support::borrow_identity(&o);
+                            if certified {
+                                o.verify_certificate().unwrap();
+                            }
+                            accepted += 1;
+                        } else {
+                            let e = Object::parse(&text).unwrap_err().to_string();
+                            assert!(e.contains("§5.6"), "{e}");
+                            rejected += 1;
+                        }
+                    }
+                }
+            }
+        }
+        for dirty in [false, true] {
+            for unrolled in [false, true] {
+                let (lifetimes, bounds) = if unrolled {
+                    (
+                        (0..n)
+                            .map(|j| format!("b{j} = qborrow any 1\ncx d b{j}\nqreturn b{j}"))
+                            .collect::<Vec<_>>()
+                            .join("\n"),
+                        vec![],
+                    )
+                } else {
+                    (
+                        format!("qloop {n} {{\nb = qborrow any 1\ncx d b\nqreturn b\n}}"),
+                        vec![n],
+                    )
+                };
+                let x = if dirty { "x d\n" } else { "" };
+                let body = format!("d = qalloc any 1\n{x}{lifetimes}\n{x}qfree d");
+                for certified in [false, true] {
+                    let text = if certified {
+                        support::certified_borrow_identity(&body, &bounds)
+                    } else {
+                        support::borrow_lifetime_object(&body, &bounds)
+                    };
+                    if dirty {
+                        assert!(Object::parse(&text)
+                            .unwrap_err()
+                            .to_string()
+                            .contains("§5.6"));
+                        rejected += 1;
+                    } else {
+                        let o = Object::parse(&text).unwrap();
+                        support::borrow_identity(&o);
+                        if certified {
+                            o.verify_certificate().unwrap();
+                        }
+                        accepted += 1;
+                    }
+                }
+            }
+        }
+    }
+    assert_eq!((accepted, rejected), (64, 64));
+}
+
+#[test]
+fn generated_r5_alpha_renaming_consumed_workspace_preserves_widths() {
+    let mut count = 0;
+    for n in 1..=3 {
+        for width in 1..=3 {
+            for second in ["d", "e"] {
+                let body = format!("qloop {n} {{\nd = qalloc any 1\ncx t d\ncx t d\nqfree d\n{second} = qalloc any {width}\nqfree {second}\n}}");
+                let o = Object::parse(&support::borrow_lifetime_object(&body, &[n])).unwrap();
+                support::borrow_identity(&o);
+                count += 1;
+            }
+        }
+    }
+    assert_eq!(count, 18);
+}

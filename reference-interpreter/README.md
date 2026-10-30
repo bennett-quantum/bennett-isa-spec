@@ -279,7 +279,9 @@ reference-interpreter/target/debug/bennett-isa-ref run-program reference-interpr
   equality are exact. Born selection compares exact-shadow norm ratios using
   outward-rounded dyadic enclosures, refining without a precision cutoff.
   Supported outcomes survive underflow; conditional binary64 amplitudes are
-  normalized with a shared extended exponent. Display probabilities remain
+  normalized with a shared extended exponent in both `amplitudes` and
+  `exact_support`, including after further gates. Unprojected user vectors
+  retain their supplied scale. Display probabilities remain
   approximations (a positive value can display as zero).
   `QuantumState::set_state_vector` installs a sparse superposition with each
   binary64 amplitude held exactly as its dyadic value.
@@ -320,7 +322,13 @@ jointly. Borrow proofs distinguish the complete classical argument and token
 bindings through inlined calls. Borrow/return lifetime boundaries survive loop
 composition and adjoints: each return proves restoration and independence before
 repetitions compose. A borrow spanning a loop may be restored by the whole loop;
-a later borrowing cannot restore an earlier completed lifetime.
+a later borrowing cannot restore an earlier completed lifetime. Loop proofs
+compose per-return obligations on reachable entries, retaining known-clean
+workspace invariants. Certificates cannot override definite lifetime or
+non-permutation failures; their exhaustive replay checks restoration and output
+independence at each completed return. Workspace widths belong to individual
+producing/consuming instructions, including inverse releases, so a consumed
+spelling may be reused at another width.
 Matched lifted oracle calls preserve all tuple
 boundaries and account for every possible numeric `qjumpr` destination.
 

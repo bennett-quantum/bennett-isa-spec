@@ -1240,6 +1240,7 @@ impl Object {
     ) -> std::result::Result<(), FrameFailure> {
         // Frames: maximal permutation-only runs, from the first to the last
         // operation touching a borrowed wire.
+        let mut unresolved = None;
         let mut start = 0;
         while start < nodes.len() {
             if !nodes[start].permutation() {
@@ -1262,11 +1263,47 @@ impl Object {
                     // Keep surrounding allocation/cleanup when evaluating
                     // lifetime boundaries; the cropped gate frame alone may
                     // omit a clean allocation consumed before a qreturn.
-                    factorises(&nodes[start..end], borrowed)?;
+                    match factorises(&nodes[start..end], borrowed) {
+                        Ok(()) => {}
+                        Err(FrameFailure::Invalid(e)) => return Err(FrameFailure::Invalid(e)),
+                        Err(FrameFailure::NeedsClaim(e)) => {
+                            unresolved.get_or_insert(e);
+                        }
+                    }
                 }
             }
             start = end;
         }
-        Ok(())
+        match unresolved {
+            Some(e) => Err(FrameFailure::NeedsClaim(e)),
+            None => Ok(()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unresolved_earlier_frame_cannot_hide_a_definite_later_nonpermutation() {
+        let o = Object::parse(include_str!("../tests/fixtures/inc8.bisa")).unwrap();
+        let b = "b".to_string();
+        let nodes = [
+            Node::Borrow(vec![b.clone()]),
+            Node::Opaque {
+                key: "unknown".into(),
+                controls: vec![],
+                inputs: vec![b.clone()],
+                outputs: vec!["t".into()],
+                assign: false,
+            },
+            Node::Return(vec![b.clone()]),
+            Node::Other(vec![b.clone()]),
+        ];
+        assert!(matches!(
+            o.decide_frames(&nodes, &BTreeSet::from([b])),
+            Err(FrameFailure::Invalid(_))
+        ));
     }
 }

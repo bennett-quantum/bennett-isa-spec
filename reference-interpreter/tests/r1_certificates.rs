@@ -515,60 +515,22 @@ fn r5_certified_lifetime(gate: &str) -> String {
     };
     let body = format!("qloop 2 {{\nb = qborrow any 1\n{gate}\nqreturn b\n}}");
     let text = support::borrow_lifetime_object(&body, &[2]).replace(&"0".repeat(64), h);
-    let sig = r#"{"abi":"0.8","args":[],"bounds":[2],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}"#;
-    let envelope = format!("isa=0.8\nptr_width=32\n{sig}\nperm_action @a (t:wire mut) () () () ()\nregs {{  }} bounds {{2}}\n^entry():\n{body}\n");
-    assert_eq!(bennett_isa_ref::sha256_hex(envelope.as_bytes()), h);
-    // §9.2 canonical object retains one blank line between sections.
-    assert_eq!(bennett_isa_ref::sha256_hex(text.as_bytes()), object_hash);
-    let template = certificate(
-        &swap_frame(1),
-        1,
-        &claim(1, "1", 1, r#"{"table":[[0,0],[0,1],[1,0],[1,1]]}"#),
-        "0",
+    let certified = support::certified_borrow_identity(&body, &[2]);
+    assert_eq!(
+        certified.split("\nsection certificate").next().unwrap(),
+        text
     );
-    let mut cert = json(template.lines().last().unwrap());
-    let Json::Object(top) = &mut cert else {
-        panic!()
-    };
-    let Json::Object(bindings) = top.get_mut("bindings").unwrap() else {
-        panic!()
-    };
-    for field in ["interface_hash", "closure_hash", "reference_program_hash"] {
-        bindings.insert(field.into(), Json::String(h.into()));
-    }
-    bindings.insert("object_hash".into(), Json::String(object_hash.into()));
-    let Json::Object(regions) = top.get_mut("regions").unwrap() else {
-        panic!()
-    };
-    let mut region = regions.values().next().unwrap().clone();
-    let Json::Object(r) = &mut region else {
-        panic!()
-    };
-    r.insert("signature".into(), json(sig));
-    r.insert("bounds".into(), json("[2]"));
-    let Json::Object(frame) = r.get_mut("frame").unwrap() else {
-        panic!()
-    };
-    frame.insert(
-        "interface".into(),
-        json(r#"[{"role":"mut","width":1,"class":"any"}]"#),
+    let cert = json(certified.lines().last().unwrap());
+    assert_eq!(
+        cert.get("bindings")
+            .unwrap()
+            .get("object_hash")
+            .unwrap()
+            .string()
+            .unwrap(),
+        object_hash
     );
-    let Json::Array(claims) = r.get_mut("claims").unwrap() else {
-        panic!()
-    };
-    let Json::Object(c) = &mut claims[0] else {
-        panic!()
-    };
-    let Json::Object(domain) = c.get_mut("domain").unwrap() else {
-        panic!()
-    };
-    domain.insert(
-        "bundles".into(),
-        json(r#"[{"name":"t","width":1,"lo":0,"hi":1}]"#),
-    );
-    regions.clear();
-    regions.insert(h.into(), region);
-    format!("{text}\nsection certificate\n{}\n", cert.canonical())
+    certified
 }
 
 #[test]
@@ -586,5 +548,67 @@ fn sol_r5_b01_certificates_cannot_waive_completed_lifetimes() {
         {
             support::reject_cli(text, "§5.6", &format!("r5-certified-{i}-{j}"));
         }
+    }
+}
+
+#[test]
+fn sol_r5_b01_library_replay_checks_boundaries_even_when_region_map_is_identity() {
+    for gate in ["x b", "cx b t"] {
+        let invalid = r5_certified_lifetime(gate);
+        // Object's fields are public. Isolate verify_certificate from parse's
+        // definite-failure guard by constructing the same compiled subject from
+        // a valid paired-gate object, then installing the independently bound
+        // invalid source/metadata. This tests the second admission defense.
+        let valid = support::borrow_lifetime_object(
+            &format!("qloop 2 {{\nb = qborrow any 1\n{gate}\n{gate}\nqreturn b\n}}"),
+            &[2],
+        );
+        let mut o = Object::parse(&valid).unwrap();
+        let f = o.functions.get_mut("a").unwrap();
+        f.blocks[0].instructions[0].bodies[0].remove(2);
+        f.lines = invalid
+            .split("section functions\n")
+            .nth(1)
+            .unwrap()
+            .split("\n\nsection certificate")
+            .next()
+            .unwrap()
+            .lines()
+            .map(str::to_string)
+            .collect();
+        o.metadata.insert(
+            "symbols".into(),
+            json(
+                invalid
+                    .split("section symbols\n")
+                    .nth(1)
+                    .unwrap()
+                    .lines()
+                    .next()
+                    .unwrap(),
+            ),
+        );
+        o.metadata
+            .insert("certificate".into(), json(invalid.lines().last().unwrap()));
+        o.text = invalid;
+        let closure = o.identity().unwrap().closure_hashes["a"].clone().unwrap();
+        assert_eq!(o.verify_claim(&closure, 0).unwrap(), ClaimVerdict::Proof);
+        let error = o.verify_certificate().unwrap_err().to_string();
+        assert!(
+            error.contains("§5.6") && error.contains("qreturn"),
+            "{error}"
+        );
+    }
+    for body in [
+        "qloop 2 {\nb = qborrow any 1\nx b\nx b\nqreturn b\n}",
+        "qloop 2 {\nb = qborrow any 1\ncx b t\ncx b t\nqreturn b\n}",
+        "b = qborrow any 1\nqloop 2 {\ncx b t\n}\nqreturn b",
+    ] {
+        let o = Object::parse(&support::certified_borrow_identity(body, &[2])).unwrap();
+        assert_eq!(
+            o.verify_certificate().unwrap()[0].verdict,
+            ClaimVerdict::Proof
+        );
+        support::borrow_identity(&o);
     }
 }

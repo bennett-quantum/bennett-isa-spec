@@ -97,3 +97,28 @@ Unnormalised user vectors retain their supplied scale, including replacing a
 previously projected state. GREEN: quantum/register/CLI targets **54 passed,
 0 failed**. No ambiguity: §14.2 specifies conditional projective measurement
 with Born probabilities.
+
+## Additional admission and metamorphic coverage
+
+`sol_r5_b01_library_replay_checks_boundaries_even_when_region_map_is_identity`
+independently exercises verify_certificate: public Object fields reconstruct
+the exact invalid subjects without parse admission. verify_claim proves the
+final region identity, but verify_certificate rejects each internal X/CX
+return. Certified doubled-X/doubled-CX and carried-even-loop positives prove
+and preserve the entangled reference. Shared fixture construction hashes the
+literal envelope/object without parsing the uncertified subject.
+
+`borrow::tests::unresolved_earlier_frame_cannot_hide_a_definite_later_nonpermutation`
+was separately RED: an unresolved earlier frame hid a later illegal borrowed
+touch. decide_frames now scans all runs, retains an unresolved result, and lets
+any definite failure take precedence before certificate admission.
+
+Two separate deterministic families (no RNG/Python seed change):
+`generated_r5_certificate_and_clean_context_lifetimes_match_independent_maps`
+checks **128 cases, 64 accept / 64 reject**, with and without correctly bound
+certificates: X/CX in either direction, trips 1..4, nesting, doubled gates,
+known-zero vs known-one outer controls and alpha-renamed unrollings. Every
+accepted subject preserves all basis/superposed/entangled-reference states;
+every accepted certificate verifies. `generated_r5_alpha_renaming_consumed_workspace_preserves_widths`
+adds **18 positive cases**, reused/renamed consumed widths 1..3 in loops 1..3,
+with the same exact full-state checks in both directions.
