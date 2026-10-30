@@ -596,6 +596,7 @@ struct Application {
 }
 /// Symbolic evaluation state of one frame.
 struct Evaluation<'a> {
+    opaque_seen: bool,
     vars: BTreeMap<String, u32>,
     state: BTreeMap<String, Poly>,
     opaque: BTreeMap<Application, u32>,
@@ -604,6 +605,7 @@ struct Evaluation<'a> {
 }
 impl Evaluation<'_> {
     fn symbol(&mut self, app: Application) -> Result<Poly> {
+        self.opaque_seen = true;
         if app.inputs.iter().any(|p| p.mentions(self.borrowed)) {
             return err("§5.6", "composed black-box input depends on borrowed wires; needs a §12 borrow_frames claim");
         }
@@ -733,6 +735,7 @@ impl Evaluation<'_> {
                 outputs,
                 assign,
             } => {
+                self.opaque_seen = true;
                 let ins: Vec<Poly> = inputs.iter().map(|w| self.var(w)).collect();
                 let c = self.condition(controls);
                 if ins
@@ -875,7 +878,19 @@ fn translation_lemma(frame: &[Node], borrowed: &BTreeSet<String>) -> bool {
     false
 }
 /// The exact route: P_F = P' ⊗ I_B on the frame's full domain.
-fn factorises(frame: &[Node], borrowed: &BTreeSet<String>) -> Result<()> {
+enum FrameFailure {
+    Invalid(Error),
+    NeedsClaim(Error),
+}
+impl From<Error> for FrameFailure {
+    fn from(e: Error) -> Self {
+        Self::Invalid(e)
+    }
+}
+fn factorises(
+    frame: &[Node],
+    borrowed: &BTreeSet<String>,
+) -> std::result::Result<(), FrameFailure> {
     let mut wires = BTreeSet::new();
     for n in frame {
         n.wires(&mut wires);
@@ -891,6 +906,7 @@ fn factorises(frame: &[Node], borrowed: &BTreeSet<String>) -> Result<()> {
         .map(|(_, v)| *v)
         .collect();
     let mut e = Evaluation {
+        opaque_seen: false,
         state: vars
             .iter()
             .map(|(w, v)| (w.clone(), Poly::var(*v)))
@@ -900,25 +916,36 @@ fn factorises(frame: &[Node], borrowed: &BTreeSet<String>) -> Result<()> {
         applications: BTreeMap::new(),
         borrowed: &borrowed_vars,
     };
+    let failure = |e: &Evaluation<'_>, error| {
+        if e.opaque_seen {
+            FrameFailure::NeedsClaim(error)
+        } else {
+            FrameFailure::Invalid(error)
+        }
+    };
     for n in frame {
-        e.apply(n)?;
+        e.apply(n).map_err(|error| failure(&e, error))?;
     }
     for (w, p) in &e.state {
         match e.vars.get(w) {
             Some(v) if borrowed.contains(w) => {
                 if *p != Poly::var(*v) {
-                    return err(
-                        "§5.6",
-                        format!("borrow frame does not restore borrowed wire {w}"),
-                    );
+                    return Err(failure(
+                        &e,
+                        Error(format!(
+                            "§5.6: borrow frame does not restore borrowed wire {w}"
+                        )),
+                    ));
                 }
             }
             _ => {
                 if p.mentions(&borrowed_vars) {
-                    return err(
-                        "§5.6",
-                        format!("borrow frame output {w} depends on borrowed entry values"),
-                    );
+                    return Err(failure(
+                        &e,
+                        Error(format!(
+                            "§5.6: borrow frame output {w} depends on borrowed entry values"
+                        )),
+                    ));
                 }
             }
         }
@@ -1159,24 +1186,24 @@ impl Object {
         match self.decide_frames(&nodes, &borrowed) {
             Ok(()) => Ok(()),
             // The library route of §5.6: verified certificate borrow_frames claims.
-            Err(e) if self.borrow_frames_certified(f)? => {
-                let _ = e;
-                Ok(())
-            }
-            Err(e) => Err(e),
+            Err(FrameFailure::NeedsClaim(_)) if self.borrow_frames_certified(f)? => Ok(()),
+            Err(FrameFailure::Invalid(e) | FrameFailure::NeedsClaim(e)) => Err(e),
         }
     }
-    fn decide_frames(&self, nodes: &[Node], borrowed: &BTreeSet<String>) -> Result<()> {
+    fn decide_frames(
+        &self,
+        nodes: &[Node],
+        borrowed: &BTreeSet<String>,
+    ) -> std::result::Result<(), FrameFailure> {
         // Frames: maximal permutation-only runs, from the first to the last
         // operation touching a borrowed wire.
         let mut start = 0;
         while start < nodes.len() {
             if !nodes[start].permutation() {
                 if touches(&nodes[start], borrowed) {
-                    return err(
-                        "§5.6",
-                        "borrowed wire touched by a non-permutation instruction",
-                    );
+                    return Err(FrameFailure::Invalid(Error(
+                        "§5.6: borrowed wire touched by a non-permutation instruction".into(),
+                    )));
                 }
                 start += 1;
                 continue;

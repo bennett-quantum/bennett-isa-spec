@@ -433,7 +433,10 @@ impl Object {
                         while done < n {
                             self.action_sequence(&i.bodies[0], q, e, adjoint, &context)?;
                             done += 1;
-                            if done < n && (q.content(), e.bindings.bundles.clone()) == entry {
+                            if done < n
+                                && !q.auditing_borrows()
+                                && (q.content(), e.bindings.bundles.clone()) == entry
+                            {
                                 done += (n - done) / done * done;
                             }
                         }
@@ -533,6 +536,7 @@ impl Object {
                         e.borrowed.insert(name.into(), indices);
                         e.produce(name, wires)?;
                     } else {
+                        q.audit_return(&e.bundle(name)?)?;
                         let indices = e
                             .borrowed
                             .remove(name)

@@ -499,3 +499,92 @@ fn sol_r4_b03_positions_distinguish_same_width_slots_and_crossed_names() {
         .to_string()
         .contains("§12.1"));
 }
+
+/// The hashes are derived without parsing the invalid uncertified subject.
+fn r5_certified_lifetime(gate: &str) -> String {
+    let (h, object_hash) = match gate {
+        "x b" => (
+            "3bc76b4398502416eed66400092c8ec2e5e273d97283b5199065a88a3ed9f1d7",
+            "9b10654c083129047b847830d3582ff3dbf15cf7c8759f4586f836c02e5b6266",
+        ),
+        "cx b t" => (
+            "1e0d1484447af491bd512ef5cc3cbe4f1b9532863aa56ae2149f61247973f343",
+            "4aaf72716633ad6037e3b542f000eb31372accd743ddb97aa97d2960447ac43b",
+        ),
+        _ => panic!("test gate"),
+    };
+    let body = format!("qloop 2 {{\nb = qborrow any 1\n{gate}\nqreturn b\n}}");
+    let text = support::borrow_lifetime_object(&body, &[2]).replace(&"0".repeat(64), h);
+    let sig = r#"{"abi":"0.8","args":[],"bounds":[2],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}"#;
+    let envelope = format!("isa=0.8\nptr_width=32\n{sig}\nperm_action @a (t:wire mut) () () () ()\nregs {{  }} bounds {{2}}\n^entry():\n{body}\n");
+    assert_eq!(bennett_isa_ref::sha256_hex(envelope.as_bytes()), h);
+    // §9.2 canonical object retains one blank line between sections.
+    assert_eq!(bennett_isa_ref::sha256_hex(text.as_bytes()), object_hash);
+    let template = certificate(
+        &swap_frame(1),
+        1,
+        &claim(1, "1", 1, r#"{"table":[[0,0],[0,1],[1,0],[1,1]]}"#),
+        "0",
+    );
+    let mut cert = json(template.lines().last().unwrap());
+    let Json::Object(top) = &mut cert else {
+        panic!()
+    };
+    let Json::Object(bindings) = top.get_mut("bindings").unwrap() else {
+        panic!()
+    };
+    for field in ["interface_hash", "closure_hash", "reference_program_hash"] {
+        bindings.insert(field.into(), Json::String(h.into()));
+    }
+    bindings.insert("object_hash".into(), Json::String(object_hash.into()));
+    let Json::Object(regions) = top.get_mut("regions").unwrap() else {
+        panic!()
+    };
+    let mut region = regions.values().next().unwrap().clone();
+    let Json::Object(r) = &mut region else {
+        panic!()
+    };
+    r.insert("signature".into(), json(sig));
+    r.insert("bounds".into(), json("[2]"));
+    let Json::Object(frame) = r.get_mut("frame").unwrap() else {
+        panic!()
+    };
+    frame.insert(
+        "interface".into(),
+        json(r#"[{"role":"mut","width":1,"class":"any"}]"#),
+    );
+    let Json::Array(claims) = r.get_mut("claims").unwrap() else {
+        panic!()
+    };
+    let Json::Object(c) = &mut claims[0] else {
+        panic!()
+    };
+    let Json::Object(domain) = c.get_mut("domain").unwrap() else {
+        panic!()
+    };
+    domain.insert(
+        "bundles".into(),
+        json(r#"[{"name":"t","width":1,"lo":0,"hi":1}]"#),
+    );
+    regions.clear();
+    regions.insert(h.into(), region);
+    format!("{text}\nsection certificate\n{}\n", cert.canonical())
+}
+
+#[test]
+fn sol_r5_b01_certificates_cannot_waive_completed_lifetimes() {
+    for (i, gate) in ["x b", "cx b t"].iter().enumerate() {
+        // Each beta_i is independent: X fails restoration, CX fails output
+        // independence. Whole-loop parity is irrelevant to either obligation.
+        let certified = r5_certified_lifetime(gate);
+        for (j, text) in [
+            certified.split("\nsection certificate").next().unwrap(),
+            &certified,
+        ]
+        .iter()
+        .enumerate()
+        {
+            support::reject_cli(text, "§5.6", &format!("r5-certified-{i}-{j}"));
+        }
+    }
+}

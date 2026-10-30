@@ -1,5 +1,12 @@
 # Editor response: council round 4
 
+Round-5 correction: R4-B01/MUSE-R4-B01 evidence below established rejection
+without certificates. SOL-R5-B01 found that certificate fallback readmitted
+both invalid lifetimes; SOL-R5-B02 found that generic Repeat lost known-clean
+entry invariants. The corrective implementation and certified/clean-context
+regressions are recorded in response-round-5.md; historical green counts below
+are evidence for their stated runs, not certified-admission coverage.
+
 Inputs: codex out-codex.json and sol out-sol.json, snapshot 8e11fe7. This
 response is appendable for the pending muse pass. Owned paths are exclusively
 reference-interpreter; ISA 0.8, the Python seed and random seeds are unchanged.

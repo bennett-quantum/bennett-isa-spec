@@ -110,11 +110,18 @@ enum State {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Content(Vec<Wire>, Vec<(Key, Amplitude)>);
+pub(crate) type BorrowObservation = (Vec<Wire>, Vec<bool>, Vec<(Wire, bool)>);
+#[derive(Clone, Debug)]
+struct BorrowAudit {
+    entry: BTreeMap<Wire, bool>,
+    returns: Vec<BorrowObservation>,
+}
 #[derive(Clone, Debug)]
 pub struct QuantumState {
     ids: Vec<Wire>,
     next: Wire,
     state: State,
+    borrow_audit: Option<BorrowAudit>,
 }
 impl PartialEq for QuantumState {
     /// Exact equality of the states (binary64 values are not compared).
@@ -240,6 +247,7 @@ impl QuantumState {
     }
     pub fn new() -> Self {
         Self {
+            borrow_audit: None,
             ids: Vec::new(),
             next: 0,
             state: State::Basis {
@@ -261,6 +269,52 @@ impl QuantumState {
                     .collect(),
             },
         )
+    }
+    pub(crate) fn start_borrow_audit(&mut self) -> Result<()> {
+        let entry = self
+            .ids
+            .iter()
+            .map(|w| Ok((*w, self.read_basis(&[*w])? != 0)))
+            .collect::<Result<_>>()?;
+        self.borrow_audit = Some(BorrowAudit {
+            entry,
+            returns: Vec::new(),
+        });
+        Ok(())
+    }
+    pub(crate) fn auditing_borrows(&self) -> bool {
+        self.borrow_audit.is_some()
+    }
+    pub(crate) fn audit_return(&mut self, wires: &[Wire]) -> Result<()> {
+        let Some(audit) = &self.borrow_audit else {
+            return Ok(());
+        };
+        for w in wires {
+            if audit.entry.get(w).copied() != Some(self.read_basis(&[*w])? != 0) {
+                return err("§5.6", "qreturn does not restore its borrowed entry");
+            }
+        }
+        let rest = audit
+            .entry
+            .iter()
+            .filter(|(w, _)| !wires.contains(w))
+            .map(|(_, v)| *v)
+            .collect();
+        let output = self
+            .ids
+            .iter()
+            .filter(|w| !wires.contains(w))
+            .map(|w| Ok((*w, self.read_basis(&[*w])? != 0)))
+            .collect::<Result<_>>()?;
+        if let Some(audit) = &mut self.borrow_audit {
+            audit.returns.push((wires.to_vec(), rest, output));
+        }
+        Ok(())
+    }
+    pub(crate) fn take_borrow_audit(&mut self) -> Vec<BorrowObservation> {
+        self.borrow_audit
+            .take()
+            .map_or_else(Vec::new, |a| a.returns)
     }
     pub fn wire_count(&self) -> usize {
         self.ids.len()

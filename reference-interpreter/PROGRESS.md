@@ -6,6 +6,21 @@ under `reference-interpreter/`; commit own paths
 (`git add -A -- reference-interpreter && git commit -- reference-interpreter`),
 never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
+## Council round 5, SOL first pass (2026-10-30)
+
+SOL-R5-B01 resolved after RED on the exact correctly bound certificate witness.
+Definite Boolean/non-permutation failures cannot fall back to certificates;
+full-domain library proof replay checks every completed return, including
+restoration and independence before later pool reuse. Exact X/CX witnesses
+reject at parse/hash/check with or without metadata. Targeted borrow/certificate
+suite: 24 pass, 0 fail, 2 ignored; round-4 pins remain green. Reading 20 now
+explicitly records per-completed-lifetime qualification. See appendable
+council/response-round-5.md. Remaining received blockers B02–B04 are in progress.
+
+Correction to round-4 evidence: the original X/CX rejection pins lacked
+certificate-adorned subjects, and generic-body proof discarded clean entry
+invariants. Round 5 covers these separately; prior counts below are historical.
+
 ## Council round 4, muse third pass (2026-10-30)
 
 MUSE-R4-B01 **resolved by 40ef8ce**, independently pinned in this pass. The

@@ -252,6 +252,15 @@ impl Object {
         element: &[(Component, BitVector)],
         budget: Option<Budget>,
     ) -> Result<Vec<BitVector>> {
+        self.execute_element_audited(f, element, budget, None)
+    }
+    fn execute_element_audited(
+        &self,
+        f: &Function,
+        element: &[(Component, BitVector)],
+        budget: Option<Budget>,
+        mut audit: Option<&mut Vec<crate::quantum::BorrowObservation>>,
+    ) -> Result<Vec<BitVector>> {
         let value = |name: &str, width: usize| -> Result<BitVector> {
             let (group, index) = interface_slot(f, name)?;
             Ok(element
@@ -363,7 +372,13 @@ impl Object {
                 b.borrowed.push(wires);
             }
         }
+        if audit.is_some() {
+            q.start_borrow_audit()?;
+        }
         self.execute_action(&f.name, &mut q, &b, false, &[])?;
+        if let Some(audit) = &mut audit {
+            audit.extend(q.take_borrow_audit());
+        }
         let read = |q: &QuantumState, wires: &[u64]| -> Result<BitVector> {
             let mut v = BitVector::zero(wires.len())?;
             for (i, w) in wires.iter().enumerate() {
@@ -710,6 +725,7 @@ impl Object {
         // Group elements by their non-borrowed part: outputs must agree and
         // borrowed outputs must equal borrowed inputs.
         let mut by_rest: BTreeMap<Vec<String>, Vec<String>> = BTreeMap::new();
+        let mut at_return = BTreeMap::new();
         for values in enumerate(&domain)? {
             let element: Vec<(Component, BitVector)> = domain
                 .components
@@ -717,7 +733,18 @@ impl Object {
                 .map(|c| c.0.clone())
                 .zip(values)
                 .collect();
-            let out = self.execute_element(f, &element, None)?;
+            let mut audit = Vec::new();
+            let out = self.execute_element_audited(f, &element, None, Some(&mut audit))?;
+            // Each completed lifetime is checked before any future borrowing.
+            // Prior checked frames are independent of their returned entries,
+            // so reusing a physical pool bit cannot cancel an invalid lifetime.
+            for (ordinal, (wires, rest, output)) in audit.into_iter().enumerate() {
+                let key = (ordinal, wires, rest);
+                if at_return.get(&key).is_some_and(|prior| *prior != output) {
+                    return err("§5.6", "qreturn outputs depend on its borrowed entry");
+                }
+                at_return.insert(key, output);
+            }
             let borrowed_in: Vec<String> = element
                 .iter()
                 .filter(|(c, _)| matches!(c, Component::Borrowed(_)))

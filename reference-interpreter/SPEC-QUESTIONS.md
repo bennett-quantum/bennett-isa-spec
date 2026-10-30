@@ -141,7 +141,10 @@ changed in response to the council's round-1 review
     call whose inputs depend on borrowed wires) is admitted only through verified
     certificate `borrow_frames` claims (proofs over D whose borrowed components
     are restored and do not influence the other outputs). *Proposed 0.9:* "A
-    checker MAY establish the factorisation by any exact decision procedure."
+    checker MAY establish the factorisation by any exact decision procedure.
+    Every completed qborrow/qreturn lifetime MUST satisfy it independently of
+    future borrowing; a certificate of the final whole-region map alone does
+    not discharge internal return obligations."
 21. **Checking exhaustive and sampled claims (§12.1–§12.2)** *new (round 1)*. The
     claim schema fixes neither the output tuple nor the table encoding, nor the
     budget of an oracle claim. Reading: a domain element's output tuple is the
