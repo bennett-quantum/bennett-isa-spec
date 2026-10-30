@@ -17,8 +17,8 @@ objects (kept outside the valid .bisa fixture audit).
 
 | Blocker | RED tests | Status | Commit |
 |---|---|---|---|
-| SOL-R10-B01/B02 ≡ R10-B01 | r10_function_header_prefix_matches_kind; r10_present_bounds_requires_an_integer; r10_exact_fhead_and_nonempty_optional_productions; CLI counterparts | resolved; full gate GREEN | pending |
-| R10-B02 | r10_equivalent_control_sets_preserve_opaque_inverse; CLI counterpart | resolved; full gate GREEN | pending |
+| SOL-R10-B01/B02 ≡ R10-B01 | r10_function_header_prefix_matches_kind; r10_present_bounds_requires_an_integer; r10_exact_fhead_and_nonempty_optional_productions; CLI counterparts | resolved; full gate GREEN | 4ba57f9 |
+| R10-B02 | r10_equivalent_control_sets_preserve_opaque_inverse; CLI counterpart | resolved; full gate GREEN | 4ba57f9 |
 
 Exact RED: parser 0/3, CLI 1/2 (positive control passed), library 0/1.
 Both controls and duplicate witnesses rejected §6.2; all 12 header positions,
@@ -52,6 +52,55 @@ it was corrected before GREEN. Extended pin-target compilation initially
 lacked mod support; corrected before the 4/0 run. Neither is semantic RED.
 The initial 2-family run was 2/0, 109 accepted / 22 rejected; final 3-family
 run was 3/0, 118 accepted / 23 rejected. RNG/seeds unchanged.
+
+### Final round-10 verification
+
+Implementation **4ba57f9**. Tracking b-isa-spec-eka closed.
+All commands headless/offline, absolute manifest, repository .tmp; tests use
+CARGO_PROFILE_TEST_OPT_LEVEL=1 with unchanged assertions/domains/overflow checks.
+No semantic source changed after the first 338/0/5 gate or during sweeps.
+Only the one-trip/tuple positive-control pin additions followed that first gate;
+the final rerun below includes them. SPEC-QUESTIONS unchanged; no new ISA gap,
+amendment, count cap, frame waiver, certificate exception or scope reduction.
+Existing deliverables 8–11 and performance follow-up b-isa-spec-436 remain staged.
+
+| Gate | Observed result |
+|---|---|
+| normal baseline | 327 passed / 0 failed / 5 ignored; 8 unit + 319 integration; 13.40 s |
+| exact RED (initial parser / library) | 0/3 / 0/1 |
+| initial grammar CLI RED / control CLI RED | 1/1 / 0/1 (passed grammar control retained) |
+| aggregate exact RED | 1 passed / 6 failed; 3 parser + 2 CLI + 1 library failures |
+| exact GREEN | 7 passed / 0 failed |
+| first full suite | 334 passed / 0 failed / 5 ignored; 16.85 s |
+| initial deterministic families | 2/0; 109 accepted / 22 rejected |
+| extended families + pin target | 4/0; final families 118 accepted / 23 rejected |
+| full suite with final families | 338 passed / 0 failed / 5 ignored; 15.67 s |
+| extended one-trip/tuple CLI controls | 3 passed / 0 failed |
+| final normal rerun | 338 passed / 0 failed / 5 ignored; 8 unit + 330 integration, 0 doctests; 17.70 s |
+| fmt --check | pass, 0 tests executed |
+| strict all-target Clippy | pass, 0 warnings, 0 tests; final rerun 1.25 s |
+| five ignored sweeps | 5 passed / 0 failed; 100.42 s runner sum |
+| independent Python pins | all supplied H/object pins reproduce, no corrections; 13 case records including new controls |
+| owned diff --check | clean |
+
+| Sweep | Domain | Observed result / runner time |
+|---|---|---|
+| u8 division/remainder | 65,536 pairs × 4 operations = 262,144 executions | 1/0; 0.52 s |
+| 17-wire borrow | 131,072 entries | 1/0; 2.91 s |
+| checked borrow certificate | 262,144 domain elements, subject and expected program | 1/0; 15.23 s |
+| §6 differential | 200,000 programs; 70,931 accepted (all exactly clean) / 129,069 rejected | 1/0; 78.84 s |
+| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 1/0; 2.92 s |
+
+The same RNG/seeds/distribution previously produced 70,930/129,070; the semantic
+set fix admits one more independently checked clean sample. All prior named
+round 4–10 positives and negatives pass. Conformance was not run.
+Response: ../bennett/docs/council/isa-ref-2026-10-29/round-10/response.md.
+Logs: repository .tmp/r10-{baseline,red-all,green-exact,first-full,families,
+families-extended,positive-extended,final-tests,final-rerun-tests,
+final-sweeps,final-rerun-clippy,final-fmt,independent-pins}.log.
+Accepted spec SHA-256 unchanged:
+90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e.
+Only explicit owned paths committed; no push.
 
 ## Round-9 fixes (2026-10-30)
 
