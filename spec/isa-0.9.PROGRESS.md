@@ -709,7 +709,7 @@ realisation gate remains a delivery dependency, not an undecided contract.
 Gate note: raw unified diffs contain space-only context lines by design;
 git diff --check covers source/progress/conformance, and the diff artifact
 is verified by regeneration rather than stripping its context bytes.
-| A6 / topology | §8.2–§8.3, §11, §17 item 15 (K14/D1) | E-topology-grid-09 | Applied, pending accepted 0.9 | commit containing this row |
+| A6 / topology | §8.2–§8.3, §11, §17 item 15 (K14/D1) | E-topology-grid-09 | Applied, pending accepted 0.9 | `679eae0b8b64dadc1b7c3105b07635058a868d85` |
 
 Step 4: optional vertices/edges with addressable classes, pairwise native
 adjacency and concrete schedule placement. The memo does not enumerate
@@ -722,3 +722,14 @@ computation reachable while automatic routing/cost rules wait for 0.10.
 Rejected: omitting topology entirely, or deferring its presence/meaning.
 Python -I JCS/hash and an independent Rust grid/byte/hash test check the
 new witness. Canonical bytes have no trailing LF (b-isa-spec-1pl).
+| B1 / multi-block actions | §5.3 (K15) | C-multiblock-09 | Applied, pending accepted 0.9 | commit containing this row |
+
+Step 5: the ratified sentence is applied. Read reference README and all
+SPEC-QUESTIONS (no separate multi-block entry); action.rs flattens blocks
+in text order with one shared environment. The built binary checks every
+t,p pair and its adjoint against the independent expression, including
+the scratch lifetime across blocks. No disagreement; no bug bead needed.
+Rejected: interpreting action labels as executable CFG branch/join nodes.
+The fixture's 0.8 interface hash is computed from its complete envelope
+(body included), independently of the CLI; no 0.9 example hash is added.
+The separate staged case is unavailable pending 0.9.

@@ -1,0 +1,25 @@
+{
+  "id": "C-multiblock-09",
+  "suite": "C",
+  "spec": "\u00a75.3 text-order multi-block action and cross-block lifetimes",
+  "derivation": "First copies p to d and flips t[0]; second applies CX t[0] t[1], XORs d into t and uncopies d. At t=p=0 the result is 3; reversing the semantic gates would give 1. Scratch d spans blocks and is clean on release. Independent enumeration covers all sixteen t,p tuples and the reference binary agrees in both directions.",
+  "object": "two-blocks.bisa",
+  "scenario": {
+    "mut": 0,
+    "in": 0,
+    "cross_block_scratch": "d"
+  },
+  "expected_outcome": {
+    "mut": [
+      3
+    ],
+    "in": [
+      0
+    ],
+    "scratch": "clean"
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-2c9 (ratified B1; circuits 7bu); 0.8 binary checked separately, not promoted to 0.9 conformance"
+  }
+}

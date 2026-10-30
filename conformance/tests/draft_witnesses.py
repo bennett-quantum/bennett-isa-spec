@@ -150,3 +150,24 @@ assert grid["classes"]["fast"]["capacity"] == len(coords)
 grid_hash = hashlib.sha256(grid_bytes).hexdigest()
 assert json.loads((grid_dir / "case.json").read_text())["expected_outcome"]["target_hash"] == grid_hash
 assert f"Target SHA-256: `{grid_hash}`." in draft
+
+# Existing 0.8 CLI agreement check: text-order blocks with shared scratch.
+import subprocess
+multi_dir = root / "conformance/cases/C/C-multiblock-09"
+source = (multi_dir / "two-blocks.bisa").read_text()
+symbols = json.loads(source.split("section symbols\n")[1].split("\n")[0])
+body = source.split("section functions\n")[1].rstrip("\n")
+envelope = "isa=0.8\nptr_width=32\n" + json.dumps(symbols["0"]["signature"], sort_keys=True, separators=(",", ":")) + "\n" + body + "\n"
+assert hashlib.sha256(envelope.encode()).hexdigest() == symbols["0"]["interface_hash"]
+for t in range(4):
+    for p in range(4):
+        first = t ^ 1
+        expected = first ^ ((first & 1) << 1) ^ p
+        for value, adjoint, output in [(t, False, expected), (expected, True, t)]:
+            command = [str(root / "reference-interpreter/target/debug/bennett-isa-ref"), "run-action", str(multi_dir / "two-blocks.bisa"), "flip", "--mut", str(value), "--in", str(p)]
+            if adjoint:
+                command.append("--adjoint")
+            result = subprocess.run(command, capture_output=True, text=True)
+            assert result.returncode == 0, result.stderr
+            state = json.loads(result.stdout)
+            assert state["mut"] == [output] and state["in"] == [p]

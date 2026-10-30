@@ -128,6 +128,8 @@ north star §3.1 requires).
 
 | K14 | §8.2–§8.3, §11, §17 item 15 | **Topology (ratified A6)**: optional ordered class vertices and undirected edges; native adjacency, scheme/placement binding; absent all-to-all; routing deferral with explicit-gate construction | b-isa-spec-wr7; b-targets-dd3; circuits b4k | S | – |
 
+| K15 | §5.3 | **Multi-block actions (ratified B1)**: text-order unitary fragments, descriptive labels, cross-block lifetimes | b-isa-spec-2c9; circuits 7bu | E | – |
+
 **Applied Q14 (2026-10-29, b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
 `lift.call`; mapped-region parameters preserve the complete lifted-call
@@ -1039,6 +1041,9 @@ permutation matrix (ε = 0, permutation gates only, transitively).
 **Body**: gates; `qcopy quncopy qxor qexch qinplace`; `qload qunload
 qstore qexchm`; `qpred qunpred qif qloop`; `oracle_call action_call`;
 `qalloc qborrow qfree qreturn`; `qregion`.
+An action body with several `block`s executes its blocks in text order,
+each a unitary fragment; labels are descriptive and carry no control
+semantics, and lifetimes may span blocks.
 
 **Bounds.** The `bounds { … }` list of an action's `regs` line and the
 `bounds` array of its signature hold, in text order, the trip count `n`

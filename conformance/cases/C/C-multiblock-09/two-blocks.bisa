@@ -1,0 +1,14 @@
+bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"4ad767902be965561f7295d5bfe7bdf6b3cb6363fb8036b3b9ef81162a425de1","kind":"perm_action","name":"flip","signature":{"abi":"0.8","args":[],"bounds":[],"in":[2],"kind":"perm_action","mem":[],"mut":[2],"tier":"q"}}}
+
+section functions
+perm_action @flip (t:wire[2] mut) (p:wire[2] in) () () ()
+^first():
+d = qcopy p
+x t[0]
+^second():
+cx t[0] t[1]
+qxor d t
+quncopy p d
