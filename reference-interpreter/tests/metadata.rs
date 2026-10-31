@@ -471,3 +471,335 @@ fn r16_schedule_consumer_resolves_default_and_preserves_explicit_binding() {
         .unwrap()
         .is_none());
 }
+
+#[test]
+fn r17_default_share_and_shadowed_witness_preserve_identity() {
+    use support::{
+        r16::{IH, OH},
+        r17::*,
+    };
+    for (source, file_hash, schedule_hash) in [
+        (
+            EPS,
+            "8af833c21de5d94c6684b36cf115c46f5080f528fc898ece2bdda9091b9fb2a5",
+            EPS_SH,
+        ),
+        (
+            TIE,
+            "9fc08dca3c5697d9fcad31bf82f4a4a566d0fda6959d10675859d748696c1aff",
+            TIE_SH,
+        ),
+    ] {
+        assert_eq!(bennett_isa_ref::sha256_hex(source.as_bytes()), file_hash);
+        let o = Object::parse(source).unwrap();
+        o.check_hashes().unwrap();
+        let id = o.identity().unwrap();
+        assert_eq!(id.object_hash, OH);
+        assert_eq!(id.interface_hashes["inc8"], IH);
+        assert_eq!(id.closure_hashes["inc8"].as_deref(), Some(IH));
+        assert_eq!(o.text, source);
+        let raw = source
+            .split_once("section schedule\n")
+            .unwrap()
+            .1
+            .trim_end();
+        assert_eq!(o.section("schedule").unwrap().canonical(), raw);
+        assert_eq!(bennett_isa_ref::sha256_hex(raw.as_bytes()), schedule_hash);
+        assert_eq!(
+            schedule(source)
+                .get("bindings")
+                .unwrap()
+                .get("budget")
+                .unwrap(),
+            &json("[3,0,0,0]")
+        );
+    }
+}
+#[test]
+fn r17_present_gate_share_and_missing_realisation_reject() {
+    for gate in support::r17::malformed_gate() {
+        let e = Object::parse(&support::r17::gate(gate)).unwrap_err();
+        assert!(e.to_string().contains("§9.1: §11"), "{e}");
+    }
+}
+#[test]
+fn r17_shadowed_tie_all_orders_and_genuine_maximum_ties() {
+    use support::r17::*;
+    let mut s = schedule(TIE);
+    let entries = s.get("entries").unwrap().array().unwrap().to_vec();
+    let operation = json(&format!(
+        r#"{{"path":[{{"symbol":"{HASH}","point":"entry:0","iteration":[]}}],"step":1,"phase":"fwd","generated":0}}"#
+    ));
+    for order in [
+        [0, 1, 2],
+        [0, 2, 1],
+        [1, 0, 2],
+        [1, 2, 0],
+        [2, 0, 1],
+        [2, 1, 0],
+    ] {
+        set(
+            &mut s,
+            "entries",
+            Json::Array(order.map(|i| entries[i].clone()).to_vec()),
+        );
+        let o = Object::parse(&document(TIE, &s)).unwrap();
+        o.check_hashes().unwrap();
+        assert_eq!(
+            o.resolve_schedule(&operation, "cleanup").unwrap(),
+            Some(&entries[2])
+        );
+    }
+    for indices in [vec![0, 1], vec![0, 1, 2, 2]] {
+        set(
+            &mut s,
+            "entries",
+            Json::Array(indices.iter().map(|i| entries[*i].clone()).collect()),
+        );
+        let e = Object::parse(&document(TIE, &s)).unwrap_err();
+        assert!(e.to_string().contains("multiple maximal"), "{e}");
+    }
+    set(
+        &mut s,
+        "entries",
+        Json::Array(vec![entries[0].clone(), entries[2].clone()]),
+    );
+    Object::parse(&document(TIE, &s))
+        .unwrap()
+        .check_hashes()
+        .unwrap();
+}
+
+#[test]
+fn r17_specificity_lattice_family_matches_brute_force() {
+    // An independent oracle enumerates concrete operations, and computes the
+    // literal §11 lexicographic maximum. No production overlap/domain helpers.
+    fn score(e: &Json) -> (usize, usize, bool, bool, bool) {
+        let path = e.get("path").unwrap().array().unwrap();
+        let specific = |v: &Json| v != &json(r#""*""#);
+        (
+            path.len(),
+            path.iter()
+                .filter(|p| specific(p.get("iteration").unwrap()))
+                .count(),
+            specific(e.get("step").unwrap()),
+            specific(e.get("phase").unwrap()),
+            specific(e.get("generated").unwrap()),
+        )
+    }
+    fn matches(e: &Json, op: &Json) -> bool {
+        let ep = e.get("path").unwrap().array().unwrap();
+        let opath = op.get("path").unwrap().array().unwrap();
+        ep.len() <= opath.len()
+            && ep.iter().zip(opath).all(|(a, b)| {
+                ["symbol", "point"]
+                    .iter()
+                    .all(|k| a.get(k).unwrap() == b.get(k).unwrap())
+                    && (a.get("iteration").unwrap() == &json(r#""*""#)
+                        || a.get("iteration").unwrap() == b.get("iteration").unwrap())
+            })
+            && ["step", "phase", "generated"].iter().all(|k| {
+                e.get(k).unwrap() == &json(r#""*""#) || e.get(k).unwrap() == op.get(k).unwrap()
+            })
+    }
+    let mut seed = 0x1718_cafe_u64;
+    let mut draw = |n: u64| {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed % n
+    };
+    let mut cases = 0;
+    let mut admitted = 0;
+    for count in 2..=4 {
+        for _ in 0..400 {
+            let mut entries = Vec::new();
+            for _ in 0..count {
+                let mut e = entry(
+                    &format!("entry:{}", draw(3)),
+                    if draw(2) == 0 { "[]" } else { r#""*""# },
+                );
+                if draw(4) == 0 {
+                    set(&mut e, "path", json("[]"));
+                }
+                for key in ["step", "phase", "generated"] {
+                    let value = match draw(3) {
+                        0 => json(r#""*""#),
+                        n if key == "phase" => json(if n == 1 { r#""fwd""# } else { r#""rev""# }),
+                        n => Json::Number((if key == "step" { n } else { n - 1 }).to_string()),
+                    };
+                    set(&mut e, key, value);
+                }
+                entries.push(e);
+            }
+            // 2 specific generated ordinals + one residual; likewise all three
+            // budget steps, both phases, and all three root program points.
+            let mut concrete = Vec::new();
+            for point in 0..3 {
+                for step in 1..=3 {
+                    for phase in ["fwd", "rev"] {
+                        for generated in 0..=2 {
+                            concrete.push(json(&format!(r#"{{"path":[{{"symbol":"{HASH}","point":"entry:{point}","iteration":[]}}],"step":{step},"phase":"{phase}","generated":{generated}}}"#)));
+                        }
+                    }
+                }
+            }
+            let winners: Vec<_> = concrete
+                .iter()
+                .map(|op| {
+                    let matching: Vec<_> = entries
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, e)| matches(e, op))
+                        .collect();
+                    let best = matching.iter().map(|(_, e)| score(e)).max();
+                    matching
+                        .into_iter()
+                        .filter(|(_, e)| Some(score(e)) == best)
+                        .map(|(i, _)| i)
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+            let ambiguous = winners.iter().any(|w| w.len() > 1);
+            let mut s = schedule();
+            set(&mut s, "entries", Json::Array(entries.clone()));
+            let parsed = Object::parse(&with("schedule", &s));
+            assert_eq!(
+                parsed.is_err(),
+                ambiguous,
+                "case {cases}: {}",
+                s.canonical()
+            );
+            if let Ok(o) = parsed {
+                admitted += 1;
+                for (op, w) in concrete.iter().zip(&winners) {
+                    assert_eq!(
+                        o.resolve_schedule(op, "gate").unwrap(),
+                        w.first().map(|i| &entries[*i])
+                    );
+                }
+            }
+            // Document order independence includes rejected cases.
+            entries.reverse();
+            set(&mut s, "entries", Json::Array(entries));
+            assert_eq!(Object::parse(&with("schedule", &s)).is_err(), ambiguous);
+            cases += 1;
+        }
+    }
+    assert_eq!(cases, 1200);
+    eprintln!("R17 specificity family: {cases} schedules + reversed orders, {admitted} admitted, {} rejected; 54 concrete operations each; oracle agreement 100%", cases - admitted);
+}
+
+#[test]
+fn r17_union_coverage_partial_coverage_and_budget_domains() {
+    let mut a = entry("entry:0", r#""*""#);
+    set(&mut a, "phase", json(r#""*""#));
+    let b = a.clone();
+    let mut fwd = a.clone();
+    set(&mut fwd, "phase", json(r#""fwd""#));
+    let mut rev = a.clone();
+    set(&mut rev, "phase", json(r#""rev""#));
+    let mut s = schedule();
+    for (entries, valid) in [
+        (vec![a.clone(), b.clone(), fwd.clone(), rev], true),
+        (vec![a.clone(), b.clone(), fwd], false),
+    ] {
+        set(&mut s, "entries", Json::Array(entries));
+        assert_eq!(Object::parse(&with("schedule", &s)).is_ok(), valid);
+    }
+    // step 4 lies outside the oracle's 1..B domain: no matchable maximum tie.
+    set(&mut a, "step", json("4"));
+    set(&mut s, "entries", Json::Array(vec![a.clone(), a]));
+    Object::parse(&with("schedule", &s)).unwrap();
+}
+
+#[test]
+fn r17_equal_share_consumer_keeps_exact_and_explicit_assignments() {
+    use bennett_isa_ref::ScheduleEpsilonShare;
+    let op = json(&format!(
+        r#"{{"path":[{{"symbol":"{HASH}","point":"entry:0","iteration":[]}}],"step":1,"phase":"fwd","generated":0}}"#
+    ));
+    let o = Object::parse(support::r17::EPS).unwrap();
+    let epsilon = o
+        .section("schedule")
+        .unwrap()
+        .get("bindings")
+        .unwrap()
+        .get("epsilon")
+        .unwrap();
+    for n in [1, 3, 1000] {
+        assert_eq!(
+            o.schedule_epsilon_share(&op, false, n).unwrap(),
+            Some(ScheduleEpsilonShare::EqualShare {
+                epsilon,
+                operations: n
+            })
+        );
+    }
+    assert!(o.schedule_epsilon_share(&op, false, 0).is_err());
+    assert_eq!(
+        o.schedule_epsilon_share(&op, true, 0).unwrap(),
+        Some(ScheduleEpsilonShare::Exact)
+    );
+    let o = Object::parse(&support::r17::gate(json(
+        r#"{"realisation":"native","epsilon_share":"0.125"}"#,
+    )))
+    .unwrap();
+    let supplied = json(r#""0.125""#);
+    assert_eq!(
+        o.schedule_epsilon_share(&op, false, 3).unwrap(),
+        Some(ScheduleEpsilonShare::Assigned(&supplied))
+    );
+    assert_eq!(
+        o.schedule_epsilon_share(&op, true, 3).unwrap(),
+        Some(ScheduleEpsilonShare::Exact)
+    );
+    let o = Object::parse(INC).unwrap();
+    assert_eq!(o.schedule_epsilon_share(&op, false, 3).unwrap(), None);
+}
+
+#[test]
+fn r17_loop_iteration_union_and_empty_domains() {
+    for (bound, valid) in [(0, true), (2, true), (3, false), (1u64 << 40, false)] {
+        let sig = r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}"#.replace("\"bounds\":[]", &format!("\"bounds\":[{bound}]"));
+        let body = format!(
+            "perm_action @a (t:wire mut) () () () ()\nregs {{  }} bounds {{{bound}}}\n^entry():\nqloop {bound} {{\nx t\nx t\n}}"
+        );
+        let o = support::rehash(&support::object(&[("a", &sig, &body)], "{}", ""));
+        let hash = &o.identity().unwrap().interface_hashes["a"];
+        let mut a = entry("entry:1", r#""*""#);
+        let Json::Object(fields) = &mut a else {
+            unreachable!()
+        };
+        let Json::Array(path) = fields.get_mut("path").unwrap() else {
+            unreachable!()
+        };
+        set(&mut path[0], "symbol", Json::String(hash.clone()));
+        let mut c = a.clone();
+        let mut d = a.clone();
+        for (e, iteration) in [(&mut c, 0), (&mut d, 1)] {
+            let Json::Object(fields) = e else {
+                unreachable!()
+            };
+            let Json::Array(path) = fields.get_mut("path").unwrap() else {
+                unreachable!()
+            };
+            set(&mut path[0], "iteration", json(&format!("[{iteration}]")));
+        }
+        let entries = if bound == 0 {
+            vec![a.clone(), a]
+        } else {
+            vec![a.clone(), a, c, d]
+        };
+        let mut s = schedule();
+        let Json::Object(fields) = &mut s else {
+            unreachable!()
+        };
+        let bindings = fields.get_mut("bindings").unwrap();
+        set(bindings, "region", json(r#""a""#));
+        set(bindings, "closure_hash", Json::String(hash.clone()));
+        set(&mut s, "entries", Json::Array(entries));
+        let text = format!("{}\nsection schedule\n{}\n", o.text, s.canonical());
+        assert_eq!(Object::parse(&text).is_ok(), valid, "loop {bound}");
+    }
+}

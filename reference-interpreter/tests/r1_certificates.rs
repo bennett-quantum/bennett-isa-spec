@@ -843,3 +843,44 @@ fn muse_r5_translation_frame_maximality_is_within_its_static_sequence() {
     let text = support::rehash(&text).text;
     sol_assert_translation(&text, &sol_translation_claim(&text, 4, 7, 4, 5, "b"), true);
 }
+
+#[test]
+fn r17_sample_count_default_replays_and_present_values_validate() {
+    let base = swap_frame(1);
+    let domain = r#"{"bundles":[{"name":"t","width":1,"lo":0,"hi":1},{"name":"x","width":1,"lo":0,"hi":1}],"borrowed":[{"name":"b","width":1,"lo":0,"hi":1}],"regions":[]}"#;
+    let mut sampler = json(r#"{"algorithm":"xoshiro256**","seed":["1","2","3","4"]}"#);
+    for count in [None, Some(0), Some(3)] {
+        if let Some(count) = count {
+            let Json::Object(fields) = &mut sampler else {
+                unreachable!()
+            };
+            fields.insert("count".into(), json(&count.to_string()));
+        }
+        let claim = format!(
+            r#"{{"kind":"sampled","domain":{domain},"sampler":{}}}"#,
+            sampler.canonical()
+        );
+        let text = certificate(&base, 1, &claim, "");
+        let o = Object::parse(&text).unwrap();
+        let closure = o.identity().unwrap().closure_hashes["a"].clone().unwrap();
+        assert_eq!(
+            o.verify_claim(&closure, 0).unwrap(),
+            ClaimVerdict::Evidence {
+                elements: count.unwrap_or(65536)
+            }
+        );
+        assert_eq!(o.text, text);
+    }
+    for bad in ["null", "{}", "-1", r#""invalid""#] {
+        let Json::Object(fields) = &mut sampler else {
+            unreachable!()
+        };
+        fields.insert("count".into(), json(bad));
+        let claim = format!(
+            r#"{{"kind":"sampled","domain":{domain},"sampler":{}}}"#,
+            sampler.canonical()
+        );
+        let error = Object::parse(&certificate(&base, 1, &claim, "")).unwrap_err();
+        assert!(error.to_string().contains("§12.1"), "{error}");
+    }
+}

@@ -35,7 +35,7 @@ pub use identity::Identity;
 pub use machine::{
     BasisConfiguration, BasisVectorConfiguration, DerivedWidths, OracleMachine, OracleVectorMachine,
 };
-pub use metadata::ScheduleExpansion;
+pub use metadata::{ScheduleEpsilonShare, ScheduleExpansion};
 pub use object::*;
 pub use oracle::{
     Argument, Budget, OracleInput, OracleOutcome, OracleVectorInput, OracleVectorOutcome,

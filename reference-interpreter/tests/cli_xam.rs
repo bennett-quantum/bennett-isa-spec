@@ -2197,3 +2197,34 @@ fn r16_cli_malformed_present_expansion_rejects() {
         }
     }
 }
+
+#[test]
+fn r17_cli_default_share_and_shadowed_tie_check_hash_pins() {
+    use support::{
+        r16::{IH, OH},
+        r17::*,
+    };
+    for (name, source) in [("epsilon", EPS), ("shadowed", TIE)] {
+        let path = tmp_file(&format!("r17-{name}.bisa"), source);
+        for command in ["check", "hash"] {
+            let result = ok(&[command, &path]);
+            assert_eq!(text(&result, "object_hash"), OH);
+            if command == "check" {
+                assert_eq!(text(&result, "status"), "ok");
+            } else {
+                let inc = field(&result, "symbols").get("inc8").unwrap();
+                assert_eq!(text(inc, "interface_hash"), IH);
+                assert_eq!(text(inc, "closure_hash"), IH);
+            }
+        }
+    }
+}
+#[test]
+fn r17_cli_malformed_gate_share_rejects() {
+    for (i, gate) in support::r17::malformed_gate().into_iter().enumerate() {
+        let path = tmp_file(&format!("r17-bad-gate-{i}.bisa"), &support::r17::gate(gate));
+        for command in ["check", "hash"] {
+            fails(&[command, &path], "§9.1: §11");
+        }
+    }
+}

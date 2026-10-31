@@ -1,4 +1,5 @@
 //! Typed schedule/coverage validation and canonical program-point resolution.
+mod schedule_domains;
 use crate::{
     err, json::Json, validation::normalize_call, Error, Function, Instruction, Object, Result,
 };
@@ -32,6 +33,56 @@ impl Object {
             name: expansion.get("name")?.string()?,
             version: expansion.get("version")?.string()?,
             hash: Some(expansion.get("hash")?.string()?),
+        }))
+    }
+}
+
+/// Exact requested accuracy, without rounding a nonterminating equal share.
+/// Expansion supplies the number of approximate operations; admission cannot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ScheduleEpsilonShare<'a> {
+    Exact,
+    Assigned(&'a Json),
+    EqualShare { epsilon: &'a Json, operations: u128 },
+}
+impl Object {
+    /// §§11/17.6: uncovered cleanup uses unitary reverse.
+    pub fn schedule_cleanup(&self, operation: &Json) -> Result<&str> {
+        self.resolve_schedule(operation, "cleanup")?
+            .map_or(Ok("reverse"), |entry| {
+                entry.get("cleanup")?.get("realisation")?.string()
+            })
+    }
+
+    /// §§8.1/17.9: exact operations stay exact. Otherwise use the selected
+    /// assignment, or region epsilon / approximate_operations. Omission stays
+    /// absent in the schedule. Target/expansion execution remains staged.
+    pub fn schedule_epsilon_share(
+        &self,
+        operation: &Json,
+        exact: bool,
+        approximate_operations: u128,
+    ) -> Result<Option<ScheduleEpsilonShare<'_>>> {
+        let Some(schedule) = self.section("schedule") else {
+            return Ok(None);
+        };
+        if exact {
+            return Ok(Some(ScheduleEpsilonShare::Exact));
+        }
+        if let Some(entry) = self.resolve_schedule(operation, "gate")? {
+            if let Some(share) = entry.get("gate")?.object()?.get("epsilon_share") {
+                return Ok(Some(ScheduleEpsilonShare::Assigned(share)));
+            }
+        }
+        if approximate_operations == 0 {
+            return err(
+                "§8.1/§17 item 9",
+                "an approximate operation requires a nonzero approximate-operation count",
+            );
+        }
+        Ok(Some(ScheduleEpsilonShare::EqualShare {
+            epsilon: schedule.get("bindings")?.get("epsilon")?,
+            operations: approximate_operations,
         }))
     }
 }
@@ -253,6 +304,7 @@ impl Object {
                     if a.get("kind")? == other.get("kind")?
                         && specificity(a)? == specificity(other)?
                         && overlaps(a, other)?
+                        && self.has_uncovered_tie(a, other, entries, region, values[0])?
                     {
                         return err("§11", "multiple maximal matching schedule entries");
                     }
@@ -336,6 +388,7 @@ impl Object {
             return Ok(None);
         };
         let mut result = None;
+        let mut maxima = 0;
         for entry in schedule.get("entries")?.array()? {
             if entry.get("kind")?.string()? != kind
                 || entry.get("path")?.array()?.len() > operation.get("path")?.array()?.len()
@@ -349,7 +402,13 @@ impl Object {
             };
             if better {
                 result = Some(entry);
+                maxima = 1;
+            } else if result.is_some_and(|prior| specificity(prior) == specificity(entry)) {
+                maxima += 1;
             }
+        }
+        if maxima > 1 {
+            return err("§11", "multiple maximal matching schedule entries");
         }
         Ok(result)
     }

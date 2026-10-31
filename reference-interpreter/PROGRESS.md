@@ -2,80 +2,79 @@
 
 Resume here. The whole accepted ISA 0.8 remains in scope; staged deliverables
 are not complete. Sole implementation sub-agent; owned interpreter and external
-round-16 response only. Never push. Every cargo invocation uses the headless
+round-17 response only. Never push. Every cargo invocation uses the headless
 prefix and TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/.tmp.
 
-## Round-16 fixes (2026-10-31)
+## Round-17 fixes (2026-10-31)
 
-Baseline **384 passed / 0 failed / 5 ignored**, summed over all binaries,
-20.67 s runner sum. R16 RED **2 passed / 4 failed** (all omission positives
-fail with missing field expansion); the corrected existing schedule test also
-fails before the fix. GREEN **6 passed / 0 failed**, 0.02 s runner sum.
-All round 4–16 tests are retained, with the contradictory omission rejection
-replaced by successful parse/check_hashes as §17 item 7 requires.
+Baseline **390 passed / 0 failed / 5 ignored**, summed over all 33 binaries
+(including 0-test main/doctests), 22.35 s runner sum. Initial witness RED:
+**2 passed / 4 failed**, missing epsilon_share and pairwise nonmaximal-tie
+rejection. Audit RED for sampler.count: **0 passed / 1 failed**, missing count.
+All round 4–17 positive and negative tests are retained.
 
 | Blocker | RED tests | Status | Commit |
 |---|---|---|---|
-| R16-B01 | metadata_schema::tests::r16_schedule_bindings_grammar_admits_omitted_expansion; metadata::r16_default_expansion_preserves_witness_and_identity; metadata::r16_schedule_consumer_resolves_default_and_preserves_explicit_binding; cli_xam::r16_cli_default_expansion_check_hash_preserves_pins; metadata::schedule_requires_typed_bindings_selectors_and_unique_maxima | GREEN | 8f4d6b7 |
+| R17-B01 | metadata_schema::tests::r17_gate_payload_omission_is_literal_clause_control; metadata::r17_default_share_and_shadowed_witness_preserve_identity; cli_xam::r17_cli_default_share_and_shadowed_tie_check_hash_pins; audit r17_sampler_count_default_is_optional | GREEN | implementation commit below |
+| R17-B02 | metadata::r17_shadowed_tie_all_orders_and_genuine_maximum_ties | GREEN | implementation commit below |
 
-Design: TABLE schedule_bindings uses expansion?:expansion with §17 item 7
-alongside it; present descriptors retain the closed §11 name/version/hash
-production. Object::schedule_expansion returns the effective name, version and
-optional supplied hash: omission resolves to ref/0.8, with no synthetic hash.
-Explicit bindings are preserved; no schedule returns None. No canonical
-schedule bytes are rewritten. Admission and binding resolution are implemented;
-target/schedule execution and interval verification remain staged. No spec
-amendment or new narrowing reading is needed.
+Design: TABLE gate_payload uses epsilon_share?:decimal (§17.9). The
+schedule_epsilon_share consumer returns an exact equal-share recipe once the
+expanded approximate-operation count is known, or preserves an explicit
+assignment; exact operations remain exact. No canonical bytes are rewritten.
+The class audit also found sampler.count wrongly required (§17.13); TABLE
+now makes it optional and claim replay defaults to 65,536, with actual replay
+and malformed-present controls. Item 7 was previously wrong and repaired in
+R16; it remains covered. The independent table-driven
+r17_section17_defaults_are_optional_and_applied enumerates all 14 items,
+checking omitted-field admission plus consumer observations where implemented.
+Nonsemantic decisions/C layout and staged target/interval choices are
+explicitly identified, never counted as implemented consumers. §§8.1, 9.1,
+11 and 12 audit: no additional incorrectly required default field found;
+block_image and pinned_closure_hash remain optional, with empty-block-map
+and unpinned-link consumers already present. Precision/seed/algorithm and
+present kind payloads still have no omission default and remain required.
 
-The copied tests/support/r16-default-expansion.bisa is byte-identical to the
-read-only reviewer witness, SHA-256 8344b91c…25bfa. r16_pins.py independently
-reconstructs the exact omission from the R13 record and checks the literal
-261-byte LF envelope and §9.2 exclusions without interpreter/rehash. Object
-8093da48…ec5d9, interface=closure 8ce5e64f…5be93 and schedule
-d5ba4457…fb99d remain unchanged; budget remains [3,0,0,0]. Six present-malformed
-controls (null, empty object, bad hash, missing hash, non-string version,
-extra field) reject at library admission and CLI check/hash; CLI requires exit
-1, empty stdout and §9.1/§11. Explicit ref/0.8 and vendor/2026.10 resolve with
-their supplied hash. No execution budget/input was added to admission tests.
+Schedule ambiguity uses intersection/subtraction of selector boxes within
+legal invocation/iteration domains and the oracle's 1..B step range. Only a
+nonempty equal-maximum remainder after subtracting the UNION of all higher
+entries rejects. The resolver counts final maxima independent of order.
+Shortest real chains suffice, including each call instruction's own generated
+operations; empty prefixes split over all root instructions. No loop bound
+or generated-ordinal sampling cap is imposed. All six witness orders admit
+and resolve C; A/B and duplicate C reject, A/C admits. Union/partial coverage,
+step-domain and loop bounds 0, 2, 3 and 2^40 are covered. The independent
+specificity family observes **1,200 schedules + 1,200 reversed orders**,
+**1,168 admitted / 32 rejected**, 54 concrete operation patterns each,
+**100% oracle agreement**; every admitted resolver result is compared too.
 
-The retained metadata_schema::tests::r14_generated_metadata_schema_type_family
-now exercises **163 productions, 9,862 generated positives, 1,653 unique typed
-paths, 26,685 grammar negatives**; **1,992** negatives also run through BOTH
-admission validators (a subset). **26 pinned objects, 2,393 parse path visits,
-17,173 full-parse negatives** remain. Total negatives without recounting dual
-assertions: **43,858**. Counts test enforcement of TABLE; the omission control
-is independently clause-derived. Family/metadata/width gate: **35 passed**,
-5.30 s runner sum. Width family remains **507: 159 constructed, 286 layout
-rejections, 62 resource diagnostics**. The reviewer's nonblocking independent
-width-outcome classification suggestion is deferred: its huge-width cases
-include allocator/storage failure as well as integer representability; an
-independent host-allocation model is beyond this short binding repair.
-No width domain, literal boundary assertion or production behavior changed.
+Both read-only reviewer witnesses were copied byte-for-byte. r17_pins.py
+independently reconstructs them from the R13 corpus and literal 261-byte
+inc8 envelope (no interpreter/rehash). File SHA-256 8af833c2…2a5 and
+9fc08dca…1aff; schedule hashes d9025ef2…4845d and e13ea989…287f;
+object 8093da48…ec5d9, interface=closure 8ce5e64f…5be93 remain unchanged.
+Raw schedule bytes, source text and budget [3,0,0,0] are preserved.
+Null/object/negative/invalid decimal-string shares and missing realisation
+reject in both library and CLI (check/hash exit 1, empty stdout, cited
+§9.1/§11). Present malformed counts also reject; absent sampled count
+actually replays 65,536 elements; explicit 0 and 3 remain 0 and 3.
 
-First full suite: **390 passed / 0 failed / 5 ignored**, 19.88 s runner sum.
-Final full suite after lint-only fixes: **390 passed / 0 failed / 5 ignored**,
-21.44 s runner sum (11 unit + 379 integration, 0 doctests). Fmt/fmt --check and
-strict all-target Clippy pass, 0 warnings. The initial lint gate found unused
-shared-helper reexports and .err().expect(); constant aliases and expect_err
-fix those without changing test behavior. Final suite and Clippy reran after
-those changes. The running sweeps use the same inputs/assertions and unchanged
-production code; neither lint edit changes a sweep.
+Derived schema family: **163 productions, 9,897 positives, 1,653 unique typed
+paths, 26,746 grammar negatives**; **1,992** negatives also pass through BOTH
+admission validators (subset). **26 pinned objects, 2,393 parse visits,
+17,173 full-parse negatives**; total negatives **43,919**. The derived family
+proves enforcement of TABLE; the independent §17 table catches wrongly
+required defaults. Width family and all previous controls are retained.
 
-All **5 ignored sweeps passed / 0 failed**, **105.08 s** runner sum across
-all binaries (105.07 s in the five sweep binaries).
-
-| Sweep | Full domain | Observed result / runner time |
-|---|---|---|
-| u8 division/remainder | 65,536 operand pairs × 4 = 262,144 executions | 1/0; 0.55 s |
-| 17-wire borrow | 131,072 entries | 1/0; 3.29 s |
-| checked borrow certificate | 262,144 elements, subject and expected program | 1/0; 16.45 s |
-| §6 differential | 200,000 programs: 70,931 accepted (all clean), 129,069 rejected | 1/0; 82.21 s |
-| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 1/0; 2.57 s |
-Logs: interpreter .tmp/r16-{before,red,red-existing,green,family,full,final,clippy,clippy-final,sweeps}.log.
-Independent pin/copy checks pass. Owned diffs pass --check. No foreign tests,
-spec/conformance/include/Python-seed edits, dependencies, Beads mutation/export,
-push or Dolt sync. Concurrent work is untouched. Historical round evidence is
-in council/response-round-N.md, external council responses and git history.
+First full suite: **403 passed / 0 failed / 5 ignored**, 37.84 s runner sum.
+Final full suite and sweeps are running. Fmt and strict all-target Clippy
+pass, 0 warnings, after grouping the unchanged RNG seed's hex digits to
+satisfy Clippy. This is a test-spelling-only edit; final suite is rerunning.
+Logs: .tmp/r17-{before,red,red-count,regressions-final,loop,schema-family,
+full,final,clippy,clippy-final,sweeps}.log. Final results will replace this
+paragraph before handoff. No foreign tests or owned-external-path edits,
+dependencies, Beads mutation/export, push or Dolt sync. Concurrent spec and
+conformance work is untouched.
 
 ## Resume here: outstanding work, in priority order
 

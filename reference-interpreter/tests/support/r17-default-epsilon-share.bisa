@@ -1,0 +1,15 @@
+bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"8ce5e64f15830d8e596ba9b4861def6565dd567b5804300f427d8b9566d5be93","kind":"oracle","name":"inc8","signature":{"abi":"0.8","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}}}
+
+section functions
+oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
+regs { one:reg[8], r:reg[8] }
+^entry():
+one = lift.const.i8 1
+r = lift.add x one
+lift.retval r
+
+section schedule
+{"bindings":{"budget":[3,0,0,0],"closure_hash":"8ce5e64f15830d8e596ba9b4861def6565dd567b5804300f427d8b9566d5be93","epsilon":0,"expansion":{"hash":"1111111111111111111111111111111111111111111111111111111111111111","name":"ref","version":"0.8"},"inherited_controls":0,"params_hash":"2222222222222222222222222222222222222222222222222222222222222222","region":"inc8","scheduler":{"name":"test","version":"1"},"target_hash":"3333333333333333333333333333333333333333333333333333333333333333","variant":"forward"},"entries":[{"gate":{"realisation":"native"},"generated":0,"kind":"gate","path":[{"iteration":[],"point":"entry:0","symbol":"8ce5e64f15830d8e596ba9b4861def6565dd567b5804300f427d8b9566d5be93"}],"phase":"fwd","step":1}]}

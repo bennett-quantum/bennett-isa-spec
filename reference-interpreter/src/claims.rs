@@ -17,6 +17,16 @@ use crate::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
+/// §17 item 13: an explicitly sampled claim defaults to 2^16 samples.
+/// This is a consumer default, never a mutation of certificate JCS.
+pub(crate) fn sample_count(sampler: &Json) -> Result<u128> {
+    crate::metadata_schema::validate("sampler", sampler)?;
+    sampler
+        .object()?
+        .get("count")
+        .map_or(Ok(1 << 16), Json::uint)
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ClaimVerdict {
     /// Re-executed over D (or the structural rule holds with verified subclaims).
@@ -483,7 +493,7 @@ impl Object {
                         })
                         .collect::<Result<Vec<_>>>()?;
                     let mut rng = Xoshiro256([seed[0], seed[1], seed[2], seed[3]]);
-                    for _ in 0..sampler.get("count")?.uint()? {
+                    for _ in 0..sample_count(sampler)? {
                         elements.push(
                             domain
                                 .components

@@ -436,10 +436,10 @@ qinplace identity requires a fault-free token; B=0 is a §4.5 rejection.
 Literal envelopes and independent hashlib pins precede interpreter checks.
 The complete round-11 sidecar audit is in tests/support/r11-comment-audit.md.
 
-**Design (metadata, round 16).** `src/metadata_schema.rs::TABLE` is the
+**Design (metadata, round 17).** `src/metadata_schema.rs::TABLE` is the
 single declarative recursive grammar for all seven JSON metadata sections,
 signatures and the textual data NAME/HEX projection. Every production cites
-its clause (§9.1, §9.2, §9.4, §8.1, §11, §12.1–12.3, §13 or §17 item 7). Both the
+its clause (§9.1, §9.2, §9.4, §8.1, §11, §12.1–12.3, §13 or §17 items 7, 9 and 13). Both the
 pre-identity admission pass and certificate/claim admission use this table;
 there are no parallel hand-written field/type schemas. Y endpoints are
 signed finite decimal strings; exhaustive tables contain arrays of canonical
@@ -450,9 +450,16 @@ is optional under §17 item 7: omission binds `ref` at the object's ISA version
 grammar. `Object::schedule_expansion` resolves that binding for consumers,
 returning no supplied hash for the default and preserving an explicit binding.
 It never inserts a descriptor into the canonical schedule or changes its §9.2
-hash; schedule execution remains staged. Semantic checks remain in
+hash. `gate.epsilon_share` is optional under §§8.1/17 item 9, including
+realisation-only entries. `Object::schedule_epsilon_share` preserves explicit
+shares or returns the exact region-epsilon / approximate-operation-count
+recipe after expansion supplies that count; exact operations stay exact.
+Admission never inserts a numeric share or rounds a repeating fraction.
+`sampler.count` is optional under §17 item 13; claim replay supplies 65,536
+when absent, and validates every present count through the same grammar.
+Target/schedule execution remains staged. Semantic checks remain in
 `object.rs` (layout ranges, image resolution), `metadata.rs` (schedule paths,
-payload agreement and overlap, exact decimal-value zero for oracle epsilon;
+payload agreement and maximal-match ambiguity, exact decimal-value zero for oracle epsilon;
 coverage points), `certificate.rs` (domain bindings,
 indices, expression environments/arity, live-range overlap and certificate
 bindings), and `validation.rs` (device model compatibility). These checks
@@ -462,12 +469,31 @@ sector block images retain their forms. The grammar-derived family in
 `src/metadata_schema/tests.rs` replaces the R13 path/type union: it populates
 nested arrays/maps, tests every production and alternative, walks all supplied
 paths, and rejects malformed types before hashing or claim execution.
-Round 16 observes 163 productions, 9,862 generated positives, 1,653 unique
-typed paths and 26,685 grammar negatives (1,992 also through both admission
+Round 17 observes 163 productions, 9,897 generated positives, 1,653 unique
+typed paths and 26,746 grammar negatives (1,992 also through both admission
 validators); 26 pinned objects add 2,393 parse visits and 17,173 parse negatives.
 This tests enforcement of the table; independent clause-derived controls
-check frame cardinality, numeric zero and omitted expansion through full
-admission; the default-binding consumer is tested separately.
+check frame cardinality, numeric zero and omitted defaults through full
+admission. `r17_section17_defaults_are_optional_and_applied` independently
+enumerates all 14 §17 items, distinguishing metadata defaults from decisions
+without a metadata field and staged target/interval consumers.
+
+**Design (schedule matching).** Specificity is the §11 lexicographic tuple;
+only ties at the actual maximum invalidate a schedule. Admission intersects
+equal-specificity selectors with the object's legal invocation/loop domains
+and oracle step budget, then subtracts the union of all strictly higher
+matching domains of the same kind. A nonempty remainder witnesses ambiguity.
+Domains are boxes with selector boundaries; loop/step counts are never
+expanded or capped. The shortest chains in a prefix suffice: each instruction
+(including a call) has its own generated operations, so a longer path cannot
+cover those operations; covering their whole domain with prefixes covers
+extensions too. Empty paths are split over real root instructions. Generated
+ordinal ranges remain symbolic for the bound expansion library.
+`Object::resolve_schedule` counts maxima after inspecting every match and
+reports a genuine tie instead of selecting document order. The independent
+1,200-schedule specificity family checks all 54 concrete selector partitions
+per case and reversed document orders; union/partial coverage and zero/large
+loop domains have separate controls.
 
 `DerivedWidths::from_program` checks H+2, A_tab+1 and S_cells+1; a legal layout
 whose counters exceed host representation returns a cited host-limit error.
