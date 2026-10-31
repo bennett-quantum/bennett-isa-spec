@@ -28,6 +28,14 @@ fn r15_translation_frame_is_first_and_last_point_tuple() {
         validate("points", &points).unwrap();
     }
 }
+#[test]
+fn r16_schedule_bindings_grammar_admits_omitted_expansion() {
+    // Literal §17 item 7 control, independent of TABLE generation/samples.
+    let bindings = j(
+        r#"{"closure_hash":"0000000000000000000000000000000000000000000000000000000000000000","target_hash":"0000000000000000000000000000000000000000000000000000000000000000","region":"inc8","variant":"forward","inherited_controls":0,"budget":[3,0,0,0],"params_hash":"0000000000000000000000000000000000000000000000000000000000000000","epsilon":0,"scheduler":{"name":"test","version":"1"}}"#,
+    );
+    validate("schedule_bindings", &bindings).unwrap();
+}
 fn samples(name: &str) -> Vec<Json> {
     match entry(name).shape {
         String => vec![j(r#""""#), j(r#""vendor.2026""#)],
@@ -351,6 +359,6 @@ fn r14_generated_metadata_schema_type_family() {
             }
         }
     }
-    eprintln!("R15 schema: {} entries; {positives} generated positives; {} unique typed paths; {negatives} grammar negatives, {admissions} through BOTH admission validators; {} pinned objects, {parse_paths} parse path visits, {parse_negatives} full-parse negatives",TABLE.len(),paths.len(),corpus.array().unwrap().len());
+    eprintln!("R16 schema: {} entries; {positives} generated positives; {} unique typed paths; {negatives} grammar negatives, {admissions} through BOTH admission validators; {} pinned objects, {parse_paths} parse path visits, {parse_negatives} full-parse negatives",TABLE.len(),paths.len(),corpus.array().unwrap().len());
     assert_eq!(visited.len(), TABLE.len());
 }

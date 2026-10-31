@@ -57,7 +57,10 @@ fn schedule_requires_typed_bindings_selectors_and_unique_maxima() {
         unreachable!()
     };
     bindings.remove("expansion");
-    reject(&s, "schedule", "§11");
+    Object::parse(&with("schedule", &s))
+        .unwrap()
+        .check_hashes()
+        .unwrap();
     for (key, value) in [
         ("phase", json("\"backwards\"")),
         ("step", json("0")),
@@ -399,4 +402,73 @@ fn r15_oracle_schedule_epsilon_uses_exact_decimal_value() {
     // The string exponent form is outside §9.1's decimal-string grammar.
     let e = Object::parse(&schedule(json(r#""1e-300""#))).unwrap_err();
     assert!(e.to_string().contains("§9.1"), "{e}");
+}
+
+#[test]
+fn r16_default_expansion_preserves_witness_and_identity() {
+    use support::r16::*;
+    assert_eq!(
+        bennett_isa_ref::sha256_hex(DEFAULT.as_bytes()),
+        "8344b91cdba546f8bf29db14c4c239011cd088660863e015727c76ea8df25bfa"
+    );
+    let o = Object::parse(DEFAULT).unwrap();
+    o.check_hashes().unwrap();
+    let id = o.identity().unwrap();
+    assert_eq!(id.object_hash, OH);
+    assert_eq!(id.interface_hashes["inc8"], IH);
+    assert_eq!(id.closure_hashes["inc8"].as_deref(), Some(IH));
+    let (_, line) = DEFAULT.split_once("section schedule\n").unwrap();
+    assert_eq!(o.section("schedule").unwrap().canonical(), line.trim_end());
+    assert_eq!(bennett_isa_ref::sha256_hex(line.trim_end().as_bytes()), SH);
+    assert_eq!(o.text, DEFAULT);
+}
+
+#[test]
+fn r16_present_expansion_still_requires_closed_descriptor() {
+    for descriptor in support::r16::malformed() {
+        let e = Object::parse(&support::r16::expansion(descriptor))
+            .err()
+            .expect("malformed present expansion");
+        assert!(
+            e.to_string().contains("§9.1") && e.to_string().contains("§11"),
+            "{e}"
+        );
+    }
+}
+
+#[test]
+fn r16_schedule_consumer_resolves_default_and_preserves_explicit_binding() {
+    use support::r16::*;
+    // §17 item 7: absence is ref at the object's ISA version, not a made-up pin.
+    let o = Object::parse(DEFAULT).unwrap();
+    let binding = o.schedule_expansion().unwrap().unwrap();
+    assert_eq!(
+        (binding.name, binding.version, binding.hash),
+        ("ref", "0.8", None)
+    );
+    // Resolution must leave the canonical schedule and its identity untouched.
+    assert_eq!(
+        bennett_isa_ref::sha256_hex(o.section("schedule").unwrap().canonical().as_bytes()),
+        SH
+    );
+    for (name, version) in [("ref", "0.8"), ("vendor", "2026.10")] {
+        let descriptor = json(&format!(
+            r#"{{"name":"{name}","version":"{version}","hash":"{}"}}"#,
+            "a".repeat(64)
+        ));
+        let text = expansion(descriptor);
+        let o = Object::parse(&text).unwrap();
+        let binding = o.schedule_expansion().unwrap().unwrap();
+        assert_eq!((binding.name, binding.version), (name, version));
+        assert_eq!(
+            binding.hash,
+            Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        );
+        o.check_hashes().unwrap();
+    }
+    assert!(Object::parse(INC)
+        .unwrap()
+        .schedule_expansion()
+        .unwrap()
+        .is_none());
 }

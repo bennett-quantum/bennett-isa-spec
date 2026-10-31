@@ -97,7 +97,9 @@ pub static TABLE: &[Entry] = &[
     entry!("regions_map", "§9.1 layout region addresses", Map("string","region_base")),
     entry!("region_base", "§9.1 layout region address", obj!("base":"uint")),
     entry!("schedule", "§11 schedule", obj!("bindings":"schedule_bindings","entries":"schedule_entries")),
-    entry!("schedule_bindings", "§11 bindings", obj!("closure_hash":"hash","target_hash":"hash","region":"text","variant":"text","inherited_controls":"uint","budget":"budget","params_hash":"hash","epsilon":"decimal","scheduler":"named_version","expansion":"expansion")),
+    // §17 item 7: omitted expansion binds ref at the object ISA version (0.8).
+    // A present descriptor still uses the closed §11 name/version/hash production.
+    entry!("schedule_bindings", "§11 bindings/§17 item 7", obj!("closure_hash":"hash","target_hash":"hash","region":"text","variant":"text","inherited_controls":"uint","budget":"budget","params_hash":"hash","epsilon":"decimal","scheduler":"named_version","expansion?":"expansion")),
     entry!("budget", "§11 budget", Tuple(&["uint","uint","uint","uint"])),
     entry!("named_version", "§11 scheduler", obj!("name":"text","version":"text")),
     entry!("expansion", "§11 expansion", obj!("name":"text","version":"text","hash":"hash")),

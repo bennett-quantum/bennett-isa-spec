@@ -2167,3 +2167,33 @@ fn r15_cli_oracle_schedule_epsilon_is_exact_by_value() {
         fails(&[command, &path], "§9.1");
     }
 }
+
+#[test]
+fn r16_cli_default_expansion_check_hash_preserves_pins() {
+    use support::r16::*;
+    let path = tmp_file("r16-default-expansion.bisa", DEFAULT);
+    for command in ["check", "hash"] {
+        let result = ok(&[command, &path]);
+        assert_eq!(text(&result, "object_hash"), OH);
+        if command == "check" {
+            assert_eq!(text(&result, "status"), "ok");
+        } else {
+            let inc8 = field(&result, "symbols").get("inc8").unwrap();
+            assert_eq!(text(inc8, "interface_hash"), IH);
+            assert_eq!(text(inc8, "closure_hash"), IH);
+        }
+    }
+}
+
+#[test]
+fn r16_cli_malformed_present_expansion_rejects() {
+    for (i, descriptor) in support::r16::malformed().into_iter().enumerate() {
+        let path = tmp_file(
+            &format!("r16-expansion-bad-{i}.bisa"),
+            &support::r16::expansion(descriptor),
+        );
+        for command in ["check", "hash"] {
+            fails(&[command, &path], "§9.1: §11");
+        }
+    }
+}

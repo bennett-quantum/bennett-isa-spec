@@ -3,6 +3,39 @@ use crate::{
     err, json::Json, validation::normalize_call, Error, Function, Instruction, Object, Result,
 };
 
+/// Effective §11/§17 item 7 expansion binding. An implicit binding has no
+/// supplied descriptor hash; resolving it never rewrites the canonical schedule.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ScheduleExpansion<'a> {
+    pub name: &'a str,
+    pub version: &'a str,
+    pub hash: Option<&'a str>,
+}
+impl Object {
+    /// Resolve the schedule's expansion descriptor for consumers, if scheduled.
+    /// §17 item 7: omission binds ref at the object's ISA version. Parsing
+    /// currently admits only ISA 0.8 (crate::version). No synthetic hash is
+    /// inserted: §9.2 hashes the supplied canonical schedule unchanged.
+    pub fn schedule_expansion(&self) -> Result<Option<ScheduleExpansion<'_>>> {
+        let Some(schedule) = self.section("schedule") else {
+            return Ok(None);
+        };
+        let Some(expansion) = schedule.get("bindings")?.object()?.get("expansion") else {
+            return Ok(Some(ScheduleExpansion {
+                name: "ref",
+                version: crate::version(),
+                hash: None,
+            }));
+        };
+        crate::metadata_schema::validate("expansion", expansion)?;
+        Ok(Some(ScheduleExpansion {
+            name: expansion.get("name")?.string()?,
+            version: expansion.get("version")?.string()?,
+            hash: Some(expansion.get("hash")?.string()?),
+        }))
+    }
+}
+
 pub(crate) fn hash(value: &Json) -> Result<&str> {
     crate::metadata_schema::validate("hash", value)?;
     value.string()
