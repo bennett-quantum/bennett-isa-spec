@@ -88,7 +88,7 @@ for kind, extra in [('lowered', {}), ('trapped', dict(fault_code=1)), ('shimmed'
 domain = dict(bundles=[dict(name='x',width=8,lo=0,hi=255)], borrowed=[dict(name='b',width=1,lo=0,hi=1)], regions=[])
 subject = dict(closure_hash=h,variant='forward',inherited_controls=0,schedule_hash='4'*64)
 claims = [
-    dict(kind='exhaustive', domain=domain, expected=dict(table=[]),label='proof'),
+    dict(kind='exhaustive', domain=domain, expected=dict(table=[[1, '340282366920938463463374607431768211456']]),label='proof'),
     dict(kind='exhaustive', domain=domain, expected=dict(program=h)),
     dict(kind='exhaustive', domain=domain, expected='oracle',subject=subject),
     dict(kind='sampled', domain=domain, sampler=dict(algorithm='xoshiro256**',seed=['1','0','0','0'],count=10),label='evidence'),
@@ -126,5 +126,6 @@ c3['regions'] = {rh:r}
 sample('certificate-regions', section(base, 'certificate', c3))
 r['verification']['fault_rate']['domain']['regions'][0]['cells']='all'
 sample('certificate-all-cells', section(base, 'certificate', c3))
+sample('certificate-action-table', (ROOT/'support/r14-witnesses/r14-table-positive.bisa').read_text())
 (ROOT/'support/r13_schema_cases.json').write_text(json.dumps(samples,indent=2)+'\n')
 print(f'{len(samples)} schema exemplars')

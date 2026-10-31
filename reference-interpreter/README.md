@@ -436,14 +436,25 @@ qinplace identity requires a fault-free token; B=0 is a §4.5 rejection.
 Literal envelopes and independent hashlib pins precede interpreter checks.
 The complete round-11 sidecar audit is in tests/support/r11-comment-audit.md.
 
-**Design (metadata and derived widths, round 13).** `metadata_types.rs` checks
-all accepted metadata sections, nested records, tagged payloads and optional
-fields at admission, before identities, binding checks or execution. Integer
-number/string encodings, decimal alternatives and null/index fields retain
-exactly their schema alternatives. Semantic validators then resolve names,
-check ranges and verify bindings. Service versions are strings; arbitrary host
-service versions remain legal. A present `layout.block_image` is a data NAME
-resolving to a complete-sector image, including for action-only objects.
+**Design (metadata, round 14).** `src/metadata_schema.rs::TABLE` is the
+single declarative recursive grammar for all seven JSON metadata sections,
+signatures and the textual data NAME/HEX projection. Every production cites
+its clause (§9.1, §9.2, §9.4, §8.1, §11, §12.1–12.3 or §13). Both the
+pre-identity admission pass and certificate/claim admission use this table;
+there are no parallel hand-written field/type schemas. Y endpoints are
+signed finite decimal strings; exhaustive tables contain arrays of canonical
+§9.1 integers of arbitrary size. Semantic checks remain in `object.rs`
+(layout ranges, image resolution), `metadata.rs` (schedule paths, payload
+agreement and overlap; coverage points), `certificate.rs` (domain bindings,
+indices, expression environments/arity, live-range overlap and certificate
+bindings), and `validation.rs` (device model compatibility). These checks
+cite their determining clauses. Target/launch/schedule execution and interval
+verification remain staged. Arbitrary string service versions and complete
+sector block images retain their forms. The grammar-derived family in
+`src/metadata_schema/tests.rs` replaces the R13 path/type union: it populates
+nested arrays/maps, tests every production and alternative, walks all supplied
+paths, and rejects malformed types before hashing or claim execution.
+
 `DerivedWidths::from_program` checks H+2, A_tab+1 and S_cells+1; a legal layout
 whose counters exceed host representation returns a cited host-limit error.
 Admission and sequential B=0 semantics remain independent of that host limit.
@@ -452,10 +463,10 @@ arithmetic. No ISA exponent cap is introduced.
 
 | Schema / rule | Load-time validator | Positive and negative controls |
 |---|---|---|
-| §9.1 optional `layout.block_image`, §7.3 sectors | `metadata_types::layout`, `Object::validate_layout`; checked lookup in `ClassicalMachine::construct` | `parser::r13_block_image_schema_is_checked_without_a_layout_consumer`, `r13_classical_missing_block_image_never_panics`; absent/disk action identities in the R13 pin corpus |
-| §9.1 optional `imports.pinned_closure_hash`, §9.3 bindings | `metadata_types::imports`, `Object::validate_symbols` | `linking::link_resolves_calls_and_pins_and_deduplicates`, `link_rejects_unresolved_signature_pin_definition_and_layout_conflicts`; R13 type family |
-| §9.1 coverage classification payloads, §13 | `metadata_types::coverage`, `Object::validate_coverage_details` | `metadata::coverage_points_and_classification_payloads_are_checked`; all three classification branches in the R13 type family |
-| §9.1 devices, layout and every accepted schedule/certificate optional field | `Object::validate_metadata_types`, followed by the section's semantic validator | `metadata::r13_generated_metadata_schema_type_family`: literal pinned controls and one-field type substitutions |
+| §9.1 optional `layout.block_image`, §7.3 sectors | `metadata_schema::TABLE` (`layout`), `Object::validate_layout`; checked lookup in `ClassicalMachine::construct` | `parser::r13_block_image_schema_is_checked_without_a_layout_consumer`, `r13_classical_missing_block_image_never_panics`; absent/disk action identities in the R13 pin corpus |
+| §9.1 optional `imports.pinned_closure_hash`, §9.3 bindings | `metadata_schema::TABLE` (`import`), `Object::validate_symbols` | `linking::link_resolves_calls_and_pins_and_deduplicates`, `link_rejects_unresolved_signature_pin_definition_and_layout_conflicts`; R14 derived type family |
+| §9.1 coverage classification payloads, §13 | `metadata_schema::TABLE` (`coverage_entry`), `Object::validate_coverage_details` | `metadata::coverage_points_and_classification_payloads_are_checked`; all three classification branches in the R14 derived type family |
+| §9.1 devices, layout and every accepted schedule/certificate optional field | `Object::validate_metadata_types`, followed by the section's semantic validator | `metadata_schema::tests::r14_generated_metadata_schema_type_family`: literal pinned controls and one-field type substitutions |
 | §§3.7, 7.2 derived counters and storage | `DerivedWidths::from_program`, `BitVector::zero` | `r1_widths::r13_generated_derived_width_extremes_family`; recursive S_cells=9 reversal in `step_machine` |
 
 These admission checks do not claim the staged target, launch, schedule

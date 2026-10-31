@@ -4,22 +4,12 @@ use crate::{
 };
 
 pub(crate) fn hash(value: &Json) -> Result<&str> {
-    let s = value.string()?;
-    if s.len() != 64
-        || !s
-            .bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-    {
-        return err("§9.2", "expected 64 lowercase SHA-256 hex digits");
-    }
-    Ok(s)
+    crate::metadata_schema::validate("hash", value)?;
+    value.string()
 }
 pub(crate) fn text(value: &Json) -> Result<&str> {
-    let s = value.string()?;
-    if s.is_empty() {
-        return err("§9.1", "empty metadata identifier");
-    }
-    Ok(s)
+    crate::metadata_schema::validate("text", value)?;
+    value.string()
 }
 /// A variant identifier: §6.4/§12.3 key cleanup, error and multiplicity entries
 /// by "<variant>:<inherited_controls>" (and "<hash>:<variant>:<controls>"), so a
@@ -36,26 +26,9 @@ pub(crate) fn variant(value: &Json) -> Result<&str> {
     Ok(s)
 }
 pub(crate) fn nonnegative(value: &Json) -> Result<()> {
-    let s = match value {
-        Json::String(s) | Json::Number(s) => s,
-        _ => return err("§9.1", "expected decimal"),
-    };
-    // Decimal bounds and costs are checked lexically, never rounded to binary64.
-    let mut split = s.split('.');
-    let integer = split.next().unwrap_or("");
-    let fraction = split.next();
-    if integer.is_empty()
-        || !integer.bytes().all(|b| b.is_ascii_digit())
-        || split.next().is_some()
-        || fraction.is_some_and(|f| f.is_empty() || !f.bytes().all(|b| b.is_ascii_digit()))
-    {
-        // JCS numbers may use a signed decimal exponent, but the mantissa is nonnegative.
-        if !matches!(value, Json::Number(_)) || s.starts_with('-') || s.parse::<f64>().is_err() {
-            return err("§9.1", "expected nonnegative finite decimal");
-        }
-    }
-    Ok(())
+    crate::metadata_schema::validate("decimal", value)
 }
+
 fn selector(value: &Json, positive: bool) -> Result<()> {
     if value == &Json::String("*".into()) {
         return Ok(());
@@ -140,7 +113,6 @@ impl Object {
     pub(crate) fn validate_path(&self, path: &Json, root: Option<&str>) -> Result<()> {
         let mut expected = root.map(str::to_string);
         for element in path.array()? {
-            element.fields(&["symbol", "point", "iteration"], &[])?;
             let (block, ordinal) = text(element.get("point")?)?
                 .rsplit_once(':')
                 .ok_or_else(|| Error("§11: point must be block:ordinal".into()))?;
@@ -180,21 +152,7 @@ impl Object {
     pub(crate) fn validate_schedule_details(&self, s: &Json) -> Result<()> {
         contextual("§11", || {
             let b = s.get("bindings")?;
-            b.fields(
-                &[
-                    "closure_hash",
-                    "target_hash",
-                    "region",
-                    "variant",
-                    "inherited_controls",
-                    "budget",
-                    "params_hash",
-                    "epsilon",
-                    "expansion",
-                    "scheduler",
-                ],
-                &[],
-            )?;
+
             for key in ["closure_hash", "target_hash", "params_hash"] {
                 hash(b.get(key)?)?;
             }
@@ -212,9 +170,6 @@ impl Object {
             b.get("inherited_controls")?.uint()?;
             nonnegative(b.get("epsilon")?)?;
             let budget = b.get("budget")?.array()?;
-            if budget.len() != 4 {
-                return err("§11", "budget requires four integers");
-            }
             let values = budget.iter().map(Json::uint).collect::<Result<Vec<_>>>()?;
             if f.kind == "oracle" {
                 self.validate_budget(crate::Budget {
@@ -231,27 +186,11 @@ impl Object {
                     return err("§5.2", "oracle schedules must be exact");
                 }
             }
-            let expansion = b.get("expansion")?;
-            expansion.fields(&["name", "version", "hash"], &[])?;
-            text(expansion.get("name")?)?;
-            text(expansion.get("version")?)?;
-            hash(expansion.get("hash")?)?;
-            let scheduler = b.get("scheduler")?;
-            scheduler.fields(&["name", "version"], &[])?;
-            text(scheduler.get("name")?)?;
-            text(scheduler.get("version")?)?;
             let entries = s.get("entries")?.array()?;
             for e in entries {
-                e.fields(
-                    &["path", "step", "phase", "generated", "kind"],
-                    &["cleanup", "gate", "alloc", "start"],
-                )?;
                 self.validate_path(e.get("path")?, Some(region))?;
                 selector(e.get("step")?, true)?;
                 selector(e.get("generated")?, false)?;
-                if !["fwd", "rev", "*"].contains(&e.get("phase")?.string()?) {
-                    return err("§11", "unknown execution phase");
-                }
                 let k = e.get("kind")?.string()?;
                 for key in ["cleanup", "gate", "alloc", "start"] {
                     if key != k && e.object()?.contains_key(key) {
@@ -259,30 +198,15 @@ impl Object {
                     }
                 }
                 match k {
-                    "cleanup" => {
-                        let p = e.get(k)?;
-                        p.fields(&["realisation"], &[])?;
-                        if !["reverse", "recompute"].contains(&p.get("realisation")?.string()?) {
-                            return err("§11", "invalid cleanup realisation");
-                        }
-                    }
-                    "gate" => {
-                        let p = e.get(k)?;
-                        p.fields(&["realisation", "epsilon_share"], &[])?;
-                        text(p.get("realisation")?)?;
-                        nonnegative(p.get("epsilon_share")?)?;
+                    "cleanup" | "gate" | "start" => {
+                        e.get(k)?;
                     }
                     "alloc" => {
                         let p = e.get(k)?;
-                        p.fields(&["class"], &[])?;
+
                         if text(p.get("class")?)? == "any" {
                             return err("§11", "allocation class must be concrete");
                         }
-                    }
-                    "start" => {
-                        let p = e.get(k)?;
-                        p.fields(&["time"], &[])?;
-                        nonnegative(p.get("time")?)?;
                     }
                     _ => return err("§11", "invalid entry kind"),
                 }
@@ -304,12 +228,6 @@ impl Object {
         contextual("§13", || {
             for e in c.get("entries")?.array()? {
                 let point = e.get("point")?.array()?;
-                if point.len() != 3 {
-                    return err(
-                        "§13",
-                        "program point must be [interface_hash,block,ordinal]",
-                    );
-                }
                 self.point(hash(&point[0])?, text(&point[1])?, point[2].uint()?)?;
                 text(e.get("source")?)?;
                 e.get("reason")?.string()?;

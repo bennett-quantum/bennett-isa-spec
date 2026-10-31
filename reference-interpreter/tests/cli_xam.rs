@@ -2093,3 +2093,37 @@ fn r13_cli_rejects_invalid_block_image() {
         assert_eq!(field(&r, "mut"), &support::json("[1]"));
     }
 }
+
+#[test]
+fn r14_cli_rejects_numeric_y_endpoints() {
+    use support::r14::*;
+    for (i, bad) in std::iter::once(Y.to_string())
+        .chain(negatives_y())
+        .enumerate()
+    {
+        let path = tmp_file(&format!("r14-y-{i}.bisa"), &bad);
+        for command in ["check", "hash"] {
+            fails(&[command, &path], "§12.1");
+        }
+    }
+    let path = tmp_file("r14-y-positive.bisa", &y_control());
+    assert_eq!(
+        text(&ok(&["check", &path]), "object_hash"),
+        "8093da48bad04d6564325faf01ea1304a84b5ac5a120e685eee9951f5daec5d9"
+    );
+}
+#[test]
+fn r14_cli_rejects_malformed_table_rows_and_cells() {
+    use support::r14::*;
+    for (i, bad) in negatives_table().iter().enumerate() {
+        let path = tmp_file(&format!("r14-table-{i}.bisa"), bad);
+        for command in ["check", "hash"] {
+            fails(&[command, &path], "§12");
+        }
+    }
+    let path = tmp_file("r14-table-positive.bisa", TABLE);
+    assert_eq!(
+        text(&ok(&["check", &path]), "object_hash"),
+        "ddc5d6729a98484acc2d5e8feb585c155799293bd36f31fd96cbc510f77666f0"
+    );
+}

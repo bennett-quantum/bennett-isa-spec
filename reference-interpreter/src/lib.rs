@@ -14,6 +14,7 @@ pub mod json;
 mod linking;
 mod machine;
 mod metadata;
+mod metadata_schema;
 mod metadata_types;
 mod object;
 mod oracle;

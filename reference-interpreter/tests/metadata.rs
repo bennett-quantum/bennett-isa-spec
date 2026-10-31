@@ -282,182 +282,74 @@ fn r13_service_versions_require_strings() {
 // One generated family: visit every field (including container fields and
 // array elements) in the accepted schema exemplars. The type alternatives
 // below come from §§9.1/9.4/11/12/13, not from the interpreter's result.
-fn r13_kind(v: &Json) -> u8 {
-    match v {
-        Json::Number(_) => 1,
-        Json::String(_) => 2,
-        Json::Bool(_) => 4,
-        Json::Null => 8,
-        Json::Array(_) => 16,
-        Json::Object(_) => 32,
+#[test]
+fn r14_y_endpoints_require_decimal_strings() {
+    use support::r14::*;
+    assert_eq!(
+        bennett_isa_ref::sha256_hex(Y.as_bytes()),
+        "578c913bb276d1446e2e038af0ab0a77017d9abe5ec351e3e20b69c307068e11"
+    );
+    let o = Object::parse(&y_control()).unwrap();
+    o.check_hashes().unwrap();
+    let pins = json(include_str!("support/r14_pins.json"));
+    let pin = &pins.array().unwrap()[0];
+    assert_eq!(
+        o.identity().unwrap().envelopes["inc8"],
+        pin.get("envelope").unwrap().string().unwrap()
+    );
+    assert_eq!(
+        o.identity().unwrap().object_hash,
+        "8093da48bad04d6564325faf01ea1304a84b5ac5a120e685eee9951f5daec5d9"
+    );
+    assert!(matches!(
+        o.verify_claim(IH, 8).unwrap(),
+        bennett_isa_ref::ClaimVerdict::Unverified(_)
+    ));
+    for bad in std::iter::once(Y.to_string()).chain(negatives_y()) {
+        let e = Object::parse(&bad).expect_err("numeric or nondecimal Y admitted");
+        assert!(e.to_string().contains("§12.1"), "{e}");
     }
-}
-fn r13_types(section: &str, path: &[String], value: &Json) -> u8 {
-    let key = path.last().map(String::as_str).unwrap_or("");
-    let parent = path.iter().rev().nth(1).map(String::as_str).unwrap_or("");
-    if section == "certificate" {
-        if key == "oracle" && parent == "verification" {
-            return 1 | 2 | 8;
-        }
-        if key == "expected" {
-            return 2 | 32;
-        }
-        if key == "cells" {
-            return 2 | 16;
-        }
-        if ["retained_history", "clean", "dirty"].contains(&key)
-            || ["scratch", "borrow", "scheme_ancillae"].contains(&parent)
-            || (parent == "args" && path.iter().any(|p| p == "retained_history"))
-        {
-            return 1 | 32;
-        }
-        if ["bound", "mu", "epsilon", "operator_norm", "diamond"].contains(&key)
-            || parent == "resources"
-            || (path.iter().any(|p| p == "Y") && !matches!(value, Json::Array(_)))
-        {
-            return 1 | 2;
-        }
-        // Canonical integers have number and decimal-string representations.
-        if parent == "multiplicities" {
-            return 1 | 2;
-        }
-    }
-    if section == "schedule" {
-        if key == "iteration" {
-            return 2 | 16;
-        }
-        if ["step", "generated", "epsilon", "epsilon_share", "time"].contains(&key) {
-            return 1 | 2;
-        }
-    }
-    if matches!(value, Json::Number(_)) {
-        return 1 | 2;
-    }
-    r13_kind(value)
-}
-fn r13_integer(section: &str, path: &[String], value: &Json) -> bool {
-    let key = path.last().map(String::as_str).unwrap_or("");
-    let parent = path.iter().rev().nth(1).map(String::as_str).unwrap_or("");
-    if section == "certificate"
-        && (path.iter().any(|p| p == "Y")
-            || [
-                "bound",
-                "mu",
-                "epsilon",
-                "operator_norm",
-                "diamond",
-                "retained_history",
-                "clean",
-                "dirty",
-            ]
-            .contains(&key)
-            || ["resources", "borrow", "scheme_ancillae"].contains(&parent)
-            || path.iter().any(|p| p == "retained_history"))
-    {
-        return false;
-    }
-    if section == "schedule" && ["epsilon", "epsilon_share", "time"].contains(&key) {
-        return false;
-    }
-    matches!(value, Json::Number(_)) || (section == "certificate" && parent == "multiplicities")
-}
-fn r13_nodes(v: &Json, path: &mut Vec<String>, out: &mut Vec<(Vec<String>, Json)>) {
-    out.push((path.clone(), v.clone()));
-    match v {
-        Json::Object(m) => {
-            for (k, v) in m {
-                path.push(k.clone());
-                r13_nodes(v, path, out);
-                path.pop();
-            }
-        }
-        Json::Array(a) => {
-            for (k, v) in a.iter().enumerate() {
-                path.push(k.to_string());
-                r13_nodes(v, path, out);
-                path.pop();
-            }
-        }
-        _ => {}
-    }
-}
-fn r13_replace(v: &mut Json, path: &[String], next: Json) {
-    if path.is_empty() {
-        *v = next;
-        return;
-    }
-    let child = match v {
-        Json::Object(m) => m.get_mut(&path[0]).unwrap(),
-        Json::Array(a) => &mut a[path[0].parse::<usize>().unwrap()],
-        _ => panic!("container"),
-    };
-    r13_replace(child, &path[1..], next);
 }
 #[test]
-fn r13_generated_metadata_schema_type_family() {
-    let corpus = json(include_str!("support/r13_schema_cases.json"));
-    let mut negatives = 0;
-    let mut fields = 0;
-    let mut positives = 0;
-    let mut failures = Vec::new();
-    for case in corpus.array().unwrap() {
-        let name = case.get("name").unwrap().string().unwrap();
-        let base = case.get("object").unwrap().string().unwrap();
-        let o = Object::parse(base).unwrap_or_else(|e| panic!("positive {name}: {e}"));
-        o.check_hashes()
-            .unwrap_or_else(|e| panic!("positive pin {name}: {e}"));
-        positives += 1;
-        for (section, v) in &o.metadata {
-            let mut nodes = Vec::new();
-            r13_nodes(v, &mut Vec::new(), &mut nodes);
-            for (path, value) in nodes {
-                fields += 1;
-                let types = r13_types(section, &path, &value);
-                let mut wrong = ["7", r#""wrong""#, "false", "null", "[]", "{}"]
-                    .iter()
-                    .map(|s| json(s))
-                    .filter(|v| types & r13_kind(v) == 0)
-                    .collect::<Vec<_>>();
-                if r13_integer(section, &path, &value) {
-                    // Test the exact raw JSON spellings, including unsafe integers.
-                    wrong.extend(
-                        ["-1", "18446744073709551615", "18446744073709551616", "1.5"]
-                            .iter()
-                            .map(|s| Json::Number((*s).into())),
-                    );
-                    wrong.push(Json::String("wrong".into()));
-                }
-                for next in wrong {
-                    negatives += 1;
-                    let mut mutated = v.clone();
-                    r13_replace(&mut mutated, &path, next.clone());
-                    let text = base.replace(
-                        &format!("section {section}\n{}\n", v.canonical()),
-                        &format!("section {section}\n{}\n", mutated.canonical()),
-                    );
-                    assert_ne!(base, text);
-                    // Admission only: no call to identity/check_hashes or execution
-                    // may be needed to notice a malformed field.
-                    match Object::parse(&text) {
-                        Ok(_) => failures.push(format!(
-                            "{name} {section}.{path:?} accepts {}",
-                            next.canonical()
-                        )),
-                        Err(e) if !e.to_string().contains("§9.1") => failures.push(format!(
-                            "{name} {section}.{path:?} {}: {e}",
-                            next.canonical()
-                        )),
-                        Err(_) => {}
-                    }
-                }
-            }
-        }
-    }
-    eprintln!("R13 schema: {positives} positive objects, {fields} field visits, {negatives} negative mutations");
-    assert!(
-        failures.is_empty(),
-        "{} failures:\n{}",
-        failures.len(),
-        failures.join("\n")
+fn r14_table_rows_and_components_are_typed_at_admission() {
+    use support::r14::*;
+    let o = Object::parse(TABLE).unwrap();
+    o.check_hashes().unwrap();
+    let pins = json(include_str!("support/r14_pins.json"));
+    let pin = pins
+        .array()
+        .unwrap()
+        .iter()
+        .find(|p| p.get("name").unwrap().string().unwrap() == "r14-table-positive")
+        .unwrap();
+    assert_eq!(
+        o.identity().unwrap().envelopes["a"],
+        pin.get("envelope").unwrap().string().unwrap()
     );
+    assert_eq!(
+        o.identity().unwrap().object_hash,
+        "ddc5d6729a98484acc2d5e8feb585c155799293bd36f31fd96cbc510f77666f0"
+    );
+    assert_eq!(
+        o.verify_claim(AH, 0).unwrap(),
+        bennett_isa_ref::ClaimVerdict::Evidence { elements: 1 }
+    );
+    let large = replace(
+        TABLE,
+        &["regions", AH, "claims", "0", "expected", "table"],
+        json(r#"[["340282366920938463463374607431768211456"]]"#),
+    );
+    Object::parse(&large).unwrap().check_hashes().unwrap();
+    for bad in negatives_table().into_iter().chain(
+        [
+            include_str!("support/r14-witnesses/r14-table-bool.bisa"),
+            include_str!("support/r14-witnesses/r14-table-row-bool.bisa"),
+            include_str!("support/r14-witnesses/r14-table-cell-bool.bisa"),
+            include_str!("support/r14-witnesses/r14-table-cell-object.bisa"),
+        ]
+        .map(str::to_string),
+    ) {
+        let e = Object::parse(&bad).expect_err("malformed table admitted");
+        assert!(e.to_string().contains("§12"), "{e}");
+    }
 }

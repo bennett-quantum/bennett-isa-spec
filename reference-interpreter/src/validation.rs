@@ -1227,142 +1227,25 @@ impl Object {
         }
         Ok(())
     }
+    // §7.3 model compatibility and §11–13 cross-field/binding checks.
     pub(crate) fn validate_metadata(&self) -> Result<()> {
+        self.validate_metadata_types()?;
         if let Some(d) = self.section("devices") {
-            d.fields(&["models", "services"], &[])?;
-            for group in ["models", "services"] {
-                for (n, v) in d.get(group)?.object()? {
-                    v.fields(&["version"], &[])?;
-                    let version = v.get("version")?.string()?;
-                    if group == "models"
-                        && (!["console", "clock", "entropy", "block"].contains(&n.as_str())
-                            || version != "0.8")
-                    {
-                        return err("§7.3", "unsupported device model/version");
-                    }
+            for (n, v) in d.get("models")?.object()? {
+                if !["console", "clock", "entropy", "block"].contains(&n.as_str())
+                    || v.get("version")?.string()? != "0.8"
+                {
+                    return err("§7.3", "unsupported device model/version");
                 }
             }
         }
         if let Some(c) = self.section("coverage") {
-            c.fields(&["entries"], &[])?;
-            for e in c.get("entries")?.array()? {
-                e.fields(
-                    &["point", "source", "classification", "reason", "count"],
-                    &["fault_code", "shim_hash"],
-                )?;
-                if !["lowered", "trapped", "shimmed"].contains(&e.get("classification")?.string()?)
-                {
-                    return err("§13", "unknown coverage classification");
-                }
-            }
             self.validate_coverage_details(c)?;
         }
         if let Some(s) = self.section("schedule") {
-            s.fields(&["bindings", "entries"], &[])?;
-            let b = s.get("bindings")?;
-            b.fields(
-                &[
-                    "closure_hash",
-                    "target_hash",
-                    "region",
-                    "variant",
-                    "inherited_controls",
-                    "budget",
-                    "params_hash",
-                    "epsilon",
-                    "scheduler",
-                ],
-                &["expansion"],
-            )?;
-            b.get("scheduler")?.fields(&["name", "version"], &[])?;
-            if let Some(e) = b.object()?.get("expansion") {
-                e.fields(&["name", "version", "hash"], &[])?;
-            }
-            if b.get("budget")?.array()?.len() != 4 {
-                return err("§11", "schedule budget needs four values");
-            }
-            for e in s.get("entries")?.array()? {
-                e.fields(
-                    &["path", "step", "phase", "generated", "kind"],
-                    &["cleanup", "gate", "alloc", "start"],
-                )?;
-                let k = e.get("kind")?.string()?;
-                match k {
-                    "cleanup" => {
-                        let c = e.get(k)?;
-                        c.fields(&["realisation"], &[])?;
-                        if !["reverse", "recompute"].contains(&c.get("realisation")?.string()?) {
-                            return err("§6.4", "unsupported cleanup realisation");
-                        }
-                    }
-                    "gate" => e.get(k)?.fields(&["realisation", "epsilon_share"], &[])?,
-                    "alloc" => {
-                        e.get(k)?.fields(&["class"], &[])?;
-                        if e.get(k)?.get("class")?.string()? == "any" {
-                            return err("§11", "schedule requires concrete class");
-                        }
-                    }
-                    "start" => e.get(k)?.fields(&["time"], &[])?,
-                    _ => return err("§11", "unknown schedule entry kind"),
-                };
-                for p in e.get("path")?.array()? {
-                    p.fields(&["symbol", "point", "iteration"], &[])?;
-                }
-            }
             self.validate_schedule_details(s)?;
         }
         if let Some(c) = self.section("certificate") {
-            c.fields(
-                &["versions", "bindings", "producer", "regions", "composition"],
-                &[],
-            )?;
-            c.get("bindings")?.fields(
-                &[
-                    "object_hash",
-                    "interface_hash",
-                    "closure_hash",
-                    "reference_program_hash",
-                    "dialect_mapping_version",
-                    "target_hash",
-                ],
-                &["schedule_hash"],
-            )?;
-            c.get("producer")?
-                .fields(&["name", "version", "materialisation"], &[])?;
-            c.get("producer")?
-                .get("materialisation")?
-                .fields(&["llvm_version", "pipeline", "normaliser_version"], &[])?;
-            c.get("composition")?
-                .fields(&["multiplicities", "epsilon_total", "method"], &[])?;
-            for r in c.get("regions")?.object()?.values() {
-                r.fields(
-                    &[
-                        "kind",
-                        "signature",
-                        "bounds",
-                        "frame",
-                        "resources",
-                        "gates_used",
-                        "claims",
-                        "verification",
-                        "cleanup",
-                        "error",
-                        "definedness_assumptions",
-                    ],
-                    &[],
-                )?;
-                r.get("verification")?.fields(
-                    &[
-                        "oracle",
-                        "borrow_frames",
-                        "inverse_pairs",
-                        "unitary",
-                        "channel",
-                        "fault_rate",
-                    ],
-                    &[],
-                )?;
-            }
             self.validate_certificate_details(c)?;
         }
         Ok(())

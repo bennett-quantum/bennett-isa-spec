@@ -147,16 +147,7 @@ impl Function {
     /// Its synthetic parameter names are local to validation, never executable.
     pub(crate) fn from_signature(name: &str, signature: &Json) -> Result<Self> {
         let kind = signature.get("kind")?.string()?;
-        let fields: &[&str] = match kind {
-            "oracle" => &["abi", "tier", "kind", "in", "tgt", "fault", "mem", "args"],
-            "action" | "perm_action" => {
-                &["abi", "tier", "kind", "mut", "in", "mem", "args", "bounds"]
-            }
-            "lproc" => &["abi", "tier", "kind", "params", "result"],
-            "cc" | "r" => &["abi", "tier", "kind", "params", "results"],
-            _ => return err("§9.1", "unknown function signature kind"),
-        };
-        signature.fields(fields, &[])?;
+        crate::metadata_schema::validate("signature", signature)?;
         let mut f = Self {
             kind: kind.into(),
             name: name.into(),
@@ -213,13 +204,9 @@ impl Function {
                 .iter()
                 .enumerate()
                 .map(|(i, v)| {
-                    v.fields(&["A", "W", "role"], &[])?;
                     let a = v.get("A")?.uint()?;
                     let w = v.get("W")?.uint()?;
                     let role = v.get("role")?.string()?;
-                    if !["in", "mut"].contains(&role) {
-                        return err("§5.1", "invalid interface region role");
-                    }
                     Ok(Param {
                         name: format!("mem_{i}"),
                         ty: Type::parse(&format!("region[{a},{w}]"))?,
@@ -782,15 +769,16 @@ impl Object {
                             tokens(line)?
                         };
                         // Empty data images have an empty HEX token, represented by NAME SP.
-                        if t.len() != 2
-                            || !name(&t[0])
-                            || t[1].len() % 2 != 0
-                            || !t[1]
-                                .bytes()
-                                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-                        {
-                            return err("§16.2", "invalid data line");
+                        if t.len() != 2 {
+                            return err("§16.2", "data line requires NAME SP HEX");
                         }
+                        crate::metadata_schema::validate(
+                            "data",
+                            &Json::Object(BTreeMap::from([(
+                                t[0].clone(),
+                                Json::String(t[1].clone()),
+                            )])),
+                        )?;
                         let bytes = (0..t[1].len())
                             .step_by(2)
                             .map(|i| u8::from_str_radix(&t[1][i..i + 2], 16).expect("hex checked"))
@@ -953,27 +941,15 @@ impl Object {
             if !integer(index) || index.starts_with('-') {
                 return err("§9.1", "invalid local symbol index");
             }
-            s.fields(&["name", "kind", "signature", "interface_hash"], &[])?;
+
             let n = s.get("name")?.string()?;
             let k = s.get("kind")?.string()?;
             if !name(n) || !names.insert(n) {
                 return err("§9.1", "invalid or duplicate symbol name");
             }
-            let h = s.get("interface_hash")?.string()?;
-            if h.len() != 64
-                || !h
-                    .bytes()
-                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-            {
-                return err("§9.2", "interface_hash must be 64 lowercase hex digits");
-            }
             let sig = s.get("signature")?;
             if k == "data" {
-                sig.fields(&["abi", "kind", "size", "tier"], &[])?;
-                if sig.get("kind")?.string()? != "data"
-                    || sig.get("tier")?.string()? != "-"
-                    || sig.get("abi")?.string()? != "0.8"
-                {
+                if sig.get("kind")?.string()? != "data" {
                     return err("§9.1", "invalid data signature");
                 }
                 let bytes = self
@@ -1029,28 +1005,10 @@ impl Object {
                         "invalid import name or import conflicts with definition",
                     );
                 }
-                im.fields(&["signature"], &["pinned_closure_hash"])?;
+
                 let signature = im.get("signature")?;
-                if signature.get("kind")?.string()? == "data" {
-                    signature.fields(&["abi", "tier", "kind", "size"], &[])?;
-                    if signature.get("abi")?.string()? != "0.8"
-                        || signature.get("tier")?.string()? != "-"
-                    {
-                        return err("§9.1", "invalid imported data signature");
-                    }
-                    signature.get("size")?.uint()?;
-                } else {
+                if signature.get("kind")?.string()? != "data" {
                     Function::from_signature(n, signature)?;
-                }
-                if let Some(p) = im.object()?.get("pinned_closure_hash") {
-                    let h = p.string()?;
-                    if h.len() != 64
-                        || !h
-                            .bytes()
-                            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
-                    {
-                        return err("§9.3", "invalid pinned hash");
-                    }
                 }
             }
         }
@@ -1456,25 +1414,9 @@ impl Object {
             }
             return Ok(());
         };
-        l.fields(
-            &[
-                "ptr_width",
-                "H",
-                "A_tab",
-                "S_cells",
-                "null_size",
-                "heap_base",
-                "heap_limit_max",
-                "globals",
-                "interface_regions",
-            ],
-            &["block_image"],
-        )?;
+
         if let Some(image) = l.object()?.get("block_image") {
             let image = image.string()?;
-            if !name(image) {
-                return err("§9.1", "block_image must be a data NAME");
-            }
             let data = self
                 .data
                 .get(image)
@@ -1510,7 +1452,6 @@ impl Object {
             ),
         ];
         for (n, g) in globals {
-            g.fields(&["base", "size", "image"], &[])?;
             let image = g.get("image")?.string()?;
             if image != n
                 || self.data.get(n).is_none_or(|b| {
@@ -1547,7 +1488,7 @@ impl Object {
                 let r = regions
                     .get(&p.name)
                     .ok_or_else(|| Error("§7.2: missing interface mapping".into()))?;
-                r.fields(&["base"], &[])?;
+
                 let size = crate::oracle::power_of_two(a as u128)
                     .ok_or_else(|| Error("§7.2: interface region exceeds 2^H".into()))?;
                 ranges.push((r.get("base")?.uint()?, size, p.name.clone()));

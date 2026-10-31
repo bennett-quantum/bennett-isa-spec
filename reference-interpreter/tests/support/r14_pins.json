@@ -1,0 +1,50 @@
+[
+  {
+    "name": "r14-Y-number",
+    "envelope": "isa=0.8\nptr_width=32\n{\"abi\":\"0.8\",\"args\":[],\"fault\":4,\"in\":[8],\"kind\":\"oracle\",\"mem\":[],\"tgt\":8,\"tier\":\"q\"}\noracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()\nregs { one:reg[8], r:reg[8] }\n^entry():\none = lift.const.i8 1\nr = lift.add x one\nlift.retval r\n",
+    "interface_hash": "8ce5e64f15830d8e596ba9b4861def6565dd567b5804300f427d8b9566d5be93",
+    "closure_hash": "8ce5e64f15830d8e596ba9b4861def6565dd567b5804300f427d8b9566d5be93",
+    "object_hash": "8093da48bad04d6564325faf01ea1304a84b5ac5a120e685eee9951f5daec5d9",
+    "file_sha256": "578c913bb276d1446e2e038af0ab0a77017d9abe5ec351e3e20b69c307068e11"
+  },
+  {
+    "name": "r14-table-bool",
+    "envelope": "isa=0.8\nptr_width=32\n{\"abi\":\"0.8\",\"args\":[],\"fault\":4,\"in\":[8],\"kind\":\"oracle\",\"mem\":[],\"tgt\":8,\"tier\":\"q\"}\noracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()\nregs { one:reg[8], r:reg[8] }\n^entry():\none = lift.const.i8 1\nr = lift.add x one\nlift.retval r\n",
+    "interface_hash": "8ce5e64f15830d8e596ba9b4861def6565dd567b5804300f427d8b9566d5be93",
+    "closure_hash": "8ce5e64f15830d8e596ba9b4861def6565dd567b5804300f427d8b9566d5be93",
+    "object_hash": "8093da48bad04d6564325faf01ea1304a84b5ac5a120e685eee9951f5daec5d9",
+    "file_sha256": "72b1a01418d2abeb0519370c84b2abb7c4a0c528689acd9db9cb1ae6f33c1e3a"
+  },
+  {
+    "name": "r14-table-cell-bool",
+    "envelope": "isa=0.8\nptr_width=32\n{\"abi\":\"0.8\",\"args\":[],\"bounds\":[],\"in\":[],\"kind\":\"action\",\"mem\":[],\"mut\":[1],\"tier\":\"q\"}\naction @a (t:wire mut) () () () ()\n^entry():\nx t\n",
+    "interface_hash": "2fcd5b3d60b42ba6092447586a2157bf44ba3a6479ab2eb319bb67665feab8be",
+    "closure_hash": "2fcd5b3d60b42ba6092447586a2157bf44ba3a6479ab2eb319bb67665feab8be",
+    "object_hash": "ddc5d6729a98484acc2d5e8feb585c155799293bd36f31fd96cbc510f77666f0",
+    "file_sha256": "5892a2821a7fad5950f3fa760331a05ddc03385928cc57c294574affdc59124a"
+  },
+  {
+    "name": "r14-table-cell-object",
+    "envelope": "isa=0.8\nptr_width=32\n{\"abi\":\"0.8\",\"args\":[],\"bounds\":[],\"in\":[],\"kind\":\"action\",\"mem\":[],\"mut\":[1],\"tier\":\"q\"}\naction @a (t:wire mut) () () () ()\n^entry():\nx t\n",
+    "interface_hash": "2fcd5b3d60b42ba6092447586a2157bf44ba3a6479ab2eb319bb67665feab8be",
+    "closure_hash": "2fcd5b3d60b42ba6092447586a2157bf44ba3a6479ab2eb319bb67665feab8be",
+    "object_hash": "ddc5d6729a98484acc2d5e8feb585c155799293bd36f31fd96cbc510f77666f0",
+    "file_sha256": "2dfe77d3d7d5b99c00e7afe3853c2622a0743cc7e07dd1acc47f733180975cc9"
+  },
+  {
+    "name": "r14-table-positive",
+    "envelope": "isa=0.8\nptr_width=32\n{\"abi\":\"0.8\",\"args\":[],\"bounds\":[],\"in\":[],\"kind\":\"action\",\"mem\":[],\"mut\":[1],\"tier\":\"q\"}\naction @a (t:wire mut) () () () ()\n^entry():\nx t\n",
+    "interface_hash": "2fcd5b3d60b42ba6092447586a2157bf44ba3a6479ab2eb319bb67665feab8be",
+    "closure_hash": "2fcd5b3d60b42ba6092447586a2157bf44ba3a6479ab2eb319bb67665feab8be",
+    "object_hash": "ddc5d6729a98484acc2d5e8feb585c155799293bd36f31fd96cbc510f77666f0",
+    "file_sha256": "e6fb4e8278e28c1aea289f6b8388f531933989a421b35306497ab46630f0cd0e"
+  },
+  {
+    "name": "r14-table-row-bool",
+    "envelope": "isa=0.8\nptr_width=32\n{\"abi\":\"0.8\",\"args\":[],\"bounds\":[],\"in\":[],\"kind\":\"action\",\"mem\":[],\"mut\":[1],\"tier\":\"q\"}\naction @a (t:wire mut) () () () ()\n^entry():\nx t\n",
+    "interface_hash": "2fcd5b3d60b42ba6092447586a2157bf44ba3a6479ab2eb319bb67665feab8be",
+    "closure_hash": "2fcd5b3d60b42ba6092447586a2157bf44ba3a6479ab2eb319bb67665feab8be",
+    "object_hash": "ddc5d6729a98484acc2d5e8feb585c155799293bd36f31fd96cbc510f77666f0",
+    "file_sha256": "74f0fb42ca0042623d146e0fac30642158f9e9d0be846d934dbdce0a5afeeb52"
+  }
+]
