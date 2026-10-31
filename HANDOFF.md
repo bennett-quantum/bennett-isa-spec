@@ -1,3 +1,8 @@
+State (2026-10-31 01:10Z): reference-interpreter/ at **353 tests + 5 sweeps green** after rounds 9-11; **round 12 on
+09fc712: sol core ACCEPT**, astra revise; two blockers left (lossless layout leaves for colliding dotted paths; interface
+region names shared with function symbols), brief docs/briefs/2026-10-31-isa-ref-round-12-fixes.md, editor launch
+waiting on Codex pace. Main still backed up on origin/wip/ref-library-2026-10-30. Read ../bennett/HANDOFF.md first.
+
 State (2026-10-31 ~22:26Z, resumed evening session): reference-interpreter/ at **338 tests + 5 sweeps green** after
 council rounds 9-10 (one sol editor each; briefs docs/briefs/2026-10-30-isa-ref-round-{9,10}-fixes.md); **round 11
 prepared** on snapshot 45475a1 (worktree ../bennett-isa-spec-review, packet ../bennett/docs/council/isa-ref-2026-10-29/
