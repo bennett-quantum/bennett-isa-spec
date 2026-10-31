@@ -264,6 +264,24 @@ changed in response to the council's round-1 review
     Pins: identity::r12_cc_r_colliding_dotted_leaves and
     r12_cc_r_layout_paths_preserve_colliding_leaves; no accepted-spec edit.
 
+    *Round-13 spec limitation (0.9 defect, not an interpreter repair):*
+    [INV-4-envelope-injective.md](../../bennett-conformance/proofs/INV-4-envelope-injective.md),
+    proof step **1.5.3** (<1>5.<2>3), shows this tie order gives CC/R
+    envelopes uniqueness, not injectivity. Two objects with respectively
+    ("a", "c.db") and ("a.c", "db") at base 32 emit the same
+    `layout interface_regions.a.c.db {"base":32}` line. A reference-free
+    CC/R function with unchanged text therefore has equal envelope bytes and
+    interface/closure hashes despite different structured closure sets; this
+    is serialization information loss, not a SHA-256 collision. Candidate
+    0.9 fixes: render leaf paths as JCS arrays of original components
+    (`layout ["interface_regions","a","c.db"] {"base":32}`), or ban '.' in
+    oracle/region keys of `layout.interface_regions`. The latter narrows NAME
+    and requires a dialect/name-mangling and rule-10 review before adoption.
+    Neither candidate is implemented or imposed on ISA 0.8. Pin:
+    identity::r13_spec_limitation_cross_object_dotted_leaf_collision, with
+    independent CC/R envelopes and distinct object hashes. The interpreter
+    continues to implement §9.2 as written.
+
 32. **Global/interface address namespace (§4.2, §9.2)** *new (round 12)*.
     Question: both a layout global and an oracle's own interface region can
     supply a base for the same lift.addr spelling, but no precedence is given.

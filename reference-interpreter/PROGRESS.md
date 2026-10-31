@@ -154,7 +154,50 @@ README also links static cleanup, full-frame factorisation and runtime-return
 validators. No accepted-spec question or new scope restriction was needed.
 All round 4–13 positives/negatives and RNG distributions remain unchanged.
 Logs: .tmp/r13-{family-red,family-green,family-full,families-final,clippy}.log.
-The five ignored sweeps are running; final results will be appended here.
+### Final round-13 verification and proof addendum
+
+The orchestrator's addendum records INV-4-envelope-injective.md step 1.5.3
+under SPEC-QUESTIONS 31: original-component tie order gives uniqueness, not
+cross-object injectivity. A reference-free CC/R @main collides across the two
+layouts a/c.db and a.c/db at base 32. Candidate 0.9 fixes are JCS-array paths
+or a '.' ban in interface_regions keys (the latter needs a rule-10/name-mangling
+review). Neither is applied; hashing is unchanged. The named limitation test
+identity::r13_spec_limitation_cross_object_dotted_leaf_collision pins four
+independent objects, both full main envelopes and equal interface/closure pins:
+CC b16b186f89d22817eb40c0996e3f62e1a664267f2969d74c80aaa844458ed3b5;
+R b96f8c9b770bbea38a4c5e0e15acd50a6f2dda7fe6785e5b892f7f5cb2762442.
+Whole-object hashes remain distinct. This is a recorded spec defect, not
+an interpreter bug, and the test passes with no identity implementation change.
+The orchestrator already filed its bead; this sub-agent did not mutate Beads.
+
+Final normal suite: **375 passed / 0 failed / 5 ignored**, 8 unit + 367
+integration, 0 doctests, 18.43 s runner sum. Progression across green steps:
+**365/0/5 → 372/0/5 → 374/0/5 → 375/0/5**. Fmt --check and strict
+all-target Clippy pass with 0 warnings. Clippy requested as_chunks::<2>()
+in the new limitation test; after this style-only edit, that test passed again
+(1/0), followed by clean Clippy. No production source changed after the
+374-test gate or sweep start; the addendum only adds evidence/tests/docs.
+All three R13 corpora (8 witness records, 25 schema exemplars, 4 limitation
+records) regenerate byte-identically, with every independent pin unchanged.
+
+All **5 ignored sweeps passed / 0 failed**, 122.27 s summed runner time.
+
+| Sweep | Full domain | Observed result / runner time |
+|---|---|---|
+| u8 division/remainder | 65,536 operand pairs × 4 = 262,144 executions | 1/0; 1.25 s |
+| 17-wire borrow | 131,072 entries | 1/0; 3.17 s |
+| checked borrow certificate | 262,144 elements, subject and expected program | 1/0; 17.88 s |
+| §6 differential | 200,000 programs: 70,931 accepted (all clean), 129,069 rejected | 1/0; 96.74 s |
+| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 1/0; 3.23 s |
+
+Fix commit **3242123**; family/schema commit **47961e7**. This checkpoint adds
+the proof addendum and final verification. Every round 4–13 test is retained;
+10 tests added, RNG and seed unchanged. Owned diff --check is clean. No
+spec/conformance/include/Python seed edits, foreign test execution, dependency,
+Beads export, push or Dolt sync. The concurrent .beads and spec/conformance
+work is untouched. External response:
+../bennett/docs/council/isa-ref-2026-10-29/round-13/response.md.
+Logs: .tmp/r13-{final,final-clippy,sweeps,spec-limitation,families-final}.log.
 No beads mutation, spec/conformance edit/execution, dependency or push.
 
 ## Earlier rounds (2–11) and the codex-job history

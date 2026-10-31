@@ -560,3 +560,55 @@ fn r12_global_and_qregion_operands_remain_symbol_references() {
         }
     }
 }
+
+#[test]
+fn r13_spec_limitation_cross_object_dotted_leaf_collision() {
+    // Recorded ISA 0.8 defect, NOT a desired identity property: INV-4 proof
+    // step 1.5.3 / SPEC-QUESTIONS 31. Tie ordering preserves leaves within one
+    // object, but dotted serialization loses components across different objects.
+    // Keep §9.2 as written; a 0.9 contract change must replace this limitation.
+    let cases = support::json(include_str!("support/r13_spec_limitation_cases.json"));
+    for pair in cases.array().unwrap().as_chunks::<2>().0 {
+        let mut ids = Vec::new();
+        let mut layouts = Vec::new();
+        for c in pair {
+            let o = Object::parse(c.get("object").unwrap().string().unwrap()).unwrap();
+            o.check_hashes().unwrap();
+            let id = o.identity().unwrap();
+            let pin = c.get("interface_hash").unwrap().string().unwrap();
+            assert_eq!(
+                id.envelopes["main"],
+                c.get("envelope").unwrap().string().unwrap()
+            );
+            assert_eq!(id.interface_hashes["main"], pin);
+            assert_eq!(id.closure_hashes["main"].as_deref(), Some(pin));
+            assert_eq!(
+                id.object_hash,
+                c.get("object_hash").unwrap().string().unwrap()
+            );
+            assert_eq!(
+                id.envelopes["main"]
+                    .lines()
+                    .filter(|s| s.starts_with("layout interface_regions."))
+                    .collect::<Vec<_>>(),
+                [r#"layout interface_regions.a.c.db {"base":32}"#]
+            );
+            layouts.push(o.section("layout").unwrap().clone());
+            ids.push(id);
+        }
+        assert_ne!(layouts[0], layouts[1], "distinct structured closure sets");
+        assert_ne!(
+            ids[0].object_hash, ids[1].object_hash,
+            "objects stay distinct"
+        );
+        assert_eq!(
+            ids[0].envelopes["main"], ids[1].envelopes["main"],
+            "recorded spec limitation"
+        );
+        assert_eq!(
+            ids[0].interface_hashes["main"],
+            ids[1].interface_hashes["main"]
+        );
+        assert_eq!(ids[0].closure_hashes["main"], ids[1].closure_hashes["main"]);
+    }
+}
