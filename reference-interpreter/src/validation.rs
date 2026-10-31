@@ -536,7 +536,9 @@ impl Object {
                 _ if gate(op) => {
                     if matches!(op, "rx" | "ry" | "rz")
                         && a.first().is_some_and(|angle| angle.parse::<f64>().is_err())
-                        && s.types.get(&a[0]) != Some(&Type::F64)
+                        && !f.params[3]
+                            .iter()
+                            .any(|p| p.name == a[0] && p.ty == Type::F64)
                     {
                         return err("§3.3", "gate angle must be a classical f64 argument");
                     }

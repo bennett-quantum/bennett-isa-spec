@@ -257,3 +257,106 @@ fn r10_exact_fhead_and_nonempty_optional_productions() {
     let sig = r#"{"abi":"0.8","args":[],"bounds":[1],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
     Object::parse(&support::object(&[("a",sig,"action @a (t:wire mut) () () () ()\nregs {  } bounds {1}\n^entry():\nqloop 1 {\nx t\n}")],"{}","")).unwrap();
 }
+
+#[test]
+fn r11_action_regs_do_not_produce_wires() {
+    let text = support::r11_text("wire");
+    for kind in ["action", "perm_action"] {
+        for operand in ["d", "d[0]"] {
+            rejects(
+                &text
+                    .replace("action", kind)
+                    .replace("cx d t", &format!("cx {operand} t")),
+                "§3.3",
+            );
+        }
+    }
+    support::r11_pin("producer");
+}
+
+#[test]
+fn r11_action_regs_cannot_invent_angles() {
+    rejects(&support::r11_text("angle"), "§3.3");
+    support::r11_pin("argument");
+    // Named angles must be an f64 argument, never a wire, region or token.
+    let text = support::r11_text("argument");
+    for ty in ["i64", "ptr", "token"] {
+        rejects(
+            &text
+                .replace("angle:f64", &format!("angle:{ty}"))
+                .replace(r#""args":["f64"]"#, &format!(r#""args":["{ty}"]"#)),
+            "§3.3",
+        );
+    }
+    rejects(&text.replace("rx angle t", "rx missing t"), "§3.3");
+    support::r10_pin("one-trip");
+    support::r11_pin("producer");
+}
+
+#[test]
+fn r11_register_types_follow_function_kind() {
+    let mut accepted = 0;
+    let mut rejected = 0;
+    for kind in ["cc", "r", "oracle", "lproc", "action", "perm_action"] {
+        let (sig, head, row, tail) = match kind {
+            "cc" | "r" => (format!(r#"{{"abi":"0.8","kind":"{kind}","params":[],"results":[],"tier":"{kind}"}}"#),
+                format!("fn {kind} @a () () () () ()"), "ret", ""),
+            "oracle" => (r#"{"abi":"0.8","args":[],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#.into(),
+                "oracle @a (x:wire in) (t:wire) (f:wire[4]) () ()".into(), "lift.retval x", ""),
+            "lproc" => (r#"{"abi":"0.8","kind":"lproc","params":[1],"result":1,"tier":"q"}"#.into(),
+                "lproc @a (x:reg[1]) (r:reg[1]) () () ()".into(), "lift.ret x",
+                r#"
+section layout
+{"A_tab":0,"H":1,"S_cells":0,"globals":{},"heap_base":1,"heap_limit_max":0,"interface_regions":{},"null_size":1,"ptr_width":32}
+"#),
+            _ => (format!(r#"{{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"{kind}","mem":[],"mut":[1],"tier":"q"}}"#),
+                format!("{kind} @a (t:wire mut) () () () ()"), "x t", ""),
+        };
+        for ty in [
+            "reg[1]",
+            "wire",
+            "wire[2]",
+            "f64",
+            "i8",
+            "ptr",
+            "token",
+            "qreg[1]",
+            "region[0,8]",
+        ] {
+            let body = format!(
+                "{head}
+regs {{ d:{ty} }}
+^entry():
+{row}
+"
+            );
+            let text = support::object(&[("a", &sig, &body)], "{}", tail);
+            if matches!(kind, "oracle" | "lproc") && ty == "reg[1]" {
+                Object::parse(&text).unwrap();
+                accepted += 1;
+            } else {
+                rejects(&text, "§3.3");
+                rejected += 1;
+            }
+        }
+        let text = support::object(
+            &[(
+                "a",
+                &sig,
+                &format!(
+                    "{head}
+regs {{  }}
+^entry():
+{row}
+"
+                ),
+            )],
+            "{}",
+            tail,
+        );
+        Object::parse(&text).unwrap();
+        accepted += 1;
+    }
+    assert_eq!((accepted, rejected), (8, 52));
+    eprintln!("R11 regs family: {accepted} accepted / {rejected} rejected");
+}

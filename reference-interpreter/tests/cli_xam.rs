@@ -1805,3 +1805,77 @@ fn r10_cli_equivalent_control_sets_preserve_opaque_inverse() {
         }
     }
 }
+
+#[test]
+fn r11_cli_action_regs_reject_before_execution() {
+    r11_cli_regs("wire");
+}
+#[test]
+fn r11_cli_action_angles_reject_before_execution() {
+    r11_cli_regs("angle");
+}
+fn r11_cli_regs(tag: &str) {
+    let mut commands = 0;
+    {
+        let raw = support::r11_text(tag);
+        // Independent object byte pin applies even though the object must not load.
+        assert_eq!(
+            bennett_isa_ref::sha256_hex(raw.as_bytes()),
+            support::r11_case(tag)
+                .get("object_hash")
+                .unwrap()
+                .string()
+                .unwrap()
+        );
+        for kind in ["action", "perm_action"] {
+            for indexed in [false, true] {
+                let text = raw.replace("action", kind);
+                let text = if indexed {
+                    text.replace("cx d t", "cx d[0] t")
+                } else {
+                    text
+                };
+                let path = tmp_file(&format!("r11-regs-{tag}-{kind}-{indexed}.bisa"), &text);
+                fails(&["hash", &path], "§3.3");
+                fails(&["check", &path], "§3.3");
+                for input in ["0", "1"] {
+                    fails(
+                        &["run-action", &path, "a", "--mut", input, "--budget", "0"],
+                        "§3.3",
+                    );
+                    commands += 1;
+                }
+                commands += 2;
+            }
+        }
+    }
+    assert_eq!(commands, 16);
+}
+#[test]
+fn r11_cli_producer_and_argument_controls() {
+    for tag in ["producer", "argument"] {
+        support::r11_pin(tag);
+        let path = tmp_file(&format!("r11-{tag}.bisa"), &support::r11_text(tag));
+        assert_eq!(text(&ok(&["check", &path]), "status"), "ok");
+        ok(&["hash", &path]);
+        for input in ["0", "1"] {
+            let mut args = vec!["run-action", path.as_str(), "a", "--mut", input];
+            if tag == "argument" {
+                args.extend(["--arg", "f64:0.0"]);
+            }
+            for adjoint in [false, true] {
+                let mut args = args.clone();
+                if adjoint {
+                    args.push("--adjoint");
+                }
+                let v = ok(&args);
+                assert_eq!(uint(&v, "wires"), 1);
+                assert_eq!(
+                    field(&v, "state").canonical(),
+                    format!(r#"{{"{input}":[1,0]}}"#)
+                );
+                assert_eq!(array(&v, "mut")[0].uint().unwrap().to_string(), input);
+            }
+        }
+    }
+}

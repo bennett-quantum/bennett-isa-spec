@@ -1715,6 +1715,11 @@ fn validate_header(f: &Function) -> Result<()> {
             all(&f.params[1], |t| matches!(t, Type::Reg(_)))?;
         }
         "action" | "perm_action" => {
+            // §3.3: structured workspace has producers, not register-file locations.
+            // An empty regs line can still carry the §5.3 loop bounds.
+            if !f.regs.is_empty() {
+                return err("§3.3", "actions use Q producers, not a mutable regs file");
+            }
             all(&f.params[3], classical)?;
             empty(&[4])?;
             // §16.2 fhead: action groups are (mut..) (in..) (mem..) (args..) ();

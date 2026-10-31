@@ -6,6 +6,39 @@ under `reference-interpreter/`; commit own paths
 (`git add -A -- reference-interpreter && git commit -- reference-interpreter`),
 never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
+## Round-11 fixes (2026-10-31)
+
+Tracking b-isa-spec-x02; sole implementer; owned interpreter and external
+round-11 response only. Baseline 338 passed / 0 failed / 5 ignored.
+Independent support/r11_pins.py reproduces both members' exact H/object pins,
+including malformed objects, without interpreter calls or pin corrections.
+
+| Blocker | RED tests | Status | Commit |
+|---|---|---|---|
+| SOL-R11-B01 ≡ R11-B01 | parser::r11_action_regs_do_not_produce_wires / r11_action_regs_cannot_invent_angles; CLI wire/angle counterparts | GREEN, 6 targeted pass; full suite 344/0/5 | this step |
+| SOL-R11-B02 ≡ R11-B02 | literal exact-owner envelope witnesses prepared | pending | — |
+| SOL-R11-B03 ≡ R11-B03 | qinplace and rounded-angle fixture claims | pending | — |
+
+B01 RED: parser 0 passed / 3 failed, CLI 1 passed / 1 failed;
+separate exact angle CLI 0 passed / 1 failed. Initial test-source quoting
+error was corrected before semantic RED and is not counted as a witness.
+GREEN: 6/0; regs family 8 accepted / 52 rejected across six kinds and nine
+types, plus empty regs and loop-bounds controls. CLI negatives exercise 32
+commands (hash/check/run-action, both action kinds, scalar/indexed, t=0/1).
+Both supplied positive controls check independently pinned H/object bytes
+and run forward/adjoint on both t basis entries.
+
+Design: register-file legality is decided by function kind at load: oracle
+and lproc locations are reg[N], CC/R use SSA, actions use Q producers.
+Empty regs may carry bounds. Named rotation angles resolve specifically to
+f64 classical arguments fixed at entry, never to a general type-map entry.
+No runtime default, count cap or scope reduction.
+
+Logs: .tmp/r11-{baseline,b01-red,b01-angle-cli-red,b01-green,b01-full,pins}.log.
+Only crate tests with absolute offline manifest; no conformance execution.
+Remaining work: B02 exact structured ownership, B03 fixture audit/fixes,
+README Design, final gates and five sweeps, external response and commits.
+
 ## Round-10 fixes (2026-10-30)
 
 Tracking b-isa-spec-eka. Sole implementer; owned interpreter and external
