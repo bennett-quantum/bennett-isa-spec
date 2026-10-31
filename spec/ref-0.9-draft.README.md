@@ -110,3 +110,8 @@ The historical 54-recipe checkpoint was
 Neither is a complete-library binding. In particular the first remaining
 blocked row, lift.load, still cannot express its ordered mapped layout
 under §11.1's typed formal grammar/K22 template-only list rule (1oa).
+
+Final local gate: **88 Rust pass / 0 fail**, fmt/clippy green; harness
+**445 pass / 0 fail / 68 unavailable**, versus entry 445/0/65. New commits:
+bbb1b62 (Part 1), 0656e14 (step/qregion family and resumed native evidence);
+see progress for the exported-beads bookkeeping commit. No push.

@@ -198,8 +198,7 @@ implemented, source region shape/role descriptors still absent. Carry 1a4,
 3xe (classes/output-lifetimes), 1oa (mapped layout records), 82x (qinplace
 release-order conflict with ratified A1). No capability is declared inert.
 
-Part 1 commit: the commit containing this entry (recorded explicitly in the
-next family entry). Headless offline fmt/clippy/test and harness are green;
+Part 1 commit: bbb1b62. Headless offline fmt/clippy/test and harness are green;
 full gate logs are project-local .tmp/ref-gate-{0,1,2,3}.log. Recipe bytes
 are unchanged in this Part 1 commit; complete-library marker is untouched.
 
@@ -212,10 +211,10 @@ supplies an opaque complete dispatcher in place of the step algorithm.
 
 | Completed row / evidence | Widths, bounds, configurations | Full-domain witnesses | Commit |
 |---|---|---:|---|
-| §3.6 step / inverse step | W=1–4, N=0/1/2/3/17, P=bit_length(N)≥1; frame old_pc[P], displacement[W], flag; 20 shapes / 112 legal pc configurations | 1,218,560 tuples | family commit containing this entry |
-| Repeated explicit step-frame binding | W=1–4; bounds 0/1/2/3/17; 20 configurations; complete finite expansion with distinct scratch identities | 3,400 tuples | same |
-| §4.6 complete qregion function scope | W=1–4; C=1/8; 272 image configurations (all 256 one-byte images, four default small-width regions, 12 multibyte patterns) | 1,088 basis tuples + 1,088 exact matrix columns | same |
-| Sparse exact amplitude backend | Every allocated coordinate retained; clean alloc/release checks; entangled H/CX/T/SDG/H/CZ/SWAP circuit adjoint | 4 dense/sparse agreeing columns | same |
+| §3.6 step / inverse step | W=1–4, N=0/1/2/3/17, P=bit_length(N)≥1; frame old_pc[P], displacement[W], flag; 20 shapes / 112 legal pc configurations | 1,218,560 tuples | 0656e14 |
+| Repeated explicit step-frame binding | W=1–4; bounds 0/1/2/3/17; 20 configurations; complete finite expansion with distinct scratch identities | 3,400 tuples | 0656e14 |
+| §4.6 complete qregion function scope | W=1–4; C=1/8; 272 image configurations (all 256 one-byte images, four default small-width regions, 12 multibyte patterns) | 1,088 basis tuples + 1,088 exact matrix columns | 0656e14 |
+| Sparse exact amplitude backend | Every allocated coordinate retained; clean alloc/release checks; entangled H/CX/T/SDG/H/CZ/SWAP circuit adjoint | 4 dense/sparse agreeing columns | 0656e14 |
 | Native checkpoint resumed from fcea698 | W=1–4; H/S/SDG/T/TDG/CZ; eight finite bit-pattern angles × rx/ry/rz; k=0/1/2/3/4/17 | 356 exact + 1,440 numerical columns; 524,412 MCX tuples + 36 typed permutation tuples | fcea698; verified in this family |
 | General no-wrap call predicate checkpoint | D,S independently1–4, R4/5/16, two depth/stack limits; 192 configurations; §16.3 D5/S10/R16/17/272 | 43,200 + 131,072 tuples | fcea698; accounting corrected bbb1b62 |
 
@@ -276,3 +275,10 @@ hash test now checks the generator's entire default catalog instead of the
 old hard-coded ten-family checkpoint. Accepted 0.8 SHA-256 remains
 90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e.
 No reference-interpreter changes, push, or publication in this work.
+
+Final commit mapping: **bbb1b62** = Part 1; **0656e14** = step/qregion
+family plus resumed native/call-predicate evidence and three pending cases.
+This final bookkeeping commit records those hashes and the required bd
+export (84 issues). The final gate above covers all implementation changes;
+only progress/README bookkeeping and the export follow it. Parent 8r4 is
+open with the exact first row blocker; no push.
