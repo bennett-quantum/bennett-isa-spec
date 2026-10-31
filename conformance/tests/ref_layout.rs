@@ -95,6 +95,10 @@ fn lifted_layout_memory_full_symbolic_domains() {
                     let maxend = Bdd::constant(cells, ext);
                     let overflow = b.less(&maxend, &top);
                     let domain = b.not(overflow);
+                    if p == 8 {
+                        // P>H includes both (0,4) and (4,0): 15 table pairs.
+                        assert_eq!(b.satisfying_count(domain).unwrap(), 15 * (1u128 << 89));
+                    }
                     let bad = b.and(enabled, flag);
                     want[m.inputs["flag"][0]] = bad;
                     let id = m.inputs["faulted"][0];

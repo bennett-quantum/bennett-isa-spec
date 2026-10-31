@@ -310,7 +310,7 @@ Part 1 commit 90590a7. Added lift.load/store (197 recipes), observed red
 at unknown lift.load, then exact BDD comparison against independently
 built byte memory/range/slot/fault semantics. 88 configurations, P1–4 and
 P5 large case; B1/2/3/4/16 bytes; mapped-region counts 0/1/2/3/17.
-Domain/tuple formula in README; exact total 167143296548916895889517112694306429377925266509132267598234820116853215623227220551812585180993364921141732939506160915932057223539145589421667637993405146421832216413988502350229780370880234778525696.
+Domain/tuple formula in README; exact total 167143296548916895889517112694306429377925266509132267598234820116853215623227220551812585180993364921141732939506160915932057223539145589421667637993405146421832216413988504826109858941640784576774144.
 This family uses a single table entry with all legal base/size combinations,
 all atop/live/pinned values, arbitrary memory/mapped spectators and outputs.
 The independent generic scan family separately covers multiple entries.
@@ -320,7 +320,7 @@ Complete marker remains untouched; qinplace remains blocked on 82x.
 
 Four additional P=N=8, H=2 byte configurations bind value/destination
 to the address location itself (load and store, mapped/unmapped). Their
-full domains add 56*2^89 tuples, including unused declared spectators.
+full domains add 60*2^89 tuples, including unused declared spectators.
 Family gate: 95 Rust tests, 0 fail; fmt/clippy green; harness 445/0/69
 (+1 pending-0.9 case). The alias-only final extension passes separately.
 
@@ -413,3 +413,33 @@ call/ret domain counts and all semantic assertions are unchanged.
 Construction State uses the same private scratch classification through
 record binding; a red/green regression prevents forward-order releases.
 No interpreter source read/copied, no writes outside owned paths, no push.
+
+## Completion II — final commit/evidence mapping
+
+| Family | Completed rows / new recipes | Widths and bounds | Exact witnesses | Commit |
+|---|---|---|---|---|
+| Contract | K25 records, K26 regions, K27 lifetimes; K23 closes 4nx | typed validation and negative witnesses | 11 descriptor tests by final gate | 90590a7; follow-up audits in f2427ec/7ff93a5/e649e36 |
+| Byte memory | lift.load/store / 2 | P1–4, P5 large and P8 alias; bytes1/2/3/4/16; mapped0/1/2/3/17 | 88 shapes; exact total and domain formula in README | fedc9c6; fault-order correction 7ff93a5 |
+| Allocation | qalloc/borrow/free/return, copy/uncopy, load/unload in/mut / 10 | widths1–4, A/W independently1–4, three classes | 7,083,657,813,172,691,625,768 tuples +180 exact borrowed columns; 4 direct class shapes | f2427ec |
+| Symbol calls | lift.oracle_call/uncall/perm_call, oracle_call/action_call / 5 | widths1–4, valid source region roles, i128/token args | 1,048,320 tuples | 7ff93a5 |
+| Activation | stack.copy/store/exchange, lift.call/ret / 5 | W1–4; 8 stack cells; heterogeneous 3+1 locations | call 11,070,410,916,511,088,640; ret 5,266,185,708,023,840,768 tuples | 7ff93a5; source fixture normalization e649e36 |
+| Construction | oracle.construct / 1 | W1–4; B0/1/2/3/17 | 60 shapes / 2,246,400 tuples | e649e36 |
+| qinplace | blocked 82x / 0 | both private allocations and calls remain required | no certification until generated-order decision | carry recorded in 90590a7 and bd export |
+
+Final count audit corrected only the P8 alias tuple total: when ptr_width
+exceeds physical H, both (base=0,size=4) and (base=4,size=0) are legal
+under the witness domain base+size<=4. There are 15 table pairs, so the
+four shapes add **60*2^89** tuples (not 56*2^89). The new exact BDD count
+assertion passes, with all 88 semantic domains and reversal assertions
+unchanged (2 memory tests pass after this final correction). Library
+bytes/hash, recipe count, overall 108-test count and harness counts are
+unchanged. No semantic test assertion was removed.
+
+Final state: **218 recipes**, checkpoint-only envelope
+64a05ef20201faad429ca2568ee27848fae0b833f95c006a7d594df0313da4ca
+(Rust=Python -I). Full gate 108/0 and harness 445/0/73 as above; final
+activation metadata and memory-count assertions pass separately, clippy
+remains green. Complete-library marker withheld for the exact qinplace
+conflict quoted above. Closed 1oa/evi/1a4/3xe/4nx; carried 82x and parent
+8r4; no new beads filed. The final .beads/issues.jsonl export contains
+89 issues and both completion/carry notes. No push.

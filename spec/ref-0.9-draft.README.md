@@ -134,11 +134,11 @@ plus P=5, 16-byte accesses with 0/17 mapped regions. All memory, mapped
 cells, values, fault/code and table inputs are arbitrary, flag/slot clean;
 one table entry, legal base+size<=2^P, atop=0/1, ambient control included.
 Exact tuples per non-alias configuration: (M*(M+3)/2-1)*2^(P+9+8*B+16*M), M=2^P.
-Total tuples: 167143296548916895889517112694306429377925266509132267598234820116853215623227220551812585180993364921141732939506160915932057223539145589421667637993405146421832216413988502350229780370880234778525696. Scratch and complete reversal checked.
+Total tuples: 167143296548916895889517112694306429377925266509132267598234820116853215623227220551812585180993364921141732939506160915932057223539145589421667637993405146421832216413988504826109858941640784576774144. Scratch and complete reversal checked.
 
 Four additional P=N=8, H=2 byte configurations bind value/destination
 to the address location itself (load and store, mapped/unmapped). Their
-full domains add 56*2^89 tuples, including unused declared spectators.
+full domains add 60*2^89 tuples, including unused declared spectators.
 Family gate: 95 Rust tests, 0 fail; fmt/clippy green; harness 445/0/69
 (+1 pending-0.9 case). The alias-only final extension passes separately.
 
@@ -209,3 +209,10 @@ entry **445/0/68**; exactly five new pending-0.9 cases account for +5.
 Rust/Python canonical bytes and checkpoint envelope agree. Accepted 0.8
 SHA-256 remains 90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e;
 qxor witness hash remains 299510fd67cc626fdcbcc10adcd40730f9af294ba596d86fb25fd31be08a5c7f.
+
+Commit mapping: 90590a7 contract; fedc9c6 byte memory; f2427ec allocation;
+7ff93a5 calls/activation and memory ordinal correction; e649e36 construction.
+The final memory-domain count is independently asserted with the exact BDD
+counter: 15 legal base/size pairs at P8/H2, adding 60*2^89 across four
+alias shapes. The two memory tests pass after this bookkeeping correction.
+Detailed per-family evidence and the final bd export are in progress.
