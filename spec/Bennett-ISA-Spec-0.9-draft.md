@@ -1363,7 +1363,7 @@ every write. Π is the effective control context at the instruction.
 test beyond workspace provenance sets to the joint state of all other
 live values, including interface `mut` wires, region cells, borrowed
 wires and outstanding diagonal phases. [deps: ISA-3.3-P3, ISA-5.1, ISA-5.3-P1, ISA-6.1-P1]
-For a proposed inverse of the computing sequence C of g, let G be g's
+For a candidate inverse of the computing sequence C of g, let G be g's
 wires and M the composed intervening operation after C and before that
 inverse, retaining every intervening gate and its effective controls,
 with internal clean and borrowed lifetimes interpreted as in §14.2.
