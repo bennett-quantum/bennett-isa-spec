@@ -1,3 +1,51 @@
+## 2026-10-31 Council round 1 → 2 — final validation
+
+- Full `cargo test --offline --manifest-path conformance/Cargo.toml`:
+  PASS, 112 passed, 0 failed, 0 ignored across 35 result groups
+  (including empty unit/doc groups); log under .tmp/council-r1.
+- Required standalone Python -I draft_witnesses.py: PASS, including exact
+  requested system diff -u byte comparison and unchanged accepted digest.
+  Required standalone cargo --test draft_contracts: PASS, 1 test.
+- Python -I ref_catalog.py --check: 219 recipes, envelope SHA-256
+  5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197.
+  Rust independent_canonical_bytes_and_envelope_hashes computed the same
+  hash, and its comparison to Python and §11.1 passed. Only the adj recipe
+  differs from the prior 219-recipe catalog; the qxor witness is unchanged.
+- Final scheduled adjoint regression uses the actual bound adj/qinplace
+  recipes with synthetic identity-map callees, checking H then G, separate
+  call paths/ordinals, caller 0..4, t[1]/f[4], matched releases and classes.
+  The final strengthened test passes (2/2 in ref_qinplace_contract).
+  Source-table SDG/TDG/H and angle-negation tests pass with the new adapter.
+- Four distinct context keys and schedule prefixes round-trip in JSON;
+  the K64 constructor partition was checked against oracle.construct's
+  initial State, forward Frames, halt..halt-release commit, inverse Frames
+  and inverse State arrays. These are contract witnesses, not a claim of
+  implemented 0.9 schedule/certificate executor conformance.
+- Final scratch statement rebuild: 1594 statements, 154 declared markers,
+  474 declared edges and zero unresolved declared dependencies. All 53
+  changed normative prose statements have markers; the one changed schema
+  code block has a declared prose introduction. All target IDs exist in
+  the supplied authority; content checks of targeted edges are recorded
+  above. No sibling graph/catalog is overwritten. The 15 clause-graph
+  unresolved external references are pre-existing external/xspec refs,
+  distinct from the zero unresolved declarations.
+- K1–K67 are continuous; K64/K65 decision cells say maintainer ratification
+  pending. Draft contains none of the three forbidden words. Source and
+  changed test/progress whitespace checks pass; raw diff context blanks
+  are deliberately retained as required by exact diff regeneration.
+- Accepted 0.8 SHA-256 unchanged:
+  90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e.
+  Final draft SHA-256:
+  59eee9ad0d96d34b6c6fd8be0acb041a56c652e8be821393c153f83cde5df96b.
+  Final diff SHA-256:
+  2f244ed04ab07a4674c68ee46286934c22a7e007f01a242ff3ae580e164df91d.
+- 8ka/23g CLOSED with the exact drafting-for-ratification phrase; 82i OPEN
+  for the remaining advisory K1–K27 dependency audit. Export refreshed.
+- Item commits: afd4bb6 (adjoint/library), b818b40 (invocation identity),
+  317d919 (pending gap mechanics), efaad51 (suggestions/witnesses).
+  This validation record and the separate meta-repo response complete
+  handback. No push, Dolt sync or edits to concurrent interpreter work.
+
 ## 2026-10-31 Council round 1 → 2 — item 4 and audit (K66/K67)
 
 | Suggestion | Disposition | Concept / reason |
