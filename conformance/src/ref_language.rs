@@ -11,6 +11,8 @@ use std::{
 };
 #[derive(Clone)]
 struct Handle {
+    declared_scratch: bool,
+    scratch: bool,
     metadata: (String, usize, String, String),
     live: bool,
 }
@@ -644,8 +646,16 @@ impl Expander {
                         || s(f(&region, "role")?)? != s(f(p, "role")?)?
                         || !matches!(s(f(&region, "role")?)?, "in" | "mut")
                         || !["local:", "interface:"].iter().any(|prefix| {
-                            s(f(&region, "origin").unwrap())
-                                .is_ok_and(|v| v.starts_with(prefix) && v.len() > prefix.len())
+                            s(f(&region, "origin").unwrap()).is_ok_and(|v| {
+                                v.strip_prefix(prefix).is_some_and(|name| {
+                                    name.as_bytes()
+                                        .first()
+                                        .is_some_and(|b| b.is_ascii_alphabetic() || *b == b'_')
+                                        && name.bytes().all(|b| {
+                                            b.is_ascii_alphanumeric() || b == b'_' || b == b'.'
+                                        })
+                                })
+                            })
                         })
                     {
                         return Err("region shape/role/origin mismatch".into());
@@ -1030,6 +1040,8 @@ impl Expander {
                     return Err("invalid allocation state".into());
                 }
                 let h = Rc::new(RefCell::new(Handle {
+                    declared_scratch: c.scratch_names.contains(n),
+                    scratch: c.scratch_names.contains(n),
                     metadata: (
                         format!("@{:?}/{}", path, self.serial),
                         width,
@@ -1052,6 +1064,13 @@ impl Expander {
                     .get(n)
                     .ok_or("unbound allocation declaration")?
                     .borrow_mut();
+                if acquire {
+                    h.scratch = h.declared_scratch || c.scratch_names.contains(n);
+                }
+                if h.scratch && h.metadata.3 != "clean" {
+                    return Err("library scratch must be clean".into());
+                }
+                leaf.scratch = h.scratch;
                 if h.live == acquire {
                     return Err("allocation lifetime mismatch".into());
                 }

@@ -1,5 +1,5 @@
 --- /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/Bennett-ISA-Spec.md	2026-10-28 15:10:07.903399463 +0100
-+++ /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/Bennett-ISA-Spec-0.9-draft.md	2026-10-31 08:52:22.357332565 +0100
++++ /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/Bennett-ISA-Spec-0.9-draft.md	2026-10-31 09:07:08.141903200 +0100
 @@ -1,25 +1,197 @@
 -# Bennett Virtual ISA — Specification, draft 0.8
 +# Bennett Virtual ISA — Specification, draft 0.9
@@ -1721,7 +1721,7 @@
  **Matching.** Every generated operation has an **invocation chain**: the
  program points of the region calls, `lift.call`s and `lift.oracle_call`s
  that led to it, outermost first, ending in its own point. `path` matches
-@@ -1291,25 +2201,567 @@
+@@ -1291,25 +2201,574 @@
  against the object and executes verbatim or rejects (`E_SCHEDULE_
  INFEASIBLE`).
  
@@ -2031,7 +2031,10 @@
 +the formal components, even if a different shape has the same total
 +width. Origin is `interface:` followed by the canonical source operand
 +name for a caller-owned interface, or `local:` followed by the local
-+source declaration's occurrence identity. The suffix is nonempty and
++source declaration's NAME token. Each suffix is the exact canonical
++§16.1 NAME token, without a sigil. Its binding together with the ordered
++cell wire identities identifies the source occurrence (including repeated
++invocations); forwarding preserves both. The suffix
 +is checked against the linked source binding; a local origin cannot be
 +substituted for an interface origin by changing its string. A region
 +formal can be used as its flattened cells in any wire actual, while
@@ -2069,7 +2072,11 @@
 +with fresh identity even within one declaration. Clean release requires
 +zero; borrowed release requires restoration on the full domain (§5.6),
 +never zero. These are user/instruction allocation results; internal
-+library scratch still obeys the clean LIFO rule below. Allocations are
++library scratch still obeys the clean LIFO rule below. A declaration
++or allocation formal listed in `scratch` when acquired marks that entire
++allocation lifetime as library scratch; the mark follows its identity
++through captures and invokes, requires clean state and cannot be removed
++by releasing through a different formal name. Allocations are
 +unconditional even under a false inherited control.
 +Witness: declare out[2] of class ancilla; invoke an allocation recipe on
 +out; apply two X gates to out[1] in separate caller/callee bodies; invoke
@@ -2297,7 +2304,7 @@
  `error` entry (§12.3) is a **common upper bound over all contexts** of
  its key; the multiplicity composition of §12.3 is sound for that reason.
  
-@@ -1325,7 +2777,10 @@
+@@ -1325,7 +2784,10 @@
  rejects): Y − J(Φ) ⪰ 0, Y + J(Φ) ⪰ 0, mu·I − Tr_out(Y) ⪰ 0 (partial trace
  over the output factor), and mu ≤ `bound`; then ‖Φ‖◇ ≤ mu (the dual of
  Watrous's SDP with Y₀ = Y₁ = Y; this is the diamond norm itself, not
@@ -2309,7 +2316,7 @@
  hi, im_lo, im_hi]` (decimal strings). **Positivity test.** The checker
  proves each of the three matrices **positive definite** by an interval
  Cholesky (or Hermitian LDL†) factorisation in which the interval lower
-@@ -1335,13 +2790,25 @@
+@@ -1335,13 +2797,25 @@
  strictly feasible by replacing Y with Y + δI and mu with mu′ = mu + δ·(d
  + 1) for a small rational δ > 0 (any mu′ > mu + δ·d suffices): then Y ±
  J(Φ) ⪰ δI ≻ 0 and, since Tr_out(Y + δI) = Tr_out(Y) + δ·d·I, mu′·I −
@@ -2338,7 +2345,7 @@
  
  **Sampling.** For each domain component with range size R = hi − lo + 1,
  assemble m = ⌈⌈log₂ R⌉/64⌉ consecutive generator words (least-significant
-@@ -1350,18 +2817,22 @@
+@@ -1350,18 +2824,22 @@
  
  ### 12.2 Domains
  
@@ -2365,7 +2372,7 @@
                                                     fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
              cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },
              error:   { "<variant>:<inherited_controls>": { local: { "operator_norm"?: v, "diamond"?: v }, inclusive: { "operator_norm"?: v, "diamond"?: v } } },
-@@ -1369,6 +2840,63 @@
+@@ -1369,6 +2847,63 @@
    composition { multiplicities: { "<hash>:<variant>:<inherited_controls>": n (from the realised schedule) }, epsilon_total: { "diamond": v }, method: "sum_over_multiplicities" }
  ```
  
@@ -2429,7 +2436,7 @@
  `inclusive(R, key) = local(R, key) + Σ_callees n_c × inclusive(c, key_c)`
  **per metric**, keyed like `cleanup` by `<variant>:<inherited_controls>`
  (the realised error depends on both); every `local` value is a verified
-@@ -1380,27 +2908,41 @@
+@@ -1380,27 +2915,41 @@
  variants) require `operator_norm` bounds throughout. A controlled
  unitary variant requires a `numerical` claim; an ε > 0 realisation
  compared as a channel requires a `channel` claim. Executable claims
@@ -2477,7 +2484,7 @@
  ### 14.2 Quantum state semantics
  
  The state of a Q region is a vector in ⊗ over live wires in allocation
-@@ -1422,10 +2964,20 @@
+@@ -1422,10 +2971,20 @@
  - **T3 (permutation theorem).** If the realised unitary V of a circuit on
    span(D) is a permutation matrix and the final basis tuple equals P(x)
    for every x ∈ D, then V|span(D) = P.
@@ -2502,7 +2509,7 @@
  - **T5.** As §6.3.
  - **T6 (executor agreement).** Two executors conforming to §3–§7 on one
    target with the same schedule produce on every x ∈ D the same final
-@@ -1439,14 +2991,14 @@
+@@ -1439,14 +2998,14 @@
  
  | Suite | Class | Tests |
  |---|---|---|
@@ -2524,7 +2531,7 @@
  
  ## 16. Canonical textual form (normative)
  
-@@ -1458,7 +3010,17 @@
+@@ -1458,7 +3017,17 @@
  `INT := -?(0|[1-9][0-9]*)`; `FLOAT :=` shortest round-trip decimal with
  `.` or exponent, finite; `STRING := "…"` with escapes `\"`, `\\`, `\n`;
  `HEX := ([0-9a-f]{2})*`. Metadata lines are RFC 8785 canonical JSON
@@ -2543,7 +2550,7 @@
  
  ### 16.2 Grammar
  
-@@ -1472,10 +3034,10 @@
+@@ -1472,10 +3041,10 @@
    dataline  := NAME SP HEX NL
    function  := fhead NL regs? block+
    fhead     := ("fn" SP ("cc"|"r") | "oracle" | "action" | "perm_action" | "lproc") SP "@" NAME SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")"
@@ -2557,7 +2564,7 @@
    regs      := "regs" SP "{" SP (NAME ":" type ("," SP NAME ":" type)*)? SP "}" (SP "bounds" SP "{" INT ("," SP INT)* "}")? NL
    block     := "^" NAME "(" plist "):" NL instr+
    instr     := (lhs SP "=" SP)? OPCODE (SP operand)* (SP "{" NL instr+ "}" (SP "{" NL instr+ "}")?)? NL
-@@ -1485,16 +3047,32 @@
+@@ -1485,16 +3054,32 @@
    VER       := INT "." INT
  ```
  
@@ -2593,7 +2600,7 @@
  
  section functions
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
-@@ -1509,9 +3087,9 @@
+@@ -1509,9 +3094,9 @@
  empty and its envelope is exactly these bytes (each line LF-terminated):
  
  ```
@@ -2605,7 +2612,7 @@
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
  regs { one:reg[8], r:reg[8] }
  ^entry():
-@@ -1521,17 +3099,19 @@
+@@ -1521,17 +3106,19 @@
  ```
  
  With B ≥ 3 every x yields `(x + 1 mod 256, 0)` (`result_val` = 0 ⊕ r);
@@ -2628,7 +2635,7 @@
  
  section functions
  oracle @sum_db (n:wire[8] in) (t:wire[8]) (f:wire[4]) (db:region[4,8] in) ()
-@@ -1586,17 +3166,18 @@
+@@ -1586,17 +3173,18 @@
  SCC (its self-reference is written `@$0`, its `@zero` reference is
  replaced by `@` + the `zero` hash, which is its only part-(6) line; its
  closure set is the `zero` global's leaf and image), so its envelope is
@@ -2651,7 +2658,7 @@
  lift.boundscheck zp 1
  zv = lift.load.i8 zp
  z = lift.icmp.eq n zv
-@@ -1615,7 +3196,7 @@
+@@ -1615,7 +3203,7 @@
  lift.ret acc
  data zero 00
  layout globals.zero {"base":16,"image":"zero","size":1}
@@ -2660,7 +2667,7 @@
  ```
  
  `@sum_db`'s envelope includes every layout leaf, the `zero` image, `@` +
-@@ -1623,12 +3204,378 @@
+@@ -1623,12 +3211,378 @@
  line (`@db` is an interface region, not a symbol):
  
  ```
@@ -3043,7 +3050,7 @@
  ## 17. Decisions deferred to implementation, with defaults
  
  Each item is one an implementer must decide to build; any decision is
-@@ -1653,7 +3600,14 @@
+@@ -1653,7 +3607,14 @@
     (ripple-carry adders and comparators, linear `inrange` scans,
     one-hot address dispatch, clean scratch released in reverse order);
     a schedule that names no `expansion` binds `ref` at the ISA's own
@@ -3059,7 +3066,7 @@
  8. **Enclosure procedure for transcendental entries** (§12.1). Default:
     Taylor series of sin and cos to the first term whose Lagrange
     remainder bound is below 2^−(`precision_bits` + 2), argument reduced
-@@ -1669,7 +3623,65 @@
+@@ -1669,7 +3630,65 @@
  13. **Suite sizes** (§15): the exhaustive widths of suite C and the
      sample counts of `sampled` claims. Default: exhaustive for ≤ 16
      interface bits; 2^16 samples above.

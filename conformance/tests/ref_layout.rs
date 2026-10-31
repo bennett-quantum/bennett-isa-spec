@@ -152,3 +152,49 @@ fn lifted_layout_memory_full_symbolic_domains() {
         }
     }
 }
+
+#[test]
+fn memory_fault_write_ordinals_follow_all_assignment_exchanges() {
+    let mut e = Expander::new(
+        include_str!("../../spec/ref-0.9-draft.json"),
+        Registry::new(),
+    )
+    .unwrap();
+    let bundles = [
+        ("a", 2),
+        ("base", 2),
+        ("size", 2),
+        ("live", 1),
+        ("pinned", 1),
+        ("atop", 1),
+        ("flag", 1),
+        ("faulted", 1),
+        ("code", 4),
+        ("v", 8),
+        ("disp", 8),
+        ("mem", 32),
+    ];
+    let args=json::parse(r#"[2,1,3,1,1,4,8,1,"a","base","size","live","pinned","atop","flag","faulted","code","v","disp",[{"base":0,"extent":4,"cells":"mem"}]]"#).unwrap();
+    for op in ["load", "store"] {
+        let leaves = e
+            .expand(&format!("lift.{op}"), args.as_arr().unwrap(), &bundles)
+            .unwrap();
+        let last_exchange = leaves
+            .iter()
+            .rposition(|l| {
+                l.gate == "swap"
+                    && l.wires
+                        .iter()
+                        .any(|(n, _)| n == if op == "load" { "v" } else { "mem" })
+            })
+            .unwrap();
+        let first_fault = leaves
+            .iter()
+            .position(|l| l.wires.iter().any(|(n, _)| n == "faulted"))
+            .unwrap();
+        assert!(
+            first_fault > last_exchange,
+            "§3.6(d) fault writes follow §3.6(c) assignment effects: {op}"
+        );
+    }
+}

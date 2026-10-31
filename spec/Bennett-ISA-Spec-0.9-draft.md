@@ -2506,7 +2506,10 @@ wires, in cell-index/LSB-first order. Both shape components must equal
 the formal components, even if a different shape has the same total
 width. Origin is `interface:` followed by the canonical source operand
 name for a caller-owned interface, or `local:` followed by the local
-source declaration's occurrence identity. The suffix is nonempty and
+source declaration's NAME token. Each suffix is the exact canonical
+§16.1 NAME token, without a sigil. Its binding together with the ordered
+cell wire identities identifies the source occurrence (including repeated
+invocations); forwarding preserves both. The suffix
 is checked against the linked source binding; a local origin cannot be
 substituted for an interface origin by changing its string. A region
 formal can be used as its flattened cells in any wire actual, while
@@ -2544,7 +2547,11 @@ occurrence identity. Reacquisition denotes a new allocation occurrence,
 with fresh identity even within one declaration. Clean release requires
 zero; borrowed release requires restoration on the full domain (§5.6),
 never zero. These are user/instruction allocation results; internal
-library scratch still obeys the clean LIFO rule below. Allocations are
+library scratch still obeys the clean LIFO rule below. A declaration
+or allocation formal listed in `scratch` when acquired marks that entire
+allocation lifetime as library scratch; the mark follows its identity
+through captures and invokes, requires clean state and cannot be removed
+by releasing through a different formal name. Allocations are
 unconditional even under a false inherited control.
 Witness: declare out[2] of class ancilla; invoke an allocation recipe on
 out; apply two X gates to out[1] in separate caller/callee bodies; invoke

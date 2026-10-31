@@ -28,3 +28,23 @@ fn bdd_truth_tables_and_canonical_equalities() {
     let double = b.xor(xor, c[0]);
     assert_eq!(double, a[0]);
 }
+
+#[test]
+fn exact_domain_counts_include_skipped_variables_and_reject_overflow() {
+    let mut b = Bdd::new();
+    let x = b.variable();
+    let y = b.variable();
+    let z = b.variable();
+    let disjunction = b.or(x, y);
+    assert_eq!(b.satisfying_count(disjunction).unwrap(), 6);
+    let parity = b.xor(x, y);
+    let conjunction = b.and(parity, z);
+    assert_eq!(b.satisfying_count(conjunction).unwrap(), 2);
+    assert_eq!(b.satisfying_count(1).unwrap(), 8);
+    assert_eq!(b.satisfying_count(0).unwrap(), 0);
+    for _ in 3..128 {
+        b.variable();
+    }
+    assert!(b.satisfying_count(1).is_err());
+    assert_eq!(b.satisfying_count(0).unwrap(), 0);
+}

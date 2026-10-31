@@ -926,3 +926,13 @@ K25 field schemas also admit the existing K21 image type, with a red/green
 initializer-record witness. Keeping image metadata in the shared record
 vocabulary avoids a separate ad hoc initializer-list binding. Image X
 semantics stay K21; no new unconditional-gate permission is introduced.
+
+K27 follow-up audit: declaration handles cannot bypass a declared library
+scratch lifetime's LIFO/clean requirement by passing through allocation
+formals. A non-LIFO scratch handle regression failed before classification
+was retained on the shared identity; caller-owned output lifetimes still
+permit overlapping release order. This specifically preserves 82x rather
+than silently treating qinplace's private scratch as caller results.
+K26 origin suffix is now the exact source NAME token; occurrence identity
+is the origin binding plus the already retained cell wire identities,
+which disambiguate repeated invocations without an unspecified string form.

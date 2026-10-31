@@ -1,0 +1,25 @@
+{
+  "id": "E-ref-09-activation",
+  "suite": "E",
+  "spec": "\u00a73.7 C1\u2013C5/R1\u2013R5; \u00a711.1 K25",
+  "derivation": "Independent BDD sequential capture/push/header/bind/counter and pop/delivery semantics, complete inverse at restored fp; full legal domains counted exactly.",
+  "scenario": {
+    "widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "checker": "ref_calls.rs / ref_activation.rs"
+  },
+  "expected_outcome": {
+    "call_shapes": 12,
+    "ret_shapes": 4,
+    "call_tuples": "11070410916511088640",
+    "ret_tuples": "5266185708023840768"
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-8r4; accepted K24-K27 and complete ref required"
+  }
+}

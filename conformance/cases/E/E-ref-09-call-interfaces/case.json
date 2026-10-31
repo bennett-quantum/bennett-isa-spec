@@ -1,0 +1,22 @@
+{
+  "id": "E-ref-09-call-interfaces",
+  "suite": "E",
+  "spec": "\u00a74.2/\u00a74.7; \u00a711.1 K24/K26",
+  "derivation": "Full typed closure arguments, source region shapes/roles, exact large values/tokens; basis execution and reverse preserve all inputs/spectators; ordinal paths remain per callee.",
+  "scenario": {
+    "widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "checker": "ref_calls.rs / ref_activation.rs"
+  },
+  "expected_outcome": {
+    "tuples": 1048320
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-8r4; accepted K24-K27 and complete ref required"
+  }
+}

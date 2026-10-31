@@ -1,6 +1,6 @@
 # ref 0.9 constructor catalog — incomplete, not publishable
 
-Current checkpoint: **207 recipes**. The complete-library hash/count marker
+Current checkpoint: **217 recipes**. The complete-library hash/count marker
 in draft §11.1 remains untouched. No ref/ publication or schedule binding is
 claimed. Historical checkpoints and family witness counts are retained in
 [the progress file](ref-0.9-draft.PROGRESS.md). No interpreter source was read
@@ -45,18 +45,18 @@ names, bound images and constructor order are hash-significant.
 | §4.2 lift.load/store | lift.load/store: K25 complete byte-partition dispatch, inherent range/fault check and single assignment slot |
 | §4.2 lift.alloc/free | lift.alloc/free with exact slot/exchange order, pinned-free correction and no-wrap checks |
 | §4.2 lift.faultif/fault/retval | lift.faultif, fault, lift.retval; cause 0 maps to 4, F≥4 |
-| §4.2 lift.call/ret; §3.7 C1–C5/R1–R5 | **Blocked evi:** ordered heterogeneous location descriptors (id,width,wire,parameter,capture/slot/stack mapping) absent; general value.call.flag is a verified predicate only |
-| §4.2 lift.oracle_call/oracle_uncall/perm_call | **Blocked 1a4:** source region shape/role descriptor binding; K24 repairs wire/value/token vector forwarding only |
+| §4.2 lift.call/ret; §3.7 C1–C5/R1–R5 | lift.call/ret: complete C1–C5/R1–R5 over K25 location/capture descriptors, with stack.copy/store/exchange low-cell dispatch |
+| §4.2 lift.oracle_call/oracle_uncall/perm_call | lift.oracle_call/uncall/perm_call: K24/K26 full typed argument vectors, semantic symbol paths and callee ordinals |
 | §4.2 qjump/qbranch/qjumpr | qjump/qbranch/qjumpr and successor.literal/flagged/dynamic |
 | §3.6 forward/inverse step | step: indexed row/successor templates, explicit current frame, dispatch including HALT, commit pc, clean dispatch; inverse visits retained leaves backwards |
 | §4.3 qalloc/qborrow/qfree/qreturn | qalloc/qborrow/qfree/qreturn: K27 declaration acquire/relinquish with exact class/state metadata |
-| §4.5 qinplace | **Blocked 82x:** printed t/f release order conflicts with ratified scratch LIFO; also needs 1a4 complete interfaces |
+| §4.5 qinplace | **Blocked 82x:** printed t/f release order conflicts with ratified scratch LIFO; K24/K26 interfaces are available |
 | §4.6 qregion | qregion: complete function-local scope, unconditional image preparation/restoration, explicit cells template argument, clean release |
 | §4.6 qload/qunload | qload.in/mut and qunload.in/mut: K26 source region + K27 result declaration |
 | §4.6 qstore/qexchm | qstore/qexchm, generic address scan |
 | §4.6 qpred/qunpred/qif/qloop/qloop-while | qpred.scope (matched lexical pair), qif, qloop, qloop.while |
-| §4.7 adj/ctl | adj/ctl body composition; generic symbol call source regions still **1a4** |
-| §4.7 oracle_call/action_call | K24 closure-bound argument forwarding mechanism checked; source region shape/role binding **1a4** |
+| §4.7 adj/ctl | adj/ctl body composition; complete symbol interfaces use K24/K26 |
+| §4.7 oracle_call/action_call | oracle_call/action_call: complete K24/K26 interface forwarding |
 | §4.8 opcode summary; §4.9 faults | Same rows above; classical faults retained in bound §4.1 event/history semantics |
 | §5.2 allocate/forward/commit/reverse/release | **Blocked 3xe:** heterogeneous state allocation/class/lifetime metadata; step-template frame binding itself is now K22 |
 
@@ -104,7 +104,7 @@ The generic call predicate adds 43,200 tuples across 192 configurations
 the exact §16.3 D5/S10/R16/limits17/272 counter configuration.
 
 Current **checkpoint-only** envelope SHA-256 (Rust and Python -I):
-`0b4b9c8b3509fe1c9b7f61ead6dc9325480dcb52a63baa6a0c4b4bf5358c7dcb`.
+`74bf368112db2f4ab86ff4403981bb9585678d12be2fb63f9993355a770b05a5`.
 The historical 54-recipe checkpoint was
 `3a99ce3028e1ecc421b3991e3b5b7423ee33323badc5ca3ce1e61088a5e5055d`.
 Neither is a complete-library binding. K25 closes the lift.load language gap; remaining catalog families follow, with qinplace still blocked on 82x.
@@ -146,3 +146,33 @@ A and W independently 1–4 for loads, classes any/ancilla/data.
 108 full-domain BDD shapes / 7083657813172691625768 tuples; 180 exact borrowed
 basis columns (all unknown borrowed inputs exposed, no zero assumption).
 Four direct clean allocation/free shapes additionally check class metadata.
+
+## Completion II call and activation family
+
+Five source symbol-call recipes preserve complete interfaces, arbitrary
+classical i128/token values, source region roles/shapes/origins, controls
+and invocation-local ordinals. Widths1–4, valid in/mut roles: 1,048,320
+full input/control tuples, preserving every spectator and complete inverse.
+
+Three low-cell stack dispatch helpers and lift.call/ret encode all printed
+C1–C5/R1–R5 operations. C1 reads recursive source aliases before C2; all
+C5 counter values precede exchanges; inverse restores counters/fp before
+header reads. R4 scans every global location, touching only the matching
+location's low width; narrow nonmatching locations remain included.
+W1–4; three locations per selected instance, one other closure location;
+cell width4, capacity8, Sc4, Dc2, P3, Did2; limits depth2/stack8, R6.
+12 call shapes / 11,070,410,916,511,088,640 tuples; 4 return shapes /
+5,266,185,708,023,840,768 tuples. All record/history bits and locations
+are arbitrary subject to active-record cleanliness, valid delivery ids
+and legal counters/header addresses. False ambient controls retain the
+whole arbitrary stack. BDD satisfying counts are exact, overflow-checked
+and independently truth-table-tested on small Boolean domains.
+
+Call-family gate: full Rust suite 104 pass/0 fail; harness 445/0/72;
+fmt/clippy green. The subsequent ordinal audit caught lift.load/store
+fault-write leaves preceding assignment effects through boundscheck
+composition. A leaf-order regression was observed red; flag computation
+is now separate, with fault writes after all exchanges (§3.6). The
+88 full-domain memory shapes and ordinal test are rerun after correction,
+and independent Rust/Python checkpoint hashes are recomputed. This
+corrects generated order without changing the byte-memory permutation.

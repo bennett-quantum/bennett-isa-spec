@@ -30,6 +30,47 @@ impl Bdd {
         self.unique.insert(key, n);
         n
     }
+    /// Exact number of satisfying assignments over all declared variables.
+    /// Counts fail explicitly if the witness domain exceeds u128.
+    pub fn satisfying_count(&self, root: usize) -> Result<u128, String> {
+        fn count(
+            b: &Bdd,
+            n: usize,
+            level: usize,
+            memo: &mut BTreeMap<(usize, usize), u128>,
+        ) -> Result<u128, String> {
+            if n == 0 {
+                return Ok(0);
+            }
+            if n == 1 {
+                return 1u128
+                    .checked_shl(
+                        (b.variables - level)
+                            .try_into()
+                            .map_err(|_| "count width")?,
+                    )
+                    .ok_or("BDD count overflow".into());
+            }
+            if let Some(v) = memo.get(&(n, level)) {
+                return Ok(*v);
+            }
+            let (variable, low, high) = b.nodes[n];
+            let sum = count(b, low, variable + 1, memo)?
+                .checked_add(count(b, high, variable + 1, memo)?)
+                .ok_or("BDD count overflow")?;
+            let skipped = variable - level;
+            let factor = 1u128
+                .checked_shl(skipped.try_into().map_err(|_| "count width")?)
+                .ok_or("BDD count overflow")?;
+            let result = sum.checked_mul(factor).ok_or("BDD count overflow")?;
+            memo.insert((n, level), result);
+            Ok(result)
+        }
+        if root >= self.nodes.len() {
+            return Err("invalid BDD root".into());
+        }
+        count(self, root, 0, &mut BTreeMap::new())
+    }
     pub fn variable(&mut self) -> usize {
         let v = self.variables;
         self.variables += 1;

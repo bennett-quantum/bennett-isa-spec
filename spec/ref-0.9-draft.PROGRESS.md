@@ -1,13 +1,13 @@
 # ref 0.9 catalog checkpoint (b-isa-spec-8r4)
 
-Current completion-II state: **207 recipes**, incomplete and not publishable.
+Current completion-II state: **217 recipes**, incomplete and not publishable.
 Contract pass: 90590a7 (K25–K27); byte memory: fedc9c6. K23 also closes 4nx.
 Language gaps 1oa/evi/1a4/3xe are closed with typed-binding witnesses.
 The remaining contract blocker is §4.5 qinplace / 82x: printed t/f release
 order conflicts with the ratified reverse-allocation scratch rule.
 Other remaining rows are catalog implementation work under the new bindings.
 Current checkpoint-only envelope:
-0b4b9c8b3509fe1c9b7f61ead6dc9325480dcb52a63baa6a0c4b4bf5358c7dcb.
+74bf368112db2f4ab86ff4403981bb9585678d12be2fb63f9993355a770b05a5.
 The 195-recipe / 84e89406…3230 sections below are historical.
 
 Status: incomplete, not publishable; no normative catalog hash/count edit.
@@ -341,3 +341,29 @@ expressions use enclosing earlier recipe integers. Observed red (coincident
 operands) before correction; eight descriptor tests now green. All record
 consumers (memory/allocations) rerun after that correction. No domain or
 semantic assertion removed. Library bytes/hash unchanged by checker fix.
+
+## Completion II — call/activation family
+
+Allocation commit f2427ec. Ten recipes (217 total): five full symbol
+forwarders, three stack low-width dispatch helpers, lift.call/ret.
+Observed red at unknown lift.call before serialization; exact semantic
+BDD witnesses pass for C1–C5/R1–R5 and complete reversal, including
+recursive aliases, heterogeneous locations, retained arbitrary stack
+history, every compatible delivery id, active/fault/false controls.
+12 call shapes / 11070410916511088640 tuples; 4 ret shapes /
+5266185708023840768 tuples; symbol interface binding / 1048320 tuples.
+Source fault code is 3 (FAULT_BUDGET_DEPTH), ret underflow is 4.
+Unused call-only parameters were removed from the return interface; no
+call-shaped dummy records are required to bind lift.ret.
+Exact satisfying-count support has truth-table and overflow witnesses.
+Checkpoint-only envelope: 74bf368112db2f4ab86ff4403981bb9585678d12be2fb63f9993355a770b05a5.
+Construction remains to serialize; sole language blocker is qinplace/82x.
+
+Call-family gate: full Rust suite 104 pass/0 fail; harness 445/0/72;
+fmt/clippy green. The subsequent ordinal audit caught lift.load/store
+fault-write leaves preceding assignment effects through boundscheck
+composition. A leaf-order regression was observed red; flag computation
+is now separate, with fault writes after all exchanges (§3.6). The
+88 full-domain memory shapes and ordinal test are rerun after correction,
+and independent Rust/Python checkpoint hashes are recomputed. This
+corrects generated order without changing the byte-memory permutation.

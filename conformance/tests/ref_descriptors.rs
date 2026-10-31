@@ -49,6 +49,7 @@ fn regions_preserve_shape_role_origin_and_forward_cells() {
         ("\"cell\":3", "\"cell\":6"),
         ("\"role\":\"in\"", "\"role\":\"mut\""),
         ("local:r", ""),
+        ("local:r", "local:1r"),
     ] {
         assert!(expand(&doc(p, "[]"), &args.replace(a, b), &[("a", 6)]).is_err());
     }
@@ -187,4 +188,19 @@ fn initializer_records_share_image_binding_and_shadow_across_types() {
     let out = expand(&d, r#"[[{"I":"81","cells":"a"}]]"#, &[("a", 8)]).unwrap();
     assert_eq!(out.iter().map(|l| l.wires[0].1).collect::<Vec<_>>(), [0, 7]);
     assert!(out.iter().all(|l| l.controls.is_empty()));
+}
+
+#[test]
+fn declaration_handles_cannot_bypass_declared_library_scratch_lifo() {
+    let body = r#"[{"declare":"a","width":1,"class":{"class":"any"},"state":"clean","body":[{"declare":"b","width":1,"class":{"class":"any"},"state":"clean","body":[{"acquire":"a"},{"acquire":"b"},{"relinquish":"a"},{"relinquish":"b"}]}]}]"#;
+    let user = doc("[]", body);
+    assert!(
+        expand(&user, "[]", &[]).is_ok(),
+        "caller result lifetimes may overlap"
+    );
+    let private = user.replace(r#""scratch":[]"#, r#""scratch":["a","b"]"#);
+    assert!(
+        expand(&private, "[]", &[]).is_err(),
+        "declared library scratch must stay LIFO"
+    );
 }
