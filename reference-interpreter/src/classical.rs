@@ -409,7 +409,10 @@ impl<'a> ClassicalMachine<'a> {
         let mut devices = Devices::default();
         if let Some(l) = object.section("layout") {
             if let Some(image) = l.object()?.get("block_image") {
-                let data = &object.data[image.string()?];
+                let data = object
+                    .data
+                    .get(image.string()?)
+                    .ok_or_else(|| Error("§7.3/§9.1: block_image names undefined data".into()))?;
                 if !data.len().is_multiple_of(512) {
                     return err("§7.3", "block image must have complete 512-byte sectors");
                 }

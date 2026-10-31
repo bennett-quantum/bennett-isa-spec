@@ -735,3 +735,40 @@ pub fn r12_address_text(region: &str) -> String {
         .unwrap()
         .into()
 }
+
+/// Literal R13 member witnesses and independently assembled §9.2 pins.
+pub fn r13_case(name: &str) -> Json {
+    json(include_str!("r13_cases.json"))
+        .array()
+        .unwrap()
+        .iter()
+        .find(|c| c.get("name").unwrap().string().unwrap() == name)
+        .unwrap()
+        .clone()
+}
+pub fn r13_text(name: &str) -> String {
+    r13_case(name)
+        .get("object")
+        .unwrap()
+        .string()
+        .unwrap()
+        .into()
+}
+pub fn r13_check(name: &str, root: &str) -> Object {
+    let c = r13_case(name);
+    let o = Object::parse(c.get("object").unwrap().string().unwrap()).unwrap();
+    o.check_hashes().unwrap();
+    let i = o.identity().unwrap();
+    let pin = c.get("interface_hash").unwrap().string().unwrap();
+    assert_eq!(i.interface_hashes[root], pin);
+    assert_eq!(i.closure_hashes[root].as_deref(), Some(pin));
+    assert_eq!(
+        i.envelopes[root],
+        c.get("envelope").unwrap().string().unwrap()
+    );
+    assert_eq!(
+        i.object_hash,
+        c.get("object_hash").unwrap().string().unwrap()
+    );
+    o
+}

@@ -258,3 +258,42 @@ section layout
     let w = bennett_isa_ref::DerivedWidths::derive(&o, "h", budget).unwrap();
     assert_eq!(w.hc, 130);
 }
+
+#[test]
+fn r13_derived_counter_width_overflow_reports_host_limit() {
+    for key in ["S_cells", "A_tab"] {
+        let o = support::r13_check(key, "inc8");
+        let input = OracleVectorInput {
+            ins: vec![BitVector::from_u128(8, 8).unwrap()],
+            ..Default::default()
+        };
+        let b = Budget::steps(0);
+        let r = o.run_oracle_vectors("inc8", &input, b).unwrap();
+        assert_eq!(
+            (
+                r.payload.to_u128().unwrap(),
+                r.code.to_u128().unwrap(),
+                r.steps
+            ),
+            (0, 1, 0)
+        );
+        let derived =
+            std::panic::catch_unwind(|| bennett_isa_ref::DerivedWidths::derive(&o, "inc8", b));
+        let e = derived
+            .expect("width derivation must not panic")
+            .unwrap_err();
+        assert!(
+            e.to_string().contains("host limit") && e.to_string().contains("§3.7"),
+            "{e}"
+        );
+        let machine = std::panic::catch_unwind(|| OracleVectorMachine::new(&o, "inc8", &input, b));
+        let e = machine
+            .expect("machine construction must not panic")
+            .err()
+            .expect("host limit");
+        assert!(
+            e.to_string().contains("host limit") && e.to_string().contains("§3.7"),
+            "{e}"
+        );
+    }
+}

@@ -1233,9 +1233,10 @@ impl Object {
             for group in ["models", "services"] {
                 for (n, v) in d.get(group)?.object()? {
                     v.fields(&["version"], &[])?;
+                    let version = v.get("version")?.string()?;
                     if group == "models"
                         && (!["console", "clock", "entropy", "block"].contains(&n.as_str())
-                            || v.get("version")?.string()? != "0.8")
+                            || version != "0.8")
                     {
                         return err("§7.3", "unsupported device model/version");
                     }

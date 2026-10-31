@@ -54,7 +54,7 @@ impl DerivedWidths {
         let exponent = |key: &str| -> Result<usize> {
             match layout {
                 Some(l) => usize::try_from(l.get(key)?.uint()?)
-                    .map_err(|_| Error(format!("host limit: layout {key} exceeds usize"))),
+                    .map_err(|_| Error(format!("§3.7: host limit: layout {key} exceeds usize"))),
                 None => Ok(0),
             }
         };
@@ -78,11 +78,20 @@ impl DerivedWidths {
             }
         }
         let did = bits_for(ids.saturating_sub(1));
-        let sc = s + 1;
+        // Legal exponents need not have host-representable counter widths.
+        // Report a representation limit here, never reject the object schema.
+        let add_width = |n: usize, extra: usize, label: &str| {
+            n.checked_add(extra).ok_or_else(|| {
+                Error(format!(
+                    "§3.7: host limit: derived {label} width exceeds usize"
+                ))
+            })
+        };
+        let sc = add_width(s, 1, "Sc = S_cells + 1")?;
         let mut widths = Self {
             p,
-            hc: h + 2,
-            ac: a + 1,
+            hc: add_width(h, 2, "Hc = H + 2")?,
+            ac: add_width(a, 1, "Ac = A_tab + 1")?,
             sc,
             dc,
             did,

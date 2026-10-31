@@ -262,3 +262,19 @@ fn certificate_subjects_errors_frame_expressions_and_bindings_are_checked() {
     );
     reject(&c, "certificate", "§12");
 }
+
+#[test]
+fn r13_service_versions_require_strings() {
+    let valid = support::r13_text("service-0.8");
+    support::r13_check("service-0.8", "inc8");
+    for v in ["7", "false", "null", "[]", "{}"] {
+        let invalid = valid.replace(r#""version":"0.8""#, &format!(r#""version":{v}"#));
+        assert!(Object::parse(&invalid)
+            .unwrap_err()
+            .to_string()
+            .contains("§9.1"));
+    }
+    // Services have their own arbitrary string versions, not the model's 0.8 rule.
+    let arbitrary = valid.replace(r#""version":"0.8""#, r#""version":"vendor.2026""#);
+    Object::parse(&arbitrary).unwrap().check_hashes().unwrap();
+}

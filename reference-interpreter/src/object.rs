@@ -1469,6 +1469,19 @@ impl Object {
             ],
             &["block_image"],
         )?;
+        if let Some(image) = l.object()?.get("block_image") {
+            let image = image.string()?;
+            if !name(image) {
+                return err("§9.1", "block_image must be a data NAME");
+            }
+            let data = self
+                .data
+                .get(image)
+                .ok_or_else(|| Error(format!("§9.1: block_image names undefined data {image}")))?;
+            if !data.len().is_multiple_of(512) {
+                return err("§7.3", "block image must have complete 512-byte sectors");
+            }
+        }
         if l.get("ptr_width")?.uint()? != self.ptr_width as u128 {
             return err("§7.2", "layout pointer width mismatch");
         }

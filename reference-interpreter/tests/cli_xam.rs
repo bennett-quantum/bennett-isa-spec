@@ -2017,3 +2017,79 @@ fn r12_cli_interface_region_may_share_function_name() {
         }
     }
 }
+
+#[test]
+fn r13_cli_rejects_nonstrings_in_service_versions() {
+    let good = support::r13_text("service-0.8");
+    for (i, v) in ["7", "false", "null", "[]", "{}"].iter().enumerate() {
+        let path = tmp_file(
+            &format!("r13-service-{i}.bisa"),
+            &good.replace(r#""version":"0.8""#, &format!(r#""version":{v}"#)),
+        );
+        for command in ["check", "hash"] {
+            fails(&[command, &path], "§9.1");
+        }
+    }
+    let path = tmp_file("r13-service-positive.bisa", &good);
+    assert_eq!(
+        text(&ok(&["check", &path]), "object_hash"),
+        support::r13_case("service-0.8")
+            .get("object_hash")
+            .unwrap()
+            .string()
+            .unwrap()
+    );
+}
+#[test]
+fn r13_cli_counter_width_limit_is_a_diagnostic() {
+    for key in ["S_cells", "A_tab"] {
+        let path = tmp_file(&format!("r13-{key}.bisa"), &support::r13_text(key));
+        for command in ["check", "hash"] {
+            ok(&[command, &path]);
+        }
+        let r = ok(&[
+            "run-oracle",
+            &path,
+            "inc8",
+            "--input",
+            "8",
+            "--budget",
+            "0,0,0,0",
+        ]);
+        assert_eq!(
+            (uint(&r, "payload"), uint(&r, "code"), uint(&r, "steps")),
+            (0, 1, 0)
+        );
+        fails(
+            &[
+                "reverse", &path, "inc8", "--input", "8", "--budget", "0,0,0,0",
+            ],
+            "host limit",
+        );
+    }
+}
+#[test]
+fn r13_cli_rejects_invalid_block_image() {
+    let bad = support::r13_text("block-number");
+    for (i, v) in ["42", "null", "true", "{}", "[]", r#""""#, r#""missing""#]
+        .iter()
+        .enumerate()
+    {
+        let path = tmp_file(
+            &format!("r13-block-{i}.bisa"),
+            &bad.replace(r#""block_image":42"#, &format!(r#""block_image":{v}"#)),
+        );
+        for command in ["hash", "check"] {
+            fails(&[command, &path], "§9.1");
+        }
+        fails(&["run-action", &path, "a", "--mut", "0"], "§9.1");
+    }
+    for case in ["block-absent", "block-disk"] {
+        let path = tmp_file(&format!("r13-{case}.bisa"), &support::r13_text(case));
+        for command in ["check", "hash"] {
+            ok(&[command, &path]);
+        }
+        let r = ok(&["run-action", &path, "a", "--mut", "0"]);
+        assert_eq!(field(&r, "mut"), &support::json("[1]"));
+    }
+}

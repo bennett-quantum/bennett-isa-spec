@@ -3,7 +3,7 @@
 Resume from this file. Scope is the entire accepted ISA 0.8 (BRIEF.md); the
 current CLI brief is `docs/briefs/2026-10-29-isa-ref-cli-xam.md`. Write only
 under `reference-interpreter/`; commit own paths
-(`git add -A -- reference-interpreter && git commit -- reference-interpreter`),
+(`git commit -- <explicit owned paths>` ),
 never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
 ## Round-12 fixes (2026-10-31)
@@ -90,6 +90,35 @@ deliverables are unchanged. External response is
 ../bennett/docs/council/isa-ref-2026-10-29/round-12/response.md.
 Logs: .tmp/r12-{b01-red,b01-green,b01-full,b02-red,b02-cli-red,
 b02-graph-red,b02-green,b02-family,b02-full,clippy,sweeps,pins,address-pins}.log.
+
+## Round-13 fixes (2026-10-31)
+
+Sole implementation sub-agent; interpreter and external round-13 response only.
+Baseline: **365 passed / 0 failed / 5 ignored**, summed over all binaries.
+
+| Blocker | RED tests | Status | Commit |
+|---|---|---|---|
+| SOL-R13-B01 | metadata::r13_service_versions_require_strings; cli_xam::r13_cli_rejects_nonstrings_in_service_versions | GREEN | implementation commit below |
+| SOL-R13-B02 | r1_widths::r13_derived_counter_width_overflow_reports_host_limit; cli_xam::r13_cli_counter_width_limit_is_a_diagnostic | GREEN | implementation commit below |
+| R13-B01 | parser::r13_block_image_schema_is_checked_without_a_layout_consumer / r13_classical_missing_block_image_never_panics; cli_xam::r13_cli_rejects_invalid_block_image | GREEN | implementation commit below |
+
+Witness RED: **0 passed / 7 failed**. Service/block schema witnesses wrongly
+admitted; derive panicked and reverse exited 101. All seven targeted tests now
+pass. tests/support/r13_pins.py independently hand-assembles eight literal
+objects/envelopes, asserts every supplied interface/object pin and emits
+r13_cases.json; no interpreter/rehash dependency or supplied-pin correction.
+Block-image absent/disk controls keep the action identity and execute X|0>=|1>.
+The auxiliary zero-hash R object rejects at parse; a publicly modified Object
+also returns a constructor error without unwinding. Complete sectors are
+validated at load. Both u64-max exponents remain admissible/checkable and
+run-oracle at B=0 still returns exactly (payload,code,steps)=(0,1,0).
+Design: every service/model version is schema-typed before model-specific
+checks; block_image is a data NAME resolved at load for every function kind.
+Derived Hc/Ac/Sc widths use checked addition and cited host-limit errors,
+without an ISA exponent cap. Existing BitVector storage arithmetic is checked.
+Logs: .tmp/r13-{before,witness-red-all,witness-green,witness-full}.log.
+Family generation and final sweeps follow in the next green step.
+No beads mutation, spec/conformance edit/execution, dependency or push.
 
 ## Earlier rounds (2–11) and the codex-job history
 

@@ -360,3 +360,75 @@ regs {{  }}
     assert_eq!((accepted, rejected), (8, 52));
     eprintln!("R11 regs family: {accepted} accepted / {rejected} rejected");
 }
+
+#[test]
+fn r13_block_image_schema_is_checked_without_a_layout_consumer() {
+    let bad = support::r13_text("block-number");
+    for v in [
+        "42",
+        "null",
+        "true",
+        "{}",
+        "[]",
+        r#""""#,
+        r#""missing""#,
+        r#""not-a-name""#,
+    ] {
+        let text = bad.replace(r#""block_image":42"#, &format!(r#""block_image":{v}"#));
+        let e = Object::parse(&text).unwrap_err();
+        assert!(e.to_string().contains("§9.1"), "{e}");
+    }
+    for case in ["block-absent", "block-disk"] {
+        support::r13_check(case, "a");
+    }
+    // Complete sectors are a load-time invariant too, even for action-only objects.
+    let disk = support::r13_text("block-disk");
+    let short = disk
+        .replace(&format!("disk {}", "00".repeat(512)), "disk 00")
+        .replace(r#""size":512"#, r#""size":1"#);
+    let e = Object::parse(&short).unwrap_err();
+    assert!(e.to_string().contains("§7.3"), "{e}");
+}
+
+#[test]
+fn r13_classical_missing_block_image_never_panics() {
+    let signature = r#"{"abi":"0.8","kind":"r","params":[],"results":[],"tier":"r"}"#;
+    let layout = support::r13_text("block-missing")
+        .split("section layout\n")
+        .nth(1)
+        .unwrap()
+        .to_string();
+    let text = support::object(
+        &[(
+            "main",
+            signature,
+            "fn r @main () () () () ()\n^entry():\nret",
+        )],
+        "{}",
+        &format!("\nsection layout\n{layout}"),
+    );
+    assert!(Object::parse(&text)
+        .unwrap_err()
+        .to_string()
+        .contains("§9.1"));
+    // Object is publicly mutable; constructors must guard against post-load damage.
+    let mut o = Object::parse(&support::object(
+        &[(
+            "main",
+            signature,
+            "fn r @main () () () () ()\n^entry():\nret",
+        )],
+        "{}",
+        "",
+    ))
+    .unwrap();
+    o.metadata
+        .insert("layout".into(), support::json(layout.trim()));
+    let result =
+        std::panic::catch_unwind(|| bennett_isa_ref::ClassicalMachine::new(&o, "main", &[], &[]));
+    let e = result
+        .expect("constructor must not unwind")
+        .err()
+        .expect("missing image error");
+    assert!(e.to_string().contains("§9.1"), "{e}");
+}
