@@ -1292,8 +1292,10 @@ computing a fresh outcome. No automatic propagation: the dialect emits `p
 = lift.icmp.ne fr' zero; lift.faultif p FAULT_CALLEE` (with `zero` a
 `lift.const` location) where the source requires it. To clear `fr'`, the
 producer emits `lift.oracle_uncall @o` with the same token, callee, `ins`
-and `args` and `mem` values (no intervening row writes those locations, suite F,
-nor those cells, below) and the successor versions of `tgt` and `fr'`; the pair shares a
+and `args` and `mem` values (no intervening row writes those `ins` locations
+(suite F); intervening writes to `mem` cells are permitted but mean the
+uncall is not guaranteed to clear `fr'`) and the successor versions of
+`tgt` and `fr'`; the pair shares a
 dynamic invocation identity. Alternatively `fr'` is retained until the
 prefix reversal. Matching is **LIFO**: on every path, a
 `lift.oracle_uncall` matches the most recent preceding unmatched

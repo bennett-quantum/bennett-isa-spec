@@ -10,6 +10,13 @@ Surgical edits only; K1–K75 and accepted 0.8 semantics/bytes retained.
 |---|---|---|---|---|---|
 | 1 / §16.3 placeholders | a: fill all 25 symbol values, including repeated symbols and the printed SCC envelope; independent precheck reconstructs every envelope | existing §9.2 | §16.3; §0 example inventory | §9.2, §16.1–§16.2 | 4a4 IN_PROGRESS |
 
+| 2 / §5.5 matched cleanup | a: clarify that ins writes invalidate the pair, while mem-cell writes only remove the clearing guarantee | existing E17.5 | §5.5 first paragraph | §4.2, §5.5 later paragraph | 4a4 IN_PROGRESS |
+
+Item 2 S0 check: this retains the existing permitted intervening store,
+the identical uncall permutation, the producer clearing obligation and
+prefix restoration. No new static memory prohibition or dynamic fault
+is introduced. Draft witness precheck PASS after exact diff regeneration.
+
 Item 1 verification: the new independent stdlib precheck first failed on
 example 1's placeholder, then passed all ten objects and both fully
 printed envelopes. It builds layout paths as JCS arrays, preserves
