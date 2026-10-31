@@ -6,7 +6,7 @@ use crate::{
     registers::RegisterUndo,
     validation::normalize_call,
     Argument, Budget, Error, Instruction, Object, QuantumBindings, QuantumRegion, QuantumRegisters,
-    Result, Type,
+    Result, Retained, Type,
 };
 use std::collections::{BTreeMap, VecDeque};
 
@@ -66,15 +66,15 @@ pub struct TapeEntry {
     pub dev: String,
     pub op: String,
     pub args: Vec<u128>,
-    pub bytes: Vec<u8>,
+    pub bytes: Retained<u8>,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 struct Devices {
-    console: Vec<u8>,
+    console: Retained<u8>,
     clock: u64,
     entropy_position: usize,
     blocks: BTreeMap<u128, Vec<u8>>,
-    tape: Vec<TapeEntry>,
+    tape: Retained<TapeEntry>,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClassicalSnapshot {
@@ -84,7 +84,7 @@ pub struct ClassicalSnapshot {
     control: Vec<Activation>,
     next_id: u64,
     fault: Option<u128>,
-    finished: Option<Vec<ClassicalValue>>,
+    finished: Option<Retained<ClassicalValue>>,
     pending: Option<HostRequest>,
     quantum: QuantumRegisters,
 }
@@ -109,29 +109,33 @@ pub struct SnapshotDelta {
 impl ClassicalSnapshot {
     /// SHA-256 (hex) of the complete §7.1 memory: allocation table, heap
     /// bump and every nonzero byte, in sorted order.
-    pub fn memory_digest(&self) -> String {
+    pub fn memory_digest(&self) -> Result<String> {
         let m = &self.memory;
-        let mut bytes = format!(
+        let mut bytes = String::new();
+        let mut append = |line: String| -> Result<()> {
+            bytes.try_reserve(line.len()).map_err(|e| {
+                crate::resource_error("§7.1/§7.4", format!("memory digest bytes: {e}"))
+            })?;
+            bytes.push_str(&line);
+            Ok(())
+        };
+        append(format!(
             "heap_base={};heap_used={};table_capacity={:?};",
             m.heap_base, m.heap_used, m.table_capacity
-        )
-        .into_bytes();
+        ))?;
         for (name, base) in &m.addresses {
-            bytes.extend(format!("address {name}={base};").bytes());
+            append(format!("address {name}={base};"))?;
         }
         for a in &m.allocations {
-            bytes.extend(
-                format!(
-                    "alloc base={} size={} live={} pinned={};",
-                    a.base, a.size, a.live, a.pinned
-                )
-                .bytes(),
-            );
+            append(format!(
+                "alloc base={} size={} live={} pinned={};",
+                a.base, a.size, a.live, a.pinned
+            ))?;
         }
         for (address, byte) in &m.bytes {
-            bytes.extend(format!("byte {address}={byte};").bytes());
+            append(format!("byte {address}={byte};"))?;
         }
-        crate::sha256_hex(&bytes)
+        Ok(crate::sha256_hex(bytes.as_bytes()))
     }
     /// True iff the §7.1 memory components (bytes, allocations, heap bump)
     /// of the two snapshots are identical.
@@ -140,16 +144,13 @@ impl ClassicalSnapshot {
     }
     /// The changes from `self` to `after`: every instance stack that differs
     /// and every memory byte that differs, in sorted order.
-    pub fn delta(&self, after: &Self) -> SnapshotDelta {
+    pub fn delta(&self, after: &Self) -> Result<SnapshotDelta> {
         let mut registers = Vec::new();
-        let keys: std::collections::BTreeSet<&Key> = self
-            .instances
-            .keys()
-            .chain(after.instances.keys())
-            .collect();
+        let keys = ordered_union(self.instances.keys(), after.instances.keys());
         for key in keys {
             let (pre_stack, post_stack) = (self.instances.get(key), after.instances.get(key));
             if pre_stack != post_stack {
+                crate::reserve_more(&mut registers, 1, "§7.4", "snapshot register deltas")?;
                 registers.push(RegisterDelta {
                     activation: key.0,
                     name: key.1.clone(),
@@ -159,31 +160,22 @@ impl ClassicalSnapshot {
             }
         }
         let mut memory = Vec::new();
-        let addresses: std::collections::BTreeSet<u128> = self
-            .memory
-            .bytes
-            .keys()
-            .chain(after.memory.bytes.keys())
-            .copied()
-            .collect();
+        let addresses = ordered_union(self.memory.bytes.keys(), after.memory.bytes.keys()).copied();
         for address in addresses {
             let (pre, post) = (self.memory.byte(address), after.memory.byte(address));
             if pre != post {
+                crate::reserve_more(&mut memory, 1, "§7.4", "snapshot memory deltas")?;
                 memory.push((address, pre, post));
             }
         }
-        SnapshotDelta { registers, memory }
+        Ok(SnapshotDelta { registers, memory })
     }
     /// A description of the first component in which `other` differs from
     /// `self`, or None when the snapshots are equal. Components are compared
     /// in §3.2 order: instances, memory, devices, control, fault/finished,
     /// pending request, quantum registers.
     pub fn first_difference(&self, other: &Self) -> Option<String> {
-        let keys: std::collections::BTreeSet<&Key> = self
-            .instances
-            .keys()
-            .chain(other.instances.keys())
-            .collect();
+        let keys = ordered_union(self.instances.keys(), other.instances.keys());
         for key in keys {
             if self.instances.get(key) != other.instances.get(key) {
                 return Some(format!(
@@ -197,8 +189,7 @@ impl ClassicalSnapshot {
         }
         if self.memory != other.memory {
             let (a, b) = (&self.memory, &other.memory);
-            let addresses: std::collections::BTreeSet<u128> =
-                a.bytes.keys().chain(b.bytes.keys()).copied().collect();
+            let addresses = ordered_union(a.bytes.keys(), b.bytes.keys()).copied();
             for address in addresses {
                 if a.byte(address) != b.byte(address) {
                     return Some(format!(
@@ -276,13 +267,13 @@ struct Undo {
     control: Vec<Activation>,
     next_id: u64,
     definitions: Vec<Key>,
-    bytes: Vec<(u128, u8)>,
+    bytes: Retained<(u128, u8)>,
     allocation: Option<(u128, usize)>,
     free: Option<(usize, bool)>,
     device: Option<DeviceUndo>,
     tape: bool,
     fault: Option<u128>,
-    finished: Option<Vec<ClassicalValue>>,
+    finished: Option<Retained<ClassicalValue>>,
     pending: Option<HostRequest>,
     registers: Vec<RegisterUndo>,
     region: Option<RegionRecord>,
@@ -323,16 +314,24 @@ struct Segment {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ClassicalOutcome {
-    pub values: Vec<ClassicalValue>,
+    pub values: Retained<ClassicalValue>,
     pub fault: Option<u128>,
     pub trapped: bool,
     pub steps: u64,
     pub request: Option<HostRequest>,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct HostRequest {
+pub struct HostRequest(std::sync::Arc<HostRequestData>);
+impl std::ops::Deref for HostRequest {
+    type Target = HostRequestData;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+#[derive(Debug, PartialEq, Eq)]
+pub struct HostRequestData {
     pub service: String,
-    pub payload: Vec<u8>,
+    pub payload: Retained<u8>,
     pub address: u128,
     pub capacity: u128,
     result_name: String,
@@ -349,7 +348,7 @@ pub struct StepPoint {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HostExchange {
     pub request: HostRequest,
-    pub reply: Vec<u8>,
+    pub reply: Retained<u8>,
 }
 pub struct ClassicalMachine<'a> {
     object: &'a Object,
@@ -385,7 +384,7 @@ impl<'a> ClassicalMachine<'a> {
             .functions
             .get(entry)
             .filter(|f| matches!(f.kind.as_str(), "cc" | "r"))
-            .ok_or_else(|| Error("§3.4: classical entry not found".into()))?;
+            .ok_or_else(|| Error::new("§3.4: classical entry not found".into()))?;
         if args.len() != f.params[0].len()
             || args
                 .iter()
@@ -409,10 +408,9 @@ impl<'a> ClassicalMachine<'a> {
         let mut devices = Devices::default();
         if let Some(l) = object.section("layout") {
             if let Some(image) = l.object()?.get("block_image") {
-                let data = object
-                    .data
-                    .get(image.string()?)
-                    .ok_or_else(|| Error("§7.3/§9.1: block_image names undefined data".into()))?;
+                let data = object.data.get(image.string()?).ok_or_else(|| {
+                    Error::new("§7.3/§9.1: block_image names undefined data".into())
+                })?;
                 if !data.len().is_multiple_of(512) {
                     return err("§7.3", "block image must have complete 512-byte sectors");
                 }
@@ -432,12 +430,12 @@ impl<'a> ClassicalMachine<'a> {
             }
             let layout = object
                 .section("layout")
-                .ok_or_else(|| Error("§7.1: seeded globals require a layout".into()))?;
+                .ok_or_else(|| Error::new("§7.1: seeded globals require a layout".into()))?;
             let global = layout
                 .get("globals")?
                 .object()?
                 .get(name)
-                .ok_or_else(|| Error(format!("§7.1: unknown global {name}")))?;
+                .ok_or_else(|| Error::new(format!("§7.1: unknown global {name}")))?;
             let base = global.get("base")?.uint()?;
             let size = global.get("size")?.uint()?;
             if size != bytes.len() as u128 {
@@ -452,8 +450,8 @@ impl<'a> ClassicalMachine<'a> {
             for (i, b) in bytes.iter().enumerate() {
                 let address = base
                     .checked_add(i as u128)
-                    .ok_or_else(|| Error("§7.1: global address overflow".into()))?;
-                memory.set_byte(address, *b);
+                    .ok_or_else(|| Error::new("§7.1: global address overflow".into()))?;
+                memory.set_byte(address, *b)?;
             }
         }
         let state = ClassicalSnapshot {
@@ -571,7 +569,7 @@ impl<'a> ClassicalMachine<'a> {
     }
     /// SHA-256 (hex) of the current §7.1 memory (see
     /// `ClassicalSnapshot::memory_digest`).
-    pub fn memory_digest(&self) -> String {
+    pub fn memory_digest(&self) -> Result<String> {
         self.state.memory_digest()
     }
     /// True while another instruction can execute: no fault record, no
@@ -612,7 +610,7 @@ impl<'a> ClassicalMachine<'a> {
         let instruction = block
             .instructions
             .get(current.ip)
-            .ok_or_else(|| Error("§3.4: fell off classical block".into()))?
+            .ok_or_else(|| Error::new("§3.4: fell off classical block".into()))?
             .clone();
         let point = StepPoint {
             function: current.function.clone(),
@@ -634,31 +632,54 @@ impl<'a> ClassicalMachine<'a> {
         bytes.extend((0..len).map(|n| self.state.memory.byte(address + n as u128)));
         Ok(bytes)
     }
-    pub fn host_transcript(&self) -> Vec<HostExchange> {
-        self.history.iter().filter_map(|h| h.host.clone()).collect()
+    pub fn host_exchanges(&self) -> impl Iterator<Item = &HostExchange> {
+        self.history.iter().filter_map(|h| h.host.as_ref())
+    }
+    pub fn host_transcript(&self) -> Result<Vec<HostExchange>> {
+        let mut out = crate::reserved(
+            self.host_exchanges().count(),
+            "§10/§7.4",
+            "host transcript entries",
+        )?;
+        out.extend(self.host_exchanges().cloned());
+        Ok(out)
     }
     pub fn reply(&mut self, payload: &[u8]) -> Result<()> {
         let request = self
             .state
             .pending
             .clone()
-            .ok_or_else(|| Error("§10: E_INVALID_STATE: no host request".into()))?;
+            .ok_or_else(|| Error::new("§10: E_INVALID_STATE: no host request".into()))?;
         if payload.len() as u128 & !mask(self.object.ptr_width) != 0 {
             return err("§10", "E_ARG: reply length exceeds ptr_width");
         }
         let count = (payload.len() as u128).min(request.capacity) as usize;
+        if self.history.last().and_then(|f| f.host.as_ref()).is_none() {
+            return err("§10/§7.4", "missing retained host request");
+        }
         let mut undo = self
             .history
             .last()
-            .ok_or_else(|| Error("§10: missing host frame".into()))?
+            .ok_or_else(|| Error::new("§10: missing host frame".into()))?
             .undo
             .clone();
         let mut reply = crate::reserved(payload.len(), "§10", "retained host reply bytes")?;
         reply.extend_from_slice(payload);
         self.save_bytes(request.address, count, &mut undo)?;
+        let mut memory = self.state.memory.clone();
+        memory
+            .bytes
+            .prepare(payload[..count].iter().filter(|b| **b != 0).count())?;
         for (n, b) in payload[..count].iter().enumerate() {
-            self.state.memory.set_byte(request.address + n as u128, *b);
+            memory.set_byte(request.address + n as u128, *b)?;
         }
+        let reply = Retained::from(reply);
+        crate::reserve_more(
+            &mut undo.definitions,
+            1,
+            "§10/§7.4",
+            "host result retention",
+        )?;
         self.define(
             &request.result_name,
             ClassicalValue::Int(self.object.ptr_width, payload.len() as u128),
@@ -667,12 +688,13 @@ impl<'a> ClassicalMachine<'a> {
         let frame = self
             .history
             .last_mut()
-            .ok_or_else(|| Error("§10: missing retained host frame".into()))?;
+            .ok_or_else(|| Error::new("§10: missing retained host frame".into()))?;
+        self.state.memory = memory;
         frame.undo = undo;
         frame
             .host
             .as_mut()
-            .ok_or_else(|| Error("§10: missing retained host request".into()))?
+            .ok_or_else(|| Error::new("§10: missing retained host request".into()))?
             .reply = reply;
         self.state.pending = None;
         Ok(())
@@ -743,7 +765,7 @@ impl<'a> ClassicalMachine<'a> {
             .state
             .control
             .last()
-            .ok_or_else(|| Error("§3.4: empty activation stack".into()))?
+            .ok_or_else(|| Error::new("§3.4: empty activation stack".into()))?
             .id;
         self.state
             .instances
@@ -751,7 +773,7 @@ impl<'a> ClassicalMachine<'a> {
             .and_then(|v| v.last())
             .cloned()
             .ok_or_else(|| {
-                trap(Error(format!(
+                trap(Error::new(format!(
                     "§7.4: instance {name} does not exist (uncalled or not yet defined)"
                 )))
             })
@@ -777,7 +799,7 @@ impl<'a> ClassicalMachine<'a> {
             .object
             .functions
             .get(name)
-            .ok_or_else(|| Error(format!("§9.3: unresolved region @{name}")))?;
+            .ok_or_else(|| Error::new(format!("§9.3: unresolved region @{name}")))?;
         let mut bindings = QuantumBindings::default();
         let mut ids = Vec::new();
         let mut controls = Vec::new();
@@ -822,7 +844,7 @@ impl<'a> ClassicalMachine<'a> {
         let mut bind_wires = |wires: &[crate::quantum::Wire]| -> Result<()> {
             for w in wires {
                 if !interface_wires.insert(*w) {
-                    return Err(trap(Error(
+                    return Err(trap(Error::new(
                         "§3.3: region interface bundles and regions overlap".into(),
                     )));
                 }
@@ -886,7 +908,7 @@ impl<'a> ClassicalMachine<'a> {
             }
         }
         if controls.iter().any(|w| targets.contains(w)) {
-            return Err(trap(Error(
+            return Err(trap(Error::new(
                 "§3.3: effective control aliases region target".into(),
             )));
         }
@@ -975,7 +997,7 @@ impl<'a> ClassicalMachine<'a> {
             .state
             .control
             .last()
-            .ok_or_else(|| Error("§3.4: define without activation".into()))?
+            .ok_or_else(|| Error::new("§3.4: define without activation".into()))?
             .id;
         self.define_at(id, name, value, undo);
         Ok(())
@@ -990,14 +1012,21 @@ impl<'a> ClassicalMachine<'a> {
         undo.definitions.push(key);
     }
     fn save_bytes(&self, p: u128, len: usize, undo: &mut Undo) -> Result<()> {
-        crate::reserve_more(&mut undo.bytes, len, "§7.1", "retained memory bytes")?;
+        let bytes = undo
+            .bytes
+            .prepare(len, "§10/§7.1/§7.4", "retained memory bytes")?;
         for n in 0..len {
-            undo.bytes
-                .push((p + n as u128, self.state.memory.byte(p + n as u128)));
+            bytes.push((p + n as u128, self.state.memory.byte(p + n as u128)));
         }
         Ok(())
     }
     fn undo_record(&mut self, undo: Undo) -> Result<()> {
+        if !undo.bytes.is_empty() {
+            self.state
+                .memory
+                .bytes
+                .prepare(undo.bytes.iter().filter(|(_, b)| *b != 0).count())?;
+        }
         for record in undo.registers.into_iter().rev() {
             self.state.quantum.undo(record)?;
         }
@@ -1013,16 +1042,16 @@ impl<'a> ClassicalMachine<'a> {
                 .state
                 .instances
                 .get_mut(&key)
-                .ok_or_else(|| Error("§7.4: missing retained dynamic instance".into()))?;
+                .ok_or_else(|| Error::new("§7.4: missing retained dynamic instance".into()))?;
             stack
                 .pop()
-                .ok_or_else(|| Error("§7.4: empty retained dynamic instance".into()))?;
+                .ok_or_else(|| Error::new("§7.4: empty retained dynamic instance".into()))?;
             if stack.is_empty() {
                 self.state.instances.remove(&key);
             }
         }
-        for (p, b) in undo.bytes.into_iter().rev() {
-            self.state.memory.set_byte(p, b);
+        for &(p, b) in undo.bytes.iter().rev() {
+            self.state.memory.set_byte(p, b)?;
         }
         if let Some((used, len)) = undo.allocation {
             self.state.memory.heap_used = used;
@@ -1032,11 +1061,11 @@ impl<'a> ClassicalMachine<'a> {
             self.state.memory.allocations[n].live = live;
         }
         if undo.tape {
-            self.state
-                .devices
-                .tape
-                .pop()
-                .ok_or_else(|| Error("§7.3: empty effect tape on reversal".into()))?;
+            let len = self.state.devices.tape.len();
+            if len == 0 {
+                return err("§7.3", "empty effect tape on reversal");
+            }
+            self.state.devices.tape.truncate(len - 1);
         }
         if let Some(d) = undo.device {
             match d {
@@ -1092,7 +1121,9 @@ impl<'a> ClassicalMachine<'a> {
             return Ok(Some(7));
         }
         let len = usize::try_from(len).map_err(|_| {
-            Error("§7.3: host limit: device length exceeds host address space".into())
+            Error::host_resource(
+                "§7.3: host limit: device length exceeds host address space".into(),
+            )
         })?;
         if dev == "entropy"
             && self
@@ -1104,18 +1135,22 @@ impl<'a> ClassicalMachine<'a> {
         {
             return Ok(Some(10));
         }
-        crate::reserve_more(&mut self.state.devices.tape, 1, "§7.3", "effect tape")?;
+        self.state
+            .devices
+            .tape
+            .prepare(0, "§7.3/§7.4", "effect tape")?
+            .try_reserve_exact(1)
+            .map_err(|e| crate::resource_error("§7.3/§7.4", format!("effect tape: {e}")))?;
         let transferred = match (dev, operation) {
             ("console", "write") => {
                 let bytes = self.transfer_bytes(p, len, "§7.3")?;
-                crate::reserve_more(
-                    &mut self.state.devices.console,
-                    len,
-                    "§7.3",
-                    "console bytes",
-                )?;
-                undo.device = Some(DeviceUndo::Console(self.state.devices.console.len()));
-                self.state.devices.console.extend(bytes.iter().copied());
+                let old_len = self.state.devices.console.len();
+                self.state
+                    .devices
+                    .console
+                    .prepare(len, "§7.3", "console bytes")?
+                    .extend_from_slice(&bytes);
+                undo.device = Some(DeviceUndo::Console(old_len));
                 bytes
             }
             ("clock", "read") => {
@@ -1131,11 +1166,15 @@ impl<'a> ClassicalMachine<'a> {
                 let start = self.state.devices.entropy_position;
                 let mut bytes = crate::reserved(len, "§7.3", "entropy transfer bytes")?;
                 bytes.extend_from_slice(&self.entropy[start..start + len]);
+                self.state
+                    .memory
+                    .bytes
+                    .prepare(bytes.iter().filter(|b| **b != 0).count())?;
                 undo.device = Some(DeviceUndo::Entropy(start));
                 for n in 0..len {
                     self.state
                         .memory
-                        .set_byte(p + n as u128, self.entropy[start + n]);
+                        .set_byte(p + n as u128, self.entropy[start + n])?;
                 }
                 self.state.devices.entropy_position += len;
                 bytes
@@ -1149,8 +1188,12 @@ impl<'a> ClassicalMachine<'a> {
                     .get(&values[0])
                     .cloned()
                     .unwrap_or_else(|| vec![0; 512]);
+                self.state
+                    .memory
+                    .bytes
+                    .prepare(bytes.iter().filter(|b| **b != 0).count())?;
                 for (n, b) in bytes.iter().enumerate() {
-                    self.state.memory.set_byte(p + n as u128, *b);
+                    self.state.memory.set_byte(p + n as u128, *b)?;
                 }
                 bytes
             }
@@ -1169,12 +1212,16 @@ impl<'a> ClassicalMachine<'a> {
                 )
             }
         };
-        self.state.devices.tape.push(TapeEntry {
-            dev: dev.into(),
-            op: operation.into(),
-            args: values,
-            bytes: transferred,
-        });
+        self.state
+            .devices
+            .tape
+            .prepare(1, "§7.3/§7.4", "effect tape")?
+            .push(TapeEntry {
+                dev: dev.into(),
+                op: operation.into(),
+                args: values,
+                bytes: transferred.into(),
+            });
         undo.tape = true;
         Ok(None)
     }
@@ -1184,13 +1231,13 @@ impl<'a> ClassicalMachine<'a> {
             .state
             .control
             .last()
-            .ok_or_else(|| Error("§3.4: no active function".into()))?
+            .ok_or_else(|| Error::new("§3.4: no active function".into()))?
             .clone();
         let f = &object.functions[&current.function];
         let i = f.blocks[current.block]
             .instructions
             .get(current.ip)
-            .ok_or_else(|| Error("§3.4: fell off classical block".into()))?
+            .ok_or_else(|| Error::new("§3.4: fell off classical block".into()))?
             .clone();
         let op = i.op.as_str();
         let a = &i.operands;
@@ -1198,7 +1245,7 @@ impl<'a> ClassicalMachine<'a> {
             control: self.state.control.clone(),
             next_id: self.state.next_id,
             definitions: Vec::new(),
-            bytes: Vec::new(),
+            bytes: Retained::default(),
             allocation: None,
             free: None,
             device: None,
@@ -1209,10 +1256,12 @@ impl<'a> ClassicalMachine<'a> {
             registers: Vec::new(),
             region: None,
         };
+        crate::reserve_more(&mut self.history, 1, "§10/§7.4", "retained history frames")?;
+        let mut pending = None;
         self.state
             .control
             .last_mut()
-            .ok_or_else(|| Error("§3.4: no active function".into()))?
+            .ok_or_else(|| Error::new("§3.4: no active function".into()))?
             .ip += 1;
         let mut fault = None;
         let mut output = None;
@@ -1347,16 +1396,14 @@ impl<'a> ClassicalMachine<'a> {
                         let (n, args) = target
                             .trim_start_matches('^')
                             .split_once('(')
-                            .ok_or_else(|| Error("§4.1: malformed branch".into()))?;
+                            .ok_or_else(|| Error::new("§4.1: malformed branch".into()))?;
                         let values = list(&format!("({args}"))?
                             .iter()
                             .map(|n| self.read(n))
                             .collect::<Result<Vec<_>>>()?;
-                        let block = f
-                            .blocks
-                            .iter()
-                            .position(|b| b.name == n)
-                            .ok_or_else(|| Error(format!("§3.4: unknown branch target {n}")))?;
+                        let block = f.blocks.iter().position(|b| b.name == n).ok_or_else(|| {
+                            Error::new(format!("§3.4: unknown branch target {n}"))
+                        })?;
                         for (p, v) in f.blocks[block].params.iter().zip(values) {
                             self.define(&p.name, v, &mut undo)?;
                         }
@@ -1364,7 +1411,7 @@ impl<'a> ClassicalMachine<'a> {
                             .state
                             .control
                             .last_mut()
-                            .ok_or_else(|| Error("§3.4: no active function".into()))?;
+                            .ok_or_else(|| Error::new("§3.4: no active function".into()))?;
                         active.block = block;
                         active.ip = 0;
                     }
@@ -1400,17 +1447,16 @@ impl<'a> ClassicalMachine<'a> {
                     }
                     "ret" => {
                         let values = a.iter().map(|n| self.read(n)).collect::<Result<Vec<_>>>()?;
-                        let active = self
-                            .state
-                            .control
-                            .pop()
-                            .ok_or_else(|| Error("§3.4: ret without an activation".into()))?;
+                        let active =
+                            self.state.control.pop().ok_or_else(|| {
+                                Error::new("§3.4: ret without an activation".into())
+                            })?;
                         if let Some(segment) = active.segment {
                             self.segments[segment].end = Some(self.history.len());
                             self.segments[segment].results = values.clone();
                         }
                         if self.state.control.is_empty() {
-                            self.state.finished = Some(values);
+                            self.state.finished = Some(values.into());
                         } else {
                             for (n, v) in active.bindings.iter().zip(values) {
                                 self.define(n, v, &mut undo)?;
@@ -1434,9 +1480,9 @@ impl<'a> ClassicalMachine<'a> {
                             .max_by_key(|s| s.end)
                             .cloned();
                         if let Some(s) = segment {
-                            let end = s
-                                .end
-                                .ok_or_else(|| Error("§7.4: segment is not complete".into()))?;
+                            let end = s.end.ok_or_else(|| {
+                                Error::new("§7.4: segment is not complete".into())
+                            })?;
                             if s.callee != name
                                 || s.args != args
                                 || s.results != results
@@ -1467,22 +1513,24 @@ impl<'a> ClassicalMachine<'a> {
                             fault = Some(7);
                         } else {
                             let count = usize::try_from(capacity).map_err(|_| {
-                                Error("§10: host limit: request exceeds host address space".into())
+                                Error::host_resource(
+                                    "§10: host limit: request exceeds host address space".into(),
+                                )
                             })?;
                             let payload = self.transfer_bytes(address, count, "§10")?;
-                            self.state.pending = Some(HostRequest {
+                            pending = Some(HostRequest(std::sync::Arc::new(HostRequestData {
                                 service: crate::object::literal_name(&a[0])?,
-                                payload,
+                                payload: payload.into(),
                                 address,
                                 capacity,
                                 result_name: i.lhs[0].clone(),
-                            });
+                            })));
                         }
                     }
                     "qreg.new" => {
-                        let n = a[1]
-                            .parse::<usize>()
-                            .map_err(|_| Error("§3.3: qreg size exceeds host storage".into()))?;
+                        let n = a[1].parse::<usize>().map_err(|_| {
+                            Error::new("§3.3: qreg size exceeds host storage".into())
+                        })?;
                         let (id, record) = self.state.quantum.allocate_recorded(n)?;
                         undo.registers.push(record);
                         output = Some(ClassicalValue::Qreg(id));
@@ -1494,12 +1542,12 @@ impl<'a> ClassicalMachine<'a> {
                     }
                     "qreg.slice" => {
                         let id = self.qreg(&a[0])?;
-                        let lo = a[1]
-                            .parse::<usize>()
-                            .map_err(|_| Error("§3.3: slice offset exceeds host storage".into()))?;
-                        let len = a[2]
-                            .parse::<usize>()
-                            .map_err(|_| Error("§3.3: slice length exceeds host storage".into()))?;
+                        let lo = a[1].parse::<usize>().map_err(|_| {
+                            Error::new("§3.3: slice offset exceeds host storage".into())
+                        })?;
+                        let len = a[2].parse::<usize>().map_err(|_| {
+                            Error::new("§3.3: slice length exceeds host storage".into())
+                        })?;
                         let (id, record) = self
                             .state
                             .quantum
@@ -1557,6 +1605,11 @@ impl<'a> ClassicalMachine<'a> {
         } else if let Some(v) = output {
             self.define(&i.lhs[0], v, &mut undo)?;
         }
+        let host = pending.clone().map(|request| HostExchange {
+            request,
+            reply: Retained::default(),
+        });
+        self.state.pending = pending;
         self.history.push(HistoryFrame {
             undo,
             reversed: false,
@@ -1564,10 +1617,7 @@ impl<'a> ClassicalMachine<'a> {
             pure: pure && fault.is_none(),
             irreversible: measurement.is_some(),
             measurement,
-            host: self.state.pending.clone().map(|request| HostExchange {
-                request,
-                reply: Vec::new(),
-            }),
+            host,
         });
         Ok(())
     }
@@ -1635,7 +1685,11 @@ pub(crate) fn compare(pred: &str, a: u128, b: u128, w: u16) -> Result<bool> {
 /// defines for it (§3.3 handle preconditions, §7.4 dead instances).
 const TRAP: &str = "trap ";
 fn trap(e: Error) -> Error {
-    Error(format!("{TRAP}{}", e.0))
+    if e.kind() == crate::ErrorKind::HostResource {
+        e
+    } else {
+        Error::new(format!("{TRAP}{}", e.0))
+    }
 }
 
 #[cfg(test)]
@@ -1646,7 +1700,7 @@ pub(crate) fn r21_resource_cases() {
     m.step_once().unwrap();
     for len in [0, 1, 8, (1usize << 63) - 1, 1 << 63, usize::MAX] {
         let mut undo = m.history.last().unwrap().undo.clone();
-        undo.bytes.clear();
+        undo.bytes = Retained::default();
         let result = m.save_bytes(1, len, &mut undo);
         if len <= 8 {
             result.unwrap();
@@ -1658,4 +1712,23 @@ pub(crate) fn r21_resource_cases() {
         }
     }
     eprintln!("R21 retained memory undo bytes: 1 path / 6 cases");
+}
+
+fn ordered_union<T: Ord>(
+    a: impl Iterator<Item = T>,
+    b: impl Iterator<Item = T>,
+) -> impl Iterator<Item = T> {
+    let (mut a, mut b) = (a.peekable(), b.peekable());
+    std::iter::from_fn(move || match (a.peek(), b.peek()) {
+        (Some(x), Some(y)) => match x.cmp(y) {
+            std::cmp::Ordering::Less => a.next(),
+            std::cmp::Ordering::Greater => b.next(),
+            std::cmp::Ordering::Equal => {
+                b.next();
+                a.next()
+            }
+        },
+        (Some(_), None) => a.next(),
+        (None, _) => b.next(),
+    })
 }

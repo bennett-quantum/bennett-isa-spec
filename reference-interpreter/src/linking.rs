@@ -6,7 +6,7 @@ impl Object {
     pub fn link(objects: &[Object]) -> Result<Self> {
         let first = objects
             .first()
-            .ok_or_else(|| Error("§9.3: no objects to link".into()))?;
+            .ok_or_else(|| Error::new("§9.3: no objects to link".into()))?;
         let mut result = Self {
             text: String::new(),
             ptr_width: first.ptr_width,
@@ -86,7 +86,7 @@ impl Object {
         for (name, import) in &imports {
             let definition = definitions
                 .get(name)
-                .ok_or_else(|| Error(format!("§9.3: unresolved import @{name}")))?;
+                .ok_or_else(|| Error::new(format!("§9.3: unresolved import @{name}")))?;
             if import.get("signature")? != definition.get("signature")? {
                 return err("§9.3", format!("import signature mismatch for @{name}"));
             }
@@ -133,7 +133,7 @@ impl Object {
             for (name, hash) in old.closure_hashes {
                 if let Some(hash) = hash {
                     let next = identity.closure_hashes[&name].clone().ok_or_else(|| {
-                        Error(format!("§9.3: @{name} is still unresolved after linking"))
+                        Error::new(format!("§9.3: @{name} is still unresolved after linking"))
                     })?;
                     replacements.insert(hash, next);
                 }
@@ -352,11 +352,11 @@ fn compose_certificates(certificates: &[Json]) -> Result<Json> {
         };
         if let Some(d) = l.get("diamond") {
             return crate::exact::Decimal::parse(&text(d)?)
-                .ok_or_else(|| Error("§12.3: invalid diamond bound".into()));
+                .ok_or_else(|| Error::new("§12.3: invalid diamond bound".into()));
         }
         if let Some(o) = l.get("operator_norm") {
             return Ok(crate::exact::Decimal::parse(&text(o)?)
-                .ok_or_else(|| Error("§12.3: invalid operator_norm bound".into()))?
+                .ok_or_else(|| Error::new("§12.3: invalid operator_norm bound".into()))?
                 .mul_int(2));
         }
         Ok(crate::exact::Decimal::zero())
@@ -365,7 +365,7 @@ fn compose_certificates(certificates: &[Json]) -> Result<Json> {
     for (k, n) in &multiplicities {
         let (region, key) = k
             .split_once(':')
-            .ok_or_else(|| Error("§12.3: malformed multiplicity key".into()))?;
+            .ok_or_else(|| Error::new("§12.3: malformed multiplicity key".into()))?;
         total = total.add(&local(region, key)?.mul_int(n.uint()?));
     }
     let root = first.get("bindings")?.get("closure_hash")?.string()?;

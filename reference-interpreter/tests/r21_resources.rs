@@ -30,7 +30,9 @@ fn family(name: &str) {
     eprintln!("{}", String::from_utf8_lossy(&out.stderr));
 }
 fn resource<T: std::fmt::Debug>(r: bennett_isa_ref::Result<T>, section: &str) {
-    let e = r.expect_err("host-resource error required").to_string();
+    let error = r.expect_err("host-resource error required");
+    assert_eq!(error.kind(), bennett_isa_ref::ErrorKind::HostResource);
+    let e = error.to_string();
     assert!(e.contains(section) && e.contains("host limit"), "{e}");
 }
 fn claim(text: &str, small: bool) {
@@ -94,7 +96,7 @@ fn transfer(text: &str, len: u64, host: bool) {
     m.step_once().unwrap();
     m.step_once().unwrap(); // alloc stays sparse and legal at every tested length.
     let prefix = m.snapshot();
-    let digest = m.memory_digest();
+    let digest = m.memory_digest().unwrap();
     assert_eq!(digest.len(), 64); // digest iterates resident bytes, never allocation size.
     let result = catch_unwind(AssertUnwindSafe(|| m.step_once())).expect("no transfer panic");
     if len > 8 {
@@ -104,7 +106,7 @@ fn transfer(text: &str, len: u64, host: bool) {
             prefix,
             "failed transfer must restore the entire prefix"
         );
-        assert!(m.host_transcript().is_empty());
+        assert!(m.host_transcript().unwrap().is_empty());
         assert!(m.console().is_empty());
         assert_eq!(m.effect_tape_len(), 0);
         resource(m.memory_bytes(1, len as usize), "§7.1");

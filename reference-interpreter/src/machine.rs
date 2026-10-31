@@ -53,16 +53,16 @@ impl DerivedWidths {
         let layout = object.section("layout");
         let exponent = |key: &str| -> Result<usize> {
             match layout {
-                Some(l) => usize::try_from(l.get(key)?.uint()?)
-                    .map_err(|_| Error(format!("§3.7: host limit: layout {key} exceeds usize"))),
+                Some(l) => usize::try_from(l.get(key)?.uint()?).map_err(|_| {
+                    Error::host_resource(format!("§3.7: host limit: layout {key} exceeds usize"))
+                }),
                 None => Ok(0),
             }
         };
         let (h, a, s) = (exponent("H")?, exponent("A_tab")?, exponent("S_cells")?);
-        let depth_plus_two = budget
-            .depth
-            .checked_add(2)
-            .ok_or_else(|| Error("§5.4: host limit: depth plus two exceeds u128".into()))?;
+        let depth_plus_two = budget.depth.checked_add(2).ok_or_else(|| {
+            Error::host_resource("§5.4: host limit: depth plus two exceeds u128".into())
+        })?;
         // ceil(log2(d + 2)) = bits(d + 1).
         let dc = bits_for(depth_plus_two - 1);
         let p = bits_for(program.halt as u128);
@@ -82,7 +82,7 @@ impl DerivedWidths {
         // Report a representation limit here, never reject the object schema.
         let add_width = |n: usize, extra: usize, label: &str| {
             n.checked_add(extra).ok_or_else(|| {
-                Error(format!(
+                Error::host_resource(format!(
                     "§3.7: host limit: derived {label} width exceeds usize"
                 ))
             })
@@ -386,8 +386,9 @@ impl<'a> OracleVectorMachine<'a> {
         }
         let memory = Memory::initial(object, root, &input.regions)?;
         let atop = memory.allocations.len() as u128;
-        let count = usize::try_from(budget.steps)
-            .map_err(|_| Error("§3.7: host limit: B frames exceed host address space".into()))?;
+        let count = usize::try_from(budget.steps).map_err(|_| {
+            Error::host_resource("§3.7: host limit: B frames exceed host address space".into())
+        })?;
         let frame = Frame {
             old_pc: 0,
             slots: widths
@@ -399,9 +400,9 @@ impl<'a> OracleVectorMachine<'a> {
             succ: 0,
         };
         let mut frames = Vec::new();
-        frames
-            .try_reserve_exact(count)
-            .map_err(|e| Error(format!("§3.7: host limit: cannot allocate B frames: {e}")))?;
+        frames.try_reserve_exact(count).map_err(|e| {
+            Error::host_resource(format!("§3.7: host limit: cannot allocate B frames: {e}"))
+        })?;
         frames.resize(count, frame);
         let target = root.params[1][0].ty.bits(object.ptr_width)?;
         let fault = root.params[2][0].ty.bits(object.ptr_width)?;
@@ -592,13 +593,13 @@ impl<'a> OracleVectorMachine<'a> {
             .locations
             .get(&(f.name.clone(), n.into()))
             .cloned()
-            .ok_or_else(|| Error(format!("§3.7: missing machine location {n} in @{}", f.name)))
+            .ok_or_else(|| Error::new(format!("§3.7: missing machine location {n} in @{}", f.name)))
     }
     fn location_mut(&mut self, f: &str, n: &str) -> Result<&mut BitVector> {
         self.state
             .locations
             .get_mut(&(f.into(), n.into()))
-            .ok_or_else(|| Error(format!("§3.7: missing machine location {n} in @{f}")))
+            .ok_or_else(|| Error::new(format!("§3.7: missing machine location {n} in @{f}")))
     }
     /// A length operand as an exact integer; None when it is 2^128 or more.
     fn length(&self, f: &Function, n: &str) -> Result<Option<u128>> {
@@ -654,8 +655,9 @@ impl<'a> OracleVectorMachine<'a> {
             || power_of_two(table).is_some_and(|cap| atop >= cap))
     }
     fn live_entries(&self) -> Result<&[Allocation]> {
-        let atop = usize::try_from(number(&self.state.atop)?)
-            .map_err(|_| Error("§3.7: host limit: atop exceeds host address space".into()))?;
+        let atop = usize::try_from(number(&self.state.atop)?).map_err(|_| {
+            Error::host_resource("§3.7: host limit: atop exceeds host address space".into())
+        })?;
         let entries = &self.state.memory.allocations;
         Ok(&entries[..atop.min(entries.len())])
     }
@@ -838,19 +840,19 @@ impl<'a> OracleVectorMachine<'a> {
                         .memory
                         .addresses
                         .get(a[0].trim_start_matches('@'))
-                        .ok_or_else(|| Error("§4.2: address not mapped".into()))?,
+                        .ok_or_else(|| Error::new("§4.2: address not mapped".into()))?,
                 )?],
                 "lift.alloc" => {
                     let n = self
                         .length(f, &a[0])?
-                        .ok_or_else(|| Error("§3.6: unguarded allocation length".into()))?;
+                        .ok_or_else(|| Error::new("§3.6: unguarded allocation length".into()))?;
                     let used = number(&self.state.heap_used)?;
                     let base = self
                         .state
                         .memory
                         .heap_base
                         .checked_add(used)
-                        .ok_or_else(|| Error("§7.1: heap bump exceeds 2^128".into()))?;
+                        .ok_or_else(|| Error::new("§7.1: heap bump exceeds 2^128".into()))?;
                     let ptr = self.object.ptr_width as usize;
                     return Ok(vec![
                         word(BitVector::from_u128_exact(ptr, base)?),
@@ -899,8 +901,9 @@ impl<'a> OracleVectorMachine<'a> {
             }
             Destination::EntryAtop => {
                 // alloctab[atop], addressed with the counter value current now (§3.6).
-                let index = usize::try_from(number(&self.state.atop)?)
-                    .map_err(|_| Error("§3.7: host limit: alloctab index exceeds usize".into()))?;
+                let index = usize::try_from(number(&self.state.atop)?).map_err(|_| {
+                    Error::host_resource("§3.7: host limit: alloctab index exceeds usize".into())
+                })?;
                 let entries = &mut self.state.memory.allocations;
                 let clean = Allocation {
                     base: 0,
@@ -964,7 +967,7 @@ impl<'a> OracleVectorMachine<'a> {
         for (j, p) in f.locations().iter().enumerate() {
             let addr = base
                 .checked_add(3 + j as u128)
-                .ok_or_else(|| Error("§3.7: stack address exceeds 2^128".into()))?;
+                .ok_or_else(|| Error::new("§3.7: stack address exceeds 2^128".into()))?;
             let mut cell = self.stack_read(addr)?;
             self.exchange_location(&f.name, &p.name, &mut cell)?;
             self.stack_set(addr, cell);
@@ -986,7 +989,7 @@ impl<'a> OracleVectorMachine<'a> {
             .iter()
             .position(|id| id.0 == f.name && id.1 == n)
             .map(|p| p as u128)
-            .ok_or_else(|| Error("§3.7: missing destination id".into()))
+            .ok_or_else(|| Error::new("§3.7: missing destination id".into()))
     }
     fn forward_call(
         &mut self,
@@ -1084,7 +1087,7 @@ impl<'a> OracleVectorMachine<'a> {
             .ok()
             .and_then(|id| self.ids.get(id))
             .cloned()
-            .ok_or_else(|| Error("§3.7: delivery id names no location".into()))?;
+            .ok_or_else(|| Error::new("§3.7: delivery id names no location".into()))?;
         self.exchange_location(&f, &n, &mut slot.word)
     }
     fn forward_ret(&mut self, f: &Function, i: &Instruction, frame: &mut Frame) -> Result<()> {
@@ -1159,7 +1162,7 @@ impl<'a> OracleVectorMachine<'a> {
                 self.arguments
                     .get(&n)
                     .cloned()
-                    .ok_or_else(|| Error(format!("§4.2: {n} is not a classical argument")))?,
+                    .ok_or_else(|| Error::new(format!("§4.2: {n} is not a classical argument")))?,
             );
         }
         // The nested invocation is itself compute / commit / prefix reversal,
@@ -1210,7 +1213,7 @@ impl<'a> OracleVectorMachine<'a> {
                 self.arguments
                     .get(n)
                     .cloned()
-                    .ok_or_else(|| Error(format!("§4.2: {n} is not a classical argument")))
+                    .ok_or_else(|| Error::new(format!("§4.2: {n} is not a classical argument")))
             })
             .collect::<Result<Vec<_>>>()?;
         let values = self.object.permutation_action_vectors(
@@ -1249,7 +1252,7 @@ impl<'a> OracleMachine<'a> {
         let f = object
             .functions
             .get(name)
-            .ok_or_else(|| Error(format!("§5.2: unknown oracle @{name}")))?;
+            .ok_or_else(|| Error::new(format!("§5.2: unknown oracle @{name}")))?;
         if f.kind == "oracle"
             && (f.params[1][0].ty.width(object.ptr_width)? > 128
                 || f.params[2][0].ty.width(object.ptr_width)? > 128)

@@ -95,7 +95,7 @@ enum Edge {
 }
 fn symbol(s: Option<&String>) -> Result<&str> {
     s.and_then(|s| s.strip_prefix('@'))
-        .ok_or_else(|| Error("§4.8: call requires an @symbol operand".into()))
+        .ok_or_else(|| Error::new("§4.8: call requires an @symbol operand".into()))
 }
 fn edges(i: &Instruction, out: &mut Vec<(String, Edge)>) -> Result<()> {
     match i.op.as_str() {

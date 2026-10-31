@@ -28,7 +28,7 @@ impl Object {
                     let n = i
                         .operands
                         .first()
-                        .ok_or_else(|| Error("§4.8: qloop requires a trip count".into()))?;
+                        .ok_or_else(|| Error::new("§4.8: qloop requires a trip count".into()))?;
                     out.push(crate::object::host_count(n, "qloop trip count")?);
                 }
                 for body in &i.bodies {
@@ -89,7 +89,7 @@ impl Object {
         if a.len() == 4 {
             let img = a[3]
                 .strip_prefix('@')
-                .ok_or_else(|| Error("§4.6: qregion image must be @data".into()))?;
+                .ok_or_else(|| Error::new("§4.6: qregion image must be @data".into()))?;
             let size = self.data_size(img)?;
             // 2^A * W bits = 8 * size bytes (§4.6), compared exactly.
             let bits = crate::oracle::power_of_two(aw as u128)
@@ -269,7 +269,7 @@ impl Object {
                     let c = s
                         .created
                         .get(&a[0])
-                        .ok_or_else(|| Error("§3.3: release of non-workspace value".into()))?;
+                        .ok_or_else(|| Error::new("§3.3: release of non-workspace value".into()))?;
                     if c.kind != if op == "qreturn" { "qborrow" } else { "qalloc" } {
                         return err("§5.1", "allocation/release kind mismatch");
                     }
@@ -304,7 +304,7 @@ impl Object {
                     let c = s
                         .created
                         .get(&a[1])
-                        .ok_or_else(|| Error("§6.2: unmatched quncopy".into()))?;
+                        .ok_or_else(|| Error::new("§6.2: unmatched quncopy".into()))?;
                     if c.kind != "qcopy"
                         || c.sources != vec![a[0].clone()]
                         || c.versions != s.read_snapshot(&s.wires(&a[0])?)?
@@ -354,7 +354,7 @@ impl Object {
                             let c = s
                                 .created
                                 .get(&a[2])
-                                .ok_or_else(|| Error("§6.2: unmatched qunload".into()))?;
+                                .ok_or_else(|| Error::new("§6.2: unmatched qunload".into()))?;
                             let mut deps = s.wires(&a[1])?;
                             deps.push(format!("{}[*]", a[0]));
                             if c.kind != "qload"
@@ -407,7 +407,7 @@ impl Object {
                     for callee in &a[..2] {
                         let name = callee
                             .strip_prefix('@')
-                            .ok_or_else(|| Error("§4.5: qinplace names @g @ginv".into()))?;
+                            .ok_or_else(|| Error::new("§4.5: qinplace names @g @ginv".into()))?;
                         let callee = self.declaration(name)?;
                         if callee.kind != "oracle" {
                             return err("§4.5", "qinplace requires an oracle pair");
@@ -698,7 +698,7 @@ impl Object {
         }
         let n = a[0]
             .strip_prefix('@')
-            .ok_or_else(|| Error("§4.8: call requires @symbol".into()))?;
+            .ok_or_else(|| Error::new("§4.8: call requires @symbol".into()))?;
         let callee = self.declaration(n)?;
         if oracle && callee.kind != "oracle"
             || !oracle && !matches!(callee.kind.as_str(), "action" | "perm_action")
@@ -732,7 +732,7 @@ impl Object {
             for (v, p) in vs.iter().zip(ps) {
                 let ty = types
                     .get(v)
-                    .ok_or_else(|| Error(format!("§3.3: unknown call operand {v}")))?;
+                    .ok_or_else(|| Error::new(format!("§3.3: unknown call operand {v}")))?;
                 let compatible = match (&p.ty, ty) {
                     (Type::Wire(n), Type::Wire(m)) | (Type::Wire(n), Type::Reg(m)) => n == m,
                     (Type::Wire(n), Type::Qreg(m)) => n == m,
@@ -820,7 +820,9 @@ impl Object {
             }
             if retry.len() == before {
                 return Err(first_error.unwrap_or_else(|| {
-                    Error("§3.3: unresolved SSA definitions without a recorded diagnostic".into())
+                    Error::new(
+                        "§3.3: unresolved SSA definitions without a recorded diagnostic".into(),
+                    )
                 }));
             }
             pending = retry;
@@ -851,7 +853,7 @@ impl Object {
             types
                 .get(n)
                 .cloned()
-                .ok_or_else(|| Error(format!("§3.3: undefined classical operand {n}")))
+                .ok_or_else(|| Error::new(format!("§3.3: undefined classical operand {n}")))
         };
         let same = |x: &str, y: &str| -> Result<Type> {
             let t = rd(x)?;
@@ -976,10 +978,10 @@ impl Object {
                     for branch in if a.len() == 1 { &a[..] } else { &a[1..] } {
                         let label = branch
                             .strip_prefix('^')
-                            .ok_or_else(|| Error("§4.8: br target must be label".into()))?;
-                        let (label, args) = label
-                            .split_once('(')
-                            .ok_or_else(|| Error("§4.8: br target needs argument list".into()))?;
+                            .ok_or_else(|| Error::new("§4.8: br target must be label".into()))?;
+                        let (label, args) = label.split_once('(').ok_or_else(|| {
+                            Error::new("§4.8: br target needs argument list".into())
+                        })?;
                         if !labels.iter().any(|l| l.as_str() == label) {
                             return err("§3.4", "unknown branch label");
                         }
@@ -1016,7 +1018,7 @@ impl Object {
                     }
                     let callee = self.declaration(
                         a[0].strip_prefix('@')
-                            .ok_or_else(|| Error("§4.8: call requires @symbol".into()))?,
+                            .ok_or_else(|| Error::new("§4.8: call requires @symbol".into()))?,
                     )?;
                     // §3.1: CC calls CC or R functions, R calls R functions
                     // (SPEC-QUESTIONS 19); uncall follows the same graph.
@@ -1134,7 +1136,9 @@ impl Object {
                         return err("§3.3", "concat tier/alias");
                     }
                     result = Some(Type::Qreg(n.checked_add(m).ok_or_else(|| {
-                        Error("§3.3: host limit: qreg descriptor sum exceeds u64".into())
+                        Error::host_resource(
+                            "§3.3: host limit: qreg descriptor sum exceeds u64".into(),
+                        )
                     })?));
                 }
                 "measure" => {
@@ -1192,7 +1196,7 @@ impl Object {
     fn validate_effect(&self, operation: &str, operands: &[Type]) -> Result<()> {
         let (device, op) = operation
             .split_once('.')
-            .ok_or_else(|| Error("§7.3: effect names dev.op".into()))?;
+            .ok_or_else(|| Error::new("§7.3: effect names dev.op".into()))?;
         let int = |t: &Type| matches!(t, Type::Int(_));
         let ptr = |t: &Type| *t == Type::Ptr;
         let shape: &[fn(&Type) -> bool] = match (device, op) {
@@ -1346,7 +1350,7 @@ impl Discipline {
             let index = crate::object::host_count(
                 index
                     .strip_suffix(']')
-                    .ok_or_else(|| Error("§16.2: invalid indexed wire".into()))?,
+                    .ok_or_else(|| Error::new("§16.2: invalid indexed wire".into()))?,
                 "wire index",
             )?;
             (base, Some(index))
@@ -1363,8 +1367,9 @@ impl Discipline {
             }
             Ok(vec![format!("{base}[{i}]")])
         } else {
-            let count = usize::try_from(w)
-                .map_err(|_| Error("§3.3: host limit: wire count exceeds usize".into()))?;
+            let count = usize::try_from(w).map_err(|_| {
+                Error::host_resource("§3.3: host limit: wire count exceeds usize".into())
+            })?;
             let mut wires = crate::reserved(count, "§3.3", "wire names")?;
             wires.extend((0..w).map(|i| format!("{base}[{i}]")));
             Ok(wires)
@@ -1567,8 +1572,9 @@ impl Discipline {
         let complete = if let Some(prior) = inverse {
             // The whole joint computation is still current: use the captured
             // entry versions, rather than treating its outputs as new inputs.
-            let complete = operation_inverse(&prior)
-                .ok_or_else(|| Error("§6.2: joint operation has no inverse identity".into()))?;
+            let complete = operation_inverse(&prior).ok_or_else(|| {
+                Error::new("§6.2: joint operation has no inverse identity".into())
+            })?;
             if let Some(reads) = self.reads.get(&prior).cloned() {
                 self.reads.insert(complete.clone(), reads);
             }

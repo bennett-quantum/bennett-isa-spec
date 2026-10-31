@@ -36,7 +36,7 @@ pub(crate) fn host_count(s: &str, what: &str) -> Result<u64> {
         return err("§16.1", format!("{what} must be a canonical unsigned INT"));
     }
     s.parse::<u64>().map_err(|_| {
-        Error(format!(
+        Error::host_resource(format!(
             "§3.3: host limit: {what} {s} exceeds the host's 64-bit descriptor range (not an ISA rule)"
         ))
     })
@@ -75,7 +75,7 @@ impl Type {
             _ if s.starts_with("region[") && s.ends_with(']') => {
                 let (a, w) = s[7..s.len() - 1]
                     .split_once(',')
-                    .ok_or_else(|| Error("§16.2: malformed region type".into()))?;
+                    .ok_or_else(|| Error::new("§16.2: malformed region type".into()))?;
                 Self::Region(host_count(a, "region address width")?, bundle_width(w)?)
             }
             _ => return err("§3.3", format!("unknown type {s}")),
@@ -94,7 +94,7 @@ impl Type {
     pub fn bits(&self, ptr: u16) -> Result<usize> {
         let w = self.width(ptr)?;
         usize::try_from(w).map_err(|_| {
-            Error(format!(
+            Error::host_resource(format!(
                 "§3.3: host limit: width {w} exceeds the host address space (not an ISA rule)"
             ))
         })
@@ -234,7 +234,7 @@ impl Function {
                     .iter()
                     .map(|n| {
                         u64::try_from(n.uint()?).map_err(|_| {
-                            Error("§5.3: loop bound exceeds implementation counter".into())
+                            Error::new("§5.3: loop bound exceeds implementation counter".into())
                         })
                     })
                     .collect::<Result<_>>()?;
@@ -486,7 +486,7 @@ pub(crate) fn list(s: &str) -> Result<Vec<String>> {
     let s = s
         .strip_prefix('(')
         .and_then(|s| s.strip_suffix(')'))
-        .ok_or_else(|| Error(format!("§16.2: expected operand list {s}")))?;
+        .ok_or_else(|| Error::new(format!("§16.2: expected operand list {s}")))?;
     if s.is_empty() {
         return Ok(Vec::new());
     }
@@ -508,7 +508,7 @@ fn params(s: &str) -> Result<Vec<Param>> {
     for p in s.split(", ") {
         let (n, rest) = p
             .split_once(':')
-            .ok_or_else(|| Error(format!("§16.2: invalid parameter {p}")))?;
+            .ok_or_else(|| Error::new(format!("§16.2: invalid parameter {p}")))?;
         if !name(n) || !seen.insert(n) {
             return err("§16.2", "invalid or duplicate parameter name");
         }
@@ -644,7 +644,7 @@ impl Object {
             .section("imports")
             .and_then(|s| s.object().ok())
             .and_then(|s| s.get(name))
-            .ok_or_else(|| Error(format!("§9.3: undefined symbol @{name}")))?;
+            .ok_or_else(|| Error::new(format!("§9.3: undefined symbol @{name}")))?;
         Function::from_signature(name, import.get("signature")?)
     }
     pub(crate) fn data_size(&self, name: &str) -> Result<u128> {
@@ -655,7 +655,7 @@ impl Object {
             .section("imports")
             .and_then(|v| v.object().ok())
             .and_then(|v| v.get(name))
-            .ok_or_else(|| Error(format!("§9.3: unknown data symbol @{name}")))?;
+            .ok_or_else(|| Error::new(format!("§9.3: unknown data symbol @{name}")))?;
         let sig = import.get("signature")?;
         if sig.get("kind")?.string()? != "data" {
             return err("§4.6", "qregion image reference must have data kind");
@@ -709,7 +709,7 @@ impl Object {
         }
         let raw = header[8]
             .strip_prefix("ptr_width=")
-            .ok_or_else(|| Error("§16.2: header requires ptr_width=INT".into()))?;
+            .ok_or_else(|| Error::new("§16.2: header requires ptr_width=INT".into()))?;
         let ptr_width = host_count(raw, "ptr_width")?;
         // SPEC-QUESTIONS 14: hostcall's rlen is iN with N = ptr_width (§4.8), and
         // iN exists only for 1 <= N <= 128 (§3.3).
@@ -749,7 +749,7 @@ impl Object {
             let order = SECTIONS
                 .iter()
                 .position(|s| *s == section)
-                .ok_or_else(|| Error(format!("§9.1: unknown section {section}")))?;
+                .ok_or_else(|| Error::new(format!("§9.1: unknown section {section}")))?;
             if previous.is_some_and(|n| n >= order) {
                 return err("§9.1", "duplicate or out-of-order section");
             }
@@ -826,18 +826,18 @@ impl Object {
             let (kind, offset) = fhead_prefix(&ts)
                 .filter(|(_, offset)| ts.len() == offset + 6)
                 .ok_or_else(|| {
-                    Error("§16.2: invalid function header or number of parameter lists".into())
+                    Error::new("§16.2: invalid function header or number of parameter lists".into())
                 })?;
             let n = ts[offset]
                 .strip_prefix('@')
                 .filter(|s| name(s))
-                .ok_or_else(|| Error("§16.2: invalid function name".into()))?;
+                .ok_or_else(|| Error::new("§16.2: invalid function name".into()))?;
             let mut ps: [Vec<Param>; 5] = Default::default();
             for (i, s) in ts[offset + 1..].iter().enumerate() {
                 let inner = s
                     .strip_prefix('(')
                     .and_then(|s| s.strip_suffix(')'))
-                    .ok_or_else(|| Error("§16.2: invalid parameter list".into()))?;
+                    .ok_or_else(|| Error::new("§16.2: invalid parameter list".into()))?;
                 ps[i] = params(inner)?;
             }
             let mut f = Function {
@@ -852,16 +852,16 @@ impl Object {
             if pos < lines.len() && lines[pos].starts_with("regs ") {
                 let body = lines[pos]
                     .strip_prefix("regs { ")
-                    .ok_or_else(|| Error("§16.2: malformed regs".into()))?;
+                    .ok_or_else(|| Error::new("§16.2: malformed regs".into()))?;
                 let (rs, rest) = body
                     .split_once(" }")
-                    .ok_or_else(|| Error("§16.2: malformed regs close".into()))?;
+                    .ok_or_else(|| Error::new("§16.2: malformed regs close".into()))?;
                 f.regs = params(rs)?;
                 if !rest.is_empty() {
                     let bs = rest
                         .strip_prefix(" bounds {")
                         .and_then(|s| s.strip_suffix('}'))
-                        .ok_or_else(|| Error("§16.2: malformed bounds".into()))?;
+                        .ok_or_else(|| Error::new("§16.2: malformed bounds".into()))?;
                     if bs.is_empty() {
                         return err("§16.2", "present bounds clause requires an integer");
                     }
@@ -877,13 +877,13 @@ impl Object {
                 pos += 1;
                 let (bn, ps) = b[1..]
                     .split_once('(')
-                    .ok_or_else(|| Error("§16.2: malformed block".into()))?;
+                    .ok_or_else(|| Error::new("§16.2: malformed block".into()))?;
                 if !name(bn) {
                     return err("§16.2", "invalid block name");
                 }
                 let ps = ps
                     .strip_suffix("):")
-                    .ok_or_else(|| Error("§16.2: malformed block parameter list".into()))?;
+                    .ok_or_else(|| Error::new("§16.2: malformed block parameter list".into()))?;
                 let mut block = Block {
                     name: bn.into(),
                     params: params(ps)?,
@@ -925,7 +925,7 @@ impl Object {
     pub fn symbols(&self) -> Result<&BTreeMap<String, Json>> {
         self.metadata
             .get("symbols")
-            .ok_or_else(|| Error("§9.1: missing symbols section".into()))?
+            .ok_or_else(|| Error::new("§9.1: missing symbols section".into()))?
             .object()
     }
     fn validate(&self) -> Result<()> {
@@ -962,7 +962,7 @@ impl Object {
                 let bytes = self
                     .data
                     .get(n)
-                    .ok_or_else(|| Error(format!("§9.1: missing data definition {n}")))?;
+                    .ok_or_else(|| Error::new(format!("§9.1: missing data definition {n}")))?;
                 if sig.get("size")?.uint()? != bytes.len() as u128 {
                     return err("§7.2", "data size differs from signature");
                 }
@@ -970,7 +970,7 @@ impl Object {
                 let f = self
                     .functions
                     .get(n)
-                    .ok_or_else(|| Error(format!("§9.1: missing function definition {n}")))?;
+                    .ok_or_else(|| Error::new(format!("§9.1: missing function definition {n}")))?;
                 validate_header(f)?;
                 if k != f.kind || sig != &f.signature() {
                     return err("§9.1", format!("signature mismatch for {n}"));
@@ -1084,7 +1084,7 @@ impl Object {
                         .operands
                         .first()
                         .and_then(|n| n.strip_prefix('@'))
-                        .ok_or_else(|| Error("§4.8: malformed lift.call".into()))?;
+                        .ok_or_else(|| Error::new("§4.8: malformed lift.call".into()))?;
                     pending.push(target.to_string());
                 }
             }
@@ -1112,7 +1112,7 @@ impl Object {
                         .operands
                         .first()
                         .and_then(|s| s.strip_prefix('@'))
-                        .ok_or_else(|| Error("§4.8: malformed lift.call".into()))?;
+                        .ok_or_else(|| Error::new("§4.8: malformed lift.call".into()))?;
                     pending.push(target.into());
                 }
             }
@@ -1148,7 +1148,7 @@ impl Object {
                     .chain(&f.regs)
                     .find(|p| p.name == n)
             };
-            p.ok_or_else(|| Error(format!("§3.7: unreadable location {n}")))?
+            p.ok_or_else(|| Error::new(format!("§3.7: unreadable location {n}")))?
                 .ty
                 .width(self.ptr_width)
         };
@@ -1192,7 +1192,7 @@ impl Object {
             if integer(s) {
                 let n = s
                     .parse::<u128>()
-                    .map_err(|_| Error("§3.3: invalid length".into()))?;
+                    .map_err(|_| Error::new("§3.3: invalid length".into()))?;
                 if self.ptr_width < 128 && n >= 1u128 << self.ptr_width {
                     return err("§3.3", "length does not fit pointer");
                 }
@@ -1284,7 +1284,7 @@ impl Object {
                     eq(dest(&i.lhs[0])?, self.ptr_width as u64)?;
                     let n = args[0]
                         .strip_prefix('@')
-                        .ok_or_else(|| Error("§4.8: addr requires @name".into()))?;
+                        .ok_or_else(|| Error::new("§4.8: addr requires @name".into()))?;
                     let global = self
                         .section("layout")
                         .and_then(|l| l.get("globals").ok())
@@ -1315,11 +1315,10 @@ impl Object {
                 }
                 "lift.call" => {
                     arity(2, 1)?;
-                    let callee = self.declaration(
-                        args[0]
-                            .strip_prefix('@')
-                            .ok_or_else(|| Error("§4.8: lift.call requires @symbol".into()))?,
-                    )?;
+                    let callee =
+                        self.declaration(args[0].strip_prefix('@').ok_or_else(|| {
+                            Error::new("§4.8: lift.call requires @symbol".into())
+                        })?)?;
                     if callee.kind != "lproc" {
                         return err("§3.7", "lift.call requires lproc");
                     }
@@ -1421,10 +1420,9 @@ impl Object {
 
         if let Some(image) = l.object()?.get("block_image") {
             let image = image.string()?;
-            let data = self
-                .data
-                .get(image)
-                .ok_or_else(|| Error(format!("§9.1: block_image names undefined data {image}")))?;
+            let data = self.data.get(image).ok_or_else(|| {
+                Error::new(format!("§9.1: block_image names undefined data {image}"))
+            })?;
             if !data.len().is_multiple_of(512) {
                 return err("§7.3", "block image must have complete 512-byte sectors");
             }
@@ -1475,7 +1473,7 @@ impl Object {
                 .functions
                 .get(n)
                 .filter(|f| f.kind == "oracle")
-                .ok_or_else(|| Error("§7.2: interface layout must name an oracle".into()))?;
+                .ok_or_else(|| Error::new("§7.2: interface layout must name an oracle".into()))?;
             let regions = regions.object()?;
             if regions.len() != f.params[3].len() {
                 return err("§7.2", "interface mapping count mismatch");
@@ -1491,10 +1489,10 @@ impl Object {
                 }
                 let r = regions
                     .get(&p.name)
-                    .ok_or_else(|| Error("§7.2: missing interface mapping".into()))?;
+                    .ok_or_else(|| Error::new("§7.2: missing interface mapping".into()))?;
 
                 let size = crate::oracle::power_of_two(a as u128)
-                    .ok_or_else(|| Error("§7.2: interface region exceeds 2^H".into()))?;
+                    .ok_or_else(|| Error::new("§7.2: interface region exceeds 2^H".into()))?;
                 ranges.push((r.get("base")?.uint()?, size, p.name.clone()));
             }
             if entries.is_some_and(|e| globals.len() as u128 + regions.len() as u128 > e) {
@@ -1590,10 +1588,9 @@ pub(crate) fn const_literal(s: &str, width: u64) -> Result<()> {
 /// Inspect only the spelling's magnitude, using four bits per
 /// decimal digit plus word padding. Destination widths never drive storage.
 fn literal_magnitude(s: &str) -> Result<(u128, bool)> {
-    let generous = s
-        .len()
-        .checked_mul(4)
-        .ok_or_else(|| Error("§3.3: host limit: literal spelling size exceeds usize".into()))?;
+    let generous = s.len().checked_mul(4).ok_or_else(|| {
+        Error::host_resource("§3.3: host limit: literal spelling size exceeds usize".into())
+    })?;
     let value = crate::BitVector::parse_decimal(generous, s)?;
     let mut bits = 0;
     let mut ones = 0usize;

@@ -20,6 +20,8 @@ mod object;
 mod oracle;
 mod quantum;
 mod registers;
+mod retained;
+pub use retained::Retained;
 mod schema;
 mod sha256;
 mod validation;
@@ -30,7 +32,7 @@ pub use classical::{
     ClassicalMachine, ClassicalOutcome, ClassicalSnapshot, ClassicalValue, RegisterDelta,
     SnapshotDelta, StepPoint, TapeEntry,
 };
-pub use classical::{HostExchange, HostRequest};
+pub use classical::{HostExchange, HostRequest, HostRequestData};
 pub use identity::Identity;
 pub use machine::{
     BasisConfiguration, BasisVectorConfiguration, DerivedWidths, OracleMachine, OracleVectorMachine,
@@ -46,7 +48,32 @@ pub use sha256::{sha256, sha256_hex};
 
 /// A diagnostic always names the normative rule that was violated.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Error(pub String);
+pub struct Error(pub String, pub ErrorKind);
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ErrorKind {
+    Diagnostic,
+    HostResource,
+}
+impl Error {
+    pub fn new(message: String) -> Self {
+        Self(message, ErrorKind::Diagnostic)
+    }
+    pub fn host_resource(message: String) -> Self {
+        Self(message, ErrorKind::HostResource)
+    }
+    pub fn kind(&self) -> ErrorKind {
+        self.1
+    }
+    pub fn context(self, rule: &str) -> Self {
+        Self(format!("{rule}: {}", self.0), self.1)
+    }
+}
+pub(crate) fn resource_error(rule: &str, message: impl std::fmt::Display) -> Error {
+    Error(
+        format!("{rule}: host limit: {message}"),
+        ErrorKind::HostResource,
+    )
+}
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.0)
@@ -55,7 +82,7 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {}
 pub type Result<T> = std::result::Result<T, Error>;
 pub(crate) fn err<T>(rule: &str, message: impl std::fmt::Display) -> Result<T> {
-    Err(Error(format!("{rule}: {message}")))
+    Err(Error::new(format!("{rule}: {message}")))
 }
 pub fn version() -> &'static str {
     "0.8"
@@ -75,15 +102,14 @@ pub(crate) fn reserve_more<T>(
     rule: &str,
     what: &str,
 ) -> Result<()> {
-    out.len().checked_add(count).ok_or_else(|| {
-        Error(format!(
-            "{rule}: host limit: {what} cumulative count exceeds usize"
-        ))
-    })?;
+    out.len()
+        .checked_add(count)
+        .ok_or_else(|| resource_error(rule, format!("{what} cumulative count exceeds usize")))?;
     out.try_reserve_exact(count).map_err(|e| {
-        Error(format!(
-            "{rule}: host limit: {what} allocation of {count} elements failed: {e}"
-        ))
+        resource_error(
+            rule,
+            format!("{what} allocation of {count} elements failed: {e}"),
+        )
     })?;
     Ok(())
 }

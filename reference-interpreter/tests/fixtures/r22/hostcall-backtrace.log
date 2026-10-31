@@ -1,0 +1,40 @@
+warning: Missing auto-load script at offset 0 in section .debug_gdb_scripts
+of file /home/tobias/Projects/bennett-workspace/bennett-isa-spec-review/reference-interpreter/target/debug/bennett-isa-ref.
+Use `info auto-load python-scripts [REGEXP]' to list them.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+memory allocation of 67108864 bytes failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+Program received signal SIGABRT, Aborted.
+__pthread_kill_implementation (no_tid=0, signo=6, threadid=<optimized out>) at ./nptl/pthread_kill.c:44
+warning: 44	./nptl/pthread_kill.c: No such file or directory
+#0  __pthread_kill_implementation (no_tid=0, signo=6, threadid=<optimized out>) at ./nptl/pthread_kill.c:44
+#1  __pthread_kill_internal (signo=6, threadid=<optimized out>) at ./nptl/pthread_kill.c:78
+#2  __GI___pthread_kill (threadid=<optimized out>, signo=signo@entry=6) at ./nptl/pthread_kill.c:89
+#3  0x00007ffff7c4527e in __GI_raise (sig=sig@entry=6) at ../sysdeps/posix/raise.c:26
+#4  0x00007ffff7c288ff in __GI_abort () at ./stdlib/abort.c:79
+#5  0x0000555555ea18da in std::sys::pal::unix::abort_internal () at library/std/src/sys/pal/unix/mod.rs:300
+#6  0x0000555555ea0479 in std::process::abort () at library/std/src/process.rs:2639
+#7  0x0000555555e8da4c in std::alloc::rust_oom::{closure#0} () at library/std/src/alloc.rs:441
+#8  0x0000555555e86439 in std::sys::backtrace::__rust_end_short_backtrace<std::alloc::rust_oom::{closure_env#0}, !> () at library/std/src/sys/backtrace.rs:182
+#9  0x0000555555ea02fa in std::alloc::rust_oom () at library/std/src/alloc.rs:436
+#10 0x0000555555e8e4d3 in std::alloc::_::__rust_alloc_error_handler () at library/std/src/alloc.rs:435
+#11 0x0000555555eb3561 in alloc::alloc::handle_alloc_error::rt_error () at library/alloc/src/alloc.rs:643
+#12 alloc::alloc::handle_alloc_error () at library/alloc/src/alloc.rs:649
+#13 0x0000555555eb3576 in alloc::raw_vec::handle_error () at library/alloc/src/raw_vec/mod.rs:890
+#14 0x00005555557c80c3 in alloc::raw_vec::RawVecInner<alloc::alloc::Global>::with_capacity_in<alloc::alloc::Global> (capacity=67108864, alloc=..., elem_layout=...) at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/alloc/src/raw_vec/mod.rs:443
+#15 0x0000555555ceb986 in alloc::raw_vec::RawVec<u8, alloc::alloc::Global>::with_capacity_in<u8, alloc::alloc::Global> (capacity=67108864, alloc=...) at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/alloc/src/raw_vec/mod.rs:177
+#16 alloc::vec::Vec<u8, alloc::alloc::Global>::with_capacity_in<u8, alloc::alloc::Global> (capacity=67108864, alloc=...) at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/alloc/src/vec/mod.rs:969
+#17 alloc::slice::{impl#0}::to_vec_in::{impl#1}::to_vec<u8, alloc::alloc::Global> (s=..., alloc=...) at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/alloc/src/slice.rs:448
+#18 0x0000555555acecf8 in alloc::slice::{impl#0}::to_vec_in<u8, alloc::alloc::Global> (self=..., alloc=...) at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/alloc/src/slice.rs:400
+#19 alloc::vec::{impl#13}::clone<u8, alloc::alloc::Global> (self=0x7fffffff56e8) at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/alloc/src/vec/mod.rs:3878
+#20 0x0000555555d2bcc7 in bennett_isa_ref::classical::{impl#52}::clone (self=0x7fffffff56b0) at src/classical.rs:335
+#21 0x0000555555d0419d in core::option::{impl#6}::clone<bennett_isa_ref::classical::HostRequest> (self=0x7fffffff56b0) at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/option.rs:2275
+#22 0x0000555555d20a8a in bennett_isa_ref::classical::ClassicalMachine::step (self=<error reading variable: That operation is not available on integers of more than 8 bytes.>) at src/classical.rs:1567
+#23 0x0000555555d277e5 in bennett_isa_ref::classical::ClassicalMachine::step_once (self=<error reading variable: That operation is not available on integers of more than 8 bytes.>) at src/classical.rs:623
+#24 0x000055555578daea in bennett_isa_ref::drive (machine=<error reading variable: That operation is not available on integers of more than 8 bytes.>, replies=0x7fffffff5490, fuel=1000000, max_steps=..., trace=...) at src/main.rs:682
+#25 0x000055555578eb61 in bennett_isa_ref::run_cc (program=0x7fffffff96a0, name=..., options=...) at src/main.rs:751
+#26 0x00005555557b6ff1 in bennett_isa_ref::run::{closure#4} () at src/main.rs:1770
+#27 0x000055555578b8cd in bennett_isa_ref::run () at src/main.rs:1752
+#28 0x000055555578c821 in bennett_isa_ref::main () at src/main.rs:1666

@@ -190,8 +190,8 @@ fn b11_classical_definitions_need_not_precede_uses_in_text() {
     let entry = m.snapshot();
     let r = m.run(4).unwrap();
     assert_eq!(
-        (r.fault, r.values),
-        (None, vec![ClassicalValue::int(8, 7).unwrap()])
+        (r.fault, r.values.as_ref()),
+        (None, [ClassicalValue::int(8, 7).unwrap()].as_slice())
     );
     m.reverse().unwrap();
     assert_eq!(m.snapshot(), entry);
@@ -247,8 +247,8 @@ fn b20_call_tiers_follow_the_section_3_1_graph() {
     let entry = m.snapshot();
     let r = m.run(10).unwrap();
     assert_eq!(
-        (r.fault, r.values),
-        (None, vec![ClassicalValue::int(8, 1).unwrap()])
+        (r.fault, r.values.as_ref()),
+        (None, [ClassicalValue::int(8, 1).unwrap()].as_slice())
     );
     m.reverse().unwrap();
     assert_eq!(m.snapshot(), entry);

@@ -1,0 +1,20 @@
+bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"73c6ceb0ef826cd5b12afb9197c30c9098689837f28209cce6147cd45da80165","kind":"action","name":"a","signature":{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1,1],"tier":"q"}},"1":{"interface_hash":"5b11805db58657cce47b895f1bf3e348971d0576baab4adfdb2a94aa6594c46e","kind":"action","name":"identity","signature":{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1,1],"tier":"q"}}}
+
+section functions
+action @a (t:wire mut, u:wire mut) () () () ()
+^entry():
+b = qborrow any 1
+cx t u
+qreturn b
+action @identity (t:wire mut, u:wire mut) () () () ()
+^entry():
+b = qborrow any 1
+x u
+x u
+qreturn b
+
+section certificate
+{"bindings":{"closure_hash":"73c6ceb0ef826cd5b12afb9197c30c9098689837f28209cce6147cd45da80165","dialect_mapping_version":"r21.sol","interface_hash":"73c6ceb0ef826cd5b12afb9197c30c9098689837f28209cce6147cd45da80165","object_hash":"310329c6dfc3813aac4e42816ebe99993a181d2fd0985004f46df71a9eaf59e2","reference_program_hash":"73c6ceb0ef826cd5b12afb9197c30c9098689837f28209cce6147cd45da80165","target_hash":"3333333333333333333333333333333333333333333333333333333333333333"},"composition":{"epsilon_total":{"diamond":0},"method":"sum_over_multiplicities","multiplicities":{}},"producer":{"materialisation":{"llvm_version":"none","normaliser_version":"1","pipeline":"none"},"name":"r21-sol","version":"1"},"regions":{"73c6ceb0ef826cd5b12afb9197c30c9098689837f28209cce6147cd45da80165":{"bounds":[],"claims":[{"domain":{"borrowed":[{"hi":1,"lo":0,"name":"b","width":1}],"bundles":[{"hi":1,"lo":0,"name":"u","width":1}],"regions":[]},"expected":{"program":"5b11805db58657cce47b895f1bf3e348971d0576baab4adfdb2a94aa6594c46e"},"kind":"exhaustive"}],"cleanup":{},"definedness_assumptions":[],"error":{},"frame":{"borrow":{"any":1},"interface":[{"class":"any","role":"mut","width":1},{"class":"any","role":"mut","width":1}],"retained_history":0,"scheme_ancillae":{},"scratch":{}},"gates_used":{},"kind":"action","resources":{},"signature":{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1,1],"tier":"q"},"verification":{"borrow_frames":[],"channel":[],"fault_rate":{"domain":{"borrowed":[],"bundles":[],"regions":[]},"faults_by_code":{},"layout_dependent_excluded":0,"undefined_excluded":0},"inverse_pairs":[],"oracle":null,"unitary":[]}}},"versions":{"cert":"0.8","coverage":"0.8","isa":"0.8","launch":"0.8","object":"0.8","sched":"0.8","target":"0.8"}}

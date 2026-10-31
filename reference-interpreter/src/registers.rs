@@ -69,7 +69,7 @@ impl QuantumRegisters {
             .handles
             .get(&id)
             .filter(|h| h.status == Status::Live)
-            .ok_or_else(|| Error(format!("§3.3: qreg {id} is not live")))?;
+            .ok_or_else(|| Error::new(format!("§3.3: qreg {id} is not live")))?;
         Ok(&h.wires)
     }
     fn ordinary(&self, id: u64) -> Result<&Handle> {
@@ -90,7 +90,7 @@ impl QuantumRegisters {
         self.handles
             .get_mut(&id)
             .ok_or_else(|| {
-                Error(format!(
+                Error::new(format!(
                     "§3.3: missing qreg handle {id} during ownership transition"
                 ))
             })?
@@ -112,7 +112,7 @@ impl QuantumRegisters {
         let id = self.next;
         let next = id
             .checked_add(1)
-            .ok_or_else(|| Error("§3.3: qreg identity overflow".into()))?;
+            .ok_or_else(|| Error::new("§3.3: qreg identity overflow".into()))?;
         self.handles.insert(
             id,
             Handle {
@@ -162,7 +162,7 @@ impl QuantumRegisters {
         let end = lo
             .checked_add(len)
             .filter(|end| *end <= h.wires.len())
-            .ok_or_else(|| Error("§3.3: qreg slice out of bounds".into()))?;
+            .ok_or_else(|| Error::new("§3.3: qreg slice out of bounds".into()))?;
         let mut wires = crate::reserved(len, "§3.3", "qreg slice wires")?;
         wires.extend_from_slice(&h.wires[lo..end]);
         let undo = self.record(&[id, self.next]);
@@ -179,10 +179,9 @@ impl QuantumRegisters {
         }
         let a_wires = &self.ordinary(a)?.wires;
         let b_wires = &self.ordinary(b)?.wires;
-        let count = a_wires
-            .len()
-            .checked_add(b_wires.len())
-            .ok_or_else(|| Error("§3.3: host limit: qreg concat count exceeds usize".into()))?;
+        let count = a_wires.len().checked_add(b_wires.len()).ok_or_else(|| {
+            Error::host_resource("§3.3: host limit: qreg concat count exceeds usize".into())
+        })?;
         let mut wires = crate::reserved(count, "§3.3", "qreg concat wires")?;
         wires.extend_from_slice(a_wires);
         wires.extend_from_slice(b_wires);
@@ -240,8 +239,8 @@ impl QuantumRegisters {
                 break;
             }
         }
-        let branch =
-            selected.ok_or_else(|| Error("§14.2: measurement has no nonzero outcome".into()))?;
+        let branch = selected
+            .ok_or_else(|| Error::new("§14.2: measurement has no nonzero outcome".into()))?;
         self.state = branch.state;
         self.set_status(id, Status::Consumed)?;
         Ok(branch.bits)

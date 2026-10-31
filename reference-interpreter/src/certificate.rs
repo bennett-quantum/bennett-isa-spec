@@ -8,12 +8,12 @@ use crate::{
 use std::collections::{BTreeMap, BTreeSet};
 
 fn contextual<T>(rule: &str, f: impl FnOnce() -> Result<T>) -> Result<T> {
-    f().map_err(|e| Error(format!("{rule}: {e}")))
+    f().map_err(|e| e.context(rule))
 }
 fn context_key(key: &str) -> Result<(&str, u128)> {
     let (name, controls) = key
         .split_once(':')
-        .ok_or_else(|| Error("§12: variant:inherited_controls key required".into()))?;
+        .ok_or_else(|| Error::new("§12: variant:inherited_controls key required".into()))?;
     variant(&Json::String(name.into()))?;
     let n = crate::object::host_count(controls, "inherited control count")?;
     Ok((name, n as u128))
@@ -107,7 +107,7 @@ fn domain(value: &Json, f: &Function) -> Result<()> {
     for group in ["bundles", "borrowed"] {
         for b in value.get(group)?.array()? {
             let name = text(b.get("name")?)?;
-            if !names.insert(name.to_string()) {
+            if !names.insert((group, name.to_string())) {
                 return err("§12.2", "repeated domain component");
             }
             let width = b.get("width")?.uint()?;
@@ -129,7 +129,7 @@ fn domain(value: &Json, f: &Function) -> Result<()> {
                     .iter()
                     .flatten()
                     .find(|p| p.name == name && matches!(p.ty, Type::Wire(_)))
-                    .ok_or_else(|| Error("§12.2: unknown domain interface bundle".into()))?;
+                    .ok_or_else(|| Error::new("§12.2: unknown domain interface bundle".into()))?;
                 if p.ty.width(32)? as u128 != width {
                     return err("§12.2", "domain bundle width mismatch");
                 }
@@ -138,7 +138,7 @@ fn domain(value: &Json, f: &Function) -> Result<()> {
     }
     for region in value.get("regions")?.array()? {
         let name = text(region.get("name")?)?;
-        if !names.insert(name.to_string()) {
+        if !names.insert(("regions", name.to_string())) {
             return err("§12.2", "repeated domain region");
         }
         let (a, w) = f
@@ -156,7 +156,7 @@ fn domain(value: &Json, f: &Function) -> Result<()> {
                     None
                 }
             })
-            .ok_or_else(|| Error("§12.2: unknown domain interface region".into()))?;
+            .ok_or_else(|| Error::new("§12.2: unknown domain interface region".into()))?;
         if w == 0 {
             return err("§12.2", "zero-width domain cell");
         }
@@ -183,7 +183,7 @@ fn domain(value: &Json, f: &Function) -> Result<()> {
 }
 fn index(value: &Json, count: usize) -> Result<usize> {
     let n = usize::try_from(value.uint()?)
-        .map_err(|_| Error("§12: claim index exceeds host range".into()))?;
+        .map_err(|_| Error::new("§12: claim index exceeds host range".into()))?;
     if n >= count {
         return err("§12", "claim index out of range or cyclic subclaim");
     }
@@ -228,11 +228,11 @@ impl Object {
                     .closure_hashes
                     .iter()
                     .find_map(|(n, h)| (h.as_deref() == Some(closure.as_str())).then_some(n))
-                    .ok_or_else(|| Error("§12: region closure is not defined".into()))?;
+                    .ok_or_else(|| Error::new("§12: region closure is not defined".into()))?;
                 let f = self
                     .functions
                     .get(name)
-                    .ok_or_else(|| Error("§12: certificate region is data".into()))?;
+                    .ok_or_else(|| Error::new("§12: certificate region is data".into()))?;
                 if r.get("kind")?.string()? != f.kind || r.get("signature")? != &f.signature() {
                     return err("§12", "region signature mismatch");
                 }
@@ -267,7 +267,7 @@ impl Object {
                 domain(fault.get("domain")?, f)?;
                 for (code, count) in fault.get("faults_by_code")?.object()? {
                     code.parse::<u128>()
-                        .map_err(|_| Error("§12: invalid fault code key".into()))?;
+                        .map_err(|_| Error::new("§12: invalid fault code key".into()))?;
                     count.uint()?;
                 }
                 fault.get("undefined_excluded")?.uint()?;
@@ -286,7 +286,7 @@ impl Object {
             for (key, n) in composition.get("multiplicities")?.object()? {
                 let (closure, context) = key
                     .split_once(':')
-                    .ok_or_else(|| Error("§12.3: malformed multiplicity key".into()))?;
+                    .ok_or_else(|| Error::new("§12.3: malformed multiplicity key".into()))?;
                 hash(&Json::String(closure.into()))?;
                 context_key(context)?;
                 n.uint()?;

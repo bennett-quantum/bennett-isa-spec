@@ -183,7 +183,7 @@ impl Object {
             labels
                 .get(s.trim_start_matches('^'))
                 .copied()
-                .ok_or_else(|| Error(format!("§3.6: unknown label {s}")))
+                .ok_or_else(|| Error::new(format!("§3.6: unknown label {s}")))
         };
         let mut successors = Vec::new();
         for (k, row) in rows.iter().enumerate() {

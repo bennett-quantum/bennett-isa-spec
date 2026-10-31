@@ -46,7 +46,7 @@ pub struct ClaimReport {
 #[derive(Clone, Debug)]
 enum Component {
     Bundle(usize, usize),
-    Borrowed(String),
+    Borrowed(usize, String),
     Cell(usize, usize, usize),
 }
 struct Domain {
@@ -65,7 +65,7 @@ fn interface_slot(f: &Function, name: &str) -> Result<(usize, usize)> {
                 .position(|p| p.name == name)
                 .map(|index| (group, index))
         })
-        .ok_or_else(|| Error(format!("§12.2: unknown interface component {name}")))
+        .ok_or_else(|| Error::new(format!("§12.2: unknown interface component {name}")))
 }
 fn json_bits(value: &Json, width: usize) -> Result<BitVector> {
     BitVector::parse_unsigned_exact(width, value.uint_text()?)
@@ -75,17 +75,23 @@ fn enumerate(domain: &Domain) -> Result<Vec<Vec<BitVector>>> {
     let mut count = 1u128;
     for (_, _, lo, hi) in &domain.components {
         let span = hi.binary("sub", lo)?.to_u128().map_err(|_| {
-            Error("§12.2: host limit: exhaustive interval cardinality exceeds u128".into())
+            Error::host_resource(
+                "§12.2: host limit: exhaustive interval cardinality exceeds u128".into(),
+            )
         })?;
         count = span
             .checked_add(1)
             .and_then(|span| count.checked_mul(span))
             .ok_or_else(|| {
-                Error("§12.2: host limit: exhaustive domain cardinality exceeds u128".into())
+                Error::host_resource(
+                    "§12.2: host limit: exhaustive domain cardinality exceeds u128".into(),
+                )
             })?;
     }
     let count = usize::try_from(count).map_err(|_| {
-        Error("§12.2: host limit: exhaustive domain cardinality exceeds usize".into())
+        Error::host_resource(
+            "§12.2: host limit: exhaustive domain cardinality exceeds usize".into(),
+        )
     })?;
     let mut out = crate::reserved(count, "§12.2", "exhaustive domain elements")?;
     let mut current = crate::reserved(domain.components.len(), "§12.2", "domain tuple components")?;
@@ -125,8 +131,9 @@ fn decimal_json(v: &BitVector) -> Json {
 }
 
 fn sample_elements(count: u128) -> Result<Vec<Vec<BitVector>>> {
-    let count = usize::try_from(count)
-        .map_err(|_| Error("§12.1: host limit: sample count exceeds usize".into()))?;
+    let count = usize::try_from(count).map_err(|_| {
+        Error::host_resource("§12.1: host limit: sample count exceeds usize".into())
+    })?;
     crate::reserved(count, "§12.1", "sampled domain elements")
 }
 
@@ -242,29 +249,30 @@ impl Object {
             .closure_hashes
             .iter()
             .find_map(|(n, h)| (h.as_deref() == Some(closure)).then_some(n.clone()))
-            .ok_or_else(|| Error(format!("§12: no region has closure hash {closure}")))?;
+            .ok_or_else(|| Error::new(format!("§12: no region has closure hash {closure}")))?;
         self.functions
             .get(&name)
-            .ok_or_else(|| Error(format!("§12: closure {closure} is not a function")))
+            .ok_or_else(|| Error::new(format!("§12: closure {closure} is not a function")))
     }
     fn domain(&self, f: &Function, d: &Json) -> Result<Domain> {
         let mut components = Vec::new();
-        let mut listed = BTreeSet::new();
+        let mut bundles = BTreeSet::new();
+        let mut regions = BTreeSet::new();
         let mut full = true;
         for (group, borrowed) in [("bundles", false), ("borrowed", true)] {
-            for b in d.get(group)?.array()? {
+            for (ordinal, b) in d.get(group)?.array()?.iter().enumerate() {
                 let name = b.get("name")?.string()?.to_string();
                 let width = usize::try_from(b.get("width")?.uint()?)
-                    .map_err(|_| Error("§12.2: host limit: domain width".into()))?;
+                    .map_err(|_| Error::host_resource("§12.2: host limit: domain width".into()))?;
                 let lo = json_bits(b.get("lo")?, width)?;
                 let hi = json_bits(b.get("hi")?, width)?;
                 full &= lo.is_zero() && hi == ones(width)?;
-                listed.insert(name.clone());
                 components.push((
                     if borrowed {
-                        Component::Borrowed(name)
+                        Component::Borrowed(ordinal, name)
                     } else {
                         let (group, index) = interface_slot(f, &name)?;
+                        bundles.insert((group, index));
                         Component::Bundle(group, index)
                     },
                     width,
@@ -284,13 +292,13 @@ impl Object {
                     Type::Region(a, w) if p.name == name => Some((a, w as usize)),
                     _ => None,
                 })
-                .ok_or_else(|| Error(format!("§12.2: unknown domain region {name}")))?;
+                .ok_or_else(|| Error::new(format!("§12.2: unknown domain region {name}")))?;
             let cells = crate::oracle::power_of_two(a as u128)
                 .and_then(|n| usize::try_from(n).ok())
-                .ok_or_else(|| Error("§12.2: host limit: region cells".into()))?;
-            listed.insert(name.clone());
+                .ok_or_else(|| Error::host_resource("§12.2: host limit: region cells".into()))?;
             match r.get("cells")? {
                 Json::String(s) if s == "all" => {
+                    regions.insert((group, slot));
                     crate::reserve_more(&mut components, cells, "§12.2", "domain components")?;
                     for i in 0..cells {
                         components.push((
@@ -302,32 +310,37 @@ impl Object {
                     }
                 }
                 cs => {
-                    full = false;
+                    let mut covered = BTreeSet::new();
                     for c in cs.array()? {
                         let i = usize::try_from(c.get("index")?.uint()?)
-                            .map_err(|_| Error("§12.2: cell index".into()))?;
+                            .map_err(|_| Error::new("§12.2: cell index".into()))?;
                         let lo = json_bits(c.get("lo")?, w)?;
                         let hi = json_bits(c.get("hi")?, w)?;
+                        full &= lo.is_zero() && hi == ones(w)?;
+                        if i < cells {
+                            covered.insert(i);
+                        }
                         components.push((Component::Cell(group, slot, i), w, lo, hi));
+                    }
+                    if covered.len() == cells {
+                        regions.insert((group, slot));
                     }
                 }
             }
         }
         // D: every interface bundle and every region in the region's input
         // domain (§5.2, §5.3; tgt/fault included for oracles).
-        let required: Vec<&str> = match f.kind.as_str() {
-            "oracle" => f.params[..4]
+        let groups = if f.kind == "oracle" { 4 } else { 3 };
+        let covers_d = full
+            && f.params[..groups]
                 .iter()
-                .flatten()
-                .map(|p| p.name.as_str())
-                .collect(),
-            _ => f.params[..3]
-                .iter()
-                .flatten()
-                .map(|p| p.name.as_str())
-                .collect(),
-        };
-        let covers_d = full && required.iter().all(|n| listed.contains(*n));
+                .enumerate()
+                .all(|(group, params)| {
+                    params.iter().enumerate().all(|(slot, p)| match p.ty {
+                        Type::Region(..) => regions.contains(&(group, slot)),
+                        _ => bundles.contains(&(group, slot)),
+                    })
+                });
         Ok(Domain {
             components,
             covers_d,
@@ -375,11 +388,12 @@ impl Object {
             };
             let cells = crate::oracle::power_of_two(a as u128)
                 .and_then(|n| usize::try_from(n).ok())
-                .ok_or_else(|| Error("§12.2: host limit: region cells".into()))?;
+                .ok_or_else(|| Error::host_resource("§12.2: host limit: region cells".into()))?;
             Ok((cells, w as usize))
         };
         if f.kind == "oracle" {
-            let budget = budget.ok_or_else(|| Error("§12: oracle claim needs a budget".into()))?;
+            let budget =
+                budget.ok_or_else(|| Error::new("§12: oracle claim needs a budget".into()))?;
             let mut input = crate::OracleVectorInput::default();
             for p in &f.params[0] {
                 input.ins.push(value(&p.name, p.ty.bits(self.ptr_width)?)?);
@@ -455,7 +469,10 @@ impl Object {
         }
         let mut borrowed = Vec::new();
         for (c, v) in element {
-            if let Component::Borrowed(_) = c {
+            if let Component::Borrowed(ordinal, _) = c {
+                if *ordinal != borrowed.len() {
+                    return err("§12.2", "borrowed component position mismatch");
+                }
                 let wires = q.allocate(v.width())?;
                 set(&mut q, &wires, v)?;
                 borrowed.push(wires.clone());
@@ -507,7 +524,7 @@ impl Object {
         }
         let b = schedule.get("bindings")?.get("budget")?.array()?;
         Ok(Some(Budget {
-            steps: u64::try_from(b[0].uint()?).map_err(|_| Error("§11: steps".into()))?,
+            steps: u64::try_from(b[0].uint()?).map_err(|_| Error::new("§11: steps".into()))?,
             heap: b[1].uint()?,
             stack: b[2].uint()?,
             depth: b[3].uint()?,
@@ -529,12 +546,12 @@ impl Object {
         }
         let certificate = self
             .section("certificate")
-            .ok_or_else(|| Error("§12: object has no certificate".into()))?;
+            .ok_or_else(|| Error::new("§12: object has no certificate".into()))?;
         let region = certificate.get("regions")?.get(closure)?;
         let claims = region.get("claims")?.array()?;
         let claim = claims
             .get(index)
-            .ok_or_else(|| Error(format!("§12: claim index {index} out of range")))?;
+            .ok_or_else(|| Error::new(format!("§12: claim index {index} out of range")))?;
         let f = self.region_function(closure)?;
         let kind = claim.get("kind")?.string()?;
         let verdict = match kind {
@@ -569,7 +586,7 @@ impl Object {
                         .map(|w| {
                             w.string()?
                                 .parse::<u64>()
-                                .map_err(|_| Error("§12.1: seed".into()))
+                                .map_err(|_| Error::new("§12.1: seed".into()))
                         })
                         .collect::<Result<Vec<_>>>()?;
                     let mut rng = Xoshiro256([seed[0], seed[1], seed[2], seed[3]]);
@@ -620,9 +637,9 @@ impl Object {
                         .collect();
                     let out = self.execute_element(f, &element, budget)?;
                     if let Some(t) = &table {
-                        let entry = t
-                            .get(row)
-                            .ok_or_else(|| Error("§12.1: expected table is too short".into()))?;
+                        let entry = t.get(row).ok_or_else(|| {
+                            Error::new("§12.1: expected table is too short".into())
+                        })?;
                         let got: Vec<Json> = out.iter().map(decimal_json).collect();
                         if entry.array()? != got.as_slice() {
                             return err("§12.1", format!("claim {index} of {closure}: element {row} yields {got:?}, the table says {entry:?}"));
@@ -648,8 +665,8 @@ impl Object {
             }
             "structural" => {
                 for sub in claim.get("subclaims")?.array()? {
-                    let s =
-                        usize::try_from(sub.uint()?).map_err(|_| Error("§12: subclaim".into()))?;
+                    let s = usize::try_from(sub.uint()?)
+                        .map_err(|_| Error::new("§12: subclaim".into()))?;
                     if self.verify_claim_guarded(closure, s, active)? != ClaimVerdict::Proof {
                         return Ok(ClaimVerdict::Unverified(format!(
                             "subclaim {s} is not a verified proof"
@@ -665,7 +682,7 @@ impl Object {
                     "inverse_pair_library" => {
                         let library = witness.get("library_closure_hash")?.string()?;
                         let i = usize::try_from(witness.get("claim_index")?.uint()?)
-                            .map_err(|_| Error("§12: claim index".into()))?;
+                            .map_err(|_| Error::new("§12: claim index".into()))?;
                         if certificate.get("regions")?.object()?.contains_key(library) {
                             self.verify_claim_guarded(library, i, active)?
                         } else {
@@ -699,7 +716,7 @@ impl Object {
                     }
                     let point = self
                         .point(hash, p[1].string()?, p[2].uint()?)
-                        .map_err(|e| Error(format!("§5.6/§12.1: {e}")))?;
+                        .map_err(|e| e.context("§5.6/§12.1"))?;
                     if !std::ptr::eq(point.function, f) {
                         return err("§5.6/§12.1", "point outside subject");
                     }
@@ -732,7 +749,7 @@ impl Object {
     pub fn verify_certificate(&self) -> Result<Vec<ClaimReport>> {
         let certificate = self
             .section("certificate")
-            .ok_or_else(|| Error("§12: object has no certificate".into()))?;
+            .ok_or_else(|| Error::new("§12: object has no certificate".into()))?;
         let mut reports = Vec::new();
         for (closure, region) in certificate.get("regions")?.object()? {
             let name = self.region_function(closure)?.name.clone();
@@ -747,7 +764,8 @@ impl Object {
             }
             // A borrow_frames claim must be a proof over D with the §5.6 property.
             for i in region.get("verification")?.get("borrow_frames")?.array()? {
-                let i = usize::try_from(i.uint()?).map_err(|_| Error("§12: claim index".into()))?;
+                let i = usize::try_from(i.uint()?)
+                    .map_err(|_| Error::new("§12: claim index".into()))?;
                 if reports
                     .iter()
                     .any(|r| r.region == name && r.index == i && r.verdict != ClaimVerdict::Proof)
@@ -782,7 +800,8 @@ impl Object {
             return Ok(false);
         }
         for i in indices {
-            let i = usize::try_from(i.uint()?).map_err(|_| Error("§12: claim index".into()))?;
+            let i =
+                usize::try_from(i.uint()?).map_err(|_| Error::new("§12: claim index".into()))?;
             if self.verify_claim(closure, i)? != ClaimVerdict::Proof {
                 return err(
                     "§5.6",
@@ -800,7 +819,7 @@ impl Object {
         self.check_borrow_frame_structure(f)?;
         let certificate = self
             .section("certificate")
-            .ok_or_else(|| Error("§12: object has no certificate".into()))?;
+            .ok_or_else(|| Error::new("§12: object has no certificate".into()))?;
         let claims = certificate
             .get("regions")?
             .get(closure)?
@@ -808,12 +827,12 @@ impl Object {
             .array()?;
         let claim = claims
             .get(index)
-            .ok_or_else(|| Error("§12: claim index out of range".into()))?;
+            .ok_or_else(|| Error::new("§12: claim index out of range".into()))?;
         let domain = self.domain(f, claim.get("domain")?)?;
         if !domain
             .components
             .iter()
-            .any(|c| matches!(c.0, Component::Borrowed(_)))
+            .any(|c| matches!(c.0, Component::Borrowed(..)))
         {
             return err(
                 "§5.6",
@@ -845,21 +864,21 @@ impl Object {
             }
             let borrowed_in: Vec<String> = element
                 .iter()
-                .filter(|(c, _)| matches!(c, Component::Borrowed(_)))
+                .filter(|(c, _)| matches!(c, Component::Borrowed(..)))
                 .map(|(_, v)| v.to_decimal())
                 .collect();
             let k = borrowed_in.len();
             let split = out
                 .len()
                 .checked_sub(k)
-                .ok_or_else(|| Error("§12: output tuple".into()))?;
+                .ok_or_else(|| Error::new("§12: output tuple".into()))?;
             let borrowed_out: Vec<String> =
                 out[split..].iter().map(BitVector::to_decimal).collect();
             if borrowed_in != borrowed_out {
                 let names: Vec<&str> = element
                     .iter()
                     .filter_map(|(c, _)| match c {
-                        Component::Borrowed(n) => Some(n.as_str()),
+                        Component::Borrowed(_, n) => Some(n.as_str()),
                         _ => None,
                     })
                     .collect();
@@ -870,7 +889,7 @@ impl Object {
             }
             let rest: Vec<String> = element
                 .iter()
-                .filter(|(c, _)| !matches!(c, Component::Borrowed(_)))
+                .filter(|(c, _)| !matches!(c, Component::Borrowed(..)))
                 .map(|(_, v)| v.to_decimal())
                 .collect();
             let outputs: Vec<String> = out[..split].iter().map(BitVector::to_decimal).collect();
@@ -925,5 +944,59 @@ mod r20_tests {
         }
         assert_eq!(cases, 12);
         eprintln!("R20 exhaustive/sample storage: 2 paths, {cases} cases");
+    }
+}
+
+#[cfg(test)]
+mod r22_coverage_tests {
+    use super::*;
+    #[test]
+    fn sol_r22_b01_resolved_role_collision_family() {
+        let o = Object::parse(include_str!("../tests/fixtures/r22/false-cnot-proof.bisa")).unwrap();
+        let mut f = o.functions["a"].clone();
+        let mut region = f.params[0][0].clone();
+        region.name = "r".into();
+        region.ty = Type::Region(0, 1);
+        f.params[2].push(region);
+        let mut cases = 0;
+        for borrowed in ["t", "u", "r", "b"] {
+            for subset in 0..8 {
+                for (cell_mode, cell_full) in [
+                    ("\"all\"", true),
+                    ("[{\"index\":0,\"lo\":0,\"hi\":1}]", true),
+                    ("[]", false),
+                    ("[{\"index\":0,\"lo\":0,\"hi\":0}]", false),
+                ] {
+                    for full_range in [false, true] {
+                        let bundles = ["t", "u"]
+                            .iter()
+                            .enumerate()
+                            .filter(|(i, _)| subset & (1 << i) != 0)
+                            .map(|(_, n)| {
+                                format!(
+                                    r#"{{"name":"{n}","width":1,"lo":0,"hi":{}}}"#,
+                                    u8::from(full_range)
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                            .join(",");
+                        let regions = if subset & 4 != 0 {
+                            format!(r#"{{"name":"r","cells":{cell_mode}}}"#)
+                        } else {
+                            String::new()
+                        };
+                        let d = Json::parse(&format!(r#"{{"bundles":[{bundles}],"regions":[{regions}],"borrowed":[{{"name":"{borrowed}","width":1,"lo":0,"hi":1}}]}}"#)).unwrap();
+                        let domain = o.domain(&f, &d).unwrap();
+                        assert_eq!(
+                            domain.covers_d,
+                            subset == 7 && full_range && cell_full,
+                            "borrowed={borrowed}, subset={subset}, full={full_range}"
+                        );
+                        cases += 1;
+                    }
+                }
+            }
+        }
+        assert_eq!(cases, 256);
     }
 }

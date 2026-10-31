@@ -316,7 +316,7 @@ impl Object {
             let bytes = self
                 .data
                 .get(&img)
-                .ok_or_else(|| Error(format!("§9.2: missing closure data {img}")))?;
+                .ok_or_else(|| Error::new(format!("§9.2: missing closure data {img}")))?;
             lines.push(replace(
                 &format!("data {img} {}", hex(bytes)),
                 None,

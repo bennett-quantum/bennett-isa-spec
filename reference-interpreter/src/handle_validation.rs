@@ -77,7 +77,7 @@ impl Object {
                         let (label, _) = branch
                             .trim_start_matches('^')
                             .split_once('(')
-                            .ok_or_else(|| Error("§3.4: malformed branch".into()))?;
+                            .ok_or_else(|| Error::new("§3.4: malformed branch".into()))?;
                         let target = f
                             .blocks
                             .iter()

@@ -1,0 +1,225 @@
+[
+  {
+    "args": [
+      "claim",
+      "domain-all.bisa"
+    ],
+    "exit": 0,
+    "stdout": "parse/hash ok; claim Err(Error(\"\u00a712.2: host limit: domain components allocation of 9223372036854775808 elements failed: memory allocation failed because the computed capacity exceeded the collection's maximum\")); certificate Err(Error(\"\u00a712.2: host limit: domain components allocation of 9223372036854775808 elements failed: memory allocation failed because the computed capacity exceeded the collection's maximum\"))\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "claim",
+      "domain-all-A0.bisa"
+    ],
+    "exit": 0,
+    "stdout": "parse/hash ok; claim Ok(Evidence { elements: 1 }); certificate Ok([ClaimReport { region: \"a\", index: 0, kind: \"sampled\", verdict: Evidence { elements: 1 } }])\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "claim",
+      "domain-all-A1.bisa"
+    ],
+    "exit": 0,
+    "stdout": "parse/hash ok; claim Ok(Evidence { elements: 1 }); certificate Ok([ClaimReport { region: \"a\", index: 0, kind: \"sampled\", verdict: Evidence { elements: 1 } }])\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "claim",
+      "domain-all-A64.bisa"
+    ],
+    "exit": 0,
+    "stdout": "parse/hash ok; claim Err(Error(\"\u00a712.2: host limit: region cells\")); certificate Err(Error(\"\u00a712.2: host limit: region cells\"))\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "transfer",
+      "host",
+      "0"
+    ],
+    "exit": 0,
+    "stdout": "transfer 0: Ok(Some(StepPoint { function: \"f\", block: \"entry\", index: 2, instruction: Instruction { lhs: [\"r\"], op: \"hostcall\", operands: [\"org.bennett.test\", \"p\", \"n\"], bodies: [], line: 11 } }))\nentry restored\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "transfer",
+      "host",
+      "1"
+    ],
+    "exit": 0,
+    "stdout": "transfer 1: Ok(Some(StepPoint { function: \"f\", block: \"entry\", index: 2, instruction: Instruction { lhs: [\"r\"], op: \"hostcall\", operands: [\"org.bennett.test\", \"p\", \"n\"], bodies: [], line: 11 } }))\nentry restored\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "transfer",
+      "host",
+      "8"
+    ],
+    "exit": 0,
+    "stdout": "transfer 8: Ok(Some(StepPoint { function: \"f\", block: \"entry\", index: 2, instruction: Instruction { lhs: [\"r\"], op: \"hostcall\", operands: [\"org.bennett.test\", \"p\", \"n\"], bodies: [], line: 11 } }))\nentry restored\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "transfer",
+      "host",
+      "9223372036854775808"
+    ],
+    "exit": 0,
+    "stdout": "transfer 9223372036854775808: Err(Error(\"\u00a710: host limit: \u00a77.1 transfer bytes allocation of 9223372036854775808 elements failed: memory allocation failed because the computed capacity exceeded the collection's maximum\"))\nunchanged full snapshot; no request, transcript, console or effect tape\nentry restored\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "transfer",
+      "console",
+      "0"
+    ],
+    "exit": 0,
+    "stdout": "transfer 0: Ok(Some(StepPoint { function: \"f\", block: \"entry\", index: 2, instruction: Instruction { lhs: [], op: \"effect\", operands: [\"console.write\", \"p\", \"n\"], bodies: [], line: 11 } }))\nentry restored\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "transfer",
+      "console",
+      "1"
+    ],
+    "exit": 0,
+    "stdout": "transfer 1: Ok(Some(StepPoint { function: \"f\", block: \"entry\", index: 2, instruction: Instruction { lhs: [], op: \"effect\", operands: [\"console.write\", \"p\", \"n\"], bodies: [], line: 11 } }))\nentry restored\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "transfer",
+      "console",
+      "8"
+    ],
+    "exit": 0,
+    "stdout": "transfer 8: Ok(Some(StepPoint { function: \"f\", block: \"entry\", index: 2, instruction: Instruction { lhs: [], op: \"effect\", operands: [\"console.write\", \"p\", \"n\"], bodies: [], line: 11 } }))\nentry restored\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "transfer",
+      "console",
+      "9223372036854775808"
+    ],
+    "exit": 0,
+    "stdout": "transfer 9223372036854775808: Err(Error(\"\u00a77.3: host limit: \u00a77.1 transfer bytes allocation of 9223372036854775808 elements failed: memory allocation failed because the computed capacity exceeded the collection's maximum\"))\nunchanged full snapshot; no request, transcript, console or effect tape\nentry restored\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "region",
+      "2"
+    ],
+    "exit": 0,
+    "stdout": "region 2: 4 bytes; cell 3=165\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "region",
+      "5"
+    ],
+    "exit": 0,
+    "stdout": "region 5: 32 bytes; cell 3=165\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "region",
+      "27"
+    ],
+    "exit": 0,
+    "stdout": "region 27: \u00a74.2/\u00a77.1: host limit: nested region transfer bytes allocation of 134217728 elements failed: memory allocation failed because the memory allocator returned an error\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "region",
+      "61"
+    ],
+    "exit": 0,
+    "stdout": "region 61: \u00a74.2/\u00a77.1: host limit: nested region transfer bytes allocation of 2305843009213693952 elements failed: memory allocation failed because the memory allocator returned an error\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "region",
+      "63"
+    ],
+    "exit": 0,
+    "stdout": "region 63: \u00a74.2/\u00a77.1: host limit: nested region transfer bytes allocation of 9223372036854775808 elements failed: memory allocation failed because the computed capacity exceeded the collection's maximum\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "region",
+      "64"
+    ],
+    "exit": 0,
+    "stdout": "region 64: \u00a74.2: host limit: region exceeds host address space\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "dense",
+      "2"
+    ],
+    "exit": 0,
+    "stdout": "dense 2: 4 entries; expected basis amplitude 1\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "dense",
+      "5"
+    ],
+    "exit": 0,
+    "stdout": "dense 5: 32 entries; expected basis amplitude 1\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "dense",
+      "26"
+    ],
+    "exit": 0,
+    "stdout": "dense 26: \u00a74.3: host limit: cannot allocate 67108864 amplitudes (memory allocation failed because the memory allocator returned an error)\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "dense",
+      "61"
+    ],
+    "exit": 0,
+    "stdout": "dense 61: \u00a74.3: host limit: cannot allocate 2305843009213693952 amplitudes (memory allocation failed because the computed capacity exceeded the collection's maximum)\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "dense",
+      "63"
+    ],
+    "exit": 0,
+    "stdout": "dense 63: \u00a74.3: host limit: 2^63 dense amplitudes exceed the host address space\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "hand"
+    ],
+    "exit": 0,
+    "stdout": "inc8 x255 B0: OracleOutcome { payload: 0, code: 1, steps: 0 }\ninc8 x255 B2: OracleOutcome { payload: 0, code: 1, steps: 2 }\ninc8 x255 B3: OracleOutcome { payload: 0, code: 0, steps: 3 }\ninc8 x255 B4: OracleOutcome { payload: 0, code: 0, steps: 3 }\n",
+    "stderr": ""
+  }
+]

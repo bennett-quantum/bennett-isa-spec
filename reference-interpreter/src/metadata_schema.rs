@@ -223,7 +223,7 @@ pub fn entry(name: &str) -> &'static Entry {
 }
 pub fn validate(name: &str, value: &Json) -> Result<()> {
     let e = entry(name);
-    check(e.shape, value).map_err(|err| Error(format!("§9.1: {} ({name}): {err}", e.clause)))
+    check(e.shape, value).map_err(|err| Error::new(format!("§9.1: {} ({name}): {err}", e.clause)))
 }
 fn digits(s: &str) -> bool {
     !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit())
@@ -299,9 +299,7 @@ fn check(shape: Shape, v: &Json) -> Result<()> {
             for (key, ty) in fields {
                 let actual = key.strip_suffix('?').unwrap_or(key);
                 match m.get(actual) {
-                    Some(child) => {
-                        validate(ty, child).map_err(|e| Error(format!("{actual}: {e}")))?
-                    }
+                    Some(child) => validate(ty, child).map_err(|e| e.context(actual))?,
                     None if key.ends_with('?') => (),
                     None => return err("§9.1", format!("missing field {actual}")),
                 }

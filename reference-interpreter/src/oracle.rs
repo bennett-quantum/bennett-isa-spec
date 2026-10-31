@@ -74,7 +74,7 @@ impl OracleVectorInput {
             .functions
             .get(name)
             .filter(|f| f.kind == "oracle")
-            .ok_or_else(|| Error(format!("§5.2: unknown oracle @{name}")))?;
+            .ok_or_else(|| Error::new(format!("§5.2: unknown oracle @{name}")))?;
         if input.ins.len() != f.params[0].len() {
             return err("§5.1", "oracle input count mismatch");
         }
@@ -107,7 +107,9 @@ impl OracleVectorOutcome {
     pub fn narrow(&self) -> Result<OracleOutcome> {
         let narrow = |v: &BitVector| {
             v.to_u128().map_err(|_| {
-                Error("§3.3: value exceeds the u128 convenience API; use the vector API".into())
+                Error::new(
+                    "§3.3: value exceeds the u128 convenience API; use the vector API".into(),
+                )
             })
         };
         Ok(OracleOutcome {
@@ -130,7 +132,7 @@ pub(crate) struct Allocation {
 /// Addresses are below 2^ptr_width <= 2^128; every sum is checked, never wrapped.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub(crate) struct Memory {
-    pub bytes: BTreeMap<u128, u8>,
+    pub bytes: crate::retained::SparseBytes,
     pub allocations: Vec<Allocation>,
     pub heap_base: u128,
     pub heap_used: u128,
@@ -144,7 +146,7 @@ pub(crate) fn power_of_two(exponent: u128) -> Option<u128> {
 #[cfg(test)]
 pub(crate) fn r21_resource_cases() {
     let mut m = Memory {
-        bytes: BTreeMap::new(),
+        bytes: Default::default(),
         allocations: Vec::new(),
         heap_base: 1,
         heap_used: 0,
@@ -215,9 +217,9 @@ impl Memory {
             let image = object
                 .data
                 .get(n)
-                .ok_or_else(|| Error(format!("§9.2: global {n} has no data image")))?;
+                .ok_or_else(|| Error::new(format!("§9.2: global {n} has no data image")))?;
             for (i, b) in image.iter().enumerate() {
-                m.set_byte(offset(base, i)?, *b);
+                m.set_byte(offset(base, i)?, *b)?;
             }
         }
         if oracle.kind == "oracle" && !oracle.params[3].is_empty() {
@@ -226,16 +228,16 @@ impl Memory {
                 let p = oracle.params[3]
                     .iter()
                     .find(|p| p.name == *n)
-                    .ok_or_else(|| Error(format!("§7.2: layout maps unknown region {n}")))?;
+                    .ok_or_else(|| Error::new(format!("§7.2: layout maps unknown region {n}")))?;
                 let Type::Region(a, _) = p.ty else {
                     return err("§5.1", "mem slot requires region type");
                 };
                 let base = r.get("base")?.uint()?;
                 let size = power_of_two(a as u128)
-                    .ok_or_else(|| Error("§7.2: interface region exceeds 2^H".into()))?;
+                    .ok_or_else(|| Error::new("§7.2: interface region exceeds 2^H".into()))?;
                 let bytes = regions
                     .get(n)
-                    .ok_or_else(|| Error(format!("§5.1: missing interface region {n}")))?;
+                    .ok_or_else(|| Error::new(format!("§5.1: missing interface region {n}")))?;
                 if bytes.len() as u128 != size {
                     return err("§5.1", format!("interface region {n} has wrong byte count"));
                 }
@@ -247,7 +249,7 @@ impl Memory {
                     pinned: true,
                 });
                 for (i, b) in bytes.iter().enumerate() {
-                    m.set_byte(offset(base, i)?, *b);
+                    m.set_byte(offset(base, i)?, *b)?;
                 }
             }
         }
@@ -268,12 +270,8 @@ impl Memory {
     pub fn byte(&self, p: u128) -> u8 {
         self.bytes.get(&p).copied().unwrap_or(0)
     }
-    pub fn set_byte(&mut self, p: u128, b: u8) {
-        if b == 0 {
-            self.bytes.remove(&p);
-        } else {
-            self.bytes.insert(p, b);
-        }
+    pub fn set_byte(&mut self, p: u128, b: u8) -> Result<()> {
+        self.bytes.set(p, b)
     }
     /// N/8 bytes little-endian at p; the caller has established inrange.
     pub fn load(&self, p: u128, width: u64) -> Result<BitVector> {
@@ -288,8 +286,11 @@ impl Memory {
         if !value.width().is_multiple_of(8) {
             return err("§3.3", "store width must be a byte multiple");
         }
-        for (i, b) in value.to_le_bytes().into_iter().enumerate() {
-            self.set_byte(offset(p, i)?, b);
+        let bytes = value.to_le_bytes();
+        self.bytes
+            .prepare(bytes.iter().filter(|b| **b != 0).count())?;
+        for (i, b) in bytes.into_iter().enumerate() {
+            self.set_byte(offset(p, i)?, b)?;
         }
         Ok(())
     }
@@ -314,7 +315,7 @@ impl Memory {
         let base = self
             .heap_base
             .checked_add(self.heap_used)
-            .ok_or_else(|| Error("§7.1: heap bump exceeds address space".into()))?;
+            .ok_or_else(|| Error::new("§7.1: heap bump exceeds address space".into()))?;
         crate::reserve_more(
             &mut self.allocations,
             1,
@@ -351,7 +352,7 @@ impl Memory {
 }
 pub(crate) fn offset(base: u128, i: usize) -> Result<u128> {
     base.checked_add(i as u128)
-        .ok_or_else(|| Error("§7.2: byte address exceeds 2^128".into()))
+        .ok_or_else(|| Error::new("§7.2: byte address exceeds 2^128".into()))
 }
 
 pub(crate) struct Program<'a> {
@@ -369,12 +370,12 @@ impl<'a> Program<'a> {
             .functions
             .get(root)
             .filter(|f| f.kind == "oracle")
-            .ok_or_else(|| Error(format!("§5.2: unknown oracle @{root}")))?;
+            .ok_or_else(|| Error::new(format!("§5.2: unknown oracle @{root}")))?;
         let mut reachable = BTreeSet::new();
         let mut pending = vec![root.to_string()];
         while let Some(n) = pending.pop() {
             let function = object.functions.get(&n).ok_or_else(|| {
-                Error(format!(
+                Error::new(format!(
                     "§9.3: oracle closure has unresolved lproc @{n}; link before execution"
                 ))
             })?;
@@ -393,9 +394,9 @@ impl<'a> Program<'a> {
                 let key = if identity.scc_members[n].len() > 1 {
                     identity.scc_hashes[n].clone()
                 } else {
-                    identity.closure_hashes[n]
-                        .clone()
-                        .ok_or_else(|| Error(format!("§9.3: lproc @{n} has no closure hash")))?
+                    identity.closure_hashes[n].clone().ok_or_else(|| {
+                        Error::new(format!("§9.3: lproc @{n} has no closure hash"))
+                    })?
                 };
                 keys.insert(n.clone(), key);
             }
@@ -428,7 +429,7 @@ impl<'a> Program<'a> {
         self.labels
             .get(&(f.into(), label.trim_start_matches('^').into()))
             .copied()
-            .ok_or_else(|| Error(format!("§3.6: unknown label {label} in @{f}")))
+            .ok_or_else(|| Error::new(format!("§3.6: unknown label {label} in @{f}")))
     }
 }
 
@@ -443,14 +444,14 @@ pub(crate) fn operand_width(object: &Object, f: &Function, n: &str) -> Result<u6
         .into_iter()
         .chain(pseudo)
         .find(|p| p.name == n)
-        .ok_or_else(|| Error(format!("§3.7: unknown operand {n} in @{}", f.name)))?
+        .ok_or_else(|| Error::new(format!("§3.7: unknown operand {n} in @{}", f.name)))?
         .ty
         .width(object.ptr_width)
 }
 /// A length operand: an INT literal in [0, 2^ptr_width) or a location.
 pub(crate) fn literal_u128(s: &str) -> Result<u128> {
     s.parse::<u128>()
-        .map_err(|_| Error(format!("§3.3: literal {s} exceeds 2^ptr_width")))
+        .map_err(|_| Error::new(format!("§3.3: literal {s} exceeds 2^ptr_width")))
 }
 
 struct Activation {
@@ -474,7 +475,7 @@ impl Activation {
     }
     fn read(&self, n: &str) -> Result<BitVector> {
         self.values.get(n).cloned().ok_or_else(|| {
-            Error(format!(
+            Error::new(format!(
                 "§3.7: unreadable operand {n} in @{}",
                 self.function
             ))
@@ -485,7 +486,7 @@ impl Activation {
             .locations()
             .into_iter()
             .find(|p| p.name == n)
-            .ok_or_else(|| Error(format!("§3.7: unwritable location {n}")))?;
+            .ok_or_else(|| Error::new(format!("§3.7: unwritable location {n}")))?;
         if value.width() != p.ty.bits(ptr)? {
             return err(
                 "§3.3",
@@ -510,10 +511,12 @@ pub(crate) fn region_bytes(memory: &Memory, n: &str, address_width: u64) -> Resu
     let base = *memory
         .addresses
         .get(n)
-        .ok_or_else(|| Error(format!("§4.2: mem operand {n} is not a mapped region")))?;
+        .ok_or_else(|| Error::new(format!("§4.2: mem operand {n} is not a mapped region")))?;
     let len = power_of_two(address_width as u128)
         .and_then(|n| usize::try_from(n).ok())
-        .ok_or_else(|| Error("§4.2: host limit: region exceeds host address space".into()))?;
+        .ok_or_else(|| {
+            Error::host_resource("§4.2: host limit: region exceeds host address space".into())
+        })?;
     let mut bytes = crate::reserved(len, "§4.2/§7.1", "nested region transfer bytes")?;
     for i in 0..len {
         bytes.push(memory.byte(offset(base, i)?));
@@ -533,7 +536,7 @@ impl Object {
             // depth_limit < 2^Dc - 1 holds for the derived Dc = ceil(log2(d + 2))
             // whenever d + 2 is representable (§3.7, §5.4).
             if b.depth.checked_add(2).is_none() {
-                return err("§5.4", "host limit: depth plus two exceeds u128");
+                return Err(crate::resource_error("§5.4", "depth plus two exceeds u128"));
             }
         } else if b.heap != 0 || b.stack != 0 || b.depth != 0 {
             return err(
@@ -692,7 +695,7 @@ impl Object {
                             *memory
                                 .addresses
                                 .get(a[0].trim_start_matches('@'))
-                                .ok_or_else(|| Error("§4.2: address not mapped".into()))?,
+                                .ok_or_else(|| Error::new("§4.2: address not mapped".into()))?,
                         )?);
                     }
                     "lift.boundscheck" => {
@@ -889,7 +892,7 @@ impl Object {
         arguments
             .get(n)
             .cloned()
-            .ok_or_else(|| Error(format!("§4.2: classical operand {n} is not an argument")))
+            .ok_or_else(|| Error::new(format!("§4.2: classical operand {n} is not an argument")))
     }
 }
 /// §3.3 classical argument typing, shared by oracles, actions and CC region calls.

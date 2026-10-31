@@ -196,7 +196,7 @@ impl QuantumState {
             .ids
             .len()
             .checked_add(positions.len())
-            .ok_or_else(|| Error("§7.4: wire count overflow".into()))?;
+            .ok_or_else(|| Error::new("§7.4: wire count overflow".into()))?;
         let mut removed = BTreeMap::new();
         for (pos, wire) in positions {
             if *pos >= n || removed.insert(*pos, *wire).is_some() || self.ids.contains(wire) {
@@ -210,7 +210,7 @@ impl QuantumState {
                 Some(w) => *w,
                 None => *source
                     .next()
-                    .ok_or_else(|| Error("§7.4: restored wire count".into()))?,
+                    .ok_or_else(|| Error::new("§7.4: restored wire count".into()))?,
             });
         }
         let expand = |k: &Key| {
@@ -235,7 +235,7 @@ impl QuantumState {
                         false
                     } else {
                         *old.next()
-                            .ok_or_else(|| Error("§7.4: basis width".into()))?
+                            .ok_or_else(|| Error::new("§7.4: basis width".into()))?
                     });
                 }
                 *bits = next;
@@ -323,7 +323,7 @@ impl QuantumState {
             if audit.entry.get(w).copied()
                 != Some(
                     self.read_basis(&[*w]).map_err(|_| {
-                        Error("§5.6: qreturn/frame borrowed entry is not restored".into())
+                        Error::new("§5.6: qreturn/frame borrowed entry is not restored".into())
                     })? != 0,
                 )
             {
@@ -367,23 +367,21 @@ impl QuantumState {
         matches!(self.state, State::Basis { .. })
     }
     pub fn allocate(&mut self, n: usize) -> Result<Vec<Wire>> {
-        let end = self
-            .next
-            .checked_add(n as u64)
-            .ok_or_else(|| Error("§4.3: host limit: wire identity exceeds u64".into()))?;
-        let total = self
-            .ids
-            .len()
-            .checked_add(n)
-            .ok_or_else(|| Error("§4.3: host limit: wire count exceeds usize".into()))?;
+        let end = self.next.checked_add(n as u64).ok_or_else(|| {
+            Error::host_resource("§4.3: host limit: wire identity exceeds u64".into())
+        })?;
+        let total = self.ids.len().checked_add(n).ok_or_else(|| {
+            Error::host_resource("§4.3: host limit: wire count exceeds usize".into())
+        })?;
         let mut wires = crate::reserved(n, "§4.3", "wire identities")?;
         self.ids
             .try_reserve(n)
-            .map_err(|e| Error(format!("§4.3: host limit: wire identities: {e}")))?;
+            .map_err(|e| Error::host_resource(format!("§4.3: host limit: wire identities: {e}")))?;
         // New wires are |0> at the high positions: sparse keys are unchanged.
         if let State::Basis { bits, .. } = &mut self.state {
-            bits.try_reserve(n)
-                .map_err(|e| Error(format!("§4.3: host limit: wire allocation failed ({e})")))?;
+            bits.try_reserve(n).map_err(|e| {
+                Error::host_resource(format!("§4.3: host limit: wire allocation failed ({e})"))
+            })?;
             bits.resize(total, false);
         }
         wires.extend(self.next..end);
@@ -402,7 +400,7 @@ impl QuantumState {
                 self.ids
                     .iter()
                     .position(|n| n == w)
-                    .ok_or_else(|| Error(format!("§3.3: dead or unknown wire {w}")))
+                    .ok_or_else(|| Error::new(format!("§3.3: dead or unknown wire {w}")))
             })
             .collect()
     }
@@ -411,15 +409,15 @@ impl QuantumState {
     pub fn amplitudes(&self) -> Result<Vec<Complex>> {
         let n = self.ids.len();
         if n >= usize::BITS as usize - 1 {
-            return err(
-                "§4.3: host limit",
+            return Err(crate::resource_error(
+                "§4.3",
                 format!("2^{n} dense amplitudes exceed the host address space"),
-            );
+            ));
         }
         let len = 1usize << n;
         let mut out = Vec::new();
         out.try_reserve_exact(len).map_err(|e| {
-            Error(format!(
+            Error::host_resource(format!(
                 "§4.3: host limit: cannot allocate {len} amplitudes ({e})"
             ))
         })?;
@@ -462,7 +460,7 @@ impl QuantumState {
                 );
             }
             let exact = exact::amplitude_from_f64(amp.re, amp.im)
-                .ok_or_else(|| Error("§14.2: non-finite amplitude".into()))?;
+                .ok_or_else(|| Error::new("§14.2: non-finite amplitude".into()))?;
             if exact.is_zero() {
                 return err("§14.2", "state component with zero amplitude");
             }
@@ -659,7 +657,7 @@ impl QuantumState {
                 ],
                 "cz" => [one, zero, zero, one.scale(-1.0)],
                 _ => {
-                    let a = angle.ok_or_else(|| Error("§4.4: rotation angle".into()))? / 2.0;
+                    let a = angle.ok_or_else(|| Error::new("§4.4: rotation angle".into()))? / 2.0;
                     match op {
                         "rx" => [
                             one.scale(a.cos()),
@@ -688,7 +686,7 @@ impl QuantumState {
                 ]);
             }
             exact::gate_matrix(op, angle)
-                .ok_or_else(|| Error(format!("§4.4: no exact entries for {op}")))
+                .ok_or_else(|| Error::new(format!("§4.4: no exact entries for {op}")))
         };
         if let State::Basis { bits, phase, exact } = &mut self.state {
             if !controls.iter().all(|(p, v)| bits[*p] == *v) {

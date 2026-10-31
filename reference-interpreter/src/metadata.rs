@@ -124,7 +124,7 @@ fn selector(value: &Json, positive: bool) -> Result<()> {
     Ok(())
 }
 fn contextual<T>(rule: &str, f: impl FnOnce() -> Result<T>) -> Result<T> {
-    f().map_err(|e| Error(format!("{rule}: {e}")))
+    f().map_err(|e| e.context(rule))
 }
 pub(crate) struct Point<'a> {
     pub(crate) function: &'a Function,
@@ -192,17 +192,19 @@ impl Object {
                 }
             }
         }
-        found.ok_or_else(|| Error("§9.2: program point does not identify an instruction".into()))
+        found.ok_or_else(|| {
+            Error::new("§9.2: program point does not identify an instruction".into())
+        })
     }
     pub(crate) fn validate_path(&self, path: &Json, root: Option<&str>) -> Result<()> {
         let mut expected = root.map(str::to_string);
         for element in path.array()? {
             let (block, ordinal) = text(element.get("point")?)?
                 .rsplit_once(':')
-                .ok_or_else(|| Error("§11: point must be block:ordinal".into()))?;
+                .ok_or_else(|| Error::new("§11: point must be block:ordinal".into()))?;
             let ordinal = ordinal
                 .parse::<u128>()
-                .map_err(|_| Error("§11: invalid instruction ordinal".into()))?;
+                .map_err(|_| Error::new("§11: invalid instruction ordinal".into()))?;
             let point = self.point(hash(element.get("symbol")?)?, block, ordinal)?;
             if expected.as_ref().is_some_and(|n| n != &point.function.name) {
                 return err("§11", "path is not a region invocation chain");
@@ -245,7 +247,7 @@ impl Object {
                 .functions
                 .get(region)
                 .filter(|f| matches!(f.kind.as_str(), "oracle" | "action" | "perm_action"))
-                .ok_or_else(|| Error("§11: schedule region is not defined".into()))?;
+                .ok_or_else(|| Error::new("§11: schedule region is not defined".into()))?;
             let identity = self.identity()?;
             if identity.closure_hashes[region].as_deref() != Some(hash(b.get("closure_hash")?)?) {
                 return err("§11", "schedule closure binding mismatch");
@@ -258,7 +260,7 @@ impl Object {
             if f.kind == "oracle" {
                 self.validate_budget(crate::Budget {
                     steps: u64::try_from(values[0])
-                        .map_err(|_| Error("§11: step budget exceeds u64".into()))?,
+                        .map_err(|_| Error::new("§11: step budget exceeds u64".into()))?,
                     heap: values[1],
                     stack: values[2],
                     depth: values[3],

@@ -112,13 +112,13 @@ impl Object {
                 .get("point")?
                 .string()?
                 .rsplit_once(':')
-                .ok_or_else(|| Error("§11: invalid point".into()))?;
+                .ok_or_else(|| Error::new("§11: invalid point".into()))?;
             let point = self.point(
                 element.get("symbol")?.string()?,
                 block,
                 ordinal
                     .parse()
-                    .map_err(|_| Error("§11: invalid point ordinal".into()))?,
+                    .map_err(|_| Error::new("§11: invalid point ordinal".into()))?,
             )?;
             if index + 1 < chain.len() {
                 // lift.call stays in the same oracle/argument environment.
@@ -164,7 +164,9 @@ impl Object {
                                         .cloned()
                                         .map(|v| (p.name.clone(), v))
                                         .ok_or_else(|| {
-                                            Error(format!("§11: unresolved classical argument {n}"))
+                                            Error::new(format!(
+                                                "§11: unresolved classical argument {n}"
+                                            ))
                                         })
                                 })
                                 .collect::<Result<_>>()?,
@@ -205,14 +207,14 @@ impl Object {
                 .get("point")?
                 .string()?
                 .rsplit_once(':')
-                .ok_or_else(|| Error("§11: invalid point".into()))?;
+                .ok_or_else(|| Error::new("§11: invalid point".into()))?;
             let depth = self
                 .point(
                     element.get("symbol")?.string()?,
                     block,
                     ordinal
                         .parse()
-                        .map_err(|_| Error("§11: invalid point ordinal".into()))?,
+                        .map_err(|_| Error::new("§11: invalid point ordinal".into()))?,
                 )?
                 .loops
                 .len();
@@ -289,18 +291,18 @@ impl Object {
             if !matches!(steps, InvocationSteps::Action) {
                 let last = chain
                     .last()
-                    .ok_or_else(|| Error("§11: empty operation chain".into()))?;
+                    .ok_or_else(|| Error::new("§11: empty operation chain".into()))?;
                 let (block, ordinal) = last
                     .get("point")?
                     .string()?
                     .rsplit_once(':')
-                    .ok_or_else(|| Error("§11: invalid point".into()))?;
+                    .ok_or_else(|| Error::new("§11: invalid point".into()))?;
                 let point = self.point(
                     last.get("symbol")?.string()?,
                     block,
                     ordinal
                         .parse()
-                        .map_err(|_| Error("§11: invalid point ordinal".into()))?,
+                        .map_err(|_| Error::new("§11: invalid point ordinal".into()))?,
                 )?;
                 let callee = if matches!(
                     point.instruction.op.as_str(),
@@ -375,14 +377,14 @@ impl Object {
                 .get("point")?
                 .string()?
                 .rsplit_once(':')
-                .ok_or_else(|| Error("§11: invalid point".into()))?;
+                .ok_or_else(|| Error::new("§11: invalid point".into()))?;
             let depth = self
                 .point(
                     element.get("symbol")?.string()?,
                     block,
                     ordinal
                         .parse()
-                        .map_err(|_| Error("§11: invalid ordinal".into()))?,
+                        .map_err(|_| Error::new("§11: invalid ordinal".into()))?,
                 )?
                 .loops
                 .len();

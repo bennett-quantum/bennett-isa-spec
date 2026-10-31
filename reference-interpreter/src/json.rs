@@ -50,6 +50,46 @@ impl Json {
             }
         }
     }
+    /// Fallible single-buffer serialization for payload-bearing CLI output.
+    /// Unlike canonical(), this does not build/clone/join child strings.
+    pub fn try_canonical(&self) -> Result<String> {
+        let mut out = String::new();
+        self.append_canonical(&mut out)?;
+        Ok(out)
+    }
+    fn append_canonical(&self, out: &mut String) -> Result<()> {
+        match self {
+            Self::Null => append_text(out, "null"),
+            Self::Bool(b) => append_text(out, if *b { "true" } else { "false" }),
+            Self::Number(n) => append_text(out, n),
+            Self::String(s) => append_quote(out, s),
+            Self::Array(a) => {
+                append_text(out, "[")?;
+                for (i, value) in a.iter().enumerate() {
+                    if i != 0 {
+                        append_text(out, ",")?;
+                    }
+                    value.append_canonical(out)?;
+                }
+                append_text(out, "]")
+            }
+            Self::Object(o) => {
+                let mut entries = crate::reserved(o.len(), "§7.4/§10", "JSON object entries")?;
+                entries.extend(o.iter());
+                entries.sort_unstable_by(|(a, _), (b, _)| a.encode_utf16().cmp(b.encode_utf16()));
+                append_text(out, "{")?;
+                for (i, (key, value)) in entries.into_iter().enumerate() {
+                    if i != 0 {
+                        append_text(out, ",")?;
+                    }
+                    append_quote(out, key)?;
+                    append_text(out, ":")?;
+                    value.append_canonical(out)?;
+                }
+                append_text(out, "}")
+            }
+        }
+    }
     pub fn object(&self) -> Result<&BTreeMap<String, Json>> {
         if let Self::Object(o) = self {
             Ok(o)
@@ -74,7 +114,7 @@ impl Json {
     pub fn get(&self, key: &str) -> Result<&Json> {
         self.object()?
             .get(key)
-            .ok_or_else(|| crate::Error(format!("§9.1: missing field {key}")))
+            .ok_or_else(|| crate::Error::new(format!("§9.1: missing field {key}")))
     }
     /// The canonical decimal text of a metadata integer of any size (§9.1):
     /// a JSON number iff it is at most 2^53 - 1, otherwise a decimal string.
@@ -99,7 +139,7 @@ impl Json {
     pub fn uint(&self) -> Result<u128> {
         let s = self.uint_text()?;
         let value = s.parse::<u128>().map_err(|_| {
-            crate::Error(format!("§9.1: integer {s} exceeds this field's u128 range"))
+            crate::Error::new(format!("§9.1: integer {s} exceeds this field's u128 range"))
         })?;
         // §9.1 "Integers that may exceed 2^53 are decimal strings": a value above
         // 2^53 - 1 is a string and a smaller one a number (SPEC-QUESTIONS 17).
@@ -126,6 +166,48 @@ impl Json {
     }
 }
 
+fn append_text(out: &mut String, text: &str) -> Result<()> {
+    out.try_reserve(text.len())
+        .map_err(|e| crate::resource_error("§7.4/§10", format!("JSON output bytes: {e}")))?;
+    out.push_str(text);
+    Ok(())
+}
+fn append_quote(out: &mut String, text: &str) -> Result<()> {
+    append_text(out, "\"")?;
+    // Copy ordinary runs together, reserving their actual UTF-8 byte length.
+    let mut start = 0;
+    for (i, c) in text.char_indices() {
+        if c != '"' && c != '\\' && c >= ' ' {
+            continue;
+        }
+        append_text(out, &text[start..i])?;
+        match c {
+            '"' => append_text(out, "\\\"")?,
+            '\\' => append_text(out, "\\\\")?,
+            '\u{8}' => append_text(out, "\\b")?,
+            '\t' => append_text(out, "\\t")?,
+            '\n' => append_text(out, "\\n")?,
+            '\u{c}' => append_text(out, "\\f")?,
+            '\r' => append_text(out, "\\r")?,
+            _ => {
+                const HEX: &[u8; 16] = b"0123456789abcdef";
+                let escape = [
+                    b'\\',
+                    b'u',
+                    b'0',
+                    b'0',
+                    HEX[(c as usize) >> 4],
+                    HEX[(c as usize) & 15],
+                ];
+                append_text(out, std::str::from_utf8(&escape).expect("ASCII escape"))?;
+            }
+        }
+        start = i + c.len_utf8();
+    }
+    append_text(out, &text[start..])?;
+    append_text(out, "\"")
+}
+
 pub fn quote(s: &str) -> String {
     let mut out = String::from("\"");
     for c in s.chars() {
@@ -148,7 +230,7 @@ pub fn quote(s: &str) -> String {
 fn canonical_number(raw: &str) -> Result<String> {
     let n: f64 = raw
         .parse()
-        .map_err(|_| crate::Error("§16.1: invalid JSON number".into()))?;
+        .map_err(|_| crate::Error::new("§16.1: invalid JSON number".into()))?;
     if !n.is_finite() {
         return err("§16.1", "non-finite JSON number");
     }
@@ -270,6 +352,9 @@ impl Parser<'_> {
                 let mut a = Vec::new();
                 if !self.take(b']') {
                     loop {
+                        a.try_reserve(1).map_err(|e| {
+                            crate::resource_error("§16.1/§10", format!("JSON array entries: {e}"))
+                        })?;
                         a.push(self.value()?);
                         self.ws();
                         if self.take(b']') {
@@ -328,7 +413,7 @@ impl Parser<'_> {
                     }
                 }
                 found.ok_or_else(|| {
-                    crate::Error(format!("§16.1: invalid JSON at byte {}", self.pos))
+                    crate::Error::new(format!("§16.1: invalid JSON at byte {}", self.pos))
                 })?
             }
         };
@@ -341,7 +426,7 @@ impl Parser<'_> {
             .text
             .as_bytes()
             .get(self.pos..end)
-            .ok_or_else(|| crate::Error("§16.1: short Unicode escape".into()))?;
+            .ok_or_else(|| crate::Error::new("§16.1: short Unicode escape".into()))?;
         let mut n = 0;
         for b in s {
             n = n * 16
@@ -359,6 +444,9 @@ impl Parser<'_> {
         self.expect(b'"')?;
         let mut out = String::new();
         loop {
+            out.try_reserve(4).map_err(|e| {
+                crate::resource_error("§16.1/§10", format!("JSON string bytes: {e}"))
+            })?;
             match self.peek() {
                 None => return err("§16.1", "unterminated JSON string"),
                 Some(b'"') => {
@@ -369,7 +457,7 @@ impl Parser<'_> {
                     self.pos += 1;
                     let b = self
                         .peek()
-                        .ok_or_else(|| crate::Error("§16.1: short escape".into()))?;
+                        .ok_or_else(|| crate::Error::new("§16.1: short escape".into()))?;
                     self.pos += 1;
                     out.push(match b {
                         b'"' => '"',
@@ -394,7 +482,7 @@ impl Parser<'_> {
                                 hi as u32
                             };
                             char::from_u32(n)
-                                .ok_or_else(|| crate::Error("§16.1: lone surrogate".into()))?
+                                .ok_or_else(|| crate::Error::new("§16.1: lone surrogate".into()))?
                         }
                         _ => return err("§16.1", "invalid JSON escape"),
                     });

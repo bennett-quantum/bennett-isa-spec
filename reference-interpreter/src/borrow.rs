@@ -379,7 +379,7 @@ impl Compiler<'_> {
         self.classical
             .get(name)
             .cloned()
-            .ok_or_else(|| Error(format!("§3.3: unknown classical binding {name}")))
+            .ok_or_else(|| Error::new(format!("§3.3: unknown classical binding {name}")))
     }
     fn bundle(&self, name: &str) -> Result<Vec<String>> {
         if let Some((base, index)) = name.split_once('[') {
@@ -389,12 +389,12 @@ impl Compiler<'_> {
                 .get(base)
                 .and_then(|w| w.get(index as usize))
                 .map(|w| vec![w.clone()])
-                .ok_or_else(|| Error(format!("§3.3: unknown indexed operand {name}")));
+                .ok_or_else(|| Error::new(format!("§3.3: unknown indexed operand {name}")));
         }
         self.bundles
             .get(name)
             .cloned()
-            .ok_or_else(|| Error(format!("§3.3: unknown operand {name}")))
+            .ok_or_else(|| Error::new(format!("§3.3: unknown operand {name}")))
     }
     fn scalar(&self, name: &str) -> Result<String> {
         let w = self.bundle(name)?;
@@ -431,17 +431,21 @@ impl Compiler<'_> {
             let w = crate::object::host_count(&a[2], "qregion cell width")? as usize;
             let cells = crate::oracle::power_of_two(aw as u128)
                 .and_then(|n| usize::try_from(n).ok())
-                .ok_or_else(|| Error("§4.6: host limit: region cell count exceeds usize".into()))?;
+                .ok_or_else(|| {
+                    Error::host_resource("§4.6: host limit: region cell count exceeds usize".into())
+                })?;
             let image = match a.get(3) {
                 Some(img) => self
                     .object
                     .data
                     .get(img.trim_start_matches('@'))
                     .cloned()
-                    .ok_or_else(|| Error("§4.6: unresolved qregion image".into()))?,
+                    .ok_or_else(|| Error::new("§4.6: unresolved qregion image".into()))?,
                 None => {
                     let bits = cells.checked_mul(w).ok_or_else(|| {
-                        Error("§4.6: host limit: region bit count exceeds usize".into())
+                        Error::host_resource(
+                            "§4.6: host limit: region bit count exceeds usize".into(),
+                        )
                     })?;
                     let mut image = crate::reserved(bits.div_ceil(8), "§4.6", "region image")?;
                     image.resize(bits.div_ceil(8), 0);
@@ -708,7 +712,7 @@ impl Compiler<'_> {
                 "qunpred" => {
                     predicate
                         .pop()
-                        .ok_or_else(|| Error("§3.5: predicate underflow".into()))?;
+                        .ok_or_else(|| Error::new("§3.5: predicate underflow".into()))?;
                 }
                 "qcopy" | "quncopy" | "qxor" => {
                     let source = self.bundle(&a[0])?;
@@ -775,7 +779,7 @@ impl Compiler<'_> {
                         .regions
                         .get(&a[0])
                         .cloned()
-                        .ok_or_else(|| Error("§4.6: unknown region".into()))?;
+                        .ok_or_else(|| Error::new("§4.6: unknown region".into()))?;
                     let value = if op == "qload" {
                         let w = self.produce(&i.lhs[0], cells.first().map_or(0, Vec::len))?;
                         out.push(Node::Alloc(w.clone()));
@@ -817,7 +821,7 @@ impl Compiler<'_> {
                         let mut memory = Vec::new();
                         for n in list(&ca[5])? {
                             let (_, cells) = self.regions.get(&n).cloned().ok_or_else(|| {
-                                Error("§4.7: oracle mem operand is not a live region".into())
+                                Error::new("§4.7: oracle mem operand is not a live region".into())
                             })?;
                             memory.extend(cells.into_iter().flatten());
                         }
@@ -862,10 +866,9 @@ impl Compiler<'_> {
                             }
                         }
                         for (p, n) in f.params[2].iter().zip(list(&ca[3])?) {
-                            let r =
-                                self.regions.get(&n).cloned().ok_or_else(|| {
-                                    Error("§4.7: region operand is not live".into())
-                                })?;
+                            let r = self.regions.get(&n).cloned().ok_or_else(|| {
+                                Error::new("§4.7: region operand is not live".into())
+                            })?;
                             child.regions.insert(p.name.clone(), r);
                         }
                         for (p, n) in f.params[3].iter().zip(list(&ca[4])?) {
@@ -888,7 +891,7 @@ impl Compiler<'_> {
                         }
                         for n in list(&ca[3])? {
                             let (_, cells) = self.regions.get(&n).ok_or_else(|| {
-                                Error("§4.7: action mem operand is not a live region".into())
+                                Error::new("§4.7: action mem operand is not a live region".into())
                             })?;
                             touched.extend(cells.iter().flatten().cloned());
                         }
@@ -1647,7 +1650,7 @@ fn check_factorisation(
     };
     for (p, message) in &e.obligations {
         if *p != Poly::zero() {
-            return Err(failure(Error(format!("§5.6: {message}"))));
+            return Err(failure(Error::new(format!("§5.6: {message}"))));
         }
     }
     if structural {
@@ -1657,13 +1660,13 @@ fn check_factorisation(
         match e.vars.get(w) {
             Some(v) if borrowed.contains(w) => {
                 if *p != Poly::var(*v) {
-                    return Err(failure(Error(format!(
+                    return Err(failure(Error::new(format!(
                         "§5.6: borrow frame does not restore borrowed wire {w}"
                     ))));
                 }
             }
             _ if p.mentions(e.borrowed) => {
-                return Err(failure(Error(format!(
+                return Err(failure(Error::new(format!(
                     "§5.6: borrow frame output {w} depends on borrowed entry values"
                 ))));
             }
@@ -1701,7 +1704,9 @@ impl Object {
                     let cells = crate::oracle::power_of_two(a as u128)
                         .and_then(|n| usize::try_from(n).ok())
                         .ok_or_else(|| {
-                            Error("§4.6: host limit: region cell count exceeds usize".into())
+                            Error::host_resource(
+                                "§4.6: host limit: region cell count exceeds usize".into(),
+                            )
                         })?;
                     let mut all = crate::reserved(cells, "§4.6", "region cells")?;
                     for _ in 0..cells {
@@ -1742,7 +1747,9 @@ impl Object {
         }
         let root: Vec<_> = f.blocks.iter().flat_map(|b| &b.instructions).collect();
         let (seq, start, end) = locate(&root, endpoints[0], endpoints[1]).ok_or_else(|| {
-            Error("§5.6/§12.1: frame endpoints do not delimit one contiguous source circuit".into())
+            Error::new(
+                "§5.6/§12.1: frame endpoints do not delimit one contiguous source circuit".into(),
+            )
         })?;
         if start > end {
             return err("§5.6/§12.1", "reversed frame endpoints");
@@ -1764,10 +1771,10 @@ impl Object {
         compiler.compile_function(f, &[], &mut Vec::new())?;
         let trace = compiler
             .trace
-            .ok_or_else(|| Error("§5.6: missing structural trace".into()))?;
+            .ok_or_else(|| Error::new("§5.6: missing structural trace".into()))?;
         let entries = trace
             .get(&endpoints[0].line)
-            .ok_or_else(|| Error("§5.6: frame has no compiled context".into()))?;
+            .ok_or_else(|| Error::new("§5.6: frame has no compiled context".into()))?;
         for (context, entry) in entries.iter().enumerate() {
             let resolve = |names: &BTreeSet<String>| -> Result<BTreeSet<String>> {
                 let mut out = BTreeSet::new();
@@ -1785,13 +1792,13 @@ impl Object {
                     let wires = entry
                         .bundles
                         .get(base)
-                        .ok_or_else(|| Error(format!("§5.6: unknown witness wire {name}")))?;
+                        .ok_or_else(|| Error::new(format!("§5.6: unknown witness wire {name}")))?;
                     if let Some(i) = index {
                         out.insert(
                             wires
                                 .get(i)
                                 .ok_or_else(|| {
-                                    Error("§5.6: witness wire index out of range".into())
+                                    Error::new("§5.6: witness wire index out of range".into())
                                 })?
                                 .clone(),
                         );
@@ -1811,7 +1818,7 @@ impl Object {
                     .and_then(|t| t.get(context))
                     .map(|t| t.nodes.as_slice())
                     .ok_or_else(|| {
-                        Error("§5.6: inconsistent structural invocation contexts".into())
+                        Error::new("§5.6: inconsistent structural invocation contexts".into())
                     })
             };
             let collect = |points: &[&Instruction]| -> Result<Vec<Node>> {

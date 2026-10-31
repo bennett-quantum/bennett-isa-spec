@@ -20,22 +20,22 @@ impl Environment {
             let index = index
                 .strip_suffix(']')
                 .and_then(|s| s.parse::<usize>().ok())
-                .ok_or_else(|| Error("§3.3: invalid wire index".into()))?;
+                .ok_or_else(|| Error::new("§3.3: invalid wire index".into()))?;
             let ws = self
                 .bindings
                 .bundles
                 .get(base)
-                .ok_or_else(|| Error(format!("§3.3: unknown live bundle {base}")))?;
+                .ok_or_else(|| Error::new(format!("§3.3: unknown live bundle {base}")))?;
             return ws
                 .get(index)
                 .map(|w| vec![*w])
-                .ok_or_else(|| Error("§3.3: wire index out of range".into()));
+                .ok_or_else(|| Error::new("§3.3: wire index out of range".into()));
         }
         self.bindings
             .bundles
             .get(n)
             .cloned()
-            .ok_or_else(|| Error(format!("§3.3: unknown live bundle {n}")))
+            .ok_or_else(|| Error::new(format!("§3.3: unknown live bundle {n}")))
     }
     fn scalar(&self, n: &str) -> Result<Wire> {
         let w = self.bundle(n)?;
@@ -98,7 +98,7 @@ impl Object {
             };
             let bytes = regions
                 .get(&p.name)
-                .ok_or_else(|| Error("§4.2: missing lifted action region".into()))?;
+                .ok_or_else(|| Error::new("§4.2: missing lifted action region".into()))?;
             let mut cells = Vec::new();
             for byte in bytes {
                 let cell = q.allocate(w as usize)?;
@@ -148,10 +148,14 @@ impl Object {
                 if i.op == "qborrow" {
                     *count = count
                         .checked_add(i.operands[1].parse::<usize>().map_err(|_| {
-                            Error("§5.6: host limit: borrow count exceeds usize".into())
+                            Error::host_resource(
+                                "§5.6: host limit: borrow count exceeds usize".into(),
+                            )
                         })?)
                         .ok_or_else(|| {
-                            Error("§5.6: host limit: borrow capacity sum exceeds usize".into())
+                            Error::host_resource(
+                                "§5.6: host limit: borrow capacity sum exceeds usize".into(),
+                            )
                         })?;
                 }
                 if let Ok(call) = normalize_call(i) {
@@ -175,7 +179,7 @@ impl Object {
             let function = self
                 .functions
                 .get(&name)
-                .ok_or_else(|| Error(format!("§9.3: unresolved action @{name}")))?;
+                .ok_or_else(|| Error::new(format!("§9.3: unresolved action @{name}")))?;
             for block in &function.blocks {
                 scan(&block.instructions, &mut count, &mut pending)?;
             }
@@ -212,13 +216,13 @@ impl Object {
             .functions
             .get(name)
             .filter(|f| matches!(f.kind.as_str(), "action" | "perm_action"))
-            .ok_or_else(|| Error(format!("§5.3: unknown action @{name}")))?;
+            .ok_or_else(|| Error::new(format!("§5.3: unknown action @{name}")))?;
         let mut used = BTreeSet::new();
         for p in f.params[0].iter().chain(&f.params[1]) {
             let w = bindings
                 .bundles
                 .get(&p.name)
-                .ok_or_else(|| Error(format!("§5.1: missing bundle {}", p.name)))?;
+                .ok_or_else(|| Error::new(format!("§5.1: missing bundle {}", p.name)))?;
             if w.len() != p.ty.width(self.ptr_width)? as usize {
                 return err("§3.3", "action bundle width mismatch");
             }
@@ -236,7 +240,7 @@ impl Object {
             let r = bindings
                 .regions
                 .get(&p.name)
-                .ok_or_else(|| Error("§5.1: missing interface region".into()))?;
+                .ok_or_else(|| Error::new("§5.1: missing interface region".into()))?;
             if r.address_width != a
                 || r.cell_width != w
                 || crate::oracle::power_of_two(a as u128) != Some(r.cells.len() as u128)
@@ -255,7 +259,7 @@ impl Object {
             let arg = bindings
                 .args
                 .get(&p.name)
-                .ok_or_else(|| Error("§5.1: missing action classical argument".into()))?;
+                .ok_or_else(|| Error::new("§5.1: missing action classical argument".into()))?;
             // §3.3 classical types, ptr included (ptr_width bits).
             crate::oracle::check_argument(self, &p.ty, arg)?;
         }
@@ -283,11 +287,13 @@ impl Object {
             let count = crate::oracle::power_of_two(a as u128)
                 .and_then(|n| usize::try_from(n).ok())
                 .ok_or_else(|| {
-                    Error("§4.6: host limit: local region exceeds host address space".into())
+                    Error::host_resource(
+                        "§4.6: host limit: local region exceeds host address space".into(),
+                    )
                 })?;
-            let n = count
-                .checked_mul(w as usize)
-                .ok_or_else(|| Error("§4.6: host limit: region bit count exceeds usize".into()))?;
+            let n = count.checked_mul(w as usize).ok_or_else(|| {
+                Error::host_resource("§4.6: host limit: region bit count exceeds usize".into())
+            })?;
             let wires = q.allocate(n)?;
             let image = if i.operands.len() == 4 {
                 self.data[i.operands[3].trim_start_matches('@')].clone()
@@ -430,9 +436,9 @@ impl Object {
                     }
                 }
                 "qloop" => {
-                    let n = a[0]
-                        .parse::<usize>()
-                        .map_err(|_| Error("§4.6: loop bound exceeds host index space".into()))?;
+                    let n = a[0].parse::<usize>().map_err(|_| {
+                        Error::new("§4.6: loop bound exceeds host index space".into())
+                    })?;
                     if a.len() == 1 {
                         // body n times (§4.6). The iterated state is exact, so once
                         // it returns to its loop-entry value the remaining iterations
@@ -534,9 +540,9 @@ impl Object {
                     let allocate = (op == "qalloc") ^ adjoint;
                     let name = if op == "qalloc" { &i.lhs[0] } else { &a[0] };
                     if allocate {
-                        let n = width
-                            .produced
-                            .ok_or_else(|| Error("§4.3: missing matched lifetime width".into()))?;
+                        let n = width.produced.ok_or_else(|| {
+                            Error::new("§4.3: missing matched lifetime width".into())
+                        })?;
                         let w = q.allocate(n)?;
                         e.produce(name, w)?;
                     } else {
@@ -549,9 +555,9 @@ impl Object {
                     let borrow = (op == "qborrow") ^ adjoint;
                     let name = if op == "qborrow" { &i.lhs[0] } else { &a[0] };
                     if borrow {
-                        let n = width
-                            .produced
-                            .ok_or_else(|| Error("§4.3: missing matched lifetime width".into()))?;
+                        let n = width.produced.ok_or_else(|| {
+                            Error::new("§4.3: missing matched lifetime width".into())
+                        })?;
                         let pool = e
                             .bindings
                             .borrowed
@@ -579,7 +585,7 @@ impl Object {
                         let indices = e
                             .borrowed
                             .remove(name)
-                            .ok_or_else(|| Error("§5.6: unmatched return".into()))?;
+                            .ok_or_else(|| Error::new("§5.6: unmatched return".into()))?;
                         for index in indices {
                             e.borrow_used.remove(&index);
                         }
@@ -611,7 +617,7 @@ impl Object {
                         .regions
                         .get(&a[0])
                         .cloned()
-                        .ok_or_else(|| Error("§4.6: quantum region not found".into()))?;
+                        .ok_or_else(|| Error::new("§4.6: quantum region not found".into()))?;
                     let address = e.bundle(&a[1])?;
                     let load = matches!(op, "qload" | "qunload");
                     let compute = (op == "qload") ^ adjoint;
@@ -661,7 +667,7 @@ impl Object {
                                     None
                                 }
                             })
-                            .ok_or_else(|| Error("§4.7: missing oracle token".into()))?;
+                            .ok_or_else(|| Error::new("§4.7: missing oracle token".into()))?;
                         let ins = list(&ca[2])?
                             .iter()
                             .map(|n| e.bundle(n))
@@ -675,19 +681,20 @@ impl Object {
                                 e.bindings
                                     .regions
                                     .get(&n)
-                                    .ok_or_else(|| Error("§4.7: missing memory region".into()))?
+                                    .ok_or_else(|| {
+                                        Error::new("§4.7: missing memory region".into())
+                                    })?
                                     .clone(),
                             );
                         }
-                        let args =
-                            list(&ca[6])?
-                                .iter()
-                                .map(|n| {
-                                    e.bindings.args.get(n).cloned().ok_or_else(|| {
-                                        Error("§4.7: missing classical argument".into())
-                                    })
+                        let args = list(&ca[6])?
+                            .iter()
+                            .map(|n| {
+                                e.bindings.args.get(n).cloned().ok_or_else(|| {
+                                    Error::new("§4.7: missing classical argument".into())
                                 })
-                                .collect::<Result<Vec<_>>>()?;
+                            })
+                            .collect::<Result<Vec<_>>>()?;
                         self.oracle_quantum(
                             callee, q, &ins, &target, &fault, &regions, &args, token, &c,
                         )?;
@@ -742,7 +749,7 @@ impl Object {
                                 None
                             }
                         })
-                        .ok_or_else(|| Error("§4.5: qinplace token".into()))?;
+                        .ok_or_else(|| Error::new("§4.5: qinplace token".into()))?;
                     let gf = &self.functions[g.trim_start_matches('@')];
                     let gif = &self.functions[gi.trim_start_matches('@')];
                     // §4.5 requires, under tk, FAULT_NONE on every input and
@@ -973,20 +980,20 @@ fn infer_widths(
             "qalloc" | "qborrow" => Some(
                 i.operands[1]
                     .parse()
-                    .map_err(|_| Error("§4.3: allocation width".into()))?,
+                    .map_err(|_| Error::new("§4.3: allocation width".into()))?,
             ),
             "qcopy" => Some(if i.operands[0].contains('[') {
                 1
             } else {
                 *live
                     .get(&i.operands[0])
-                    .ok_or_else(|| Error("§3.3: copy source width".into()))?
+                    .ok_or_else(|| Error::new("§3.3: copy source width".into()))?
             }),
             "qload" => Some(
                 e.bindings
                     .regions
                     .get(&i.operands[0])
-                    .ok_or_else(|| Error("§4.6: load region width".into()))?
+                    .ok_or_else(|| Error::new("§4.6: load region width".into()))?
                     .cell_width as usize,
             ),
             _ => None,
@@ -1006,13 +1013,13 @@ fn infer_widths(
         if let Some(name) = consumed {
             step.produced = Some(
                 live.remove(name)
-                    .ok_or_else(|| Error("§3.3: missing consumed lifetime width".into()))?,
+                    .ok_or_else(|| Error::new("§3.3: missing consumed lifetime width".into()))?,
             );
         }
         if i.op == "qloop" {
             let n = i.operands[0]
                 .parse::<usize>()
-                .map_err(|_| Error("§4.6: loop bound exceeds host index space".into()))?;
+                .map_err(|_| Error::new("§4.6: loop bound exceeds host index space".into()))?;
             let mut seen = BTreeMap::new();
             let mut entries: Vec<BTreeMap<String, usize>> = Vec::new();
             while step.bodies.len() < n {

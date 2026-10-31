@@ -8,7 +8,7 @@ use std::collections::VecDeque;
 
 const USAGE:&str="bennett-isa-ref check <object>\nbennett-isa-ref hash <object>\nbennett-isa-ref run-oracle <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref step-check <object> <oracle> (--exhaustive [--max-bits N] | --suite | --samples N) [--seed a,b,c,d] [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref run-cc <object> <entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex]\nbennett-isa-ref reverse <object> <entry> [run-cc options] [--steps N]\nbennett-isa-ref reverse <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--steps N] [--mem name=hex] [--arg value]\nbennett-isa-ref reverse <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]>] [--adjoint]\nbennett-isa-ref run-action <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]> | --arg value...] [--adjoint]\nbennett-isa-ref run-program <object> <cc-entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex] [--reverse] [--target file]";
 fn fail(message: impl std::fmt::Display) -> Error {
-    Error(message.to_string())
+    Error::new(message.to_string())
 }
 fn uint(s: &str) -> Result<u128> {
     if let Some(hex) = s.strip_prefix("0x") {
@@ -66,7 +66,7 @@ fn budget(raw: &str, default: Budget) -> Result<Budget> {
         return Err(fail("budget requires B or B,heap,stack,depth (§5.4)"));
     }
     let steps = u64::try_from(v[0]).map_err(|e| {
-        fail(format!(
+        Error::host_resource(format!(
             "§5.4: host limit: step budget exceeds the u64 counter: {e}"
         ))
     })?;
@@ -82,12 +82,12 @@ fn budget(raw: &str, default: Budget) -> Result<Budget> {
     })
 }
 fn hex_buffer(len: usize) -> Result<String> {
-    let count = len
-        .checked_mul(2)
-        .ok_or_else(|| fail("§7.3/§10: host limit: CLI hex byte count exceeds usize"))?;
+    let count = len.checked_mul(2).ok_or_else(|| {
+        Error::host_resource("§7.3/§10: host limit: CLI hex byte count exceeds usize".into())
+    })?;
     let mut out = String::new();
     out.try_reserve_exact(count)
-        .map_err(|e| fail(format!("§7.3/§10: host limit: CLI hex bytes: {e}")))?;
+        .map_err(|e| Error::host_resource(format!("§7.3/§10: host limit: CLI hex bytes: {e}")))?;
     Ok(out)
 }
 fn hex(bytes: &[u8]) -> Result<String> {
@@ -130,10 +130,13 @@ fn parse_hex(s: &str) -> Result<Vec<u8>> {
             "§16.1: invalid HEX (even-length hexadecimal expected)",
         ));
     }
-    (0..s.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(fail))
-        .collect()
+    let mut out = Vec::new();
+    out.try_reserve_exact(s.len() / 2)
+        .map_err(|e| Error::host_resource(format!("§10: host limit: decoded reply bytes: {e}")))?;
+    for i in (0..s.len()).step_by(2) {
+        out.push(u8::from_str_radix(&s[i..i + 2], 16).map_err(fail)?);
+    }
+    Ok(out)
 }
 /// A binary64 as a canonical JSON number (RFC 8785 via `Json::parse`).
 fn float_json(v: f64) -> Result<Json> {
@@ -179,9 +182,10 @@ fn value_json(v: &ClassicalValue) -> Result<Json> {
     })
 }
 fn values_json(values: &[ClassicalValue]) -> Result<Json> {
-    Ok(Json::Array(
-        values.iter().map(value_json).collect::<Result<_>>()?,
-    ))
+    Ok(Json::Array(collect_output(
+        values.iter().map(value_json),
+        "outcome values",
+    )?))
 }
 fn fault_name(code: u128) -> Option<&'static str> {
     Some(match code {
@@ -212,22 +216,20 @@ fn faults_json(fault: Option<u128>) -> Json {
     }
 }
 fn tape_json(m: &ClassicalMachine) -> Result<Json> {
-    Ok(Json::Array(
-        m.effect_tape()
-            .iter()
-            .map(|e| {
-                Ok(object([
-                    (
-                        "args".into(),
-                        Json::Array(e.args.iter().map(|a| number(*a)).collect()),
-                    ),
-                    ("bytes".into(), string(hex(&e.bytes)?)),
-                    ("dev".into(), string(e.dev.clone())),
-                    ("op".into(), string(e.op.clone())),
-                ]))
-            })
-            .collect::<Result<_>>()?,
-    ))
+    Ok(Json::Array(collect_output(
+        m.effect_tape().iter().map(|e| {
+            Ok(object([
+                (
+                    "args".into(),
+                    Json::Array(e.args.iter().map(|a| number(*a)).collect()),
+                ),
+                ("bytes".into(), string(hex(&e.bytes)?)),
+                ("dev".into(), string(e.dev.clone())),
+                ("op".into(), string(e.op.clone())),
+            ]))
+        }),
+        "tape_json",
+    )?))
 }
 fn measurements_json(m: &ClassicalMachine) -> Json {
     Json::Array(
@@ -256,29 +258,27 @@ fn measurements_json(m: &ClassicalMachine) -> Json {
     )
 }
 fn host_requests_json(m: &ClassicalMachine) -> Result<Json> {
-    Ok(Json::Array(
-        m.host_transcript()
-            .into_iter()
-            .map(|e| {
-                Ok(object([
-                    ("address".into(), number(e.request.address)),
-                    ("capacity".into(), number(e.request.capacity)),
-                    ("payload".into(), string(hex(&e.request.payload)?)),
-                    ("reply".into(), string(hex(&e.reply)?)),
-                    ("service".into(), string(e.request.service.clone())),
-                ]))
-            })
-            .collect::<Result<_>>()?,
-    ))
+    Ok(Json::Array(collect_output(
+        m.host_exchanges().map(|e| {
+            Ok(object([
+                ("address".into(), number(e.request.address)),
+                ("capacity".into(), number(e.request.capacity)),
+                ("payload".into(), string(hex(&e.request.payload)?)),
+                ("reply".into(), string(hex(&e.reply)?)),
+                ("service".into(), string(e.request.service.clone())),
+            ]))
+        }),
+        "host_requests_json",
+    )?))
 }
-fn console_json(m: &ClassicalMachine) -> Json {
+fn console_json(m: &ClassicalMachine) -> Result<Json> {
     match std::str::from_utf8(m.console()) {
-        Ok(s) => string(s),
-        Err(_) => Json::Null,
+        Ok(s) => Ok(string(copy_text(s, "console UTF-8 output")?)),
+        Err(_) => Ok(Json::Null),
     }
 }
 fn earg(message: impl std::fmt::Display) -> Error {
-    Error(format!("§10: E_ARG: {message}"))
+    Error::new(format!("§10: E_ARG: {message}"))
 }
 /// Options shared by the CC/R entry commands (`run-cc`, `reverse`,
 /// `run-program`); command-specific options are rejected for the others.
@@ -538,6 +538,9 @@ fn load_replies(path: Option<&str>) -> Result<VecDeque<Reply>> {
     let mut queue = VecDeque::new();
     for entry in entries.array()? {
         entry.fields(&["payload", "reply", "service"], &[])?;
+        queue
+            .try_reserve(1)
+            .map_err(|e| Error::host_resource(format!("§10: host limit: reply queue: {e}")))?;
         queue.push_back(Reply {
             service: entry.get("service")?.string()?.into(),
             payload: parse_hex(entry.get("payload")?.string()?)?,
@@ -547,10 +550,8 @@ fn load_replies(path: Option<&str>) -> Result<VecDeque<Reply>> {
     Ok(queue)
 }
 fn delta_registers_json(delta: &SnapshotDelta) -> Result<Vec<Json>> {
-    delta
-        .registers
-        .iter()
-        .map(|r| {
+    collect_output(
+        delta.registers.iter().map(|r| {
             Ok(object([
                 ("activation".into(), number(r.activation as u128)),
                 ("name".into(), string(r.name.clone())),
@@ -569,21 +570,21 @@ fn delta_registers_json(delta: &SnapshotDelta) -> Result<Vec<Json>> {
                     },
                 ),
             ]))
-        })
-        .collect()
+        }),
+        "delta_registers_json",
+    )
 }
-fn delta_memory_json(delta: &SnapshotDelta) -> Vec<Json> {
-    delta
-        .memory
-        .iter()
-        .map(|(address, pre, post)| {
-            object([
+fn delta_memory_json(delta: &SnapshotDelta) -> Result<Vec<Json>> {
+    collect_output(
+        delta.memory.iter().map(|(address, pre, post)| {
+            Ok(object([
                 ("address".into(), number(*address)),
                 ("post".into(), number(*post as u128)),
                 ("pre".into(), number(*pre as u128)),
-            ])
-        })
-        .collect()
+            ]))
+        }),
+        "delta_memory_json",
+    )
 }
 fn trace_record(step: u64, point: &StepPoint, delta: &SnapshotDelta) -> Result<Json> {
     Ok(object([
@@ -595,7 +596,7 @@ fn trace_record(step: u64, point: &StepPoint, delta: &SnapshotDelta) -> Result<J
             Json::Array(point.instruction.lhs.iter().cloned().map(string).collect()),
         ),
         ("line".into(), number(point.instruction.line as u128)),
-        ("memory".into(), Json::Array(delta_memory_json(delta))),
+        ("memory".into(), Json::Array(delta_memory_json(delta)?)),
         ("op".into(), string(point.instruction.op.clone())),
         (
             "operands".into(),
@@ -637,25 +638,49 @@ fn drive(
                     request.service
                 ))
             })?;
-            if reply.service != request.service || reply.payload != request.payload {
-                return Err(fail(format!(
-                    "§10: reply mismatch: expected request service={} payload={}, replies file next names service={} payload={}",
-                    request.service,
-                    hex(&request.payload)?,
-                    reply.service,
-                    hex(&reply.payload)?
-                )));
+            if reply.service != request.service || request.payload != reply.payload {
+                let mut message = String::new();
+                for part in [
+                    "§10: reply mismatch: expected request service=",
+                    &request.service,
+                    " payload=",
+                    &hex(&request.payload)?,
+                    ", replies file next names service=",
+                    &reply.service,
+                    " payload=",
+                    &hex(&reply.payload)?,
+                ] {
+                    message.try_reserve(part.len()).map_err(|e| {
+                        bennett_isa_ref::Error::host_resource(format!(
+                            "§10: host limit: reply mismatch diagnostic: {e}"
+                        ))
+                    })?;
+                    message.push_str(part);
+                }
+                return Err(Error::new(message));
             }
             let before = trace.is_some().then(|| machine.snapshot());
             machine.reply(&reply.reply)?;
             if let (Some(trace), Some(before)) = (trace.as_deref_mut(), before) {
-                let delta = before.delta(&machine.snapshot());
+                let delta = before.delta(&machine.snapshot())?;
                 if let Some(Json::Object(record)) = trace.last_mut() {
                     if let Some(Json::Array(registers)) = record.get_mut("registers") {
-                        registers.extend(delta_registers_json(&delta)?);
+                        let more = delta_registers_json(&delta)?;
+                        registers.try_reserve(more.len()).map_err(|e| {
+                            Error::host_resource(format!(
+                                "§7.4: host limit: trace register records: {e}"
+                            ))
+                        })?;
+                        registers.extend(more);
                     }
                     if let Some(Json::Array(memory)) = record.get_mut("memory") {
-                        memory.extend(delta_memory_json(&delta));
+                        let more = delta_memory_json(&delta)?;
+                        memory.try_reserve(more.len()).map_err(|e| {
+                            Error::host_resource(format!(
+                                "§7.4: host limit: trace memory records: {e}"
+                            ))
+                        })?;
+                        memory.extend(more);
                     }
                 }
             }
@@ -673,9 +698,9 @@ fn drive(
             ));
         }
         if let Some(trace) = trace.as_deref_mut() {
-            trace
-                .try_reserve(1)
-                .map_err(|e| fail(format!("§7.4: host limit: CLI trace records: {e}")))?;
+            trace.try_reserve(1).map_err(|e| {
+                Error::host_resource(format!("§7.4: host limit: CLI trace records: {e}"))
+            })?;
         }
         let before = trace.is_some().then(|| machine.snapshot());
         let point = machine
@@ -683,7 +708,7 @@ fn drive(
             .ok_or_else(|| fail("§3.4: running machine took no step"))?;
         steps += 1;
         if let (Some(trace), Some(before)) = (trace.as_deref_mut(), before) {
-            let delta = before.delta(&machine.snapshot());
+            let delta = before.delta(&machine.snapshot())?;
             trace.push(trace_record(steps - 1, &point, &delta)?);
         }
     }
@@ -760,7 +785,7 @@ fn run_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> {
     Ok(object([
         ("budgets".into(), budgets),
         ("clock".into(), number(machine.clock() as u128)),
-        ("console".into(), console_json(&machine)),
+        ("console".into(), console_json(&machine)?),
         ("console_hex".into(), string(hex(machine.console())?)),
         (
             "effect_tape_length".into(),
@@ -774,7 +799,7 @@ fn run_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> {
         ("faults".into(), faults_json(outcome.fault)),
         ("host_requests".into(), host_requests_json(&machine)?),
         ("measurements".into(), measurements_json(&machine)),
-        ("memory_digest".into(), string(machine.memory_digest())),
+        ("memory_digest".into(), string(machine.memory_digest()?)),
         ("results".into(), values_json(&outcome.values)?),
         (
             "status".into(),
@@ -958,17 +983,24 @@ fn build_action_state(
         let cells = (a < 63)
             .then(|| 1usize.checked_shl(a as u32))
             .flatten()
-            .ok_or_else(|| fail("§3.3: host limit: interface region exceeds host memory"))?;
-        let cell_width = usize::try_from(w)
-            .map_err(|_| fail("§3.3: host limit: cell width exceeds host storage"))?;
+            .ok_or_else(|| {
+                Error::host_resource(
+                    "§3.3: host limit: interface region exceeds host memory".into(),
+                )
+            })?;
+        let cell_width = usize::try_from(w).map_err(|_| {
+            Error::host_resource("§3.3: host limit: cell width exceeds host storage".into())
+        })?;
         let cell_bytes = cell_width.div_ceil(8);
-        let byte_count = cells
-            .checked_mul(cell_bytes)
-            .ok_or_else(|| fail("§3.3: host limit: interface region byte count exceeds usize"))?;
+        let byte_count = cells.checked_mul(cell_bytes).ok_or_else(|| {
+            Error::host_resource(
+                "§3.3: host limit: interface region byte count exceeds usize".into(),
+            )
+        })?;
         let mut values = Vec::new();
-        values
-            .try_reserve_exact(cells)
-            .map_err(|e| fail(format!("§3.3: host limit: interface region cells: {e}")))?;
+        values.try_reserve_exact(cells).map_err(|e| {
+            Error::host_resource(format!("§3.3: host limit: interface region cells: {e}"))
+        })?;
         for _ in 0..cells {
             values.push(BitVector::zero(cell_width)?);
         }
@@ -988,8 +1020,9 @@ fn build_action_state(
             }
         }
         let mut all = Vec::new();
-        all.try_reserve_exact(cells)
-            .map_err(|e| fail(format!("§5.1: host limit: CLI region cells: {e}")))?;
+        all.try_reserve_exact(cells).map_err(|e| {
+            Error::host_resource(format!("§5.1: host limit: CLI region cells: {e}"))
+        })?;
         for _ in 0..cells {
             let cell = q.allocate(cell_width)?;
             interface_wires.extend(&cell);
@@ -1227,7 +1260,7 @@ fn reverse_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> 
     let mut replies = load_replies(options.replies.as_deref())?;
     let (mut machine, budgets) = classical_machine(program, name, &options)?;
     let entry = machine.snapshot();
-    let entry_digest = machine.memory_digest();
+    let entry_digest = machine.memory_digest()?;
     let steps = drive(
         &mut machine,
         &mut replies,
@@ -1247,7 +1280,7 @@ fn reverse_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> 
     Ok(object([
         ("budgets".into(), budgets),
         ("clock".into(), number(machine.clock() as u128)),
-        ("console".into(), console_json(&machine)),
+        ("console".into(), console_json(&machine)?),
         ("console_hex".into(), string(hex(machine.console())?)),
         (
             "effect_tape_length".into(),
@@ -1269,7 +1302,7 @@ fn reverse_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> 
                 .unwrap_or(Json::Null),
         ),
         ("host_requests".into(), forward_requests),
-        ("memory_digest".into(), string(machine.memory_digest())),
+        ("memory_digest".into(), string(machine.memory_digest()?)),
         (
             "memory_equals_entry".into(),
             Json::Bool(entry.memory_equals(&after)),
@@ -1370,10 +1403,15 @@ fn parse_oracle_options(
             let n = (a < 64)
                 .then(|| 1usize.checked_shl(a as u32))
                 .flatten()
-                .ok_or_else(|| fail("§3.3: host limit: interface region exceeds host memory"))?;
+                .ok_or_else(|| {
+                    Error::host_resource(
+                        "§3.3: host limit: interface region exceeds host memory".into(),
+                    )
+                })?;
             let mut zero = Vec::new();
-            zero.try_reserve_exact(n)
-                .map_err(|e| fail(format!("§3.3: host limit: interface region storage: {e}")))?;
+            zero.try_reserve_exact(n).map_err(|e| {
+                Error::host_resource(format!("§3.3: host limit: interface region storage: {e}"))
+            })?;
             zero.resize(n, 0);
             regions.insert(p.name.clone(), zero);
         }
@@ -1593,7 +1631,7 @@ fn run_program(program: &Object, name: &str, options: CcOptions) -> Result<Json>
         machine.push_measurement_draw(*draw)?;
     }
     let entry = machine.snapshot();
-    let entry_digest = machine.memory_digest();
+    let entry_digest = machine.memory_digest()?;
     let mut replies = load_replies(options.replies.as_deref())?;
     let steps = drive(&mut machine, &mut replies, options.fuel, None, None)?;
     check_replies_consumed(&replies)?;
@@ -1626,7 +1664,7 @@ fn run_program(program: &Object, name: &str, options: CcOptions) -> Result<Json>
     Ok(object([
         ("budgets".into(), budgets),
         ("clock".into(), number(machine.clock() as u128)),
-        ("console".into(), console_json(&machine)),
+        ("console".into(), console_json(&machine)?),
         ("console_hex".into(), string(hex(machine.console())?)),
         (
             "effect_tape_length".into(),
@@ -1649,7 +1687,7 @@ fn run_program(program: &Object, name: &str, options: CcOptions) -> Result<Json>
         ),
         ("host_requests".into(), forward_requests),
         ("measurements".into(), forward_measurements),
-        ("memory_digest".into(), string(machine.memory_digest())),
+        ("memory_digest".into(), string(machine.memory_digest()?)),
         (
             "memory_equals_entry".into(),
             Json::Bool(entry.memory_equals(&after)),
@@ -1776,10 +1814,10 @@ fn run() -> Result<()> {
             if e.0.contains('§') {
                 e
             } else {
-                fail(format!("{rule}: {e}"))
+                e.context(rule)
             }
         })?;
-        println!("{}", output.canonical());
+        println!("{}", output.try_canonical()?);
         return Ok(());
     }
     let name = args
@@ -1900,10 +1938,15 @@ fn run() -> Result<()> {
             let n = (a < 64)
                 .then(|| 1usize.checked_shl(a as u32))
                 .flatten()
-                .ok_or_else(|| fail("§3.3: host limit: interface region exceeds host memory"))?;
+                .ok_or_else(|| {
+                    Error::host_resource(
+                        "§3.3: host limit: interface region exceeds host memory".into(),
+                    )
+                })?;
             let mut zero = Vec::new();
-            zero.try_reserve_exact(n)
-                .map_err(|e| fail(format!("§3.3: host limit: interface region storage: {e}")))?;
+            zero.try_reserve_exact(n).map_err(|e| {
+                Error::host_resource(format!("§3.3: host limit: interface region storage: {e}"))
+            })?;
             zero.resize(n, 0);
             input.regions.insert(p.name.clone(), zero);
         }
@@ -2054,4 +2097,21 @@ fn run() -> Result<()> {
         .canonical()
     );
     Ok(())
+}
+
+fn copy_text(text: &str, what: &str) -> Result<String> {
+    let mut out = String::new();
+    out.try_reserve_exact(text.len())
+        .map_err(|e| Error::host_resource(format!("§7.3/§10: host limit: {what}: {e}")))?;
+    out.push_str(text);
+    Ok(out)
+}
+fn collect_output<T>(iter: impl Iterator<Item = Result<T>>, what: &str) -> Result<Vec<T>> {
+    let mut out = Vec::new();
+    for item in iter {
+        out.try_reserve(1)
+            .map_err(|e| Error::host_resource(format!("§7.4/§10: host limit: {what}: {e}")))?;
+        out.push(item?);
+    }
+    Ok(out)
 }

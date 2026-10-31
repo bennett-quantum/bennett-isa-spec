@@ -226,7 +226,7 @@ impl Amplitude {
     }
     pub(crate) fn times_f64(&self, x: f64) -> crate::Result<Self> {
         let d = dyadic_from_f64(x)
-            .ok_or_else(|| crate::Error("§14.2: nonfinite measurement scale".into()))?;
+            .ok_or_else(|| crate::Error::new("§14.2: nonfinite measurement scale".into()))?;
         Ok(self.mul(&Self::constant(Coefficient::new(
             d,
             Dyadic::default(),
