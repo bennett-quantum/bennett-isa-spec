@@ -1587,7 +1587,7 @@ pub(crate) fn const_literal(s: &str, width: u64) -> Result<()> {
     }
     Ok(())
 }
-/// Inspect only the spelling's magnitude, using fewer than four bits per
+/// Inspect only the spelling's magnitude, using four bits per
 /// decimal digit plus word padding. Destination widths never drive storage.
 fn literal_magnitude(s: &str) -> Result<(u128, bool)> {
     let generous = s
