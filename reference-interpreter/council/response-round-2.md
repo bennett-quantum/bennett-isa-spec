@@ -248,7 +248,7 @@ and the absolute `--manifest-path
 
 | Ignored sweep | Cases | Reported time |
 |---|---|---|
-| u8 division/remainder | 262,144 (a,b) pairs × 4 operations | 2.39 s |
+| u8 division/remainder | 65,536 operand pairs × 4 operations = 262,144 executions | 2.39 s |
 | 17-wire borrow-frame execution | 2^17 basis entries | 11.83 s |
 | checked borrow-frame certificate | 2^18 claim elements, both programs | 82.92 s |
 | extended §6 differential generator | 200,000 programs: **64,717 accepted, all exactly clean**, 135,283 rejected | 259.39 s |

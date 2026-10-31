@@ -15,7 +15,7 @@ All cargo/Python commands headless with repository .tmp; only crate tests.
 | Blocker | RED tests | Status | Commit |
 |---|---|---|---|
 | SOL-R12-B01 ≡ R12-B01 | identity::r12_cc_r_colliding_dotted_leaves / r12_cc_r_layout_paths_preserve_colliding_leaves / r12_dotted_leaf_collision_family; cli_xam::r12_cli_checks_lossless_layout_envelopes | GREEN; full suite 358/0/5 | 76714aa |
-| R12-B02 | identity::r12_interface_address_is_not_a_function_dependency; r1_linking::r12_interface_region_may_share_function_name; cli_xam::r12_cli_interface_region_may_share_function_name | GREEN; full suite 365/0/5 | this step |
+| R12-B02 | identity::r12_interface_address_is_not_a_function_dependency; r1_linking::r12_interface_region_may_share_function_name; cli_xam::r12_cli_interface_region_may_share_function_name | GREEN; full suite 365/0/5 | 054bb7e |
 
 B01 RED: 0 passed / 4 failed across identity and CLI; omitted duplicate
 layout lines and wrong main pin. Independent support/r12_pins.py reproduces
@@ -54,6 +54,42 @@ Object admission drops symbol/import bans, retaining only the existing actual
 layout.globals ambiguity (recorded narrowly in SPEC-QUESTIONS 32, as codex
 requests). No new rejection or rule-10 blocker; no Beads issues created/closed.
 Logs: .tmp/r12-b02-{red,cli-red,graph-red,green,family,full}.log.
+
+### Final round-12 verification
+
+Implementation commits: **76714aa**, **054bb7e**. Normal suite totals before
+and after, summed over every binary: **353/0/5 → 358/0/5 → 365/0/5**.
+Final suite: 8 unit + 357 integration, 0 doctests; 36.27 s runner sum.
+B01 full: 37.76 s. Final R12 target: 12/0. Fmt --check passes; strict
+all-target Clippy passes, 0 warnings (2.52 s), 0 tests executed by either.
+Independent corpus regeneration is byte-identical: 36 layout + 20 address
+records, every supplied pin reproduced without correction, no interpreter
+or support::rehash used to define expected answers.
+
+All **5 ignored sweeps passed / 0 failed**, 168.57 s summed runner time.
+
+| Sweep | Full domain | Observed result / runner time |
+|---|---|---|
+| u8 division/remainder | 65,536 operand pairs × 4 = 262,144 executions | 1/0; 0.89 s |
+| 17-wire borrow | 131,072 entries | 1/0; 4.73 s |
+| checked borrow certificate | 262,144 elements, subject and expected program | 1/0; 26.83 s |
+| §6 differential | 200,000 programs: 70,931 accepted (all clean), 129,069 rejected | 1/0; 131.76 s |
+| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 1/0; 4.36 s |
+
+No Rust source or test changes after the final normal suite or sweep start.
+All round 4–12 tests retained, 12 tests added, original RNG unchanged.
+Owned diff --check is clean. No new rule-10 blocker; the two requested 0.9
+clarifications are SPEC-QUESTIONS 31 (sol's exact equal-path wording) and
+32 (codex's narrow existing global/interface ambiguity wording).
+Historical arithmetic labels in the round-1/2/3 progress tables and local
+round-2 response now correctly say 65,536 operand pairs × 4 operations =
+262,144 executions; no old domain/result changed.
+No Beads issues created or closed; no export required. No spec/conformance
+edits or execution, dependencies, push or Dolt sync. Existing whole-ISA staged
+deliverables are unchanged. External response is
+../bennett/docs/council/isa-ref-2026-10-29/round-12/response.md.
+Logs: .tmp/r12-{b01-red,b01-green,b01-full,b02-red,b02-cli-red,
+b02-graph-red,b02-green,b02-family,b02-full,clippy,sweeps,pins,address-pins}.log.
 
 ## Round-11 fixes (2026-10-31)
 
@@ -1150,7 +1186,7 @@ Logs are retained in ignored `.tmp/r3-{tests,ignored,conformance}.log`.
 
 | Ignored sweep | Cases | Runner time |
 |---|---|---|
-| u8 division/remainder | 262,144 pairs × 4 operations | 2.96 s |
+| u8 division/remainder | 65,536 operand pairs × 4 operations = 262,144 executions | 2.96 s |
 | 17-wire borrow execution | 2^17 entries | 16.06 s |
 | checked borrow-frame certificate | 2^18 claim elements, both programs | 72.61 s |
 | extended §6 differential | 200,000 programs: **64,717 accepted, all clean**, 135,283 rejected | 209.69 s |
@@ -1209,7 +1245,7 @@ and the absolute `--manifest-path
 
 | Ignored sweep | Cases | Reported time |
 |---|---|---|
-| u8 division/remainder | 262,144 (a,b) pairs × 4 operations | 2.39 s |
+| u8 division/remainder | 65,536 operand pairs × 4 operations = 262,144 executions | 2.39 s |
 | 17-wire borrow-frame execution | 2^17 basis entries | 11.83 s |
 | checked borrow-frame certificate | 2^18 claim elements, both programs | 82.92 s |
 | extended §6 differential generator | 200,000 programs: **64,717 accepted, all exactly clean**, 135,283 rejected | 259.39 s |
@@ -1287,7 +1323,7 @@ Ignored sweeps (debug build, this machine):
 
 | Sweep | Cases | Time |
 |---|---|---|
-| `tests/oracle.rs` `exhaustive_unsigned_and_signed_division_u8` | 262,144 (a, b) × 4 ops | 1.64 s |
+| `tests/oracle.rs` `exhaustive_unsigned_and_signed_division_u8` | 65,536 operand pairs × 4 operations = 262,144 executions | 1.64 s |
 | `tests/step_machine.rs` recursive prefixes (all 8-bit n, every prefix) | 256 inputs × every B to completion | 8.87 s |
 | `tests/r1_borrow.rs` 17-wire swap frame, exhaustive execution | 2^17 × 2 | 9.02 s |
 | `tests/r1_certificates.rs` 17-wire frame with its checked claim | 2^18 claim elements, both programs | 50.16 s |
