@@ -17,7 +17,7 @@ including malformed objects, without interpreter calls or pin corrections.
 |---|---|---|---|
 | SOL-R11-B01 ≡ R11-B01 | parser::r11_action_regs_do_not_produce_wires / r11_action_regs_cannot_invent_angles; CLI wire/angle counterparts | GREEN, 6 targeted pass; full suite 344/0/5 | d3e3c21 |
 | SOL-R11-B02 ≡ R11-B02 | identity::r11_oracle_layout_ownership_uses_exact_names / r11_dotted_oracle_layout_ownership; CLI counterpart | GREEN; full suite 348/0/5 | fc6ab68 |
-| SOL-R11-B03 ≡ R11-B03 | r1_fixtures::r11_qinplace_comment_matches_budget_contract; quantum_control::qif_and_nested_control_preserve_interference | GREEN; full suite 353/0/5 | this step |
+| SOL-R11-B03 ≡ R11-B03 | r1_fixtures::r11_qinplace_comment_matches_budget_contract; quantum_control::qif_and_nested_control_preserve_interference | GREEN; full suite 353/0/5 | 352e8f5 |
 
 B01 RED: parser 0 passed / 3 failed, CLI 1 passed / 1 failed;
 separate exact angle CLI 0 passed / 1 failed. Initial test-source quoting
@@ -66,7 +66,31 @@ No runtime quantum or qinplace semantics changed for B03.
 Normal/fmt/strict all-target Clippy gates pass; 0 warnings (Clippy 1.12 s).
 Owned diff --check is clean. New control_flow object hash:
 e7e0acadaebf638a1adb34adb61efc2c79b43f0ec90b786582d2fdb6db7634d8.
-Remaining: five ignored sweeps, external response and final evidence commits.
+Final sweeps: 5 passed / 0 failed, 94.46 s summed runner time.
+| Sweep | Domain | Observed result / runner time |
+|---|---|---|
+| u8 division/remainder | 65,536 pairs × 4 = 262,144 executions | 1/0; 0.51 s |
+| 17-wire borrow | 131,072 entries | 1/0; 2.74 s |
+| checked certificate | 262,144 domain elements, subject and expected | 1/0; 14.76 s |
+| §6 differential | 200,000 programs; 70,931 accepted, all clean / 129,069 rejected | 1/0; 73.97 s |
+| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 1/0; 2.48 s |
+
+Implementation commits d3e3c21 / fc6ab68 / 352e8f5. All round-11 blockers
+resolved; 15 new tests, normal 338→344→348→353, 0 failed, 5 ignored.
+Final suite 8 unit + 345 integration; 0 doctests. Baseline/full runner sums:
+15.02 / 15.28 / 15.13 / 15.36 s. Fmt clean; strict all-target Clippy clean,
+0 warnings (1.12 s). No semantic source changed after the normal gate or
+sweep start. All round 4–10 positives/negatives retained.
+Independent regeneration is idempotent: 16 R11 corpus records, every member
+pin correct, four R9 .bisa bytes unchanged, control_flow envelope pins stable.
+Owned diff --check clean. Tracking b-isa-spec-x02 closed at final handoff.
+External response: ../bennett/docs/council/isa-ref-2026-10-29/round-11/response.md.
+All work is complete for this round; staged whole-ISA deliverables remain.
+Logs: .tmp/r11-final-{fmt,clippy,sweeps}.log and all per-step logs above.
+No conformance test or foreign source was edited/executed; no push.
+Beads auto-export and the pre-existing untracked repository .tmp remain
+outside owned commits. Accepted spec hash remains
+90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e.
 ISA 0.8 gap/amendment: none. Existing staging and SPEC-QUESTIONS unchanged.
 
 ## Round-10 fixes (2026-10-30)
