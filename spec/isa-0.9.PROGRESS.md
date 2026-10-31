@@ -1,3 +1,175 @@
+## 2026-10-31 INV-6 editorial pass III — final dispositions
+
+All 12 gaps: **8 a** (text changes), **4 b** (already covered by K13),
+**0 NAD**. Eight new K rows, **K68–K75**, remain in the single §0.2
+table. Status explicitly reopens snapshot 59eee9ad0d96 for a one-seat
+re-review; that earlier sol/codex acceptance is retained as history.
+The clean starting file's 01da16588c0b digest includes only 9b8e01e's
+later acceptance header. This pass does not perform the re-review.
+
+Final clause IDs are from the scratch graph; the supplied statement
+catalog remains the dependency authority and is not regenerated in place.
+For a rows, dependencies below are the declared semantic premises (a
+clause includes its cited statements); for b rows they identify existing
+coverage, not newly added markers. All rows close through afu; no new
+follow-up bead or library-boundary exception is needed.
+
+| Gap / proof step | Disposition | K | Final clauses / existing coverage | [deps:] IDs (ISA- prefix) | Bead status |
+|---|---|---|---|---|---|
+| 1 / 1.1.3 | a: action D includes both region roles; factor list repaired in one sentence | K68 | ISA-5.3-P1.S1 | 5.1-P1, 5.2-P4, 3.3-P19, 5.6-P1, 14.2 | afu CLOSED |
+| 2 / 1.2.2 | a: header names resolve to category/group/slot/cell identities; equality to D component by component | K69 | ISA-12.2-P2.S2–S5; P4.S2–S3 | 5.1-P1, 9.4-P2, 3.3-P19, 5.2-P4, 5.3-P1, 12.1-P1, 12.1-P7, 12.1-P8, 12.2-P1, 14.3-P3 | afu CLOSED |
+| 3 / 1.2.3 | a: zero-based borrow positions in checked K13 allocation order; names label-only, no interface coverage | K70 | ISA-12.2-P2.S6–S8 | 4.3-P2, 5.6-P1, 12.1-P8 | afu CLOSED |
+| 4 / 1.2.4 | a: omitted components fixed at zero; n and exact n/\|D\| | K71 | ISA-12.2-P3.S2–S4 | 5.2-P4, 5.3-P1, 12.1-P8, 12.2-P1 | afu CLOSED |
+| 5 / 1.2.5 | a: uniqueness after resolution, equal widths, inclusive valid ranges, valid cell indices | K72 | ISA-12.2-P3.S1 | 3.3-P2.S2, 3.3-P19, 12.2-P1 | afu CLOSED |
+| 6 / 1.4.2 | b: complete K13 tuple object already fixed, including controls, every interface cell and borrowed component; no projection-only comparison | K13 | ISA-12.1-P7.S6; P8.S1–S6 | existing 12.1-P7, 12.1-P8 (P7.S6 declares 14.3-P3, 5.6) | afu CLOSED |
+| 7 / 1.4.3 | a: compatible ordered roles, widths/classes, region shapes and borrow requirements; map by position, never local names | K73 | ISA-12.1-P15; non-normative P16 | 5.1-P1, 9.4-P2, 12.1-P7.S4, 12.1-P8 | afu CLOSED |
+| 8 / 1.4.4 | b: K13 before/after object, canonical unsigned decimal strings, exact domain row count/order, including sampled table relations | K13 | ISA-12.1-P8.S1–S7 | existing 12.1-P8; enumeration 12.2-P1.S1 | afu CLOSED |
+| 9 / 1.4.6 | b: subject already mandatory for both kinds, standalone per-claim invocation supplies all four budget values; scheduled root binding plus separately resolved nested contexts | K13 | ISA-12.1-P7.S1–S4; P11; ISA-12.3-P2/P3, P7.S3 | existing 12.1-P7, 12.1-P11, 12.3-P2, 12.3-P3, 12.3-P7 | afu CLOSED |
+| 10 / 1.5.1 | a: checker report indexed by region hash / claim index / invocation or context; checked producer label request never a premise | K74 | ISA-12.2-P4.S1/S4–S6 | 1.2-P4, 12.1-P1, 12.1-P2, 12.1-P7, 12.1-P8, 12.1-P11, 12.2-P1, 12.3-P1, 12.3-P3, 5.6-P2, 14.3-P3, 12.3 | afu CLOSED |
+| 11 / 1.6.5 | b: K13 uses distinct draws / \|D\|, always evidence even at fraction 1; K74 makes the separate count of replayed draws explicit | K13 (K74 report integration) | ISA-12.1-P8.S9–S10; existing witness P10/JSON; ISA-12.2-P4.S4 | existing 12.1-P8; report deps 12.1-P1, 12.1-P2, 12.1-P8.S9, 12.1-P8.S10, 12.2-P1 | afu CLOSED |
+| 12 / 1.7.5–6 | a: unchecked (host limit), normal termination with cited quantity/operation, no label/count/fraction or discharged obligation, no host-imposed legality cap | K75 | ISA-12.2-P5 | 3.3-P2.S2, 3.3-P19, 12.1-P1, 12.1-P2, 12.1-P8, 12.2-P1, 1.2-P4, 5.6-P2, 14.3-P3, 12.3 | afu CLOSED |
+
+Witnesses beside text: the CNOT zero slice, borrowed renaming, full-domain
+mismatch at element 4 and full explicit reversed cell list are printed
+in §12.2 P6/P7. K73's crossed-name equal-width witness is §12.1 P16.
+K13/K67's existing complete before/after tuples, changed-argument and
+short-budget outcomes, four draws/one distinct element and 25-bit D
+remain unchanged. An action's unchanged in-region still contributes
+independent cells to D; the region[63,1] count-1 witness describes a legal
+action region (oracle mappings separately retain W=8).
+
+Rejected alternatives and S0 cross-check:
+- Gaps 1/2: dropping action in-region factors or deciding coverage by a
+  name set makes independent systems disappear. Names are resolved only
+  within their category; identities then decide equality. Do not ban
+  cross-role names: borrowed t remains legal, and an explicit full cell
+  list can prove full coverage just like all cells. No region, arbitrary
+  width, body operation, oracle or demo-ladder capability is removed.
+- Gap 3: matching borrowed labels against interface or body-local names,
+  or merging distinct lifetimes on reused storage, loses positional
+  identity. Checked K13 allocation order already includes the subject's
+  calls/structured lifetimes; no new recipe traversal or source ordinal
+  is invented. Omitted trailing borrow positions zero-fill; an earlier
+  fixed-zero position is expressed by its singleton range.
+- Gap 4: banning omission would discard already legal partial domains;
+  unspecified or unconstrained fill would make replay ambiguous or
+  inflate coverage. Select zero fill and retain all singleton/range
+  slices. This fixes values on the checked slice only, never narrows D.
+- Gap 5: duplicate-name counting, intersecting duplicate ranges, modular
+  truncation of bounds or silently ignoring bad indices do not define
+  one Cartesian product of independent coordinates. Reject those
+  malformed descriptors, while preserving their well-formed equivalents.
+- Gaps 6/8: replacing K13's object with a flat tuple or a §9.1 number
+  encoding, accepting target/fault-only comparisons, or sample-only table
+  rows would contradict the ratified full-tuple contract. Keep canonical
+  decimal strings and one complete before/after row per declared domain
+  element; a program expectation supplies a compact relation. Table
+  enumeration follows the existing listed component order (last fastest),
+  not tuple field order or signature sorting of the domain entries.
+- Gap 7: matching equal-width slots or cells by local names can cross
+  independent coordinates. Class/shape/role and borrow compatibility
+  retains arbitrary names and arbitrary algorithms implementing the same
+  relation, with classical arguments/budgets still K13-bound.
+- Gap 9: adding a second budget field, defaulting to a chosen B, or
+  reusing the root tuple for a different callee is unnecessary/unsound.
+  K13 already requires per-claim standalone invocation, or the actual
+  scheduled context's resolved budget, for all expectations and both
+  exhaustive/sampled kinds. The payload table is completed by its prose.
+- Gap 10: producer verdicts as premises, or writing checker labels back
+  into certificate identity, would defeat independent checking. A label
+  is a request and a completed evidence result rejects an overstated
+  proof request. Structural/library proofs remain available: the new
+  ordinary component-domain proof test expressly preserves K4's separate
+  quantified two-composition relation. The host-limit result remains
+  unchecked even when a label was requested.
+- Gap 11: count/|D| overstates repeated draws. Retain the K13 distinct
+  fraction plus replayed count; all sampled successes remain evidence.
+  INV-6 1.6.8 forbids an overstrong mathematical claim that agreement on
+  a slice never implies anything outside it; no such sentence is added.
+- Gap 12: hard width/A/count caps, malformed-domain errors for host
+  exhaustion, process aborts or proof/evidence based on incomplete replay
+  are rejected. Legal large programs remain executable and claims remain
+  expressible; only this host's unfinished check is unverified. Normal
+  termination identifies the failing operation/quantity and §12.2.
+- K13 prepends inherited controls to complete tuples. Resolving those
+  first c bundles entries positionally prevents the same interface-name
+  confusion for controls; a fixed control is a singleton range, so every
+  zero slice and every full controlled domain remains expressible. This
+  is domain metadata only, without a schedule/library/recipe change.
+
+Validation (headless, Python -I; scratch .tmp/inv6-editorial):
+- Required standalone `python3 -I conformance/tests/draft_witnesses.py`
+  PASS, exit 0, including the exact system `diff -u --label
+  a/spec/Bennett-ISA-Spec.md --label b/spec/Bennett-ISA-Spec-0.9-draft.md
+  <absolute accepted> <absolute draft>` byte comparison. That exact command
+  generated the artifact (exit 1 means the expected files differ).
+- Independent `check_witness.py`: PASS on the final draft, after the
+  baseline failed at the absent new witness. Derives all 8 CNOT tuples,
+  the 4-element zero slice and first full-domain mismatch at 4, checks
+  five borrowed-label spellings, both explicit cell orders, crossed-name
+  positional tuples, and the retained K13 budget/sampling calculations.
+  This is a finite contract witness, not a claim of implemented 0.9
+  checker/executor conformance; no interpreter source or test is edited.
+- Scratch baseline/current clause graphs and statement catalogs: 26
+  new/changed normative-classified statements, all with markers; all
+  declared IDs resolve in the supplied Markdown authority; zero
+  unresolved declared dependencies and zero ambiguous terms. The 15
+  unresolved clause references are pre-existing external/xspec edges.
+  The proof uses 0.8 positional IDs: its region-binding ISA-3.3-P14 is
+  ISA-3.3-P19 in the supplied 0.9 catalog; unbounded widths are P2.S2.
+  New declarations use the actual semantic premises, not the stale IDs.
+- Scope audit PASS: only status header, eight §0 rows, one §5.3 sentence
+  and §12 additions changed. K1–K75 continuous; all new rows have a
+  witness. Forbidden-word scan PASS. Source/progress diff whitespace
+  PASS; raw unified-diff context whitespace deliberately remains exact.
+- Accepted 0.8 SHA-256 unchanged:
+  90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e.
+  Entire §11.1 (including heading) unchanged, SHA-256
+  f08c515b2c9fc8cc9418211c907c7cd681b30e4f5bb95c59fa9065be89d01e2e;
+  full-library binding remains 219 recipes and envelope hash
+  5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197.
+  Entire §12.3 (including heading) unchanged, SHA-256
+  60298f0f4fc04339643607134d9ef31b24487ed16e0c997faf0b4a9b4fe59547.
+- Final draft SHA-256:
+  3e4aa324d8b0e3ed8a9dfcc2c8312b886bfe8956160821a9207d2e701fe59e64.
+  Regenerated diff SHA-256:
+  424c2f75e050854a719fbaf42184753f56d438558ebc4b01c7827caf3d4c5ea6.
+- afu closure note names K68–K75 and retained K13/K67; the closure is
+  drafting/disposition completion, not acceptance by the re-review seat.
+  Beads export refreshed before the explicit-path commit containing this
+  record. No push or remote/Dolt sync; no sibling, worklog, public index,
+  library or concurrent interpreter change is included by this editor.
+
+## 2026-10-31 INV-6 editorial pass III — derivations before text
+
+Read CLAUDE rules 10/12, AGENTS, §0/§12, INV-6 in full, afu,
+SOL-R22-B01 and all 33 interpreter SPEC-QUESTIONS entries (read-only).
+The clean baseline is 01da16588c0b (9b8e01e adds only the acceptance
+header to accepted snapshot 59eee9ad0d96); reopening is for one-seat
+re-review. Owned paths remain draft/diff/progress/beads; no worklog or
+sibling edit. NAD means not addressed here, never a capability rejection.
+
+Derivations: for mut t,u and borrowed b, each one bit, D has 2^3 = 8
+basis tuples. Omitting t holds it at zero: u,b enumerate 2^2 = 4 tuples,
+so CNOT(t,u) agrees with identity on that slice, coverage 4/8 = 1/2.
+At (t,u,b)=(1,0,0) the outputs are (1,1,0) and (1,0,0).
+Changing only borrowed.name leaves the slice unchanged. In a bundles
+order [u,t], borrowed b last, that counterexample is element 2 (zero
+based); the council's full control lists [t,u] and fails at element 4.
+A two-cell, one-bit action region has 2^(1*2)=4 configurations; an
+explicit [cell 1,cell 0] full-range list covers the same D as all cells
+but enumerates in its own listed order. Duplicate aliases of a cell
+cannot multiply cardinality. Four singleton samples replay four draws
+and cover one distinct element (K13/K67), not four elements of D.
+A region[63,1] element itself contains 2^63 bits even at count=1; host
+representability is independent of domain legality and sample count.
+
+Decision: retain the ratified K13 full-tuple object, canonical decimal
+strings, complete-domain table rows (also for sampling), invocation
+bindings and distinct-draw fraction. Gaps 6/8/9/11 are already covered;
+other gaps need eight concepts K68–K75. All numerical witnesses above
+are elementary finite products/XOR, independent of an executor.
+
 ## 2026-10-31 Council round 1 → 2 — final validation
 
 - Full `cargo test --offline --manifest-path conformance/Cargo.toml`:

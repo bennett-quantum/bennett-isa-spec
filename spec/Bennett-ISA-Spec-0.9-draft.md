@@ -1,6 +1,7 @@
 # Bennett Virtual ISA — Specification, draft 0.9
 
-**Date:** 2026-10-31. **Status:** draft 0.9, **accepted by the sol and codex seats** (council run
+**Date:** 2026-10-31. **Status:** draft 0.9, **reopened by editorial pass III, pending a one-seat re-review**.
+Snapshot `59eee9ad0d96` was accepted by the sol and codex seats (council run
 `isa-09-2026-10-31`: codex round 2, sol round 3, both core accept, 0 blocking; muse seat held).
 K64 and K65 are drafted pending maintainer ratification; publication is gated on that ratification
 and the muse vote. It
@@ -182,6 +183,14 @@ north star §3.1 requires).
 | K65 | §11 | **WHOLE-CLEANUP-CARRIER**. One non-emitting ordinal-0 carrier selects the whole explicit cleanup before expansion, even if empty; witness: reverse/recompute for quncopy share one carrier. [deps: ISA-6.2-P1, ISA-6.4-P1, ISA-11-P6] | INV-5 gap 8; 23g; maintainer ratification pending | S | – |
 | K66 | §9.2, §11, §11.1, §12.1 | **DEPENDENCY-ACCURACY**. Retarget release, matching, staging, construction and replay declarations to their semantic premises; witness: K28 cites ordinal/scratch P29 rather than activation P21. [deps: ISA-11.1-P29, ISA-11-P5, ISA-11-P6, ISA-11-P7, ISA-9.2-P4, ISA-12.1-P7] | SOL S1; COD S01/S02 (targeted) | E | – |
 | K67 | §12.1 | **LEGAL-REPLAY-WITNESS**. F=4 and W=8 with legal unused mapping give a 25-bit domain; witness: four singleton draws cover 1/33554432 with unchanged XOR outcomes. [deps: ISA-5.4, ISA-7.1, ISA-7.2, ISA-12.1-P8, ISA-12.2] | COD S03 | E | – |
+| K68 | §5.3 | **ACTION-DOMAIN**. Include both region roles in the unitary and D; witness: an unchanged two-cell one-bit `in` region still contributes four configurations. [deps: ISA-5.1-P1, ISA-5.2-P4, ISA-3.3-P19, ISA-5.6-P1, ISA-14.2] | INV-6 gap 1; afu | E | – |
+| K69 | §12.2 | **COMPONENT-COVERAGE**. Resolve interface names to group/slot/cell identities and require every full range for exhaustive proof; witness: full explicit cell lists cover D, but borrowed `t` cannot cover omitted mut slot t. [deps: ISA-5.1-P1, ISA-9.4-P2, ISA-3.3-P19, ISA-5.2-P4, ISA-5.3-P1, ISA-12.1-P8, ISA-14.3-P3] | INV-6 gap 2; SOL-R22-B01; afu | S | – |
+| K70 | §12.2 | **BORROWED-POSITIONS**. Borrow entries denote checked lifetimes by position with label-only names; witness: borrowed labels t and b give the same four-element CNOT slice. [deps: ISA-4.3-P2, ISA-5.6-P1, ISA-12.1-P8] | INV-6 gap 3; afu | E | – |
+| K71 | §12.2 | **OMITTED-ZERO-SLICE**. Hold omitted components at zero and count the resulting slice; witness: omitting t from three independent bits yields 4/8 coverage. [deps: ISA-5.2-P4, ISA-5.3-P1, ISA-12.2-P1] | INV-6 gap 4; afu | S | – |
+| K72 | §12.2 | **DOMAIN-VALIDITY**. Validate unique resolved components, widths, bounds and cell indices; witness: duplicate cell 1, width 2 for a one-bit slot and index 2 for region[1,1] reject. [deps: ISA-3.3-P2.S2, ISA-3.3-P19, ISA-12.2-P1] | INV-6 gap 5; afu | S | – |
+| K73 | §12.1 | **EXPECTED-CORRESPONDENCE**. Compare programs by ordered roles, shapes and borrow positions; witness: crossed local names on two equal-width slots do not exchange those slots. [deps: ISA-5.1-P1, ISA-9.4-P2, ISA-12.1-P7, ISA-12.1-P8] | INV-6 gap 7; afu | E | – |
+| K74 | §12.2 | **CHECKER-VERDICT**. The checker records per-claim labels and counts in its report, never trusting a requested label; witness: the four-element CNOT slice reports evidence with count 4 and fraction 1/2. [deps: ISA-1.2-P4, ISA-12.1-P1, ISA-12.1-P2, ISA-12.1-P8, ISA-12.3-P1] | INV-6 gap 10; afu | S | – |
+| K75 | §12.2 | **UNCHECKED-HOST-LIMIT**. Report host exhaustion separately from labels and rejection without a domain cap; witness: region[63,1] at count 1 remains legal even when one element cannot be stored. [deps: ISA-3.3-P2.S2, ISA-3.3-P19, ISA-12.1-P2, ISA-12.2-P1, ISA-5.6-P2, ISA-14.3-P3, ISA-12.3] | INV-6 gap 12; afu | S | – |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -1142,10 +1151,14 @@ local regions at image.
 
 ### 5.3 Quantum action
 
-**Semantics.** The body denotes a unitary U on mut ⊗ ins ⊗ mem_mut ⊗
-(borrowed), block-diagonal in the computational basis of `ins` and of
-`in`-region cells, identity on borrowed and external reference systems
-(§5.6), workspace returned clean. No fault outcome. Coherent internal
+**Semantics.** The body denotes a unitary U on mut ⊗ ins ⊗ mem ⊗
+(borrowed), where mem includes both `mut` and `in` interface regions,
+block-diagonal in the computational basis of `ins` and of `in`-region
+cells, identity on borrowed and external reference systems (§5.6),
+workspace returned clean, with domain D every value of each `mut`
+and `in` bundle, every cell of every `mut` and `in` interface region and
+every borrowed bundle, workspace initially at 0 and local regions at
+image. [deps: ISA-5.1-P1, ISA-5.2-P4, ISA-3.3-P19, ISA-5.6-P1, ISA-14.2] No fault outcome. Coherent internal
 control yields the padded unitary under declared bounds, part of the
 action's identity. **Permutation action**: realised unitary a
 permutation matrix (ε = 0, permutation gates only, transitively).
@@ -3344,6 +3357,22 @@ supplied separately as §11 selectors in the schedule form. [deps: ISA-11-P3, IS
 }
 ```
 
+**Expected-program correspondence (K73).** Compatibility for
+`expected: {program: H}` requires the same ordered interface roles,
+bundle widths/classes, region shapes/classes/roles, classical parameter
+types and ordered borrowed-bundle widths/classes as the subject; local
+names may differ. [deps: ISA-5.1-P1, ISA-9.4-P2, ISA-12.1-P7.S4, ISA-12.1-P8]
+The checker initialises and compares each interface bundle by (group,
+slot), each region cell by (group, slot, index), each borrowed bundle by
+its checked lifetime position and each prepended inherited control by
+position, using the complete before/after tuples of K13, never matching
+components between the two programs by name. [deps: ISA-5.1-P1, ISA-9.4-P2, ISA-12.1-P7.S4, ISA-12.1-P8]
+
+*(non-normative)* For subject mut slots named t,u and expected mut slots
+named u,t, both one bit, the first slot is compared with the first and
+the second with the second; exchanging the expected local names cannot
+exchange the values compared. [deps: ISA-9.4-P2, ISA-12.1-P7.S4, ISA-12.1-P8]
+
 ### 12.2 Domains
 
 `"domain": { "bundles": [ { "name", "width", "lo", "hi" } ], "borrowed": [ same ], "regions": [ { "name", "cells": "all" | [ { "index", "lo", "hi" } ] } ], "args"?: [ same as bundles ] }`,
@@ -3354,6 +3383,127 @@ read as an unsigned integer of its width (`ptr`: ptr_width; `f64`: 64,
 its bits).
 A `proof` label requires the domain to equal D; otherwise the claim is
 `evidence` with the covered fraction.
+
+**Component resolution (K69/K70).** These component-domain rules apply
+to table/program/oracle relations; K4 inverse-pair claims retain their
+separate two-composition relation and quantified argument bindings.
+[deps: ISA-12.1-P7.S8, ISA-12.1-P1.S2, ISA-12.3-P3]
+For an oracle the interface bundle groups are `in`, `tgt`, `fault` and its interface regions have role `in`;
+for an action the bundle and region roles are `mut`, `in`, with slots
+numbered from zero within each declared group. [deps: ISA-5.1-P1, ISA-5.2-P4, ISA-5.3-P1, ISA-9.4-P2]
+A `bundles` or `regions` entry's `name` MUST be the subject header's
+local name of an interface bundle or region of that category, resolving
+to (group, slot); unknown names reject. [deps: ISA-5.1-P1, ISA-9.4-P2, ISA-12.2-P1]
+For a subject with c inherited controls, the first c `bundles` entries
+instead denote those prepended one-bit controls by position, with
+label-only names; all c entries are required, and a singleton range
+expresses a fixed control value. [deps: ISA-12.1-P8.S3, ISA-12.1-P7.S1, ISA-12.2-P1]
+A region's `cells: "all"` denotes every cell (group, slot, index) in
+increasing index order with its full W-bit range, and an explicit cell
+list denotes those same cell identities in listed order with the stated
+ranges. [deps: ISA-3.3-P19, ISA-12.2-P1.S1]
+Entry k of `borrowed` denotes checked borrow lifetime k (zero-based) in
+K13's tuple allocation order, independently of any physical storage
+reuse; its `name` is only a label, may coincide with any other name and
+never denotes an interface component. [deps: ISA-4.3-P2, ISA-5.6-P1, ISA-12.1-P8.S4]
+A borrowed position beyond the checked borrow requirement rejects as
+ill-formed. [deps: ISA-4.3-P2, ISA-12.1-P8.S4]
+A `borrowed` entry MUST NOT discharge an interface bundle or region-cell
+coverage obligation, whatever its name. [deps: ISA-4.3-P2, ISA-5.6-P1, ISA-12.1-P8]
+
+**Domain validity and omission (K71/K72).** After resolution, each
+component MUST occur at most once, every supplied `width` MUST equal
+that component's width, ranges MUST satisfy 0 ≤ lo ≤ hi < 2^width, and
+cell indices MUST satisfy 0 ≤ index < 2^A; a violation rejects the
+claim as ill-formed. [deps: ISA-3.3-P2.S2, ISA-3.3-P19, ISA-12.2-P1]
+Every omitted component is held at zero on every replayed element,
+including omitted borrowed positions after the listed entries; workspace
+and local regions retain their separate zero/image initialisations.
+[deps: ISA-5.2-P4, ISA-5.3-P1, ISA-12.2-P1]
+The domain denotes the product of the resolved ranges with those
+omitted components fixed at zero, not the full range of an omitted
+component. [deps: ISA-5.2-P4, ISA-5.3-P1, ISA-12.2-P1]
+For an exhaustive claim its element count n is the product of the range
+sizes over individual resolved components, the empty product being 1,
+and its covered fraction is exactly n/|D|, with |D| the product of the
+full component range sizes (prepended inherited controls included).
+[deps: ISA-5.2-P4, ISA-5.3-P1, ISA-12.1-P8, ISA-12.2-P1]
+
+**Coverage and verdicts (K69/K74).** For exhaustive and sampled claims,
+`proof` and `evidence` are checker-assigned outcomes recorded in the
+checker report against the region closure hash and zero-based `claims`
+array index, with the bound invocation or invocation context key where
+applicable; they are not producer assertions in the certificate.
+[deps: ISA-1.2-P4, ISA-12.1-P7, ISA-12.1-P11, ISA-12.3-P1, ISA-12.3-P3]
+An exhaustive table/program/oracle claim receives `proof` iff every
+obligation of §12.1 succeeds on every element and its domain equals D
+component by
+component: every interface bundle, every interface region cell, every
+borrowed position and every prepended inherited control occurs exactly
+once with its full range. [deps: ISA-12.1-P1, ISA-12.1-P7, ISA-12.1-P8, ISA-5.2-P4, ISA-5.3-P1, ISA-14.3-P3]
+This equality is decided over resolved identities and ranges, never
+sets of names; an explicit full-range list of every cell covers exactly
+the same region domain as `cells: "all"`. [deps: ISA-3.3-P19, ISA-12.2-P1, ISA-12.1-P8]
+Successful exhaustive checks on a strict slice receive `evidence` with
+n replayed elements and n/|D|; successful sampled checks receive
+`evidence` with exactly `count` replayed draws and K13's distinct-draw
+fraction, even if it is 1. [deps: ISA-12.1-P1, ISA-12.1-P2, ISA-12.1-P8.S9, ISA-12.1-P8.S10, ISA-12.2-P1]
+A supplied `label` of `proof` or `evidence` is only a request: the
+checker MUST compute the outcome independently and reject a requested
+`proof` when a completed check yields only `evidence`. [deps: ISA-1.2-P4, ISA-12.1-P7.S6, ISA-12.2-P1]
+Neither an evidence label nor a requested label discharges an obligation
+requiring proof over D. [deps: ISA-5.6-P2, ISA-14.3-P3, ISA-12.3]
+
+**Host limits (K75).** Domain widths, region address width A, cell-list
+lengths and sampler `count` have no ISA-imposed upper cap; a checker
+MUST NOT treat its host's representability, allocation or replay limits
+as domain illegality. [deps: ISA-3.3-P2.S2, ISA-3.3-P19, ISA-12.1-P2, ISA-12.2-P1]
+If a checker cannot complete a legal claim on its host, including
+materialising an element, enumerating the domain or retaining the
+required replay/coverage data, it MUST terminate normally and record
+**unchecked (host limit)** for that claim in the same report, citing
+§12.2 and the quantity or operation that exceeded the host limit.
+[deps: ISA-12.1-P1, ISA-12.1-P2, ISA-12.1-P8, ISA-12.2-P1]
+That outcome is distinct from rejection and from either label, supplies
+no evidence count or covered fraction for the claim, and discharges no
+obligation of §5.6, T3 or §12.3, including when a producer requested a
+label. [deps: ISA-1.2-P4, ISA-5.6-P2, ISA-14.3-P3, ISA-12.3]
+
+**COMPONENT-COVERAGE witness**
+The following full tuples and resolved identities instantiate the
+component rules without a schedule or inherited controls.
+[deps: ISA-4.4, ISA-12.1-P8, ISA-12.2-P1]
+
+```json
+{
+  "mut_names":["t","u"],"widths":[1,1],"borrowed_widths":[1],
+  "domain":{"bundles":[{"name":"u","width":1,"lo":0,"hi":1}],"borrowed":[{"name":"t","width":1,"lo":0,"hi":1}],"regions":[]},
+  "resolved":[["mut",1],["borrowed",0]],
+  "elements":4,"full_elements":8,"covered_fraction":"1/2","verdict":"evidence",
+  "renamed_borrowed":"b",
+  "counterexample":{
+    "before":{"bundles":["1","0"],"borrowed":["0"],"regions":[]},
+    "cnot_after":{"bundles":["1","1"],"borrowed":["0"],"regions":[]},
+    "identity_after":{"bundles":["1","0"],"borrowed":["0"],"regions":[]}
+  },
+  "full_bundle_order":["t","u"],"first_mismatch_index":4,
+  "region":{"A":1,"W":1,"cells":[{"index":1,"lo":0,"hi":1},{"index":0,"lo":0,"hi":1}],"elements":4,"covers_all":true}
+}
+```
+
+*(non-normative)* For the one-bit mut t,u action that borrows b,
+applies `cx t u` and returns b, compared with identity with the same
+borrow requirement, the four elements above agree because omitted t
+is zero, while (t,u,b)=(1,0,0) distinguishes the programs; renaming the
+borrowed label cannot change the domain or its verdict. [deps: ISA-4.4, ISA-4.3-P2, ISA-12.1-P7, ISA-12.2-P1]
+Adding the full t range in the printed full-bundle order exposes the
+mismatch at zero-based element 4, rather than yielding proof.
+[deps: ISA-4.4, ISA-12.1-P1, ISA-12.2-P1]
+The two-cell region's explicit reversed cell list covers all four basis
+configurations, while repeating index 1 or using index 2 is ill-formed;
+an action region[63,1] with `cells: "all"` and `count: 1` remains legal but has
+2^63 bits per element, so an unable host reports unchecked (host limit).
+[deps: ISA-3.3-P19, ISA-12.1-P2, ISA-12.2-P1]
 
 ### 12.3 Schema and composition
 
