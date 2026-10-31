@@ -1,3 +1,144 @@
+## 2026-10-31 INV-5 second editorial pass — dispositions and validation
+
+Sole draft-text editor; only draft/diff/progress/beads are owned. Read
+CLAUDE/AGENTS, §0/§11/§17, prior K29–K48 dispositions and rejected
+alternatives, INV-5 in full, b-isa-spec-6hs and the round-18 council
+report. SPEC-QUESTIONS initially ended at 32; re-read the concurrent
+agent's new entry 33 (round 18) once it appeared, without editing it.
+The supplied statement catalog is the dependency-ID authority; sibling
+graphs/catalogs/proofs are read-only.
+
+All **17** list items plus the bead are dispositioned below: **15 a**
+(text change, with two pairs sharing their concept row), **2 NAD**
+under the frozen-library boundary. There are **13 new K rows, K49–K61**,
+one per changed concept. Gap 10's token encoding subpart was already
+covered by K3/K13 (§12.3); §11 now cites it expressly. Gap 13's full-library
+hash already existed in §11.1; the omitted-binding rule now names it.
+No proof file, interpreter or conformance source is edited here.
+NAD means not addressed in this pass, not a rejection of the capability.
+The K55 fix closes **b-isa-spec-6hs**; separate maintainer beads retain
+the two library-facing gaps.
+
+Final clause IDs are from the scratch rebuild, not a renumbered sibling
+catalog. Declared dependency IDs are the union per concept and were
+checked against the supplied catalog. The old proof's ISA-11-P4 is the
+accepted-0.8 Matching paragraph; its 0.9 counterpart was ISA-11-P5 and
+is now split across ISA-11-P5/P6/P7.
+
+| Gap / proof step | Disposition | K | Clauses changed/added or unchanged coverage | Declared deps (ISA- prefix) | Bead status |
+|---|---|---|---|---|---|
+| 1 / 1.1.3–4 | a: no lift.call element | K49 | ISA-11-P5.S1/S2 | 4.7, 4.2, 3.6, 3.7 | — |
+| 2 / 1.1.5.2 | a: callee token budget | K50 | ISA-11-P5.S4 | 5.2-P3, 5.4, 10 | — |
+| 3 / 1.1.6 | NAD: total non-row address/ordinal mapping needs library-facing design | — | ISA-11-P2/P5; ISA-11.1-P29 remain incomplete on this point | — no new sentence | b-isa-spec-8ka OPEN |
+| 4 / 1.1.7 | a: wildcard-only absent coordinates | K51 | ISA-11-P5.S8 | 5.2-P3, 5.3, 4.7 | — |
+| 5 / 1.1.8 | a: last entered oracle in entry path | K52 | ISA-11-P5.S5/S6/S7 | 4.2, 4.7, 5.2-P3, 3.6, 3.7 | — |
+| 6 / 1.2.2 | a: distinct equal maxima; shadows/union cover | K53 | ISA-11-P6.S1/S2/S3/S4 | 11-P3, 4.6, 5.2-P3 | — |
+| 7 / 1.2.4.1 | a: kind operation classes | K54 | ISA-11-P6.S6 | 11-P2.S1, 11-P3 | — |
+| 8 / 1.2.4.2 | NAD: stable whole-cleanup carrier needs library-facing design | — | ISA-6.4; ISA-11-P6 keep both realisations without inventing a carrier | — no new sentence | b-isa-spec-23g OPEN |
+| 9 / 1.4.1 | a: maximal-match validation at fixed stages | K55 | ISA-11-P7.S1–S8 | 11-P3, 9.2, 5.2-P3, 4.1, 3.7, 5.4, 10, 3.4, 4.7, 12.3, 4.6 | 6hs CLOSED |
+| 10 / 1.4.3 | a: known admission / unknown first ambiguous operation; encoding subpart b, K3/K13 already cover it | K55 | ISA-11-P7.S1–S8/S10; existing ISA-12.3-P3 | 11-P3, 9.2, 5.2-P3, 4.1, 3.7, 5.4, 10, 3.4, 4.7, 12.3, 4.6 | 6hs CLOSED |
+| 11 / 1.6.2 | a: default, never less-specific inheritance | K56 | ISA-11-P6.S7 | 11-P3, 17 | — |
+| 12 / 1.6.3.2 | a: object ISA version | K57 | ISA-17-P8.S2/S3/S4 | 9.1, 11.1-P3, 11.1-P4, 11.1 | — |
+| 13 / 1.6.3.3 | a: omitted binding names existing full-library hash | K57 | ISA-17-P8.S2/S3/S4; unchanged §11.1 hash | 9.1, 11.1-P3, 11.1-P4, 11.1 | — |
+| 14 / 1.6.4.2 | a: eps-independent N, root accuracy, inclusive nested population | K58 | ISA-17-P10.S2/S3/S4/S5 | 8.1, 8.3, 11-P2, 11-P3, 8.2 | — |
+| 15 / 1.6.4.3 | a: exact reduced-rational resolved share | K59 | ISA-17-P10.S2/S5/S6/S7/S8 | 8.1, 8.3, 11-P2, 11-P3, 8.2, 9.2 | — |
+| 16 / 1.6.5 | a: exact decimal value | K60 | ISA-11-P7.S9 | 8.1-P1, 5.2-P1 | — |
+| 17 / 1.6.7 | a: direct uncovered default, no synthetic entry | K61 | ISA-11-P6.S9/S10 | 8.3, 17, 11-P3 | — |
+| b-isa-spec-6hs | a: same concept as gaps 9/10, not an extra K row | K55 | ISA-11-P7 | same K55 union above | CLOSED, note names K55 |
+
+Exact 1.4.3 sentence (line wraps removed):
+
+> A consumer MUST reject root-level ties and nested ties whose invocation domains are object-derivable at admission, and MUST reject a tie in a non-derivable nested domain at the first concrete operation in generated order having multiple maximal matching entries, before applying any realisation to that operation, with `E_SCHEDULE_INFEASIBLE` and the diagnostic "§11: multiple maximal matching schedule entries". [deps: ISA-11-P3, ISA-5.2-P3, ISA-5.4, ISA-10]
+
+K55 follows the directed interpreter reading in entry 33, while fixing
+the admission classification so implementation-specific inference cannot
+move the failure. Literal/forwarding propagation and unresolved root
+token parameters define object-derivability; a literal mint in some CC/R
+caller does not fix every invocation of a Q root. No token literal or
+new object/schedule field is introduced. The derivable-nested branch is
+conditional; current Q token parameters leave nested domains unknown.
+Root and same-machine lproc domains are known at admission. Unknown
+nested domains are neither empty nor universally quantified over budgets.
+Concrete rejection identifies the first ambiguous operation in generated
+order, before its realisation; the already executed prefix is not claimed
+to be atomic. This expressly revises theorem B's unbound-admission
+premise rather than asserting the refuted theorem. Entry 33's 0.8
+token-encoding gap is already resolved for this 0.9 draft by K3/K13.
+
+Rejected alternatives / S0 cross-check:
+- Keep lift.call chains: the two call sites/recursive depths select
+  incompatible choices for the same static lproc row. No lproc capability
+  or recursive call is removed; only oracle calls create a new step level.
+- Read every selector at the innermost operation, or at the owner of a
+  path's last point: those change empty-path and call-ending witnesses.
+  The chain transition into a callee, including when the entry ends at
+  that transition, fixes the selected level. A call row's own terminal
+  point does not itself enter a callee for that operation.
+- Product-order incomparability, pairwise overlap rejection, duplicate
+  collapse, document-order winners: contradict the lexicographic unique
+  maximum or reject fully shadowed ties. Count array positions and
+  subtract all higher coverage, including union coverage.
+- Root-budget clipping and symbolic any-budget rejection: respectively
+  under-reject B_nested > B_root and over-reject dead B_nested=2 step 3.
+  Optional eager checks using extra runtime knowledge would move rejection;
+  K55 fixes the stage and diagnostic instead. No params_hash inversion.
+- Store all nested tuples or multi-level selectors: unnecessary schema
+  changes for these fixes; retaining direct defaults closes 1.6.7 without
+  disturbing an outer step-1 entry. Token tuple hashing already exists.
+- Merge omitted fields from lower entries: violates per-entry default
+  equivalence. Do not rewrite hashed schedules to materialise defaults.
+- Round 0.1/3 to a decimal: loses exact equal sharing and can change §8.1
+  filters/buckets. Keep (1,30); (0,1) covers N=0 without division.
+  N is fixed before accuracy matching, over the bound-library gates of
+  one root invocation including nesting, before target scheme expansion.
+  Explicit-share gates remain in N; exact-native gates are excluded.
+  The achieved-error filter, cost evaluation and error charging in §8.1
+  are unchanged; explicit shares/realisations remain expressible.
+- Give non-row operations ad hoc pseudo-points, or choose the first leaf
+  of whichever cleanup realisation is selected: neither supplies a total,
+  realisation-independent address map. Non-row nested constructor paths,
+  step vs row ordinal spaces, empty cleanup and reverse/recompute first
+  leaves need a maintained library-facing contract. Stop on those two
+  concepts under the frozen-library instruction; 8ka/23g record the exact
+  work and preserve execution/charging and both unitary realisations.
+- Restrict names, token budgets, recursive lprocs, oracle scope or nested
+  schedules to avoid these cases: rejected under rule 10. No accepted
+  0.8 text, recipe, source, ordinal, count or library hash changes.
+
+Validation (headless, Python -I; scratch under .tmp/inv5-editorial):
+- Baseline/current graphs and statement catalogs rebuilt outside the
+  sibling; 49 changed/new normative-classified statements all carry
+  markers (including witnesses the extractor classifies as normative).
+  All declared IDs exist in the supplied catalog; zero unresolved
+  declared dependencies. New K rows form one continuous K1–K61 table,
+  with witnesses on every new row and beside the clauses.
+- Independent finite two-level witness model: 12 operations, all 6
+  shadow-cover and 24 union-cover entry orders, genuine/duplicate ties,
+  partial cover, B_nested=3 vs 2, lexicographic longer-path choice, kind
+  isolation, outer-step selection and uncovered nested defaults checked.
+  Exact Fraction arithmetic gives 1/30, eps_decade=2, log2inv_eps=5;
+  all four zero spellings agree. These are contract/witness checks,
+  not executor conformance or a mechanisation of INV-5.
+- Exact byte checks: accepted 0.8 SHA-256
+  90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e;
+  entire §11.1 SHA-256
+  eab3766ce4cfd301b447230d96b01b10932d6d86ebbefd770789583c3a636d10;
+  both unchanged. Library JSON bytes and 219 recipes unchanged; its
+  recomputed envelope hash remains
+  fcb2f1e6d61aced0bf9689eab5f6d82c4ae42e9fea8d1b21ae9c7ffccda6f5ce.
+- Diff generator identified by byte-identical regeneration of the input
+  artifact before editing: Python difflib.unified_diff, default 3 context
+  lines, splitlines(keepends=True), stable a/spec/Bennett-ISA-Spec.md and
+  b/spec/Bennett-ISA-Spec-0.9-draft.md labels. Regenerated after edits;
+  raw diff context spaces intentionally retained. Source/progress
+  git diff --check passes.
+- Final draft SHA-256: 7d44aca7f62bdd07b4c936c10e47515fad770efd0adb56a518a2dfd47bcb1630.
+  Diff SHA-256: 50c5ed98d161588bfb5002ddec7a23ca52942bd0e37afe38f0a964018d29de88.
+- bd close 6hs names K55; 8ka/23g remain OPEN for the maintainer;
+  bd export -o .beads/issues.jsonl performed. No push or Dolt sync.
+  Concurrent interpreter edits belong to the other agent and are
+  excluded from this editor's explicit-path commit.
+
 ## 2026-10-31 Proof editorial pass — final disposition and validation
 
 All five requested beads resolved/closed; no NAD or carried blocker.

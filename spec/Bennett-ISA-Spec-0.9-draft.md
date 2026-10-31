@@ -160,6 +160,19 @@ north star §3.1 requires).
 | K46 | §9.2 | **LAYOUT-ORDER**. Emit every structured leaf once, sorted bytewise by its JCS path; witness: both a/c.db and a.c/db survive, independently of their base values. | INV-4 gap 2; b-isa-spec-4it; SQ 31 | S | +bytes |
 | K47 | §9.2, §16.3 | **INJECTIVE-PATHS**. JCS key-component arrays preserve leaf identity; witness: ["interface_regions","a","c.db"] differs from ["interface_regions","a.c","db"]. Prefer arrays: dialect §16.3 emits dotted block names and §12 Naming emits dotted temporaries; although its reference layout uses ref, no general ban on dotted oracle/region NAMEs is established, and a dot ban would narrow legal ISA names. Also disposes of INV-4 gap 5: structural selection is encoded regardless of any CC/R harm analysis. | INV-4 gaps 3, 5; b-isa-spec-ccv; SQ 31 | S | +bytes |
 | K48 | §9.2 | **ENVELOPE-BOUNDARIES**. Grammar distinguishes function/data payload and suffix classes without new length fields; witness: a lhs named layout gives `layout = …`, never a layout-array line, and a data symbol named data has one payload line selected by its signature kind. | INV-4 gap 4; §16.2 grammar lemma | E | – |
+| K49 | §11 | **INVOCATION-CHAINS**. Only region calls open schedule invocations; lproc rows retain their enclosing oracle chain; witness: two lift.call sites reaching the same lproc row give the same chain. | INV-5 gap 1 | S | – |
+| K50 | §11 | **NESTED-BUDGETS**. Each nested oracle uses its token budget, independently of its parent; witness: root B=2 and nested B=3 include nested step 3; nested B=2 excludes it. | INV-5 gap 2 | E | – |
+| K51 | §11 | **NONSTEP-SELECTORS**. Absent oracle coordinates match only wildcard step/phase; witness: an action-root X matches */* but neither step 1 nor phase rev, including adjoint X. | INV-5 gap 4 | E | – |
+| K52 | §11 | **SELECTOR-LEVEL**. The last oracle-call element in the entry path selects the invocation whose step/phase it reads; witness: path [] step 1 reads the root even inside nested step 3; a path ending at the nested call reads nested step 3. | INV-5 gap 5 | S | – |
+| K53 | §11 | **MAXIMAL-TIES**. Equal maximal lexicographic tuples at distinct array positions tie; shadowed overlaps do not; witness: duplicate C rejects; tied A/B covered by higher C (or a union of higher entries) admit in every order. | INV-5 gap 6 | S | – |
+| K54 | §11 | **KIND-DOMAINS**. Gate, allocation and start decisions match only their operation classes; witness: gate and alloc entries with identical selectors cannot tie with each other. | INV-5 gap 7 | E | – |
+| K55 | §11 | **TIE-CHECK-STAGES**. Admission checks known invocation domains; unknown nested domains check the first ambiguous concrete operation before its realisation; witness: unknown nested B=3 rejects at nested step 3; B=2 never generates it; a derivable B=3 rejects at admission. | INV-5 gap 9–10; b-isa-spec-6hs | S | – |
+| K56 | §11 | **ENTRY-DEFAULTS**. Omitted payload fields take their defaults without inheritance from less specific entries; witness: a more-specific realisation-only gate entry uses the default share despite a broad explicit share. | INV-5 gap 11 | E | – |
+| K57 | §17 item 7 | **DEFAULT-REF-BINDING**. The omitted expansion binds the object ISA version and its published library envelope hash; witness: a 0.9 object binds ref@0.9 at the §11.1 full-library hash, not the qxor witness hash. | INV-5 gap 12–13 | E | – |
+| K58 | §17 item 9 | **SHARE-POPULATION**. An eps-independent exact-native test fixes N over the root expansion including nested invocations; witness: an exact native gate is excluded; three gates lacking an exact native match give N=3 even with explicit shares. | INV-5 gap 14 | S | – |
+| K59 | §17 item 9 | **RATIONAL-DEFAULT-SHARE**. Exact reduced-rational resolved shares preserve §8.1 evaluation without rounding or modifying schedule bytes; witness: epsilon 0.1 with N=3 resolves to (1,30); N=0 assigns zero without division. | INV-5 gap 15 | S | – |
+| K60 | §11 | **SCHEDULE-DECIMALS**. Schedule decimal values are exact rationals, independent of spelling; witness: 0, "0", "0.0" and "0.000" all denote exact zero. | INV-5 gap 16 | E | – |
+| K61 | §11 | **UNCOVERED-NESTED-DEFAULTS**. Uncovered operations take defaults directly; no synthetic entry or multi-level selector is required; witness: root step 1 keeps scheme X while an uncovered root-step-2/nested-step-1 gate takes its default. | INV-5 gap 17 | E | – |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -2315,35 +2328,139 @@ on release; borrowed wires retain their owner's vertices. Every native
 leaf, including scheme leaves, MUST satisfy §8.3 adjacency, else
 `E_SCHEDULE_INFEASIBLE` naming §17 item 15. No routing is inserted.
 
-**Matching.** Every generated operation has an **invocation chain**: the
-program points of the region calls, `lift.call`s and `lift.oracle_call`s
-that led to it, outermost first, ending in its own point. `path` matches
+**Matching.** Every generated operation has an **invocation chain**:
+the program points of the region calls and `lift.oracle_call`s that led
+to it, outermost first, ending in its own point. [deps: ISA-4.7, ISA-4.2, ISA-3.6]
+`lift.call` adds no element: an lproc row in an oracle's closure generates
+its expansion once per step under its dispatch predicate, independently
+of which `lift.call` reached that row or the recursion depth. [deps: ISA-3.6, ISA-3.7]
+`path` matches
 an operation iff it is a **prefix** of that chain, element by element:
 `symbol` and `point` equal, and `iteration` either `*` or equal to the
 vector of 0-based dynamic repetition counts of the `qloop`s enclosing
 that point (outermost first; its length is the point's loop nesting
-depth, `[]` outside every loop). `step` is the forward machine step t ∈
-1..B of an oracle-generated operation (`phase: rev` denotes the inverse
-of step t; both are per invocation level, so a nested oracle's step is
-selected by a path element for the nested call); `generated` is the
-ordinal within the row's expansion in the bound library. **Specificity**
-is the lexicographic tuple (path length, number of non-`*` iterations,
-step non-`*`, phase non-`*`, generated non-`*`); an entry applies to a
-generated operation iff all its selectors match; among matching entries
-the unique maximal one applies; **two incomparable maximal matching
-entries make the schedule invalid** (document order is never
-significant). Selectors are resolved independently per `kind`. Defaults
+depth, `[]` outside every loop).
+An oracle invocation's forward step coordinate is t ∈ 1..B and its
+inverse step t has `phase: rev`; the root B is `bindings.budget[0]`
+and a nested oracle's B is the steps component of its own call token,
+not the parent's B. [deps: ISA-5.2-P3, ISA-5.4, ISA-10]
+An entry's `step` and `phase` read the oracle invocation entered by the
+last oracle-call element of its `path`, or the root invocation if there
+is no such element. [deps: ISA-4.2, ISA-4.7, ISA-5.2-P3]
+A call element enters that invocation only when it is followed along
+the operation's chain into the callee: when the element is the
+operation's own final point, it remains in its containing invocation. [deps: ISA-4.2, ISA-4.7]
+`lift.call` never changes this level; a path ending at a call element
+that is a proper prefix of the operation's chain already selects the
+entered callee level. [deps: ISA-3.6, ISA-3.7, ISA-4.7]
+At a level with no oracle step, including an action root and oracle
+construction/commit/release outside the steps, only `step: "*"` and
+`phase: "*"` match; an action's adjoint does not itself supply a
+`rev` phase. [deps: ISA-5.2-P3, ISA-5.3, ISA-4.7]
+`generated` is the ordinal within the row's expansion in the bound
+library. [deps: ISA-11-P2.S3, ISA-11.1-P5]
+
+**Specificity** is the lexicographic tuple (path length, number of
+non-`*` iterations, step non-`*`, phase non-`*`, generated non-`*`);
+an entry applies iff all its selectors match, and among matching entries
+of the same kind the unique maximal one applies. [deps: ISA-11-P3, ISA-4.6]
+Two distinct entries (distinct array positions, even if identical)
+with equal maximal specificity for the same generated operation and
+kind make a tie; this is the meaning of "incomparable", and document
+order is never significant. [deps: ISA-11-P3]
+A tie makes the schedule invalid for that operation under the validation
+stages below; overlapping equal-specificity entries do not make a tie
+where a more-specific matching entry applies, including coverage by a
+union of such entries. [deps: ISA-11-P3, ISA-5.2-P3]
+Operations outside an invocation's own budget or inside a zero-trip
+loop are not generated and cannot witness a tie. [deps: ISA-5.2-P3, ISA-4.6]
+Selectors are resolved independently per `kind`.
+A `gate` entry matches only gate operations, an `alloc` entry only
+allocations, and a `start` entry every generated operation. [deps: ISA-11-P2.S1, ISA-11-P3]
+The applying entry supplies the decision: an omitted field with a
+default takes that default, never a value from a less-specific matching
+entry. [deps: ISA-11-P3, ISA-17]
+Defaults
 for uncovered operations: `reverse`; `native` if the gate matches a
 `gates` entry, else the first matching scheme; class = the first class
 declared in the target's `classes` object (JCS order) that has capacity
-for it; sequential timing in generated order. **Timing**: a `start` time
+for it; sequential timing in generated order.
+An operation uncovered for one kind, including in a nested invocation,
+takes that kind's default directly, without inserting an entry or
+altering any other operation's selected decision. [deps: ISA-8.3, ISA-17]
+There is no requirement that these defaults be expressible by additional
+entries in the single-`step`, single-`phase` selector language. [deps: ISA-11-P3, ISA-17]
+**Timing**: a `start` time
 MUST be ≥ the end of every operation the operation depends on (data,
 wire lifetime, region cell version, effect order); an entry violating
 this makes the schedule invalid. **Obligations**: satisfy §6; respect
 capacity; report every resource; be reproducible from the request plus
-scheduler version. A consumer validates every binding and every path
-against the object and executes verbatim or rejects (`E_SCHEDULE_
-INFEASIBLE`).
+scheduler version.
+
+**Validation stages (K55).** A consumer validates every binding and
+every path against the object, including the maximal-match condition
+at the stages specified here, and executes verbatim or rejects with
+`E_SCHEDULE_INFEASIBLE`. [deps: ISA-11-P3, ISA-9.2, ISA-5.2-P3]
+For admission, a nested invocation budget is **object-derivable** exactly
+when substituting literal integer constants and signature-positional
+classical/token forwarding into the four operands of `budget.mint`
+yields one tuple for that call site; an unresolved root parameter,
+conflicting tuples or any other unresolved operand makes it
+non-derivable. [deps: ISA-4.1, ISA-3.7, ISA-5.4, ISA-10]
+Literal propagation initialises every nonliteral value to unknown,
+takes exact bit-vector values from `const.iN`, copies values through
+positional call/return and branch/block-parameter bindings to a fixed
+point, and joins all syntactic incoming values as unknown unless they
+are all the same known value; arithmetic, predicate reasoning and
+additional implementation-specific inference do not make a budget
+object-derivable for this staging rule. [deps: ISA-4.1, ISA-3.4, ISA-3.7, ISA-5.4]
+The root region's token parameters remain unresolved at object
+admission even if a CC/R caller in the object mints a literal-budget
+token, since that caller does not bind every invocation of the
+region. [deps: ISA-4.1, ISA-4.7, ISA-5.4, ISA-10]
+This derivation does not invert `params_hash`, assume a token id's
+tuple, or substitute an enclosing invocation's budget. [deps: ISA-9.2, ISA-12.3, ISA-5.4]
+A consumer MUST reject root-level ties and nested ties whose invocation
+domains are object-derivable at admission, and MUST reject a tie in a
+non-derivable nested domain at the first concrete operation in generated
+order having multiple maximal matching entries, before applying any realisation to
+that operation, with `E_SCHEDULE_INFEASIBLE` and the diagnostic
+"§11: multiple maximal matching schedule entries". [deps: ISA-11-P3, ISA-5.2-P3, ISA-5.4, ISA-10]
+A nested domain is object-derivable only if every oracle budget on its
+invocation chain is object-derivable (the root uses the bound budget);
+admission quantifies over the generated operations of these domains,
+and defers the remaining domains without rejecting merely because
+some possible budget would contain a tie. [deps: ISA-5.2-P3, ISA-4.6, ISA-11-P3]
+Admission success therefore leaves the prescribed concrete checks in
+non-derivable domains outstanding, even when actual token values become
+available earlier; learning them does not move rejection to a different
+stage. [deps: ISA-5.4, ISA-10, ISA-11-P3]
+Schedule decimal numbers and decimal strings denote the exact rational
+of their decimal text; equal values match and resolve identically
+regardless of spelling. [deps: ISA-8.1-P1, ISA-5.2-P1]
+Token parameters in `params_hash` use §12.3's canonical four-component
+tuple encoding, for host- and device-minted tokens alike. [deps: ISA-12.3, ISA-5.4]
+
+**Selection witnesses** *(non-normative)*. [deps: ISA-11-P3, ISA-5.2-P3] For root B=2 and nested B=3,
+nested step 3 exists; with nested B=2 it does not, independently of root
+B. [deps: ISA-5.2-P3, ISA-5.4] A path of `[]` with `step: 1` reads root step 1 even for an operation
+at nested step 3; a path through the nested call reads nested step 3. [deps: ISA-4.2, ISA-4.7, ISA-5.2-P3]
+Two `lift.call` sites p1/p2 into the same lproc row q give one row-q
+expansion per enclosing step, with neither p1 nor p2 in its chain. [deps: ISA-3.6, ISA-3.7]
+An action-root X has no step/phase, including under adjoint. [deps: ISA-5.3, ISA-4.7]
+Equal maximal entries A/B reject; A/B fully covered by higher C or a
+union C1/C2 admit in every order; duplicate C entries reject. [deps: ISA-11-P3]
+An alloc entry cannot shadow a gate entry. [deps: ISA-11-P2.S1, ISA-11-P3]
+A more-specific realisation-only entry takes the default share even if
+a broad entry writes a share. [deps: ISA-11-P3, ISA-17]
+For root-step-1 scheme X and an uncovered root-step-2/nested-step-1
+gate, only the latter takes its default; no synthetic nested entry
+overrides the former. [deps: ISA-11-P3, ISA-17]
+An unknown nested budget permits admission, but if the first ambiguous
+operation is at nested step 3, B=3 rejects there before its realisation,
+whereas B=2 has no such operation; an object-derivable B=3 rejects at
+admission. [deps: ISA-11-P3, ISA-5.2-P3, ISA-5.4, ISA-10]
+Numeral 0 and strings `"0"`, `"0.0"`, `"0.000"` all denote zero. [deps: ISA-8.1-P1, ISA-5.2-P1]
 
 ### 11.1 Reference-library contract (K11)
 
@@ -3800,9 +3917,14 @@ the item is revised. Items 1–5 are asserted non-semantic.
    level. Default: the library `ref` published by `bennett-isa-spec`
    (ripple-carry adders and comparators, linear `inrange` scans,
    one-hot address dispatch, clean scratch released in reverse order);
-   a schedule that names no `expansion` binds `ref` at the ISA's own
-   version; §11.1 fixes its schema, hash, ordinals, scratch identities,
-   empty removable sets and deterministic decomposition algorithms.
+   a schedule that names no `expansion` binds `ref` at the ISA version
+   in the object's header, with the full-library envelope hash published
+   for that version in §11.1. [deps: ISA-9.1, ISA-11.1-P3, ISA-11.1-P4]
+   For a 0.9 object this is exactly
+   `{"name":"ref","version":"0.9","hash":"fcb2f1e6d61aced0bf9689eab5f6d82c4ae42e9fea8d1b21ae9c7ffccda6f5ce"}`,
+   equally for omission and an explicit binding. [deps: ISA-11.1-P3, ISA-11.1-P4, ISA-11.1]
+   §11.1 fixes its schema, ordinals, scratch identities, empty removable
+   sets and deterministic decomposition algorithms. [deps: ISA-11.1]
    Serialization as `spec/ref-0.9-draft.json` is a separate job under
    b-isa-spec-8r4; publication in `ref/` follows 0.9 acceptance. The
    worked controlled-action target/schedule/certificate fixture bound to
@@ -3814,8 +3936,39 @@ the item is revised. Items 1–5 are asserted non-semantic.
    remainder bound is below 2^−(`precision_bits` + 2), argument reduced
    modulo 2π with an outward-rounded enclosure of π.
 9. **Default `epsilon_share`** (§8.1, §11) when a schedule assigns none.
-   Default: the region's `epsilon` divided equally among its ε > 0
-   operations.
+   Default: the exact rational `bindings.epsilon / N`, where N is the
+   number of gate operations in the bound-library expansion of one
+   invocation of `bindings.region`, including every nested invocation,
+   that have no exact native match as defined below. [deps: ISA-8.1, ISA-8.3, ISA-11-P2]
+   For this count only, an exact native match is a `gates` entry whose
+   opcode, classes, control range and parameters cover the operation
+   and whose `epsilon` expression is independent of `eps` and evaluates
+   to zero; compute this test before the requested-accuracy filter,
+   without selecting an achieved-error entry using the default share. [deps: ISA-8.1, ISA-8.3]
+   N counts the gate operations before target scheme expansion and
+   includes operations with explicit shares as well as omitted shares;
+   the root accuracy is `bindings.epsilon`, not a nested region's
+   separately requested accuracy. [deps: ISA-11-P2, ISA-11-P3, ISA-8.2, ISA-8.3]
+   Gates with an exact native match take a default share of zero; if
+   N=0 all default shares are zero and no division is performed. [deps: ISA-8.1, ISA-8.3]
+   The resolved share is represented exactly as a reduced pair (p,q)
+   of nonnegative numerator and positive denominator, with zero
+   represented by (0,1); it is passed as that rational value to every
+   §8.1 comparison, expression and accuracy bucket, without rounding
+   to a finite decimal. [deps: ISA-8.1]
+   This is a resolved value, not an inserted `epsilon_share` field;
+   existing decimal schedule fields and the hashed schedule bytes are
+   unchanged by default resolution. [deps: ISA-11-P3, ISA-9.2]
+   Explicit shares still supply `eps` by their exact value and the
+   §8.1 requested-versus-achieved filter and achieved-error charge
+   still apply to every resolved share. [deps: ISA-8.1, ISA-8.3]
+   *(non-normative witness)* At `bindings.epsilon: "0.1"`, three gates
+   lacking exact native matches give N=3 and default (1,30), even if
+   one gate has an explicit share; a fourth, exact-native gate takes
+   zero and is excluded from N. [deps: ISA-8.1, ISA-8.3, ISA-11-P2]
+   With no such inexact gates N=0. [deps: ISA-8.1, ISA-8.3, ISA-11-P2]
+   Omitting expansion on a 0.9 object selects the full-library hash in
+   item 7, not the single-qxor witness hash. [deps: ISA-11.1-P3, ISA-11.1-P4]
 10. **`any`-class resolution** (§11). Default: the first class in JCS
     order with capacity.
 11. **Occupancy rate of a class absent from `rate`** (§8.2). Default: 1.
