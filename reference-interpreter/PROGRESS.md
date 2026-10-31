@@ -2,94 +2,71 @@
 
 Resume here. The whole accepted ISA 0.8 remains in scope; staged deliverables
 are not complete. Sole implementation sub-agent; owned interpreter and external
-round-21 response only. Never push. Every cargo invocation uses the headless
+round-22 response only. Never push. Every cargo invocation uses the headless
 prefix and TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/.tmp.
 
-## Round-21 fixes (2026-10-31)
+## Round-22 fixes (2026-10-31)
 
-Baseline **425 passed / 0 failed / 5 ignored**, **105.24 s** runner sum across
-**33** result blocks. Final **436 passed / 0 failed / 5 ignored**, **139.44 s**
-across **34** blocks: **18 unit + 418 integration**, 0 doctests. All round 4–21
-controls retained. Focused R21: **11 passed / 0 failed**, **0.49 s** runner sum.
+Baseline **436 passed / 0 failed / 5 ignored**, **112.97 s** runner sum across
+**34** result blocks. Final **451 passed / 0 failed / 5 ignored**, **137.93 s**
+across **36** blocks: **20 unit + 431 integration**, 0 doctests. All round 4–22
+controls retained. All five ignored release sweeps passed: **84.94 s**.
+Fmt/check and strict offline all-target Clippy pass with no warnings.
 
-| Blocker | RED tests | Status | Commit |
+| Blocker | RED tests / observations | Status | Commit |
 |---|---|---|---|
-| CODEX-R21-B01 ≡ SOL-R21-B01 | r21_resources::r21_b01_claims_public_consumers: allocator SIGABRT child | GREEN | f931307 |
-| CODEX-R21-B02 | r21_resources::r21_b02_hostcall_public_consumer / r21_b02_console_public_consumer: allocator SIGABRT; r21_b02_cli_pinned_transfers: exact CLI capacity panic / exit 101 | GREEN | f931307 |
+| CODEX-R22-B01 | r22_retention::r22_b01_request_retention_and_observers: child SIGABRT at 64 MiB request clone after first reservation | GREEN | 73eb62049e7624541b58730c59c417e061f112e0 |
+| SOL-R22-B01 | r22_coverage::sol_r22_b01_false_proof_and_controls: Proof instead of Evidence(4) | GREEN | 73eb62049e7624541b58730c59c417e061f112e0 |
 
-`claims::Object::domain` now checked-adds and fallibly reserves all-cells
-components before expanding 2^A. Replay still materializes complete region
-states, so this uses the allowed checked-eager repair and returns a §12.2
-host-limit Result when unavailable, including count=1 on huge regions. No ISA
-A/W/count cap or range relabelling. Both seats' complete witnesses and small
-controls are retained byte-for-byte with independent pins. Small samples remain
-Evidence(1), and sol's eight-row exhaustive identity remains Proof.
+Host requests now share immutable descriptors and payloads. `Retained<T>` moves
+reserved vectors into Arc<Vec<T>>, never via Arc<[T]>'s payload conversion.
+History capacity reserves before stepping; pending/history/outcome/snapshot and
+transcript share request/reply/undo/result/console/tape payloads. Sparse memory
+snapshots share sorted resident entries. Reply prepares retained bytes, undo,
+sparse writes and result retention before publication. A denied request/console
+instruction or reply preserves the complete prefix and reverses exactly.
+Public observer storage and CLI hex, UTF-8, trace and JSON output are fallible.
+No ISA length cap. Fixed-size Arc owners/bookkeeping and unrelated control/Q
+metadata are not an arbitrary-OOM recovery claim.
 
-Classical memory/hostcall/console transfers reserve before reading bytes;
-console growth and the tape entry reserve before mutation. Failed transfers
-publish no request/output/tape entry, leave the complete prefix unchanged and
-reverse exactly. Sparse alloc remains legal through the 64-bit pointer range.
-Memory-range faults and entropy fault 10 keep their ISA meanings. Hostcall
-errors cite §10, console errors §7.3, direct memory queries §7.1.
+The audit exposed and reproduced another SIGABRT: legacy JSON serialization
+cloned a feasible 64 MiB string infallibly. Executed payload output now uses
+single-buffer Json::try_canonical. Existing canonical metadata/identity bytes
+remain unchanged. ErrorKind::HostResource and category-preserving context
+wrappers implement the previously deferred diagnostic suggestion; Display text
+and ISA fault codes remain distinct. Public constructor/observer/value API
+migrations are documented in README.
 
-The wider audit reproduced another allocator abort in `oracle::region_bytes`.
-Nested transfers, replay region bytes/cells, memory loads, undo/reply/entropy,
-qreg slice/concat, CLI hex output and incremental trace growth now reserve
-fallibly or retain sparse/lazy traversal. Bead **b-isa-spec-3va** records the
-class and is closed. No spec gap or theorem assumption was introduced.
+**Retention/later copies: 12 tagged stages / 53 stage cases**, separately from
+R21's retained **24 paths / 186 cases** and R20's **102 paths / 1,113 cases**;
+these overlap and are not additive path counts. Lengths 0/1/8/1 MiB/64 MiB/2^63;
+8 MiB reply storage then denied undo storage; successful 256 KiB nonzero reply.
+Every new resource family runs in a fresh Linux child with RLIMIT_AS=128 MiB,
+RLIMIT_CORE=0 and MALLOC_ARENA_MAX=1. Reached-stage checks distinguish first
+reservation, shared retention, observer copies and denied later storage. The
+exact 64 MiB CLI now suspends normally at HOST_REQUEST and exits 1 when no reply
+was supplied, with empty stdout. This is valid because the shared request fits.
+Full path/change/case inventory is in external round-22 response.md.
 
-**24 tagged consumer paths / 186 generated cases**, separate from the retained
-R20 **102 fixture-qualified paths / 1,113 cases** (overlapping paths, not an
-additive 126-path claim). R20 checked scalar arithmetic and selected admission /
-direct consumers; it missed executable all-cells domains and classical transfer
-lengths. README corrects that coverage description. Full path/guard/case rows
-are in external round-21 response.md.
+Exhaustive coverage uses resolved Bundle(group,slot), complete region-cell
+coverage (all or a complete explicit full-range list), and borrowed ordinals.
+Borrowed names never discharge interface obligations; cross-role spellings
+remain legal. Program and table spoofs yield Evidence(4)/Evidence(2); the real
+full-domain CNOT comparison still fails at element 4. A **32-case public** family
+asserts exact-label/count invariance under borrowed renaming; **256 direct**
+coverage cases include region collisions and complete/partial explicit lists.
+See INV-6 1.3.4, 1.3.5 and 1.5.5; its other spec readings remain open.
 
-| Family / consumers | Paths | Cases |
-|---|---:|---:|
-| All-cells and explicit-list domains, both public claim entry points | 2 | 32 |
-| Exhaustive powers/products; samples; direct oracle replay | 4 | 30 |
-| Hostcall / console / memory query / undo / entropy / cumulative console | 6 | 42 |
-| Nested region transfer / memory load / symbolic table capacity / sparse allocation | 4 | 27 |
-| Sparse memory digest/snapshot consumers | 1 | 12 |
-| Qreg allocate/slice and dense amplitudes | 3 | 17 |
-| CLI region cells / sparse output / hex expansion / lazy sample count | 4 | 26 |
-| **Total** | **24** | **186** |
+Unchanged Python seed: 2 examples / 2 envelopes. Independent R20/R21 pins and
+R22 pins (12 byte-exact reviewer artifacts) pass. Both new aborts were observed
+before repair; logs: interpreter .tmp/r22-{baseline,red,sol-red,json-red,family,
+final,sweeps,clippy,fmt}.log. An initial full-run COW probe rejected too early
+because of an unrelated glibc thread arena; allocator-arena control fixed the
+harness, without accepting early rejection as later-stage coverage.
 
-Region exponents include 0/1/3/62/63/64/127/128; value exponents include
-1/2/3/62/63/64/127/128. Transfer lengths include 0/1/8/2^63−1/2^63/2^64−1.
-Every resource family runs under catch_unwind in a fresh Linux child with
-RLIMIT_AS=256 MiB and RLIMIT_CORE=0. The family distinguishes admission,
-cardinality, materialization, sparse/lazy traversal and range/fault results.
-Huge CLI sample counts enter lazily and stop on a downstream frame-storage
-error; no completed astronomical replay or general OOM proof is claimed.
-Pinned controls, exact reversals and successful concat controls are additional.
-Sol S1 applied; codex's nonblocking structured Error-category migration deferred
-because the public Error(pub String) API and contextual wrappers need a
-coordinated change. Display/CLI semantics remain unchanged.
-
-All **5 ignored release sweeps passed / 0 failed**, **88.31 s** runner sum:
-
-| Sweep | Full domain | Result / runner time |
-|---|---|---|
-| u8 division/remainder | 65,536 pairs × 4 = 262,144 executions | 1/0; 0.39 s |
-| 17-wire borrow | 131,072 entries | 1/0; 2.12 s |
-| checked borrow certificate | 262,144 elements, subject and expected program | 1/0; 12.16 s |
-| §6 differential | 200,000 programs: 70,931 accepted clean / 129,069 rejected | 1/0; 71.22 s |
-| recursive prefix reversal | 256 inputs × every completion/first-fault prefix | 1/0; 2.42 s |
-
-Fmt/fmt --check and strict offline all-target Clippy pass with zero warnings.
-Unchanged Python seed: 2 examples / 2 envelopes. Independent R20 pins and R21
-pins (9 complete objects / 2 envelopes) pass; all 9 reviewer-file byte comparisons
-pass. Production and test inputs stayed fixed throughout final tests/sweeps.
-Implementation commit **f931307a002877317fb6d35813e97023f0aa2917**. Logs: interpreter
-.tmp/r21-{baseline,red,transfer-consumer-red,nested-region-red,family,final,sweeps,
-final-clippy}.log. Early exploratory transfer logs with invalid generated pins
-are superseded by transfer-consumer-red and are not used as RED evidence.
-
-No user decision needed. Deliverables 8–11 remain staged/Unverified; the full ISA
-and open other-value theorem obligations remain. Only owned paths committed;
-Beads auto-export and worklog left for the orchestrator. No push or Dolt sync.
+Beads **b-isa-spec-949** and **b-isa-spec-7ld** record the defects. No spec,
+conformance or worklog edits; no push or Dolt sync. Beads export/worklog are left
+for the orchestrator. Deliverables 8–11 remain staged/Unverified.
 
 ## Resume here: outstanding work, in priority order
 
@@ -105,7 +82,7 @@ its full verification obligation met yet. The entire ISA remains the scope.
    frame live ranges and borrowed library claims (recursive admission schemas
    are centralized and tested in metadata_schema.rs).
    Imports resolve by signature and pin, including data; linking is tested.
-3. Continue generalized-width and host-resource verification beyond the R21
+3. Continue generalized-width and host-resource verification beyond the R22
    finite boundary family. Lifted widths are u64 descriptors; concrete vectors
    and Q basis execution already exceed128. Audit remaining JSON/JCS numeric
    corner cases and spellings without an ISA width cap.

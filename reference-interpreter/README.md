@@ -575,6 +575,57 @@ The huge CLI sample-count probes stop at a downstream frame-storage error;
 they test lazy entry, not completion of huge replays. Resident collection sizes
 and general allocator exhaustion are not a full-ISA resource-availability proof.
 
+**Design (host-request retention, round 22).** Initial transfer storage and
+history-entry capacity are reserved before publication. A `HostRequest` owns a
+shared immutable descriptor; its payload, retained reply, undo bytes, finished
+values, console and tape use `Retained<T>` (`Arc<Vec<T>>` plus a visible length).
+The reserved vector moves into its owner: converting a `Vec` to `Arc<[T]>` would
+copy the payload again. Pending/history/outcome/transcript and snapshot clones
+share payloads. Sparse resident memory is a sorted, shared entry vector; a
+snapshot never copies transferred resident bytes. Writes and copy-on-write
+append reserve before mutation; truncation for reversal is a shared prefix.
+A reply prepares its reply bytes, overwritten-byte history, sparse memory and
+result retention before publishing any change. Frame capacity is reserved
+before the instruction. No transfer-length or ISA limit is introduced.
+
+Observer allocations are explicit Results: `host_transcript`, `memory_digest`
+and snapshot `delta`; `host_exchanges` borrows entries. CLI hex/UTF-8 conversion,
+trace growth/deltas and final `Json::try_canonical` serialization reserve
+fallibly. The latter writes into one buffer instead of cloning, formatting and
+joining payload strings. The legacy `Json::canonical` remains for metadata and
+identity callers; executed CC/R payload output uses the fallible API. Structured
+`ErrorKind::HostResource` preserves diagnostic Display text and context;
+`Error::new` replaces the old one-field tuple constructor. ISA faults remain
+outcome fault codes. `ClassicalOutcome::values` and request/reply/tape bytes are
+immutable `Retained` slices; callers can borrow via Deref/AsRef. Snapshot payload
+sharing does not claim allocation-free copies of unrelated control/quantum
+metadata, nor recovery from every fixed-size allocator bookkeeping failure.
+
+The retention/later-copy extension has **12 tagged stages / 53 stage cases**
+(overlapping path observations, not 53 distinct programs), including a legal
+64 MiB request under RLIMIT_AS=128 MiB, an 8 MiB reply whose subsequent undo
+reservation is denied, denied console retention after its initial transfer,
+and denied final JSON storage after its first 64 MiB buffer. Errors are typed,
+clause-cited and leave the instruction/reply prefix unchanged; machine cases
+reverse exactly. The 0/1/8-byte and moderate successful transfers and original
+2^63 rejections remain. New Linux children disable core dumps and set
+MALLOC_ARENA_MAX=1 to keep unrelated glibc arena reservations from hiding the
+required allocation stage. Complete pinned witnesses are in `tests/fixtures/r22`.
+
+**Design (claim coverage, round 22).** Exhaustive coverage is checked over
+resolved components: a `Bundle(group, slot)` covers only that interface bundle,
+a region is complete only when its own cells all have full ranges (either
+`cells:"all"` or a complete explicit list), and a borrowed component has its
+own ordinal. A borrowed name never supplies a missing interface component.
+This follows [INV-6 §1.3.4](../../bennett-conformance/proofs/INV-6-certificate-soundness.md)
+(and §1.3.5/§1.5.5): renaming borrowed entries cannot change coverage or the
+verdict. Duplicate spellings are checked within roles, allowing names shared
+across roles. The supplied CNOT and table spoofs now yield Evidence; the
+complete CNOT domain still rejects at element 4. A 32-case public replay family
+checks exact-label invariance under borrowed renaming; 256 direct coverage
+cases also cover regions and complete/partial explicit cell lists. These fixes
+do not claim to discharge INV-6's separately documented specification readings.
+
 | Schema / rule | Load-time validator | Positive and negative controls |
 |---|---|---|
 | §9.1 optional `layout.block_image`, §7.3 sectors | `metadata_schema::TABLE` (`layout`), `Object::validate_layout`; checked lookup in `ClassicalMachine::construct` | `parser::r13_block_image_schema_is_checked_without_a_layout_consumer`, `r13_classical_missing_block_image_never_panics`; absent/disk action identities in the R13 pin corpus |
