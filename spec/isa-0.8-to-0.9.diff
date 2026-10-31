@@ -10,7 +10,7 @@
 -responses under `docs/council/isa-2026-10-28/round-{1..8}/` in the
 -`bennett` meta repository). Implementation is expected to expose
 -frictions; revisions go back through the council. Founding text of
-+**Date:** 2026-10-31. **Status:** draft 0.9, **reopened by editorial pass III, pending a one-seat re-review**.
++**Date:** 2026-10-31. **Status:** draft 0.9, **accepted by the council's sol and codex seats** (round 4 re-review after editorial pass III: codex accept, 0 blocking; K64/K65 ratified by the maintainer).
 +Snapshot `59eee9ad0d96` was accepted by the sol and codex seats (council run
 +`isa-09-2026-10-31`: codex round 2, sol round 3, both core accept, 0 blocking; muse seat held).
 +K64 and K65 were ratified by the maintainer on 2026-10-31; publication is gated on the muse vote
