@@ -1,15 +1,17 @@
 # Bennett Virtual ISA — Specification, draft 0.9
 
-**Date:** 2026-10-31. **Status:** draft 0.9, **accepted by the council's sol and codex seats** (round 4 re-review after editorial pass III: codex accept, 0 blocking; K64/K65 ratified by the maintainer).
+**Date:** 2026-10-31. **Status:** draft 0.9, **accepted by all three council seats** (sol r3, codex r2/r4, muse r5, 2026-10-31; K64/K65 ratified). Publication as the current ISA specification is the maintainer's next step.
 Snapshot `59eee9ad0d96` was accepted by the sol and codex seats (council run
 `isa-09-2026-10-31`: codex round 2, sol round 3, both core accept, 0 blocking; muse seat held).
-K64 and K65 were ratified by the maintainer on 2026-10-31; publication is gated on the muse vote
-(required for 0.9 as a new contract; maintainer ruling 2026-10-31). It
+K64 and K65 were ratified by the maintainer on 2026-10-31; muse accepted
+in round 5 that day, satisfying the council-vote publication gate
+(maintainer ruling 2026-10-31). It
 revises draft 0.8, which was **accepted by the council in round 8**
 (2026-10-28; reports and the editor's responses under
 `docs/council/isa-2026-10-28/round-{1..8}/` in the `bennett` meta
 repository) and which remains the contract every other repository
-targets until this draft is accepted. §0 lists every change from 0.8.
+targets until the maintainer publishes 0.9 as the current specification.
+§0 lists every change from 0.8.
 Implementation is expected to expose frictions; revisions go back
 through the council. Founding text of
 `bennett-isa-spec` (`Bennett-NorthStar.md` §4.4, §6.1); the north star

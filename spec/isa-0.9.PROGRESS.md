@@ -8,10 +8,52 @@ Surgical edits only; K1–K75 and accepted 0.8 semantics/bytes retained.
 
 | Suggestion / proof step | Disposition | K | Clauses / existing coverage | Semantic premises | Bead status |
 |---|---|---|---|---|---|
-| 1 / §16.3 placeholders | a: fill all 25 symbol values, including repeated symbols and the printed SCC envelope; independent precheck reconstructs every envelope | existing §9.2 | §16.3; §0 example inventory | §9.2, §16.1–§16.2 | 4a4 IN_PROGRESS |
-| 2 / §5.5 matched cleanup | a: clarify that ins writes invalidate the pair, while mem-cell writes only remove the clearing guarantee | existing E17.5 | §5.5 first paragraph | §4.2, §5.5 later paragraph | 4a4 IN_PROGRESS |
-| 3 / INV-3 1.4.2–1.4.3, gaps 5–6 | a: add muse's permissive sufficient dependency-set test; failure is inconclusive | existing K41 | §6.1 outstanding dependence | §6.1 transfer, §14.2; INV-3 1.4 | 4a4 IN_PROGRESS |
-| 4 / §11.1 and §17 item 7 | a: publish byte-identical bound catalog and worked ctl-X fixture; replace pending publication references | existing K11, K19–K28 | §11.1 serialization; §17.7; §0 D2 | §9.2, §9.4, §11, §11.1, §12.1–§12.3 | 4a4 IN_PROGRESS |
+| 1 / §16.3 placeholders | a: fill all 25 symbol values, including repeated symbols and the printed SCC envelope; independent precheck reconstructs every envelope | existing §9.2 | §16.3; §0 example inventory | §9.2, §16.1–§16.2 | 4a4 CLOSED |
+| 2 / §5.5 matched cleanup | a: clarify that ins writes invalidate the pair, while mem-cell writes only remove the clearing guarantee | existing E17.5 | §5.5 first paragraph | §4.2, §5.5 later paragraph | 4a4 CLOSED |
+| 3 / INV-3 1.4.2–1.4.3, gaps 5–6 | a: add muse's permissive sufficient dependency-set test; failure is inconclusive | existing K41 | §6.1 outstanding dependence | §6.1 transfer, §14.2; INV-3 1.4 | 4a4 CLOSED |
+| 4 / §11.1 and §17 item 7 | a: publish byte-identical bound catalog and worked ctl-X fixture; replace pending publication references | existing K11, K19–K28 | §11.1 serialization; §17.7; §0 D2 | §9.2, §9.4, §11, §11.1, §12.1–§12.3 | 4a4 CLOSED |
+| 5 / final status and validation | a: record all three council acceptances and completed vote gate; current-spec publication stays with maintainer | none | opening status/history | muse r5 acceptance; maintainer K64/K65 ratification | 4a4 CLOSED |
+
+Item commits: 1 c55743d; 2 55d15f4; 3 3466b5e; 4 5053fcd.
+Item 5 also removes the stale pending-muse gate in the immediately
+following status prose and makes the 0.8-to-current-publication boundary
+explicit. It does not replace the accepted 0.8 file or request a council
+round. All four muse S1 suggestions have a dispositions row above; no
+new K row or normative capability restriction is introduced.
+
+Additional hash cross-check: the read-only Python seed independently
+agrees for examples 1, 3, 5, 6, 7 and 9 (all six memoryless envelopes).
+Layout-bearing examples use K65's JCS component-array paths; no old
+0.8 dotted-path identity is substituted. The pinned review binary's
+SHA-256 is 7b1e6cca78d21f01793e5eeb96a5c8e780609b75bf076bbbf049861cccdb59f5.
+
+Final headless validation (exit 0 for both required commands):
+- `python3 -I conformance/tests/draft_witnesses.py`: PASS on final bytes,
+  all ten objects / 25 symbol fields, both printed envelopes, exact
+  system-diff byte comparison, forbidden-word scan, published catalog,
+  derived fixture bytes and pinned compatibility check/hash/8 runs.
+- `cargo test --offline --manifest-path conformance/Cargo.toml`: PASS,
+  113 tests, 0 failed, 0 ignored. This includes the new exact ctl
+  matrix witness and all retained full-domain/count/ordinal assertions.
+  Run log: `.tmp/editorial-iv/cargo-test.log`.
+- `python3 -I conformance/tools/controlled_action_fixture.py --check`:
+  PASS; `ref_catalog.py --check`: PASS (219 recipes, bound hash above).
+- K1–K75 continuous; no `<to be computed` example placeholders or
+  proposal/proposed/proposes words in the draft. Owned source/progress
+  whitespace checks pass; unified-diff context whitespace stays exact.
+- Accepted 0.8 SHA-256 unchanged:
+  90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e.
+- Final draft SHA-256:
+  6ee2aaba780385c750a04dc13eeb186788225c434435dace9ba6c4184036eac1.
+- Exact-label diff SHA-256:
+  880d500df26c7495c6003771c17be6eab9f0930ec7cd54f2c2ca94e1fd1b18f8.
+The artifact is regenerated with `diff -u --label
+ a/spec/Bennett-ISA-Spec.md --label b/spec/Bennett-ISA-Spec-0.9-draft.md
+ <absolute accepted> <absolute draft>` (exit 1 means the expected files
+ differ). Bead 4a4 closes this editorial/publication-artifact work only;
+ current-spec publication remains the maintainer's next step. Beads export
+ is refreshed before the fifth explicit-path commit. No push, remote/Dolt
+ sync, accepted-text edit, interpreter edit, sibling write or worklog edit.
 
 Item 4 verification/S0 check:
 - `spec/ref-0.9.json` is byte-identical to `spec/ref-0.9-draft.json`.
