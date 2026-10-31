@@ -1,6 +1,6 @@
 # ref 0.9 constructor catalog — incomplete, not publishable
 
-Current checkpoint: **195 recipes**. The complete-library hash/count marker
+Current checkpoint: **197 recipes**. The complete-library hash/count marker
 in draft §11.1 remains untouched. No ref/ publication or schedule binding is
 claimed. Historical checkpoints and family witness counts are retained in
 [the progress file](ref-0.9-draft.PROGRESS.md). No interpreter source was read
@@ -15,7 +15,7 @@ bytes; empty means absent/default-zero even for non-byte-aligned regions.
 Template application binds explicit frame/wire actuals while preserving free
 captures. Arguments vectors are tied to one closure hash and capture their
 actuals' environment; value formals preserve exact §12.3 integer, ptr, f64
-and token encodings. They do not yet encode source region roles/shapes.
+and token encodings. K25–K27 add ordered descriptors, source region roles/shapes/origins and shared allocation declarations.
 
 The generators under conformance/tools/ contain no interpreter imports.
 Run ref_catalog.py with python3 -I (the required headless project TMPDIR
@@ -28,7 +28,7 @@ names, bound images and constructor order are hash-significant.
 
 | ISA row | Recipe / exact remaining disposition |
 |---|---|
-| §4.5 qxor/qcopy/quncopy/qexch | qxor/qcopy/quncopy/qexch; positional bind.qxor/bind.qexch adapters. Generic allocation result lifetimes for copy/uncopy remain 3xe. |
+| §4.5 qxor/qcopy/quncopy/qexch | qxor/qcopy/quncopy/qexch; positional bind.qxor/bind.qexch adapters. Generic allocation-result catalog adapters follow under K27. |
 | §4.4 x/cx/ccx/swap | gate.x/cx/ccx/swap; typed bind.gate.x/cx/ccx/swap |
 | §4.4 h/s/sdg/t/tdg/cz | gate.h/s/sdg/t/tdg/cz; exact full-basis matrix witnesses |
 | §4.4 rx/ry/rz/mcx(k) | gate.rx/ry/rz/mcx; exact angle bits, numerical matrix evidence for rotations, full-domain variadic mcx |
@@ -42,7 +42,7 @@ names, bound images and constructor order are hash-significant.
 | §4.2 lift.const/binop/icmp/select/cast/mov/parmov/label/addr | lift.const; lift.add/sub/mul/and/or/xor/shl/lshr/ashr; lift.icmp.<pred>; lift.select/zext/sext/trunc/mov/parmov/label/addr |
 | §4.2 lift.div | lift.udiv/urem/sdiv/srem; old-state flag before success-only assignment and effective fault writes |
 | §4.2 lift.boundscheck | lift.boundscheck with widened pointer/length endpoints |
-| §4.2 lift.load/store | **Blocked 1oa:** typed ordered mapped-region layout records and byte/wire bindings absent |
+| §4.2 lift.load/store | lift.load/store: K25 complete byte-partition dispatch, inherent range/fault check and single assignment slot |
 | §4.2 lift.alloc/free | lift.alloc/free with exact slot/exchange order, pinned-free correction and no-wrap checks |
 | §4.2 lift.faultif/fault/retval | lift.faultif, fault, lift.retval; cause 0 maps to 4, F≥4 |
 | §4.2 lift.call/ret; §3.7 C1–C5/R1–R5 | **Blocked evi:** ordered heterogeneous location descriptors (id,width,wire,parameter,capture/slot/stack mapping) absent; general value.call.flag is a verified predicate only |
@@ -104,14 +104,36 @@ The generic call predicate adds 43,200 tuples across 192 configurations
 the exact §16.3 D5/S10/R16/limits17/272 counter configuration.
 
 Current **checkpoint-only** envelope SHA-256 (Rust and Python -I):
-`84e8940646f1cf2416790b71a9eed525589f0c62e2c397f2a7d08e0b33233230`.
+`2e9aa148155b32038de17dea5caa74f8a569d7d83b4b71d090655b93943f8034`.
 The historical 54-recipe checkpoint was
 `3a99ce3028e1ecc421b3991e3b5b7423ee33323badc5ca3ce1e61088a5e5055d`.
-Neither is a complete-library binding. In particular the first remaining
-blocked row, lift.load, still cannot express its ordered mapped layout
-under §11.1's typed formal grammar/K22 template-only list rule (1oa).
+Neither is a complete-library binding. K25 closes the lift.load language gap; remaining catalog families follow, with qinplace still blocked on 82x.
 
 Final local gate: **88 Rust pass / 0 fail**, fmt/clippy green; harness
 **445 pass / 0 fail / 68 unavailable**, versus entry 445/0/65. New commits:
 bbb1b62 (Part 1), 0656e14 (step/qregion family and resumed native evidence);
 see progress for the exported-beads bookkeeping commit. No push.
+
+## Completion II byte-memory family
+
+K25 byte partitions select mapped cells and ordinary mem, preserving
+ordinary bytes hidden under mappings as arbitrary spectators. Both rows
+carry inherent widened inrange and effective fault 7. Load computes the
+whole displacement slot before exchanging its destination (including
+address/destination aliases); store copies the entire value before any
+selected byte exchange. All scratch disappears before load's destination
+exchange; inverse restores the old address before its scans.
+
+ref_layout.rs proves 88 full symbolic configurations: pointer widths 1–4,
+accesses 1/2/3/4/16 bytes, with 0/1/2/3 mapped byte regions as width permits;
+plus P=5, 16-byte accesses with 0/17 mapped regions. All memory, mapped
+cells, values, fault/code and table inputs are arbitrary, flag/slot clean;
+one table entry, legal base+size<=2^P, atop=0/1, ambient control included.
+Exact tuples per configuration: (M*(M+3)/2-1)*2^(P+9+8*B+16*M), M=2^P.
+Total tuples: 167143296548916895889517112694306429377925266509132267598234820116853215623227220551812585180993364921141732939506160915932057223539145589421667637993405146421832216413988502350229780370880234778525696. Scratch and complete reversal checked.
+
+Four additional P=N=8, H=2 byte configurations bind value/destination
+to the address location itself (load and store, mapped/unmapped). Their
+full domains add 56*2^89 tuples, including unused declared spectators.
+Family gate: 95 Rust tests, 0 fail; fmt/clippy green; harness 445/0/69
+(+1 pending-0.9 case). The alias-only final extension passes separately.

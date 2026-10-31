@@ -300,3 +300,23 @@ library scratch; scratch LIFO stays mandatory, caller output lifetimes may
 overlap. Language/completion/call-flag regression tests green after audit.
 Recipe bytes/checkpoint hash unchanged at 195 / 84e89406…3230; complete
 §11.1 hash/count marker and qxor witness untouched.
+
+## Completion II — §4.2 byte memory
+
+Part 1 commit 90590a7. Added lift.load/store (197 recipes), observed red
+at unknown lift.load, then exact BDD comparison against independently
+built byte memory/range/slot/fault semantics. 88 configurations, P1–4 and
+P5 large case; B1/2/3/4/16 bytes; mapped-region counts 0/1/2/3/17.
+Domain/tuple formula in README; exact total 167143296548916895889517112694306429377925266509132267598234820116853215623227220551812585180993364921141732939506160915932057223539145589421667637993405146421832216413988502350229780370880234778525696.
+This family uses a single table entry with all legal base/size combinations,
+all atop/live/pinned values, arbitrary memory/mapped spectators and outputs.
+The independent generic scan family separately covers multiple entries.
+Checkpoint envelope (Rust/Python agreement required by gate):
+2e9aa148155b32038de17dea5caa74f8a569d7d83b4b71d090655b93943f8034.
+Complete marker remains untouched; qinplace remains blocked on 82x.
+
+Four additional P=N=8, H=2 byte configurations bind value/destination
+to the address location itself (load and store, mapped/unmapped). Their
+full domains add 56*2^89 tuples, including unused declared spectators.
+Family gate: 95 Rust tests, 0 fail; fmt/clippy green; harness 445/0/69
+(+1 pending-0.9 case). The alias-only final extension passes separately.
