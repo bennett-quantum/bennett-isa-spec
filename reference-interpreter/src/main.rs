@@ -81,8 +81,48 @@ fn budget(raw: &str, default: Budget) -> Result<Budget> {
         }
     })
 }
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
+fn hex_buffer(len: usize) -> Result<String> {
+    let count = len
+        .checked_mul(2)
+        .ok_or_else(|| fail("§7.3/§10: host limit: CLI hex byte count exceeds usize"))?;
+    let mut out = String::new();
+    out.try_reserve_exact(count)
+        .map_err(|e| fail(format!("§7.3/§10: host limit: CLI hex bytes: {e}")))?;
+    Ok(out)
+}
+fn hex(bytes: &[u8]) -> Result<String> {
+    let mut out = hex_buffer(bytes.len())?;
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    for b in bytes {
+        out.push(DIGITS[(b >> 4) as usize] as char);
+        out.push(DIGITS[(b & 15) as usize] as char);
+    }
+    Ok(out)
+}
+#[test]
+fn r21_cli_hex_storage_memory_limited() {
+    if std::env::var_os("R21_HEX_CHILD").is_none() {
+        let out = std::process::Command::new("python3").args(["-c",
+            "import os,resource,sys; resource.setrlimit(resource.RLIMIT_AS,(256*1024*1024,)*2); resource.setrlimit(resource.RLIMIT_CORE,(0,0)); os.execv(sys.argv[1],sys.argv[1:])"])
+            .arg(std::env::current_exe().unwrap())
+            .args(["--exact", "r21_cli_hex_storage_memory_limited", "--nocapture"])
+            .env("R21_HEX_CHILD", "1").output().unwrap();
+        assert!(out.status.success(), "{out:?}");
+        return;
+    }
+    std::panic::catch_unwind(|| {
+        for len in [0, 1, 8, (1usize << 63) - 1, 1 << 63, usize::MAX] {
+            let r = hex_buffer(len);
+            if len <= 8 {
+                assert!(r.unwrap().capacity() >= 2 * len);
+            } else {
+                let e = r.unwrap_err().to_string();
+                assert!(e.contains('§') && e.contains("host limit"), "{e}");
+            }
+        }
+        assert_eq!(hex(&[0, 127, 128, 255]).unwrap(), "007f80ff");
+    })
+    .expect("no CLI output length panic");
 }
 fn parse_hex(s: &str) -> Result<Vec<u8>> {
     if !s.len().is_multiple_of(2) || !s.bytes().all(|c| c.is_ascii_hexdigit()) {
@@ -171,23 +211,23 @@ fn faults_json(fault: Option<u128>) -> Json {
         ])]),
     }
 }
-fn tape_json(m: &ClassicalMachine) -> Json {
-    Json::Array(
+fn tape_json(m: &ClassicalMachine) -> Result<Json> {
+    Ok(Json::Array(
         m.effect_tape()
             .iter()
             .map(|e| {
-                object([
+                Ok(object([
                     (
                         "args".into(),
                         Json::Array(e.args.iter().map(|a| number(*a)).collect()),
                     ),
-                    ("bytes".into(), string(hex(&e.bytes))),
+                    ("bytes".into(), string(hex(&e.bytes)?)),
                     ("dev".into(), string(e.dev.clone())),
                     ("op".into(), string(e.op.clone())),
-                ])
+                ]))
             })
-            .collect(),
-    )
+            .collect::<Result<_>>()?,
+    ))
 }
 fn measurements_json(m: &ClassicalMachine) -> Json {
     Json::Array(
@@ -215,21 +255,21 @@ fn measurements_json(m: &ClassicalMachine) -> Json {
             .collect(),
     )
 }
-fn host_requests_json(m: &ClassicalMachine) -> Json {
-    Json::Array(
+fn host_requests_json(m: &ClassicalMachine) -> Result<Json> {
+    Ok(Json::Array(
         m.host_transcript()
             .into_iter()
             .map(|e| {
-                object([
+                Ok(object([
                     ("address".into(), number(e.request.address)),
                     ("capacity".into(), number(e.request.capacity)),
-                    ("payload".into(), string(hex(&e.request.payload))),
-                    ("reply".into(), string(hex(&e.reply))),
+                    ("payload".into(), string(hex(&e.request.payload)?)),
+                    ("reply".into(), string(hex(&e.reply)?)),
                     ("service".into(), string(e.request.service.clone())),
-                ])
+                ]))
             })
-            .collect(),
-    )
+            .collect::<Result<_>>()?,
+    ))
 }
 fn console_json(m: &ClassicalMachine) -> Json {
     match std::str::from_utf8(m.console()) {
@@ -601,9 +641,9 @@ fn drive(
                 return Err(fail(format!(
                     "§10: reply mismatch: expected request service={} payload={}, replies file next names service={} payload={}",
                     request.service,
-                    hex(&request.payload),
+                    hex(&request.payload)?,
                     reply.service,
-                    hex(&reply.payload)
+                    hex(&reply.payload)?
                 )));
             }
             let before = trace.is_some().then(|| machine.snapshot());
@@ -631,6 +671,11 @@ fn drive(
             return Err(fail(
                 "§3.4: reference execution fuel exhausted; CC/R has no ISA step budget",
             ));
+        }
+        if let Some(trace) = trace.as_deref_mut() {
+            trace
+                .try_reserve(1)
+                .map_err(|e| fail(format!("§7.4: host limit: CLI trace records: {e}")))?;
         }
         let before = trace.is_some().then(|| machine.snapshot());
         let point = machine
@@ -716,7 +761,7 @@ fn run_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> {
         ("budgets".into(), budgets),
         ("clock".into(), number(machine.clock() as u128)),
         ("console".into(), console_json(&machine)),
-        ("console_hex".into(), string(hex(machine.console()))),
+        ("console_hex".into(), string(hex(machine.console())?)),
         (
             "effect_tape_length".into(),
             number(machine.effect_tape_len() as u128),
@@ -727,7 +772,7 @@ fn run_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> {
             outcome.fault.map(number).unwrap_or(Json::Null),
         ),
         ("faults".into(), faults_json(outcome.fault)),
-        ("host_requests".into(), host_requests_json(&machine)),
+        ("host_requests".into(), host_requests_json(&machine)?),
         ("measurements".into(), measurements_json(&machine)),
         ("memory_digest".into(), string(machine.memory_digest())),
         ("results".into(), values_json(&outcome.values)?),
@@ -740,7 +785,7 @@ fn run_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> {
             }),
         ),
         ("steps".into(), number(steps as u128)),
-        ("tape".into(), tape_json(&machine)),
+        ("tape".into(), tape_json(&machine)?),
         ("trace".into(), Json::Array(trace)),
     ]))
 }
@@ -943,6 +988,8 @@ fn build_action_state(
             }
         }
         let mut all = Vec::new();
+        all.try_reserve_exact(cells)
+            .map_err(|e| fail(format!("§5.1: host limit: CLI region cells: {e}")))?;
         for _ in 0..cells {
             let cell = q.allocate(cell_width)?;
             interface_wires.extend(&cell);
@@ -1190,8 +1237,8 @@ fn reverse_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> 
     )?;
     check_replies_consumed(&replies)?;
     let forward = machine.outcome();
-    let forward_tape = tape_json(&machine);
-    let forward_requests = host_requests_json(&machine);
+    let forward_tape = tape_json(&machine)?;
+    let forward_requests = host_requests_json(&machine)?;
     // §10 reverse eligibility is enforced by the machine (measurement in
     // history is E_NOT_REVERSIBLE; a pending request never reaches here).
     machine.reverse()?;
@@ -1201,7 +1248,7 @@ fn reverse_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> 
         ("budgets".into(), budgets),
         ("clock".into(), number(machine.clock() as u128)),
         ("console".into(), console_json(&machine)),
-        ("console_hex".into(), string(hex(machine.console()))),
+        ("console_hex".into(), string(hex(machine.console())?)),
         (
             "effect_tape_length".into(),
             number(machine.effect_tape_len() as u128),
@@ -1558,8 +1605,8 @@ fn run_program(program: &Object, name: &str, options: CcOptions) -> Result<Json>
     } else {
         values_json(&outcome.values)?
     };
-    let forward_tape = tape_json(&machine);
-    let forward_requests = host_requests_json(&machine);
+    let forward_tape = tape_json(&machine)?;
+    let forward_requests = host_requests_json(&machine)?;
     let forward_measurements = measurements_json(&machine);
     let mut status = if failed { "FAILED" } else { "COMPLETED" };
     let mut reversed = false;
@@ -1580,7 +1627,7 @@ fn run_program(program: &Object, name: &str, options: CcOptions) -> Result<Json>
         ("budgets".into(), budgets),
         ("clock".into(), number(machine.clock() as u128)),
         ("console".into(), console_json(&machine)),
-        ("console_hex".into(), string(hex(machine.console()))),
+        ("console_hex".into(), string(hex(machine.console())?)),
         (
             "effect_tape_length".into(),
             number(machine.effect_tape_len() as u128),

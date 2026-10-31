@@ -88,9 +88,12 @@ fn enumerate(domain: &Domain) -> Result<Vec<Vec<BitVector>>> {
         Error("§12.2: host limit: exhaustive domain cardinality exceeds usize".into())
     })?;
     let mut out = crate::reserved(count, "§12.2", "exhaustive domain elements")?;
-    let mut current: Vec<BitVector> = domain.components.iter().map(|c| c.2.clone()).collect();
+    let mut current = crate::reserved(domain.components.len(), "§12.2", "domain tuple components")?;
+    current.extend(domain.components.iter().map(|c| c.2.clone()));
     loop {
-        out.push(current.clone());
+        let mut row = crate::reserved(current.len(), "§12.2", "exhaustive tuple components")?;
+        row.extend(current.iter().cloned());
+        out.push(row);
         let mut i = domain.components.len();
         let mut wrapped = true;
         while i > 0 {
@@ -125,6 +128,59 @@ fn sample_elements(count: u128) -> Result<Vec<Vec<BitVector>>> {
     let count = usize::try_from(count)
         .map_err(|_| Error("§12.1: host limit: sample count exceeds usize".into()))?;
     crate::reserved(count, "§12.1", "sampled domain elements")
+}
+
+#[cfg(test)]
+pub(crate) fn r21_resource_cases() {
+    for width in [1, 2, 3, 62, 63, 64, 127, 128] {
+        for count in [1, 2] {
+            let d = Domain {
+                covers_d: true,
+                components: (0..count)
+                    .map(|i| {
+                        (
+                            Component::Bundle(0, i),
+                            width,
+                            BitVector::zero(width).unwrap(),
+                            ones(width).unwrap(),
+                        )
+                    })
+                    .collect(),
+            };
+            let r = enumerate(&d);
+            if width < 4 {
+                assert_eq!(r.unwrap().len(), 1 << (width * count));
+            } else {
+                let e = r.unwrap_err().to_string();
+                assert!(e.contains("§12.2") && e.contains("host limit"), "{e}");
+            }
+        }
+    }
+    for count in [0, 1, 8, (1u128 << 63) - 1, 1 << 63, u64::MAX as u128] {
+        let r = sample_elements(count);
+        if count <= 8 {
+            assert!(r.unwrap().capacity() >= count as usize);
+        } else {
+            let e = r.unwrap_err().to_string();
+            assert!(e.contains("§12.1") && e.contains("host limit"), "{e}");
+        }
+    }
+    // Direct replay consumer: domain admission is covered separately through
+    // parse/check_hashes/verify_claim, including both region schema branches.
+    let mut o = Object::parse(include_str!("../tests/fixtures/tiny_memory.bisa")).unwrap();
+    let mut f = o.functions["tiny"].clone();
+    for a in [0, 1, 3, 62, 63, 64, 127, 128] {
+        f.params[3][0].ty = Type::Region(a, 8);
+        o.functions.insert("tiny".into(), f.clone());
+        let r = o.execute_element(&f, &[], Some(Budget::steps(0)));
+        if a < 4 {
+            r.unwrap();
+        } else {
+            let e = r.unwrap_err().to_string();
+            assert!(e.contains("§12.2") && e.contains("host limit"), "{e}");
+        }
+    }
+    eprintln!("R21 exhaustive power/product / samples / oracle replay region: 4 paths / 30 cases");
 }
 
 /// xoshiro256** (Blackman and Vigna), the §12.1 sampler.
@@ -235,6 +291,7 @@ impl Object {
             listed.insert(name.clone());
             match r.get("cells")? {
                 Json::String(s) if s == "all" => {
+                    crate::reserve_more(&mut components, cells, "§12.2", "domain components")?;
                     for i in 0..cells {
                         components.push((
                             Component::Cell(group, slot, i),
@@ -329,9 +386,10 @@ impl Object {
             }
             for p in &f.params[3] {
                 let (cells, w) = region_dims(p)?;
-                let bytes = (0..cells)
-                    .map(|i| Ok(cell(&p.name, i, w)?.to_u128()? as u8))
-                    .collect::<Result<_>>()?;
+                let mut bytes = crate::reserved(cells, "§12.2", "oracle replay region bytes")?;
+                for i in 0..cells {
+                    bytes.push(cell(&p.name, i, w)?.to_u128()? as u8);
+                }
                 input.regions.insert(p.name.clone(), bytes);
             }
             if !f.params[4].is_empty() {
@@ -346,6 +404,7 @@ impl Object {
             out.push(value(&f.params[2][0].name, r.code.width())?.binary("xor", &r.code)?);
             for p in &f.params[3] {
                 let (cells, w) = region_dims(p)?;
+                crate::reserve_more(&mut out, cells, "§12.2", "oracle replay output cells")?;
                 for i in 0..cells {
                     out.push(cell(&p.name, i, w)?);
                 }
@@ -376,7 +435,7 @@ impl Object {
         }
         for p in &f.params[2] {
             let (cells, w) = region_dims(p)?;
-            let mut all = Vec::new();
+            let mut all = crate::reserved(cells, "§12.2", "action replay region cells")?;
             for i in 0..cells {
                 let wires = q.allocate(w)?;
                 set(&mut q, &wires, &cell(&p.name, i, w)?)?;
@@ -517,13 +576,15 @@ impl Object {
                     let count = sample_count(sampler)?;
                     elements = sample_elements(count)?;
                     for _ in 0..count {
-                        elements.push(
-                            domain
-                                .components
-                                .iter()
-                                .map(|(_, w, lo, hi)| rng.draw(*w, lo, hi))
-                                .collect::<Result<_>>()?,
-                        );
+                        let mut row = crate::reserved(
+                            domain.components.len(),
+                            "§12.1",
+                            "sample tuple components",
+                        )?;
+                        for (_, w, lo, hi) in &domain.components {
+                            row.push(rng.draw(*w, lo, hi)?);
+                        }
+                        elements.push(row);
                     }
                 }
                 let table = match expected {

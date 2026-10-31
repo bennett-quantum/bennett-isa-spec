@@ -624,12 +624,15 @@ impl<'a> ClassicalMachine<'a> {
         Ok(Some(point))
     }
     pub fn memory_bytes(&self, address: u128, len: usize) -> Result<Vec<u8>> {
+        self.transfer_bytes(address, len, "§7.1")
+    }
+    fn transfer_bytes(&self, address: u128, len: usize, rule: &str) -> Result<Vec<u8>> {
         if !self.state.memory.valid(address, len as u128) {
             return err("§7.1", "memory query outside live allocation");
         }
-        Ok((0..len)
-            .map(|n| self.state.memory.byte(address + n as u128))
-            .collect())
+        let mut bytes = crate::reserved(len, rule, "§7.1 transfer bytes")?;
+        bytes.extend((0..len).map(|n| self.state.memory.byte(address + n as u128)));
+        Ok(bytes)
     }
     pub fn host_transcript(&self) -> Vec<HostExchange> {
         self.history.iter().filter_map(|h| h.host.clone()).collect()
@@ -650,7 +653,9 @@ impl<'a> ClassicalMachine<'a> {
             .ok_or_else(|| Error("§10: missing host frame".into()))?
             .undo
             .clone();
-        self.save_bytes(request.address, count, &mut undo);
+        let mut reply = crate::reserved(payload.len(), "§10", "retained host reply bytes")?;
+        reply.extend_from_slice(payload);
+        self.save_bytes(request.address, count, &mut undo)?;
         for (n, b) in payload[..count].iter().enumerate() {
             self.state.memory.set_byte(request.address + n as u128, *b);
         }
@@ -668,7 +673,7 @@ impl<'a> ClassicalMachine<'a> {
             .host
             .as_mut()
             .ok_or_else(|| Error("§10: missing retained host request".into()))?
-            .reply = payload.to_vec();
+            .reply = reply;
         self.state.pending = None;
         Ok(())
     }
@@ -984,11 +989,13 @@ impl<'a> ClassicalMachine<'a> {
             .push(value);
         undo.definitions.push(key);
     }
-    fn save_bytes(&self, p: u128, len: usize, undo: &mut Undo) {
+    fn save_bytes(&self, p: u128, len: usize, undo: &mut Undo) -> Result<()> {
+        crate::reserve_more(&mut undo.bytes, len, "§7.1", "retained memory bytes")?;
         for n in 0..len {
             undo.bytes
                 .push((p + n as u128, self.state.memory.byte(p + n as u128)));
         }
+        Ok(())
     }
     fn undo_record(&mut self, undo: Undo) -> Result<()> {
         for record in undo.registers.into_iter().rev() {
@@ -1084,8 +1091,9 @@ impl<'a> ClassicalMachine<'a> {
         if !self.state.memory.valid(p, len) {
             return Ok(Some(7));
         }
-        let len = usize::try_from(len)
-            .map_err(|_| Error("§7.3: device length exceeds host address space".into()))?;
+        let len = usize::try_from(len).map_err(|_| {
+            Error("§7.3: host limit: device length exceeds host address space".into())
+        })?;
         if dev == "entropy"
             && self
                 .state
@@ -1096,17 +1104,22 @@ impl<'a> ClassicalMachine<'a> {
         {
             return Ok(Some(10));
         }
+        crate::reserve_more(&mut self.state.devices.tape, 1, "§7.3", "effect tape")?;
         let transferred = match (dev, operation) {
             ("console", "write") => {
+                let bytes = self.transfer_bytes(p, len, "§7.3")?;
+                crate::reserve_more(
+                    &mut self.state.devices.console,
+                    len,
+                    "§7.3",
+                    "console bytes",
+                )?;
                 undo.device = Some(DeviceUndo::Console(self.state.devices.console.len()));
-                let bytes: Vec<_> = (0..len)
-                    .map(|i| self.state.memory.byte(p + i as u128))
-                    .collect();
                 self.state.devices.console.extend(bytes.iter().copied());
                 bytes
             }
             ("clock", "read") => {
-                self.save_bytes(p, 8, undo);
+                self.save_bytes(p, 8, undo)?;
                 let c = self.state.devices.clock;
                 undo.device = Some(DeviceUndo::Clock(c));
                 self.state.memory.store_u128(p, 64, c as u128)?;
@@ -1114,8 +1127,10 @@ impl<'a> ClassicalMachine<'a> {
                 c.to_le_bytes().to_vec()
             }
             ("entropy", "read") => {
-                self.save_bytes(p, len, undo);
+                self.save_bytes(p, len, undo)?;
                 let start = self.state.devices.entropy_position;
+                let mut bytes = crate::reserved(len, "§7.3", "entropy transfer bytes")?;
+                bytes.extend_from_slice(&self.entropy[start..start + len]);
                 undo.device = Some(DeviceUndo::Entropy(start));
                 for n in 0..len {
                     self.state
@@ -1123,10 +1138,10 @@ impl<'a> ClassicalMachine<'a> {
                         .set_byte(p + n as u128, self.entropy[start + n]);
                 }
                 self.state.devices.entropy_position += len;
-                self.entropy[start..start + len].to_vec()
+                bytes
             }
             ("block", "read") => {
-                self.save_bytes(p, 512, undo);
+                self.save_bytes(p, 512, undo)?;
                 let bytes = self
                     .state
                     .devices
@@ -1279,7 +1294,7 @@ impl<'a> ClassicalMachine<'a> {
                 if !self.state.memory.valid(p, (w / 8) as u128) {
                     fault = Some(7);
                 } else {
-                    self.save_bytes(p, (w / 8) as usize, &mut undo);
+                    self.save_bytes(p, (w / 8) as usize, &mut undo)?;
                     self.state.memory.store_u128(p, w as u64, v)?;
                 }
             } else {
@@ -1452,9 +1467,9 @@ impl<'a> ClassicalMachine<'a> {
                             fault = Some(7);
                         } else {
                             let count = usize::try_from(capacity).map_err(|_| {
-                                Error("§10: request exceeds host address space".into())
+                                Error("§10: host limit: request exceeds host address space".into())
                             })?;
-                            let payload = self.memory_bytes(address, count)?;
+                            let payload = self.transfer_bytes(address, count, "§10")?;
                             self.state.pending = Some(HostRequest {
                                 service: crate::object::literal_name(&a[0])?,
                                 payload,
@@ -1621,4 +1636,26 @@ pub(crate) fn compare(pred: &str, a: u128, b: u128, w: u16) -> Result<bool> {
 const TRAP: &str = "trap ";
 fn trap(e: Error) -> Error {
     Error(format!("{TRAP}{}", e.0))
+}
+
+#[cfg(test)]
+pub(crate) fn r21_resource_cases() {
+    let o = Object::parse(include_str!("../tests/fixtures/r21/cc-length.bisa")).unwrap();
+    let mut m = ClassicalMachine::new(&o, "f", &[], &[]).unwrap();
+    m.step_once().unwrap();
+    m.step_once().unwrap();
+    for len in [0, 1, 8, (1usize << 63) - 1, 1 << 63, usize::MAX] {
+        let mut undo = m.history.last().unwrap().undo.clone();
+        undo.bytes.clear();
+        let result = m.save_bytes(1, len, &mut undo);
+        if len <= 8 {
+            result.unwrap();
+            assert_eq!(undo.bytes.len(), len);
+        } else {
+            let e = result.unwrap_err().to_string();
+            assert!(e.contains("§7.1") && e.contains("host limit"), "{e}");
+            assert!(undo.bytes.is_empty());
+        }
+    }
+    eprintln!("R21 retained memory undo bytes: 1 path / 6 cases");
 }

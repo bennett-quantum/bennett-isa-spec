@@ -64,10 +64,62 @@ pub fn version() -> &'static str {
 /// Reserve text-derived storage fallibly before iteration or initialization.
 pub(crate) fn reserved<T>(count: usize, rule: &str, what: &str) -> Result<Vec<T>> {
     let mut out = Vec::new();
+    reserve_more(&mut out, count, rule, what)?;
+    Ok(out)
+}
+
+/// Check cumulative storage before a count-driven loop or any visible mutation.
+pub(crate) fn reserve_more<T>(
+    out: &mut Vec<T>,
+    count: usize,
+    rule: &str,
+    what: &str,
+) -> Result<()> {
+    out.len().checked_add(count).ok_or_else(|| {
+        Error(format!(
+            "{rule}: host limit: {what} cumulative count exceeds usize"
+        ))
+    })?;
     out.try_reserve_exact(count).map_err(|e| {
         Error(format!(
             "{rule}: host limit: {what} allocation of {count} elements failed: {e}"
         ))
     })?;
-    Ok(out)
+    Ok(())
+}
+
+#[cfg(test)]
+mod r21_tests {
+    use super::*;
+    #[test]
+    fn r21_derived_consumers_memory_limited() {
+        if std::env::var_os("R21_UNIT_CHILD").is_none() {
+            let out = std::process::Command::new("python3").args(["-c",
+                "import os,resource,sys; resource.setrlimit(resource.RLIMIT_AS,(256*1024*1024,)*2); resource.setrlimit(resource.RLIMIT_CORE,(0,0)); os.execv(sys.argv[1],sys.argv[1:])"])
+                .arg(std::env::current_exe().unwrap())
+                .args(["--exact", "r21_tests::r21_derived_consumers_memory_limited", "--nocapture"])
+                .env("R21_UNIT_CHILD", "1").output().unwrap();
+            assert!(out.status.success(), "{out:?}");
+            eprintln!("{}", String::from_utf8_lossy(&out.stderr));
+            return;
+        }
+        std::panic::catch_unwind(|| {
+            crate::oracle::r21_resource_cases();
+            crate::claims::r21_resource_cases();
+            crate::classical::r21_resource_cases();
+            for count in [0, 1, 8, (1usize << 63) - 1, 1 << 63, usize::MAX] {
+                let mut console = vec![0u8; 8];
+                let result = reserve_more(&mut console, count, "§7.3", "console bytes");
+                if count <= 8 {
+                    result.unwrap();
+                } else {
+                    let e = result.unwrap_err().to_string();
+                    assert!(e.contains("§7.3") && e.contains("host limit"), "{e}");
+                }
+                assert_eq!(console, vec![0; 8]);
+            }
+            eprintln!("R21 cumulative console storage: 1 path / 6 cases");
+        })
+        .expect("no derived-cardinality or transfer panic");
+    }
 }

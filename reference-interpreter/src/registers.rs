@@ -163,7 +163,8 @@ impl QuantumRegisters {
             .checked_add(len)
             .filter(|end| *end <= h.wires.len())
             .ok_or_else(|| Error("§3.3: qreg slice out of bounds".into()))?;
-        let wires = h.wires[lo..end].to_vec();
+        let mut wires = crate::reserved(len, "§3.3", "qreg slice wires")?;
+        wires.extend_from_slice(&h.wires[lo..end]);
         let undo = self.record(&[id, self.next]);
         self.set_status(id, Status::Viewed)?;
         let view = self.create(wires, Some(id))?;
@@ -176,8 +177,15 @@ impl QuantumRegisters {
         if a == b {
             return err("§3.3", "qreg concat operands alias");
         }
-        let mut wires = self.ordinary(a)?.wires.clone();
-        wires.extend(&self.ordinary(b)?.wires);
+        let a_wires = &self.ordinary(a)?.wires;
+        let b_wires = &self.ordinary(b)?.wires;
+        let count = a_wires
+            .len()
+            .checked_add(b_wires.len())
+            .ok_or_else(|| Error("§3.3: host limit: qreg concat count exceeds usize".into()))?;
+        let mut wires = crate::reserved(count, "§3.3", "qreg concat wires")?;
+        wires.extend_from_slice(a_wires);
+        wires.extend_from_slice(b_wires);
         if wires.iter().collect::<BTreeSet<_>>().len() != wires.len() {
             return err("§3.3", "qreg concat wires overlap");
         }

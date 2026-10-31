@@ -141,6 +141,44 @@ pub(crate) struct Memory {
 pub(crate) fn power_of_two(exponent: u128) -> Option<u128> {
     (exponent < 128).then(|| 1u128 << exponent)
 }
+#[cfg(test)]
+pub(crate) fn r21_resource_cases() {
+    let mut m = Memory {
+        bytes: BTreeMap::new(),
+        allocations: Vec::new(),
+        heap_base: 1,
+        heap_used: 0,
+        table_capacity: None,
+        addresses: BTreeMap::from([("r".into(), 1)]),
+    };
+    for a in [0, 1, 3, 62, 63, 64, 127, 128] {
+        let r = region_bytes(&m, "r", a);
+        if a < 4 {
+            assert_eq!(r.unwrap(), vec![0; 1 << a]);
+        } else {
+            let e = r.unwrap_err().to_string();
+            assert!(e.contains("§4.2") && e.contains("host limit"), "{e}");
+        }
+        // The table capacity is symbolic, not 2^A eagerly allocated entries.
+        m.table_capacity = power_of_two(a as u128);
+        assert!(!m.allocation_fails(1, 1));
+    }
+    for width in [8, 64, (1u64 << 63) - 8, 1 << 63, u64::MAX - 7] {
+        let r = m.load(1, width);
+        if width <= 64 {
+            assert!(r.unwrap().is_zero());
+        } else {
+            let e = r.unwrap_err().to_string();
+            assert!(e.contains("§7.1") && e.contains("host limit"), "{e}");
+        }
+    }
+    for len in [0, 1, 8, (1u128 << 63) - 1, 1 << 63, u64::MAX as u128] {
+        let base = m.allocate(len).unwrap();
+        assert!(m.valid(base, len));
+        assert!(m.bytes.is_empty());
+    }
+    eprintln!("R21 nested region transfer / symbolic table capacity / load storage / sparse allocation: 4 paths / 27 cases");
+}
 impl Memory {
     pub fn initial(
         object: &Object,
@@ -240,9 +278,10 @@ impl Memory {
     /// N/8 bytes little-endian at p; the caller has established inrange.
     pub fn load(&self, p: u128, width: u64) -> Result<BitVector> {
         let count = (width / 8) as usize;
-        let bytes = (0..count)
-            .map(|i| Ok(self.byte(offset(p, i)?)))
-            .collect::<Result<Vec<_>>>()?;
+        let mut bytes = crate::reserved(count, "§7.1", "memory load bytes")?;
+        for i in 0..count {
+            bytes.push(self.byte(offset(p, i)?));
+        }
         BitVector::from_le_bytes(width as usize, &bytes)
     }
     pub fn store(&mut self, p: u128, value: &BitVector) -> Result<()> {
@@ -276,6 +315,12 @@ impl Memory {
             .heap_base
             .checked_add(self.heap_used)
             .ok_or_else(|| Error("§7.1: heap bump exceeds address space".into()))?;
+        crate::reserve_more(
+            &mut self.allocations,
+            1,
+            "§7.1",
+            "sparse allocation entries",
+        )?;
         self.allocations.push(Allocation {
             base,
             size: n,
@@ -469,9 +514,11 @@ pub(crate) fn region_bytes(memory: &Memory, n: &str, address_width: u64) -> Resu
     let len = power_of_two(address_width as u128)
         .and_then(|n| usize::try_from(n).ok())
         .ok_or_else(|| Error("§4.2: host limit: region exceeds host address space".into()))?;
-    (0..len)
-        .map(|i| Ok(memory.byte(offset(base, i)?)))
-        .collect()
+    let mut bytes = crate::reserved(len, "§4.2/§7.1", "nested region transfer bytes")?;
+    for i in 0..len {
+        bytes.push(memory.byte(offset(base, i)?));
+    }
+    Ok(bytes)
 }
 
 impl Object {

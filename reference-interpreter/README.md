@@ -524,8 +524,8 @@ It never constructs N+1 bits or adds to N. The same magnitude check serves
 fault codes and certificate endpoints; admission of small constants/intervals
 at huge widths needs no destination-sized storage. `Function::signature` emits
 large dimensions as decimal strings under §9.1. Concrete wire names, region
-images/cells, quantum identities, claim elements and CLI interface buffers
-reserve storage fallibly, with checked products/cardinalities. Range errors
+images/cells, quantum identities, claim elements and selected CLI interface buffers
+received fallible reservations, with checked products/cardinalities. Range errors
 cite their ISA clause; representation/allocation failures additionally name the
 host limit, without an ISA width cap.
 
@@ -537,9 +537,43 @@ arithmetic. The R13 family retains its 507 inputs and adds the 2^63 boundaries
 (591 cases), assigning expected layout/range, deterministic representation,
 legal and allocation-dependent outcomes before execution. Its R20 siblings
 cover text descriptors, casts, counts, bounds, region products, storage,
-schedules and certificate domains: 102 fixture-qualified paths / 1,113 cases
+schedules and certificate **admission** domains, plus selected direct enumeration
+consumers: 102 fixture-qualified paths / 1,113 cases
 total, with catch_unwind and cited range/resource distinctions. This is a
-finite extreme-value sweep, not an exhaustive proof over all objects.
+finite extreme-value sweep. It missed executable all-cells domain expansion
+and classical transfer lengths; it was not a complete storage-safety audit.
+
+**Design (round 21).** `claims::Object::domain` checked-adds and fallibly reserves
+the cumulative all-cells component count before expanding 2^A. The current
+replay engine materializes every region cell, so this repair retains the eager
+domain representation and reports a §12.2 host limit when it cannot fit. A
+count=1 sample does not imply that its complete input state fits the host.
+Admission and the reviewer hashes are unchanged, with no ISA A/W/count cap.
+Both the all-cells and explicit-list branches reach checked replay storage.
+Nested oracle region transfers and memory loads reserve before iteration.
+
+Classical hostcall (§10), console.write (§7.3), entropy, reply and undo buffers
+reserve before filling; cumulative console storage and the effect-tape entry
+reserve before device mutation. A failed hostcall publishes no request; a
+failed console transfer appends neither output nor a tape entry, and the
+instruction prefix reverses exactly. Sparse allocation remains legal through
+the pointer range. Invalid ranges and exhausted entropy retain their ISA fault
+semantics. Qreg slicing/concatenation and CLI hex output check derived storage;
+trace records reserve incrementally, and step-check retains its lazy odometer.
+
+The R21 extension covers **24 tagged consumer paths / 186 generated cases**,
+separately from the retained R20 family (the path sets overlap). It distinguishes
+admission, exponent-derived cardinality, concrete materialization and sparse
+or lazy consumers. Exponents include 62/63/64 and 127/128; lengths include
+2^63−1, 2^63 and 2^64−1, with successful small controls. Resource regressions
+use catch_unwind inside fresh Linux subprocesses with RLIMIT_AS=256 MiB and
+RLIMIT_CORE=0; an allocator abort cannot be caught by catch_unwind alone.
+Full reviewer objects, independent pins and public verify_claim /
+verify_certificate / library / CLI consumers are retained in
+`tests/fixtures/r21`, `tests/r21_resources.rs` and `tests/support/r21_pins.py`.
+The huge CLI sample-count probes stop at a downstream frame-storage error;
+they test lazy entry, not completion of huge replays. Resident collection sizes
+and general allocator exhaustion are not a full-ISA resource-availability proof.
 
 | Schema / rule | Load-time validator | Positive and negative controls |
 |---|---|---|

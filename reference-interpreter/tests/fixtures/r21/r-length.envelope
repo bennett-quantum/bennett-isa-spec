@@ -1,0 +1,17 @@
+isa=0.8
+ptr_width=64
+{"abi":"0.8","kind":"r","params":[],"results":[],"tier":"r"}
+fn r @f () () () () ()
+^entry():
+n = const.i64 9223372036854775808
+p = alloc n
+effect console.write p n
+ret
+layout A_tab 1
+layout H 64
+layout S_cells 1
+layout heap_base 1
+layout heap_limit_max "9223372036854775808"
+layout null_size 1
+layout ptr_width 64
+device console {"version":"0.8"}

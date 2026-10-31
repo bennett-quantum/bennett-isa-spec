@@ -1,0 +1,16 @@
+bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"f30725fa31cc35b68090b82cfd046681c4342821591cd2d6dd5300ea522499af","kind":"action","name":"a","signature":{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[{"A":63,"W":1,"role":"in"}],"mut":[1],"tier":"q"}}}
+
+section functions
+action @a (t:wire mut) () (r:region[63,1] in) () ()
+^entry():
+x t
+x t
+
+section layout
+{"A_tab":0,"H":1,"S_cells":0,"globals":{},"heap_base":1,"heap_limit_max":0,"interface_regions":{},"null_size":1,"ptr_width":32}
+
+section certificate
+{"bindings":{"closure_hash":"f30725fa31cc35b68090b82cfd046681c4342821591cd2d6dd5300ea522499af","dialect_mapping_version":"r21.sol","interface_hash":"f30725fa31cc35b68090b82cfd046681c4342821591cd2d6dd5300ea522499af","object_hash":"2d99832aa4800ca61e5bc17976931fed374f02ba54abe2e08a31544c72a18859","reference_program_hash":"f30725fa31cc35b68090b82cfd046681c4342821591cd2d6dd5300ea522499af","target_hash":"3333333333333333333333333333333333333333333333333333333333333333"},"composition":{"epsilon_total":{"diamond":0},"method":"sum_over_multiplicities","multiplicities":{}},"producer":{"materialisation":{"llvm_version":"none","normaliser_version":"1","pipeline":"none"},"name":"r21-sol","version":"1"},"regions":{"f30725fa31cc35b68090b82cfd046681c4342821591cd2d6dd5300ea522499af":{"bounds":[],"claims":[{"domain":{"borrowed":[],"bundles":[{"hi":1,"lo":0,"name":"t","width":1}],"regions":[{"cells":"all","name":"r"}]},"kind":"sampled","sampler":{"algorithm":"xoshiro256**","count":1,"seed":["1","2","3","4"]}}],"cleanup":{},"definedness_assumptions":[],"error":{},"frame":{"borrow":{},"interface":[{"class":"any","role":"mut","width":1},{"class":"any","role":"in","width":"9223372036854775808"}],"retained_history":0,"scheme_ancillae":{},"scratch":{}},"gates_used":{},"kind":"action","resources":{},"signature":{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[{"A":63,"W":1,"role":"in"}],"mut":[1],"tier":"q"},"verification":{"borrow_frames":[],"channel":[],"fault_rate":{"domain":{"borrowed":[],"bundles":[],"regions":[]},"faults_by_code":{},"layout_dependent_excluded":0,"undefined_excluded":0},"inverse_pairs":[],"oracle":null,"unitary":[]}}},"versions":{"cert":"0.8","coverage":"0.8","isa":"0.8","launch":"0.8","object":"0.8","sched":"0.8","target":"0.8"}}
