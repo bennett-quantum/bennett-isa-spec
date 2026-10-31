@@ -1,6 +1,9 @@
 # Bennett Virtual ISA — Specification, draft 0.9
 
-**Date:** 2026-10-29. **Status:** draft 0.9, **not yet graded**. It
+**Date:** 2026-10-31. **Status:** draft 0.9, **accepted by the sol and codex seats** (council run
+`isa-09-2026-10-31`: codex round 2, sol round 3, both core accept, 0 blocking; muse seat held).
+K64 and K65 are drafted pending maintainer ratification; publication is gated on that ratification
+and the muse vote. It
 revises draft 0.8, which was **accepted by the council in round 8**
 (2026-10-28; reports and the editor's responses under
 `docs/council/isa-2026-10-28/round-{1..8}/` in the `bennett` meta
