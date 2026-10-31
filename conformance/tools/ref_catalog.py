@@ -1,4 +1,4 @@
-"""Generate resumable constructor checkpoints. Python -I, stdlib only.
+"""Generate the complete draft catalog or historical family checkpoints. Python -I, stdlib only.
 No interpreter imports. Does not publish or update the normative hash marker.
 """
 import argparse
@@ -124,6 +124,7 @@ def build(families):
     if families>=14: recipes+=runpy.run_path(str(ROOT/'conformance/tools/ref_calls.py'))['family'](globals())
     if families>=15: recipes+=runpy.run_path(str(ROOT/'conformance/tools/ref_activation.py'))['family'](globals())
     if families>=16: recipes+=runpy.run_path(str(ROOT/'conformance/tools/ref_construction.py'))['family'](globals())
+    if families>=17: recipes+=runpy.run_path(str(ROOT/'conformance/tools/ref_qinplace.py'))['family'](globals())
     recipes.sort(key=lambda r:r['kind'].encode())
     return {'isa':'0.9','name':'ref','version':'0.9','recipes':recipes}
 def witness():
@@ -131,8 +132,8 @@ def witness():
     w=json.loads(text.split('**ISA-REF-LIB witness**')[1].split('```json\n')[1].split('\n```')[0])
     assert hashlib.sha256(('isa=0.9\nexpansion=ref\nversion=0.9\n'+jcs(w)+'\n').encode()).hexdigest()=='299510fd67cc626fdcbcc10adcd40730f9af294ba596d86fb25fd31be08a5c7f'
 if __name__=='__main__':
-    p=argparse.ArgumentParser(); p.add_argument('--families',type=int,choices=range(1,17),default=16); p.add_argument('--check',action='store_true'); a=p.parse_args()
+    p=argparse.ArgumentParser(); p.add_argument('--families',type=int,choices=range(1,18),default=17); p.add_argument('--check',action='store_true'); a=p.parse_args()
     witness(); raw=jcs(build(a.families)).encode(); path=ROOT/'spec/ref-0.9-draft.json'
     if a.check: assert path.read_bytes()==raw
     else: path.write_bytes(raw)
-    print('checkpoint only:',len(build(a.families)['recipes']),'recipes; Python envelope SHA-256',hashlib.sha256(b'isa=0.9\nexpansion=ref\nversion=0.9\n'+raw+b'\n').hexdigest())
+    print('complete draft library:' if a.families==17 else 'checkpoint only:',len(build(a.families)['recipes']),'recipes; Python envelope SHA-256',hashlib.sha256(b'isa=0.9\nexpansion=ref\nversion=0.9\n'+raw+b'\n').hexdigest())

@@ -1,16 +1,17 @@
-# ref 0.9 constructor catalog — incomplete, not publishable
+# ref 0.9 constructor catalog — complete under draft 0.9
 
-Current checkpoint: **218 recipes**. The complete-library hash/count marker
-in draft §11.1 remains untouched. No ref/ publication or schedule binding is
-claimed. Historical checkpoints and family witness counts are retained in
-[the progress file](ref-0.9-draft.PROGRESS.md). No interpreter source was read
-or copied into the checker.
+Status: **complete under draft 0.9 — 219 recipes; publication remains gated
+on accepted 0.9**. Every row in the disposition table below is bound.
+The complete-library hash/count is recorded once in draft §11.1. No ref/
+publication or schedule execution is claimed. Historical checkpoints and
+family counts remain in [the progress file](ref-0.9-draft.PROGRESS.md).
+No interpreter source was read or copied into the checker.
 
 The document is RFC 8785 canonical UTF-8 without a trailing LF; recipes are
 ordered by bytewise kind. Every recipe has kind, ordered parameters, body,
 scratch, removable:[], and its motivating ISA source. Typed formals,
 constructors, lexical capture, call ordinal spaces and fresh allocation
-identities are defined by §11.1 K19–K27. An image actual binds exact data
+identities are defined by §11.1 K19–K28. An image actual binds exact data
 bytes; empty means absent/default-zero even for non-byte-aligned regions.
 Template application binds explicit frame/wire actuals while preserving free
 captures. Arguments vectors are tied to one closure hash and capture their
@@ -50,7 +51,7 @@ names, bound images and constructor order are hash-significant.
 | §4.2 qjump/qbranch/qjumpr | qjump/qbranch/qjumpr and successor.literal/flagged/dynamic |
 | §3.6 forward/inverse step | step: indexed row/successor templates, explicit current frame, dispatch including HALT, commit pc, clean dispatch; inverse visits retained leaves backwards |
 | §4.3 qalloc/qborrow/qfree/qreturn | qalloc/qborrow/qfree/qreturn: K27 declaration acquire/relinquish with exact class/state metadata |
-| §4.5 qinplace | **Blocked 82x:** printed t/f release order conflicts with ratified scratch LIFO; K24/K26 interfaces are available |
+| §4.5 qinplace | qinplace: exact §4.5 allocation/calls/exchange/t-then-f release sequence under K28; K22 source-call adapters retain complete K24/K26 interfaces |
 | §4.6 qregion | qregion: complete function-local scope, unconditional image preparation/restoration, explicit cells template argument, clean release |
 | §4.6 qload/qunload | qload.in/mut and qunload.in/mut: K26 source region + K27 result declaration |
 | §4.6 qstore/qexchm | qstore/qexchm, generic address scan |
@@ -60,13 +61,11 @@ names, bound images and constructor order are hash-significant.
 | §4.8 opcode summary; §4.9 faults | Same rows above; classical faults retained in bound §4.1 event/history semantics |
 | §5.2 allocate/forward/commit/reverse/release | oracle.construct: K25 state/frame descriptors, catalog step loop, commit, prefix reversal and reverse-order state release |
 
-The sole remaining contract blocker is qinplace (82x). Accepted §4.5
-prints `qfree t; qfree f` after allocating t then f; ratified §11.1/A1
-requires library scratch released in reverse allocation order. Resolving
-that conflict needs a generated-order/ratification decision, not a new
-binding type. No recipe or complete-library marker is supplied for it.
-Closed: 1oa/evi (K25), 1a4 (K26), 3xe (K27), 4nx (existing K23).
-The catalog parent 8r4 remains open. All other current rows have recipes;
+All current rows have serialized recipes. K28 resolves the final release-order
+conflict without editing §4.5: instruction-private t/f are released in the
+printed order; recipe scratch within either call still follows LIFO.
+All catalog contract children (cbk/8sc/afi/lph/1oa/evi/1a4/3xe/4nx/82x) are
+closed. Catalog parent 8r4 is closed after the final gate. As before,
 the family witnesses certify their stated configurations, not every
 possible source object or an ISA 0.9 executor. Linked source/layout and
 closure-hash validation remains a prerequisite to typed descriptor input.
@@ -107,11 +106,13 @@ The generic call predicate adds 43,200 tuples across 192 configurations
 (D,S independently1–4, R4/5/16, two depth/stack limits), plus 131,072 at
 the exact §16.3 D5/S10/R16/limits17/272 counter configuration.
 
-Current **checkpoint-only** envelope SHA-256 (Rust and Python -I):
+Complete library envelope SHA-256 (independent Rust and Python -I):
+`fcb2f1e6d61aced0bf9689eab5f6d82c4ae42e9fea8d1b21ae9c7ffccda6f5ce`.
+The previous 218-recipe checkpoint was
 `64a05ef20201faad429ca2568ee27848fae0b833f95c006a7d594df0313da4ca`.
 The historical 54-recipe checkpoint was
 `3a99ce3028e1ecc421b3991e3b5b7423ee33323badc5ca3ce1e61088a5e5055d`.
-Neither is a complete-library binding. The sole omitted row is qinplace, blocked on 82x.
+Those historical checkpoints are not complete-library bindings; the 219-recipe binding above includes qinplace.
 
 Previous-pass gate (historical): **88 Rust pass / 0 fail**, fmt/clippy green; harness
 **445 pass / 0 fail / 68 unavailable**, versus that pass's entry 445/0/65. Previous-pass commits:
@@ -202,7 +203,7 @@ family do not claim exhaustive source-program enumeration. Large memory
 examples, source/link validation and recursive programs are covered by
 separate component witnesses, not inferred from these construction tuples.
 
-Final verified gate: **108 Rust tests pass / 0 fail**, including
+Completion-II gate (historical): **108 Rust tests pass / 0 fail**, including
 ref_call_flag.rs; fmt --check and clippy --offline --all-targets -D warnings
 green. Harness **445 pass / 0 fail / 73 unavailable**, compared with
 entry **445/0/68**; exactly five new pending-0.9 cases account for +5.
@@ -216,3 +217,55 @@ The final memory-domain count is independently asserted with the exact BDD
 counter: 15 legal base/size pairs at P8/H2, adding 60*2^89 across four
 alias shapes. The two memory tests pass after this bookkeeping correction.
 Detailed per-family evidence and the final bd export are in progress.
+
+## Completion III — qinplace and complete binding
+
+One new recipe, `qinplace(N,F,x,G,H,E)`, owns the entire printed sequence.
+G/H are one-element K22 templates with `(x:wire[N],t:wire[N],f:wire[F])`
+formals. Each source-binding adapter contains exactly the corresponding
+linked oracle `call`, capturing that source call's complete `ins`, `mem`,
+`args` and token actuals. It does not supply allocation, exchange, cleanup,
+or a decomposition algorithm. This permits arbitrary heterogeneous source
+interfaces without referring to private wires before acquisition. Source
+signature/overlap validation, closure identity and the covering inverse-pair
+certificate remain §4.5 prerequisites; the expander is not a source linker
+or certificate checker. Symbol fixtures use synthetic registry identities.
+The adjoint swaps the two adapters, retaining all captures.
+
+Private instruction allocations use K27 declarations, class any and clean
+state, with t/f widths N/F. They are not recipe scratch under K28; all
+ordinary recipe scratch retains identity-based clean LIFO enforcement.
+The leaf witness checks exact allocation/release identities and ordinals,
+two distinct callee invocation spaces, and unconditional lifetime boundaries.
+
+| New family / evidence | Recipes | Widths / bounds | Exact full-domain witnesses |
+|---|---:|---|---:|
+| qinplace short form, both orientations | 1 shared recipe | W1–4, F4; B0/1/2/3/17 | 40 shapes / 5,592,320 tuples |
+| qinplace full wire/region/i128/f64/token interface, both orientations | same recipe | W1–4, two W-bit region cells; same bounds | 40 shapes / 5,592,320 tuples |
+| §16.3 example 7 addya and adjoint | same recipe | W2/F4; all a:i2; legal token (3,0,0,0) | 256 tuples |
+
+For the 80 symbolic shapes, every x/y/region bit, the effective control and
+two spectator bits are arbitrary: 2^(4W+3) tuples per shape, including unused
+y/region wires as spectators in the short form. Total 11,184,640 tuples.
+The direct oracle fixtures implement +B then context XOR and its inverse;
+B is their static source loop count (0/1/2/3/17), with token (64,2,3,4),
+not a claim that example 7
+is fault-free below its three-row budget. The example-7 fixture separately
+uses its legal budget and exact arithmetic. Every lifetime boundary is
+clean, every unchanged input/spectator is preserved, and reversing original
+leaves restores the entire state. These permutation witnesses extend by
+T3/linearity to coherent inputs; no non-permutation leaf was added.
+
+Both new tests were observed red on the absent qinplace recipe, then green.
+The complete count/hash includes every source/scratch/body byte and agrees
+between the independent Rust JCS/SHA-256 and Python -I stdlib computation.
+Final fmt/clippy/cargo/harness evidence is recorded in the progress file.
+
+Final verified gate: **111 Rust tests pass / 0 fail** (entry 108/0),
+including ref_call_flag.rs; fmt --check and clippy --offline --all-targets
+-D warnings green. Harness **445 pass / 0 fail / 74 unavailable (519)**
+from entry **445/0/73 (518)**: exactly one new pending-0.9 qinplace case.
+The corrected n=1/F=4 K28 witness and draft_contracts pass separately too.
+All 31 disposition rows are bound; all 218 earlier recipe objects are
+unchanged. Parent 8r4 and final child 82x are closed; beads exported by path.
+Status: **complete under draft 0.9; publication gated on accepted 0.9**.

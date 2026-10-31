@@ -122,7 +122,7 @@ north star §3.1 requires).
 | K8 | §16.3, §15 | Examples 4–9 (one per new family, hand-derived results) and the suite rows for every new instruction and fault | brief | E | new |
 | K9 | §8.1 | **EPS-DECADE (ratified A5)**: exact zero-based decimal accuracy bucket, domain and exact-entry prohibition; boundary witness | bennett-vm-cxg; b-isa-spec-f31 | S | – |
 | K10 | §7.3 | **BLOCK-IMAGE (ratified A5)**: contiguous complete 512-byte sectors, byte order, partial-image rejection at device initialisation; witness | bennett-vm-47i; b-isa-spec-0d0 | S | – |
-| K11 | §11.1, §17 item 7 | **ISA-REF-LIB (ratified A1)**. Decided serialization, envelope hash, ordinals, scratch/removable rules and decomposition set; witness only, publication gated on accepted 0.9 | bennett-vm-47t; b-isa-spec-8r4 (open) | S | new |
+| K11 | §11.1, §17 item 7 | **ISA-REF-LIB (ratified A1)**. Decided serialization, envelope hash, ordinals, scratch/removable rules and decomposition set; witness only, publication gated on accepted 0.9 | bennett-vm-47t; b-isa-spec-8r4 | S | new |
 | K12 | §10, §10.1, §12.3 | **LAUNCH-ESTIMATE (ratified A2)**. Resolved parameters, class-preserving resource keys, upward decimal encoding and exact certificate binding; witness | bennett-vm-hsd; b-isa-spec-c15 (open) | S | – |
 | K13 | §9.2, §12.1–§12.3 | **CLAIM-REPLAY (ratified A3)**. Mandatory sampled expected relation, standalone invocation binding, canonical parameter and full-table tuple encoding; witness; sampling stays evidence | bennett-vm-clw; b-isa-spec-9uy (open) | S | – |
 | K14 | §8.2–§8.3, §11, §17 item 15 | **Topology (ratified A6)**: optional ordered class vertices and undirected edges; native adjacency, scheme/placement binding; absent all-to-all; routing deferral with explicit-gate construction | b-isa-spec-wr7; b-targets-dd3; circuits b4k | S | – |
@@ -2654,10 +2654,10 @@ remove only operations the library marks removable"; §17 item 7:
 
 The reverse-allocation release rule governs recipe scratch; an instruction whose own semantics fix a release sequence (qinplace per §4.5: `qfree t; qfree f`) keeps that sequence, and its recipe MUST reproduce it exactly. [deps: ISA-4.5-P5, ISA-11.1-P21]
 
-**Instruction-release witness (K28).** For n=F=1 and identity oracles,
+**Instruction-release witness (K28).** For n=1, F=4 and identity oracles,
 qinplace emits allocation t (row ordinal 0), allocation f (1), G's CX
 (callee ordinal 0), exchange x/t (row 2), Ginv's CX (its own callee
-ordinal 0), release t (row 3), release f (4). [deps: ISA-4.5-P5, ISA-11.1-P21] The certified pair leaves
+ordinal 0), release t (row 3), release f (4). [deps: ISA-4.5-P5, ISA-5.4, ISA-11.1-P21] The certified pair leaves
 t/f clean for both x values and both effective controls; allocations and
 releases are unconditional. [deps: ISA-4.5-P5, ISA-3.5, ISA-4.3] Recipe-internal scratch within either call
 still releases in reverse allocation order. [deps: ISA-11.1-P21] Inverse traversal retains
@@ -2691,8 +2691,9 @@ is balanced when the external control is false (§3.5, §4.3).
 The permutation algorithms define exact permutation circuits, preserving
 every input required by the row and cleaning scratch; circuit correctness must still be checked
 against full-domain T3 witnesses and §5.7, not inferred from costs or
-names. The separate catalog job computes the full catalog and its hash
-under this contract; publication follows acceptance. In particular this is
+names. Complete draft catalog: **219 recipes**; envelope SHA-256
+`fcb2f1e6d61aced0bf9689eab5f6d82c4ae42e9fea8d1b21ae9c7ffccda6f5ce`. [deps: ISA-11.1-P2, ISA-11.1-P3, ISA-11.1-P28, ISA-11.1-P29]
+Publication follows acceptance. [deps: ISA-11.1-P1, ISA-11.1-P2] In particular this is
 not permission to publish a partial library that omits division, stack,
 coherent control, memory or any instruction.
 

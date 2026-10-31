@@ -131,8 +131,11 @@ Python; `python3 -I conformance/tools/ref_catalog.py --check` regenerates bytes
 and compares the four-line envelope digest. Both first check the printed
 qxor witness. Neither reads interpreter source.
 
-The resumable catalog is **incomplete and not publishable**. See
-`spec/ref-0.9-draft.README.md` for every §4 row disposition, helper interfaces,
-widths/counts and contract blockers b-isa-spec-cbk / b-isa-spec-8sc. These cases
-remain unavailable pending 0.9 and do not certify a complete expansion library.
+The catalog is **complete under draft 0.9: 219 recipes**, with the complete
+count/hash bound in §11.1. Publication remains gated on accepted 0.9.
+See `spec/ref-0.9-draft.README.md` for all bound §4 row dispositions,
+interfaces and family domains. `tests/ref_qinplace.rs` adds K28's exact
+instruction release order, complete interface forwarding, widths1–4,
+bounds0/1/2/3/17, both orientations and §16.3 example 7. These cases remain
+unavailable pending accepted 0.9/publication and do not certify a 0.9 executor.
 Run `python3 -I conformance/tools/ref_gate.py` for the headless offline gate.

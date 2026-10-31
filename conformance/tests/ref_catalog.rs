@@ -449,7 +449,17 @@ fn independent_canonical_bytes_and_envelope_hashes() {
     );
     let hash = envelope_hash(BYTES);
     assert!(String::from_utf8(output.stdout).unwrap().contains(&hash));
-    println!("Rust and Python CHECKPOINT ONLY envelope SHA-256 {hash}");
+    let count = json::parse(BYTES)
+        .unwrap()
+        .get("recipes")
+        .unwrap()
+        .as_arr()
+        .unwrap()
+        .len();
+    assert!(draft.contains(&format!(
+        "Complete draft catalog: **{count} recipes**; envelope SHA-256\n`{hash}`."
+    )));
+    println!("Rust and Python complete draft library: {count} recipes; envelope SHA-256 {hash}");
 }
 #[test]
 fn linear_scan_full_domain() {

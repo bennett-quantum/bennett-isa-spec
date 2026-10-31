@@ -1,0 +1,25 @@
+{
+  "id": "E-ref-09-qinplace",
+  "suite": "E",
+  "spec": "§4.5 qinplace; §5.3; §11.1 K22/K24/K26/K27/K28; §16.3 example 7",
+  "derivation": "The catalog owns t/f allocation, both source-bound oracle calls, the bitwise exchange and literal t/f release order. Independently map all x values by integer +/-B modulo 2^W, with complete-interface context XOR from ins, both region cells and an exact i128 literal; compare full BDD states including clean t/f/work and arbitrary spectators, then reverse original leaves. Both orientations and controls are included. Example 7 separately checks every x/y/a/control tuple against (x +/- y +/- a) modulo 4.",
+  "scenario": {
+    "widths": [1, 2, 3, 4],
+    "bounds": [0, 1, 2, 3, 17],
+    "interfaces": ["short with spectators", "wire/region/i128/f64/token"],
+    "orientations": ["G,H", "H,G"],
+    "checker": "ref_qinplace.rs; ref_qinplace_contract.rs"
+  },
+  "expected_outcome": {
+    "shapes": 80,
+    "full_domain_tuples": 11184640,
+    "example7_tuples": 256,
+    "private_release_order": ["t", "f"],
+    "recipe_scratch_release_order": "reverse allocation",
+    "inverse_restores_complete_state": true
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending accepted 0.9 and ref publication: b-isa-spec-8r4; the complete draft catalog and K28 witnesses do not promote a 0.8 schedule executor"
+  }
+}

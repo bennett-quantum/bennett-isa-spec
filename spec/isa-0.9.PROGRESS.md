@@ -977,5 +977,26 @@ unchanged sentences are not retrofitted.
 Ruling gate: 109 Rust tests / 0 fail (entry 108/0); fmt --check and
 clippy --offline --all-targets -D warnings green; full harness unchanged
 445 pass / 0 fail / 73 unavailable (518). After the dependency-marker
-addendum, draft_contracts and the exact four-tuple n=F=1 witness were
+addendum, draft_contracts and the exact four-tuple identity-pair witness were
 rerun green, as was clippy. Accepted 0.8 fingerprint and qxor unchanged.
+
+Completion self-review corrects the small K28 witness from n=F=1 to
+n=1/F=4 under §5.4 (dependency added). The fault-width assertion was red
+before fixture correction and green after; instruction/callee ordinals,
+release order and four-tuple domain are unchanged. The catalog's 80 shapes
+and example 7 already used F=4. No accepted text or catalog hash changed.
+
+## 2026-10-31 REF complete draft-library binding
+
+All 31 README dispositions are bound after qinplace completion under K28.
+The single §11.1 marker now records 219 recipes and complete envelope
+fcb2f1e6d61aced0bf9689eab5f6d82c4ae42e9fea8d1b21ae9c7ffccda6f5ce,
+computed independently in Rust and Python -I (including original qxor check).
+The new binding/publication sentences carry declared dependencies too;
+only K11's non-normative bead-status annotation is updated outside that
+marker in this family. No other normative K11 wording is changed.
+K28 correction and release rule retain accepted §4.5 bytes and ordinals.
+Final gate 111 Rust/0 fail (entry108, ruling109), fmt/clippy green,
+ref_call_flag green; harness445/0/74 from445/0/73, one pending-0.9 case.
+82x and parent8r4 closed; all children closed; publication still requires
+accepted 0.9. Full evidence and family domains are in ref-0.9-draft.PROGRESS.md.

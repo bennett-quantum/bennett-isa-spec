@@ -1,20 +1,17 @@
-# ref 0.9 catalog checkpoint (b-isa-spec-8r4)
+# ref 0.9 catalog — complete under draft 0.9 (b-isa-spec-8r4)
 
-Current completion-II state: **218 recipes**, incomplete and not publishable.
-Contract pass: 90590a7 (K25–K27); byte memory: fedc9c6. K23 also closes 4nx.
-Language gaps 1oa/evi/1a4/3xe are closed with typed-binding witnesses.
-The remaining contract blocker is §4.5 qinplace / 82x: printed t/f release
-order conflicts with the ratified reverse-allocation scratch rule.
-All other README rows now have serialized recipes under the new bindings.
-Current checkpoint-only envelope:
-64a05ef20201faad429ca2568ee27848fae0b833f95c006a7d594df0313da4ca.
-The 195-recipe / 84e89406…3230 sections below are historical.
+Status: **complete under draft 0.9 — 219 recipes; publication remains gated
+on accepted 0.9**. Every README disposition row is bound; no remaining
+contract gap or omitted row. Complete envelope SHA-256 (Rust = Python -I):
+`fcb2f1e6d61aced0bf9689eab5f6d82c4ae42e9fea8d1b21ae9c7ffccda6f5ce`.
+K28 / 3d763ee applies the maintainer's instruction-release ruling and closes
+82x. The final family adds qinplace, with 80 shapes / 11,184,640 full-domain
+tuples plus 256 exact §16.3 example-7 tuples. Draft §11.1 now binds the
+complete count/hash once; no ref/ publication or schedule execution.
+Accepted 0.8 and the printed qxor witness remain unchanged. No interpreter
+source was read/copied, no writes outside owned paths, no push.
 
-Status: incomplete, not publishable; no normative catalog hash/count edit.
-Contract blockers filed before implementation: b-isa-spec-cbk and
-b-isa-spec-8sc. Their descriptions quote the exact §11.1 sentences and
-required contract changes. Publication remains gated on accepted 0.9.
-No reference-interpreter source was read or copied.
+## Historical checkpoints (superseded by the complete binding above)
 
 | §11.1 family, in required order | Recipes completed | Widths / tuples verified | Commit |
 |---|---:|---|---|
@@ -443,3 +440,71 @@ remains green. Complete-library marker withheld for the exact qinplace
 conflict quoted above. Closed 1oa/evi/1a4/3xe/4nx; carried 82x and parent
 8r4; no new beads filed. The final .beads/issues.jsonl export contains
 89 issues and both completion/carry notes. No push.
+
+## 2026-10-31 completion III — final qinplace family
+
+K28 ruling commit: 3d763ee; normative sentence and every new witness sentence
+carry declared dependencies. Rejected alternative: changing accepted §4.5.
+82x closed after the ruling landed; all nine earlier catalog contract children
+were independently checked closed before final closure of parent 8r4.
+
+qinplace adds one recipe, bringing 218 to 219. It owns declarations,
+allocations t/f, both call applications, every increasing-bit exchange and
+the exact t/f releases. K22 adapters only bind each corresponding source
+oracle call's full interface and capture; K24/K26 and source linking retain
+all values/region metadata. They cannot replace the catalog algorithm.
+K27 clean declarations plus K28 encode instruction-private lifetime order;
+ordinary library scratch remains LIFO (existing capture regressions green).
+
+| Family | New recipes | Widths / bounds | Full-domain witnesses | Commit |
+|---|---:|---|---|---|
+| K28 contract | 0 | n=1/F=4 identity pair | 4 x/control tuples; exact row/callee ordinals | 3d763ee |
+| qinplace short | 1 shared | W1–4/F4; B0/1/2/3/17; both orientations | 40 shapes / 5,592,320 tuples | completion-family commit containing this entry |
+| qinplace complete interface | same | W1–4, two region cells; i128/f64/token; same bounds | 40 shapes / 5,592,320 tuples | same commit |
+| qinplace §16.3 example 7 | same | W2/F4; all x/y/a; both controls/orientations; token≥3 | 256 tuples | same commit |
+
+The symbolic domain is 2^(4W+3) per shape: arbitrary x/y/two region cells,
+control and two spectators; short-form unused y/region wires remain arbitrary.
+Integer truth-table expectations are separate from source increment gates;
+all scratch boundaries and the whole reversed state are checked. The source
+fixture B denotes a bounded gate loop with token (64,2,3,4), not successful
+execution of example 7
+below its minimum budget. Example 7 is separately checked at its legal tuple.
+Two new tests were red on unknown recipe qinplace before generation, then green.
+
+Rust and Python -I canonicalizers/SHA-256 independently agree on the complete
+219-recipe envelope. The qxor 299510fd…7f witness is verified by both first.
+All README rows have recipes; no blocked dispositions remain. Source/link
+and certificate validation are prerequisites, not supplied by this checker.
+Publication remains gated on accepted 0.9; staged cases remain pending 0.9.
+
+Self-review correction: the small K28 witness in 3d763ee used F=1, below
+§5.4's minimum. A legal-fault-width assertion was observed red; the printed
+witness and fixture now use n=1/F=4, retaining all row/callee ordinals and
+four tuples. Every qinplace family witness already used F=4. No library
+bytes/hash or accepted text change. The corrected witness carries ISA-5.4
+as an additional dependency and is rerun with draft_contracts.
+
+Final gate: **111 Rust pass / 0 fail**, versus entry **108/0** and ruling
+**109/0**; fmt --check and clippy --offline --all-targets -D warnings green.
+ref_call_flag.rs remains green with every semantic/count assertion intact.
+Harness **445/0/74 (519), exit 2**, versus entry/ruling **445/0/73 (518)**;
+only E-ref-09-qinplace adds unavailable, pending accepted 0.9/publication.
+The corrected n=1/F=4 contract witness and draft_contracts were rerun green;
+full qinplace witnesses were rerun after fixing their source-loop token to
+(64,2,3,4) and asserting effective controls on every callee semantic leaf.
+
+Final audits: all 31 README disposition rows bound; 219 sorted unique
+recipes with empty removable; all 218 pre-existing recipe objects unchanged
+and their 64a05ef2…4ca checkpoint independently reproduced. All eight new
+normative dependency markers name existing catalog clauses/sections.
+Draft edits are isolated to §0/§11.1. Accepted 0.8 SHA-256 remains
+90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e;
+qxor witness bytes and 299510fd…7f envelope unchanged.
+
+Complete library: **219 recipes**, envelope (Rust = Python -I)
+`fcb2f1e6d61aced0bf9689eab5f6d82c4ae42e9fea8d1b21ae9c7ffccda6f5ce`.
+Closed 82x (K28) and parent 8r4 after checking every contract child closed;
+no new/carried catalog blockers. Final bd export is committed in the
+completion-family commit containing this evidence. No push.
+Status: **complete under draft 0.9; publication gated on accepted 0.9**.
