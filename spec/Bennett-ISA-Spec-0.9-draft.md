@@ -141,6 +141,14 @@ north star §3.1 requires).
 | K27 | §11.1 | **REF-LIFETIMES**. Exact class actuals and shared allocation declarations across invocations | b-isa-spec-3xe | S | new |
 | K28 | §11.1 | **REF-INSTRUCTION-RELEASE**. Recipe scratch follows reverse allocation order; instruction-defined release sequences remain exact, with the qinplace ordinal witness. [deps: ISA-4.5-P5, ISA-11.1-P21] | b-isa-spec-82x; maintainer ruling 2026-10-31 | S | new |
 
+| K29 | §5.3 | **QIF-ADJOINT**. Complete-expansion inverse for cross-arm lifetimes; §5.1 matches lifetimes region-wide, not arm-wise; witness: `qif p { d = qalloc any 1 } { qfree d }` recreates d before freeing it in the inverse. | INV-1 gap 2; b-isa-spec-bdv; SQ 28 | S | +bytes |
+| K30 | §4.6 | **LOOP-BINDINGS**. Visit-local linear binding carry-over; witness: a body frees c then reallocates c, and the next visit uses the new c. | INV-1 gap 3; r9_mixed_loop_threads_reallocated_bindings | E | – |
+| K31 | §5.3 | **MATCHED-PAIRS**. Callees, classical/token values, operand versions and effective control sets identify adjoints; witness: opaque oracle pairs under stacks [p,q] and [q,p,p] match. | INV-1 gap 4; r10_equivalent_control_sets_preserve_opaque_inverse | E | – |
+| K32 | §3.7 | **LOCATION-DECLARATIONS**. Locations only in oracles/lprocs; witness: an action `regs { ghost:wire }` cannot manufacture a live wire; empty regs with bounds remains legal. | INV-2 gap 1; r11_action_regs_do_not_produce_wires | E | – |
+| K33 | §3.3 | **WIRE-DISTINCTNESS**. Distinct denoted wires, not spellings; witness: w and w[0] overlap, and two w[0] operands overlap. | INV-2 gap 2; tier_arity_aliasing_and_input_roles | E | – |
+| K34 | §3.3 | **REGISTER-FRESHNESS**. Fresh allocation disjoint from live/viewed registers; launch ids pairwise disjoint; witness: duplicate launch id returns E_ARG before execution, while from_id aliases remain references to one register. | INV-2 gap 3; register_handles_enforce_views_consumption_and_cleanliness | E | – |
+| K35 | §3.3 | **CALL-ALIASES**. Atomic CC/R fault for overlapping qreg call slots, including control/target overlap; witness: the same id in two slots faults without consuming a view or mutating wires. | INV-2 gap 4; r4_dynamic_interface_alias_is_an_atomic_reversible_cc_and_r_fault | E | – |
+
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
 `lift.call`; mapped-region parameters preserve the complete lifted-call
@@ -326,6 +334,9 @@ instruction executed under it (so `qpred p; x p` is ill-formed); a
 predicate wire is not modified between its push and its matching pop; a
 `qif`/`qloop … while` selector is not modified inside its arms or body.
 A region's interface bundles and regions are pairwise disjoint.
+Distinctness is judged on the wires denoted: a bundle and an indexed
+operand of it, or two indexed operands denoting the same wire, overlap
+and are not distinct. [deps: ISA-3.3-P3, ISA-4.4]
 
 **Per-opcode operand schema** (§4.8): every opcode has a tier set, a
 fixed arity, operand kinds and a result type; results are written first
@@ -385,14 +396,14 @@ another register while the program is loaded. **Handle transitions:**
 
 | Instruction | Precondition | Effect |
 |---|---|---|
-| `q = qreg.new cls n` | `n` a literal n ≥ 1 (q: `qreg[n]`) or an `i64` value read unsigned, 0 included (q: `qreg[*]`); the device can provide n wires of class `cls`, else code `FAULT_BUDGET_HEAP` | q live, clean, with a fresh id |
+| `q = qreg.new cls n` | `n` a literal n ≥ 1 (q: `qreg[n]`) or an `i64` value read unsigned, 0 included (q: `qreg[*]`); the device can provide n wires of class `cls`, else code `FAULT_BUDGET_HEAP` | q live, clean, with a fresh id and wires disjoint from every live or viewed register. [deps: ISA-3.3-P7] |
 | `qreg.free q` | q live, not a view, clean on every basis configuration (a verifying executor checks it; on failure q stays live and unchanged; a non-verifying one: §17 item 14) | q consumed |
 | `q2 = qreg.slice q lo len` | q live, not a view; `lo` and `len` each a literal (`len` ≥ 1) or an `i64` value, both unsigned; lo + len ≤ n, computed without wrap (a trap even when literals make the failure evident) | q2 a view of wires [lo, lo+len) of q, of type `qreg[len]` for a literal len and `qreg[*]` otherwise; q viewed; q2 MUST be the operand of exactly one region call and of nothing else; after that call q2 is consumed and q is live again; a use of q while it is viewed traps (the static rule below covers the cases suite F rejects). Reversing that region call (§7.4) restores q viewed and q2 live; reversing the slice frame then restores q live |
 | `q = qreg.concat q1 q2` | q1, q2 live, not views, distinct registers | q1, q2 consumed; q live, with a fresh id, over the wires of q1 then q2; `qreg[n1+n2]` if both operands are static, else `qreg[*]` |
 | `w = qreg.width q` | q live, not a view | w: `i64`, the width; no state change |
 | `id = qreg.id q` | q live, not a view | id: `i64`, the bits of q's id; no state change |
 | `q = qreg.from_id id` | `id` is the id of a register of the program that is live, not a view, and not owned by another run that is not CLOSED (§10) | q: `qreg[*]`, an alias of that register; no ledger state change; the run now owns the register (§10), which reversal does not undo (ownership ends when the run is CLOSED) |
-| region call (§4.7) with q as operand | q live (a view included); its width equals the slot's (§3.3 binding) | q unchanged |
+| region call (§4.7) with q as operand | q live (a view included); its width equals the slot's (§3.3 binding); the wire sets filling distinct wire/region slots are pairwise disjoint, and an explicit control is disjoint from targets and consumed/produced operands (read-only input overlap remains allowed), else CC trap / R fault FAULT_UB_TRAP before any effect, including any view consumption. [deps: ISA-3.3-P4, ISA-4.7, ISA-4.9] | q unchanged |
 | `r = measure q` / `r = measure.iN q` | q live, not a view; the form `measure.iN` (1 ≤ N ≤ 128) for a `qreg[*]`, whose width MUST be N (checked before measuring); for a `qreg[n]` either `measure` or `measure.iN` with N = n (checked statically) | q consumed, its wires released; r: `in` / `iN` |
 | reversal of a `qreg.*` frame (§7.4, §10) | – | the ledger state before that frame (below). A `measure` frame is **never reversed**: a segment containing one cannot be uncalled (§7.4) and a run containing one is not reversible (§10) |
 
@@ -417,6 +428,11 @@ width n) fills a `wire[n]` slot bit for bit (bit 0 ↔ wire 0); it fills a
 `region[A,W]` slot iff n = 2^A·W with cell i = bits [iW, (i+1)W); for a
 `qreg[*]` the width is checked at the call, before any effect.
 Host-supplied register ids are `qreg` values of the parameter's type.
+
+The register ids supplied as arguments of one `bennett_run` MUST
+denote pairwise disjoint registers, else `bennett_run` returns `E_ARG`
+before executing the entry function or acquiring any register ownership.
+[deps: ISA-3.3-P7, ISA-10]
 
 **Registers, handles and aliases.** A `qreg` value is a reference to a
 register of the device; the state live / viewed / consumed belongs to
@@ -746,6 +762,11 @@ forward `lift.call` step and one forward `lift.ret` step of a recursive
 call, each followed by its inverse, and asserts that the complete
 pre-step tuple is restored and every frame field is clean.
 
+Only oracles and lprocs declare locations, and every `regs` entry in
+them has type `reg[N]`; the `regs` list of an action, permutation
+action, CC or R function MUST be empty (an action's empty list may
+still carry `bounds`). [deps: ISA-3.3-P1, ISA-3.7-P1, ISA-16.2]
+
 ## 4. Instruction set
 
 ### 4.1 Classical control (CC, R)
@@ -919,6 +940,12 @@ permutation actions require ε = 0** for every gate; actions MAY use ε > 0
 | `qif` | `qif w { then } { else }` | `qpred w; then; qunpred w; x w; qpred w; else; qunpred w; x w` |
 | `qloop` | `qloop n { body }` | body n times |
 | `qloop … while` | `qloop n while cond { body }` | `cond : wire[n]` permutation-provenance wires computed before the loop from wires the body does not modify; flags `c_1..c_n` clean; `cx cond[0] c_1`; iteration i under `qpred c_i`; after iteration i < n: `ccx c_i cond[i] c_{i+1}`; flags uncomputed in reverse and freed |
+
+A `qloop` body is threaded like a block: each visit resolves linear
+names against the bindings live at its entry, and its exit bindings
+supply the next visit's entry bindings; the entry and exit live names
+and their types MUST agree, with consumed body-local names absent from
+both. [deps: ISA-3.3-P3, ISA-4.6-P8, ISA-4.6-P9]
 
 ### 4.7 Region calls (structured code, CC and R)
 
@@ -1107,13 +1134,30 @@ renumbered):
   qxor qexch qstore qexchm: self-adjoint   qinplace @g @ginv tk x (ins) (mem) (args) ↦ qinplace @ginv @g tk x (ins) (mem) (args)
   oracle_call ↦ oracle_call
   action_call @b ↦ adj action_call @b   qpred/qunpred pairs reversed as a whole
-  qif w {A}{B} ↦ qif w {adj A}{adj B}   qloop n {A} ↦ qloop n {adj A}
+  qif w {A}{B} ↦ adjoint of the complete §4.6 expansion, including unconditional lifetimes, in reverse order. [deps: ISA-3.5, ISA-4.6-P7]
+  qloop n {A} ↦ qloop n {adj A}
   qloop n while cond {A} ↦ flags computed forward as §4.6; adj A for i = n..1 under c_i; flags uncomputed
 ```
 
 **Control.** `ctl w @a` is controlled-U: workspace, regions and flags
 allocated unconditionally; every gate of the body and its cleanup runs
 under `w` in addition to the active predicate.
+
+The shorthand `qif w {adj A}{adj B}` denotes that adjoint when each
+arm's allocations and releases are matched within that arm; no
+arm-local lifetime restriction is imposed on the source `qif`.
+[deps: ISA-3.5, ISA-4.6-P7, ISA-5.1]
+
+Two operations form a **matched pair** iff the second is the §5.3
+adjoint of the first, with the same callee(s) (the pair exchanged for
+`qinplace`), identical classical argument values and token identities
+and tuples, the same operand wires with the first's read-only input
+versions and produced target versions current at the second, and equal
+effective control sets including the versions of their wires; order and
+repetition in predicate stacks are irrelevant. [deps: ISA-2-P10, ISA-3.3-P3, ISA-4.5-P5, ISA-4.7, ISA-5.3-P4, ISA-5.4]
+A matched inverse restores the preceding wire-version bindings for
+subsequent matching, but a cell write always advances its cell version,
+even when its value is restored. [deps: ISA-3.3-P3, ISA-6.1-P1]
 
 ### 5.4 Budgets and fault codes
 

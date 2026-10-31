@@ -1,3 +1,53 @@
+## 2026-10-31 Proof editorial pass — group 1 (K29–K35)
+
+Sole implementation editor; owned draft/diff/progress/beads only. Read all
+CLAUDE rules, §0, this progress file, the four structured proofs and their
+format/index, both clause graphs and the statement catalog, the five task
+beads, SQ 25/30/31 (also SQ 28), and dialect §16.3 Names and layout.
+Impact cones queried in both graphs before changes (local evidence under
+.tmp/proof-editorial-pass/impact-before.txt); the committed draft graph is
+a baseline snapshot, so final clause ordinals are verified on a scratch rebuild.
+No accepted 0.8 or §11.1 recipe text change is authorized.
+
+The index/task's “18 gaps” excludes the four defect entries: the four
+numbered Spec gaps lists actually contain 4+4+9+5 = 22 entries. This pass
+accounts for all 22, with defect/gap duplicates recorded once.
+
+- INV-1/1: disposition b, existing K4, ISA-4.5-P5 (also ISA-1.2-P1):
+  every executing qinplace needs a covering verified inverse-pair entry
+  before any effect of the enclosing CC/R call; failure faults atomically.
+  The existing sentence already says the requested timing/outcome.
+- INV-1/2 + bdv: disposition a, K29. §5.1 (accepted and draft) matches
+  lifetimes region-wide; neither says “within each arm”. Allocation and
+  release are unconditional under §3.5. The supplied program is therefore
+  well-formed: forward allocates then frees d, inverse must allocate in
+  inverse else before freeing in inverse then. NAD was considered and
+  rejected after reading the actual §5.1 text. Retain the self-contained
+  shorthand, but use the complete expansion generally; no capability lost.
+- INV-1/3: a K30, per-visit names/types, including reallocated c and
+  zero visits (no binding transition); only consumed locals disappear.
+- INV-1/4: a K31, exact classical/token/callee/version key and set-valued
+  controls; inverse pairs restore wire bindings, never roll back cell
+  version counters. Same-token binding follows §5.5; opaque pairs remain
+  available without inlining.
+- INV-2/1: a K32, regs restricted to locations in oracles/lprocs; an
+  action has no source of an unproduced wire/classical local. Empty
+  regs/bounds remains supported.
+- INV-2/2: a K33, denoted-wire distinctness; the read-only overlap with
+  inherited controls allowed by §3.3 remains allowed.
+- INV-2/3: a K34, fresh allocation (including viewed parents) and atomic
+  E_ARG for overlapping launch arguments. from_id aliases are still
+  references to a single ledger register, not overlapping new registers.
+- INV-2/4: a K35, runtime alias check before gates or view transitions,
+  CC/R FAULT_UB_TRAP; static Q interface-disjointness remains as specified.
+
+Rejected: arm-local qif lifetime bans; keeping the ill-formed adjoint
+shorthand for cross-arm lifetimes; using stale first-visit loop names;
+lexical-stack matching; treating spelling inequality as disjointness;
+banning qreg aliases or requiring predicate/read-only input disjointness.
+Witnesses are named on each K row; these are contract edits, not claims
+that the read-only 0.8 interpreter executes 0.9.
+
 ## REF-BINDING / REF-QUANTUM completion — 2026-10-30
 
 K19/K20 extend §11.1 within A1's serialization/envelope/ordinal contract.
