@@ -139,6 +139,7 @@ north star §3.1 requires).
 | K25 | §11.1 | **REF-DESCRIPTORS**. Ordered typed records for byte layouts and heterogeneous activation locations | b-isa-spec-1oa; b-isa-spec-evi | S | new |
 | K26 | §11.1 | **REF-REGIONS**. Shape, role, origin and cell bindings preserved in closure arguments | b-isa-spec-1a4 | S | new |
 | K27 | §11.1 | **REF-LIFETIMES**. Exact class actuals and shared allocation declarations across invocations | b-isa-spec-3xe | S | new |
+| K28 | §11.1 | **REF-INSTRUCTION-RELEASE**. Recipe scratch follows reverse allocation order; instruction-defined release sequences remain exact, with the qinplace ordinal witness. [deps: ISA-4.5-P5, ISA-11.1-P21] | b-isa-spec-82x; maintainer ruling 2026-10-31 | S | new |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -2650,6 +2651,17 @@ may infer extra permission from a zero-valued basis input. Motivation
 (0.8 §11): "MUST keep the ordinals of the operations they keep and MAY
 remove only operations the library marks removable"; §17 item 7:
 "clean scratch released in reverse order".
+
+The reverse-allocation release rule governs recipe scratch; an instruction whose own semantics fix a release sequence (qinplace per §4.5: `qfree t; qfree f`) keeps that sequence, and its recipe MUST reproduce it exactly. [deps: ISA-4.5-P5, ISA-11.1-P21]
+
+**Instruction-release witness (K28).** For n=F=1 and identity oracles,
+qinplace emits allocation t (row ordinal 0), allocation f (1), G's CX
+(callee ordinal 0), exchange x/t (row 2), Ginv's CX (its own callee
+ordinal 0), release t (row 3), release f (4). [deps: ISA-4.5-P5, ISA-11.1-P21] The certified pair leaves
+t/f clean for both x values and both effective controls; allocations and
+releases are unconditional. [deps: ISA-4.5-P5, ISA-3.5, ISA-4.3] Recipe-internal scratch within either call
+still releases in reverse allocation order. [deps: ISA-11.1-P21] Inverse traversal retains
+these ordinals, reverses their order and adjoints the leaves (§5.3). [deps: ISA-5.3, ISA-11.1-P21]
 
 **Decomposition set.** The §17 item 7 defaults are made explicit below. Bit
 loops below increase from the least-significant bit. To make Boolean

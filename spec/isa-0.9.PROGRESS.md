@@ -947,3 +947,35 @@ order, and flattening all heterogeneous frames into caller-private circuits.
 The catalog invokes its own step algorithm; only source row/successor
 templates are supplied. Record acquire retains the recipe scratch mark
 through K25 scope binding, so private state cannot bypass K27 LIFO.
+
+## 2026-10-31 REF completion — K28 instruction release ruling
+
+Maintainer ruling on b-isa-spec-82x is applied solely to §0/§11.1 as
+K28 REF-INSTRUCTION-RELEASE. The reverse-allocation rule governs recipe
+scratch; an instruction-defined sequence is reproduced exactly, including
+qinplace's qfree t; qfree f. The one-bit identity-pair witness records
+instruction ordinals 0/1/2/3/4 and separate callee ordinal zero for both
+calls. conformance/tests/ref_qinplace_contract.rs was observed red before
+the normative addition, then checks the exact leaf sequence and identities.
+Existing scratch-LIFO/capture regressions stay binding.
+
+Rejected alternative: changing §4.5 to qfree f; qfree t would alter accepted
+0.8 generated order. Neither accepted 0.8 nor draft §4.5 is changed. Also
+rejected: relaxing release order for ordinary recipe scratch or removing
+either private allocation/call. K27 declarations encode the instruction's
+own lifetimes under K28, not a general scratch exception. The printed qxor
+witness bytes/hash are unchanged. Catalog completion and full-library
+binding follow as a separate family commit; publication requires accepted
+0.9.
+
+Rule 12 addendum: K28 and every new witness sentence carry declared
+dependencies. Lookups in ISA-0.8.json and ISA-0.9-draft.json identify
+qinplace as ISA-4.5-P5 and the original scratch/ordinal clause as
+ISA-11.1-P21. The new rule is a separate paragraph after that clause;
+unchanged sentences are not retrofitted.
+
+Ruling gate: 109 Rust tests / 0 fail (entry 108/0); fmt --check and
+clippy --offline --all-targets -D warnings green; full harness unchanged
+445 pass / 0 fail / 73 unavailable (518). After the dependency-marker
+addendum, draft_contracts and the exact four-tuple n=F=1 witness were
+rerun green, as was clippy. Accepted 0.8 fingerprint and qxor unchanged.
