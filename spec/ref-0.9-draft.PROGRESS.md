@@ -1,11 +1,14 @@
 # ref 0.9 catalog checkpoint (b-isa-spec-8r4)
 
-Current resumed state (2026-10-31): **195 recipes**, still incomplete and
-not publishable. Latest family evidence and blockers are in the final
-section below; the 54-recipe and intermediate sections are historical.
-Part 1: bbb1b62 (K21–K24). First remaining blocked row: §4.2 lift.load,
-b-isa-spec-1oa (typed ordered mapped-region descriptors). Current
-checkpoint-only hash: 84e8940646f1cf2416790b71a9eed525589f0c62e2c397f2a7d08e0b33233230.
+Current completion-II state: **207 recipes**, incomplete and not publishable.
+Contract pass: 90590a7 (K25–K27); byte memory: fedc9c6. K23 also closes 4nx.
+Language gaps 1oa/evi/1a4/3xe are closed with typed-binding witnesses.
+The remaining contract blocker is §4.5 qinplace / 82x: printed t/f release
+order conflicts with the ratified reverse-allocation scratch rule.
+Other remaining rows are catalog implementation work under the new bindings.
+Current checkpoint-only envelope:
+0b4b9c8b3509fe1c9b7f61ead6dc9325480dcb52a63baa6a0c4b4bf5358c7dcb.
+The 195-recipe / 84e89406…3230 sections below are historical.
 
 Status: incomplete, not publishable; no normative catalog hash/count edit.
 Contract blockers filed before implementation: b-isa-spec-cbk and
@@ -320,3 +323,21 @@ to the address location itself (load and store, mapped/unmapped). Their
 full domains add 56*2^89 tuples, including unused declared spectators.
 Family gate: 95 Rust tests, 0 fail; fmt/clippy green; harness 445/0/69
 (+1 pending-0.9 case). The alias-only final extension passes separately.
+
+## Completion II — allocation-result family
+
+Memory commit fedc9c6. Ten allocation/copy/load result recipes added
+(207 total), observed red for qborrow/qcopy.bound before serialization.
+108 BDD shapes at widths1–4, A/W independently1–4, three classes;
+7083657813172691625768 tuples; 180 exact full borrowed basis columns;
+four direct qalloc/qfree metadata shapes. Uses shared declaration identities,
+never allocates into a captured caller wire name. Checkpoint-only hash
+0b4b9c8b3509fe1c9b7f61ead6dc9325480dcb52a63baa6a0c4b4bf5358c7dcb.
+
+Allocation gate: full Rust suite 98 pass/0 fail; harness 445/0/70,
+fmt/clippy green. Two additional record-binding regressions were found
+during audit: wire actuals must resolve before field binding, while width
+expressions use enclosing earlier recipe integers. Observed red (coincident
+operands) before correction; eight descriptor tests now green. All record
+consumers (memory/allocations) rerun after that correction. No domain or
+semantic assertion removed. Library bytes/hash unchanged by checker fix.

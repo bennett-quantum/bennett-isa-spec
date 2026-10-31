@@ -914,3 +914,15 @@ released in reverse allocation order. Changing §4.5 would change accepted
 change the ratified A1 rule. Neither is a constructor-language extension.
 Stop on qinplace; require an explicit semantic/ratification decision.
 The two calls and both private bundles remain required and in scope.
+
+K25 checker audit in the allocation family: record wire actuals evaluate
+in the captured caller environment, not in an environment overwritten by
+earlier wire fields. Field width expressions instead use the receiving
+recipe's earlier integers plus earlier integer fields. A regression
+produced coincident operands before the fix; the two scopes are now
+separate. Normative text already required these scopes.
+
+K25 field schemas also admit the existing K21 image type, with a red/green
+initializer-record witness. Keeping image metadata in the shared record
+vocabulary avoids a separate ad hoc initializer-list binding. Image X
+semantics stay K21; no new unconditional-gate permission is introduced.

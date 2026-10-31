@@ -2432,7 +2432,8 @@ body match the supplied closure hash.
 
 **Ordered descriptors (K25).** A `records` formal has exactly `name`,
 `type`, `fields`, `order`. `fields` is an ordered typed formal list;
-its types are `integer`, `wire`, `region`, `class`, or `allocation`.
+its types are `integer`, `wire`, `region`, `class`, `allocation`, or
+`image` (K21, for source data-image descriptors).
 A field's width/shape expressions may use enclosing earlier integer
 formals and earlier integer fields, never later fields. `order` is an
 array of distinct integer field names. An actual is an array of objects

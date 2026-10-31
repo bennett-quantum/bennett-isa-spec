@@ -1,0 +1,35 @@
+{
+  "id": "E-ref-09-allocation-results",
+  "suite": "E",
+  "spec": "\u00a74.3; \u00a74.5 copy; \u00a74.6 load; \u00a711.1 K27",
+  "derivation": "Exact symbolic helper composition with caller-visible allocation identities and classes; arbitrary borrowed inputs are full-basis matrix coordinates, not zero ancillas.",
+  "scenario": {
+    "checker": "ref_allocations.rs",
+    "widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "address_widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "classes": [
+      "any",
+      "ancilla",
+      "data"
+    ]
+  },
+  "expected_outcome": {
+    "symbolic_shapes": 108,
+    "tuples": "7083657813172691625768",
+    "borrowed_columns": 180
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-8r4; accepted K27 and complete catalog required"
+  }
+}

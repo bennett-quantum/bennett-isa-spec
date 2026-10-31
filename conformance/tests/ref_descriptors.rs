@@ -149,3 +149,42 @@ fn activation_records_bind_low_cell_slices_in_global_id_order() {
     let bad = args.replace("\"id\":1", "\"id\":0");
     assert!(expand(&doc(p, b), &bad, &[("a", 2), ("b", 1), ("s", 12)]).is_err());
 }
+
+#[test]
+fn record_actual_wires_resolve_at_capture_before_any_field_binding() {
+    let p = r#"[{"name":"D","type":"records","fields":[{"name":"a","type":"wire","width":1},{"name":"b","type":"wire","width":1}],"order":[]}]"#;
+    let d = doc(
+        p,
+        r#"[{"visit":"D","body":[{"gate":"cx","wires":["a","b"]}]}]"#,
+    );
+    let out = expand(
+        &d,
+        r#"[[{"a":"outer","b":"a"}]]"#,
+        &[("a", 1), ("outer", 1)],
+    )
+    .unwrap();
+    assert_eq!(out[0].wires, [("outer".into(), 0), ("a".into(), 0)]);
+}
+
+#[test]
+fn record_widths_use_earlier_recipe_integers_and_actuals_keep_capture() {
+    let p = r#"["N",{"name":"D","type":"records","fields":[{"name":"w","type":"wire","width":"N"}],"order":[]}]"#;
+    let d = doc(
+        p,
+        r#"[{"visit":"D","body":[{"gate":"cx","wires":["w[0]","w[1]"]}]}]"#,
+    );
+    let out = expand(&d, r#"[2,[{"w":"a"}]]"#, &[("a", 2)]).unwrap();
+    assert_eq!(out[0].wires, [("a".into(), 0), ("a".into(), 1)]);
+}
+
+#[test]
+fn initializer_records_share_image_binding_and_shadow_across_types() {
+    let p = r#"[{"name":"D","type":"records","fields":[{"name":"I","type":"image"},{"name":"cells","type":"wire","width":8}],"order":[]}]"#;
+    let d = doc(
+        p,
+        r#"[{"visit":"D","body":[{"image":"I","wires":"cells"}]}]"#,
+    );
+    let out = expand(&d, r#"[[{"I":"81","cells":"a"}]]"#, &[("a", 8)]).unwrap();
+    assert_eq!(out.iter().map(|l| l.wires[0].1).collect::<Vec<_>>(), [0, 7]);
+    assert!(out.iter().all(|l| l.controls.is_empty()));
+}

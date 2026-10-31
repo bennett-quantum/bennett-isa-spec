@@ -315,7 +315,10 @@ fn validate_formals(ps: &[Json]) -> Result<(), String> {
                         .get("type")
                         .and_then(Json::as_str)
                         .unwrap_or("integer");
-                    if !matches!(ty, "integer" | "wire" | "region" | "class" | "allocation") {
+                    if !matches!(
+                        ty,
+                        "integer" | "wire" | "region" | "class" | "allocation" | "image"
+                    ) {
                         return Err("invalid record field type".into());
                     }
                 }
@@ -685,7 +688,7 @@ impl Expander {
                                 })
                                 .collect::<Vec<_>>();
                             keys(record, &names)?;
-                            let mut source = caller.clone();
+                            let mut widths = c.ints.clone();
                             let mut bound = Context::default();
                             for field in fields {
                                 let n = field
@@ -707,12 +710,12 @@ impl Expander {
                                 let mut b = self.bind_seeded(
                                     &fake,
                                     &[f(record, n)?.clone()],
-                                    &source,
-                                    &source.ints,
+                                    caller,
+                                    &widths,
                                 )?;
                                 b.legacy = false;
                                 b.ints.retain(|key, _| key == n);
-                                source.merge(&b);
+                                widths.extend(b.ints.clone());
                                 bound.merge(&b);
                             }
                             result.push(bound);
@@ -1007,6 +1010,7 @@ impl Expander {
                         .chain(record.wires.keys())
                         .chain(record.handles.keys())
                         .chain(record.classes.keys())
+                        .chain(record.images.keys())
                     {
                         local.clear_name(n);
                     }
