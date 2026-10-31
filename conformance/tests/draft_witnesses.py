@@ -111,7 +111,16 @@ assert replay["wrong_row"]["after"] == before  # a self-comparison would miss th
 assert replay["changed_arg_after"] == dict(before, bundles=[str(x), str(target ^ ((x + 1) % 4)), str(fault)])
 assert replay["short_budget_after"] == dict(before, bundles=[str(x), str(target), str(fault ^ 1)])
 assert replay["sample_count"] == 4 and replay["distinct_samples"] == 1
-assert Fraction(replay["covered_fraction"]) == Fraction(1, 2**11)
+widths = replay["widths"]
+assert widths == {"bundles": [2, 2, 4], "borrowed": [1], "regions": [[8, 8]]}
+full_bits = sum(widths["bundles"] + widths["borrowed"] + sum(widths["regions"], []))
+assert full_bits == 25
+for pair in [replay["row"], replay["wrong_row"]]:
+    for values in pair.values():
+        for kind in ["bundles", "borrowed"]:
+            assert all(0 <= int(v) < 2**w for v, w in zip(values[kind], widths[kind]))
+        assert all(0 <= int(v) < 256 for cells in values["regions"] for v in cells)
+assert Fraction(replay["covered_fraction"]) == Fraction(1, 2**full_bits)
 assert replay["verdict"] == "evidence"
 for case_id, bead in [("G-estimate-resolved-class-decimal", "b-isa-spec-c15"), ("D-sampled-relation-invocation", "b-isa-spec-9uy")]:
     suite = case_id[0]

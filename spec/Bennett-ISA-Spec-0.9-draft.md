@@ -177,6 +177,8 @@ north star §3.1 requires).
 | K63 | §9.2, §11, §11.1, §12.1 | **INVOCATION-EDGE-IDENTITY**. Serialize fixed-binding instance and forward semantic-call occurrence independently of leaf ordinals; witness: qinplace G G has call_index 0/1; lproc keys [0]/[1] have distinct contexts. [deps: ISA-3.7-P5, ISA-3.7-P6, ISA-9.2-P1.S3, ISA-11.1-P9, ISA-12.1-P11] | COD-R1-B01; SOL S2 | S | – |
 | K64 | §11 | **NON-ROW-ADDRESSES**. Reserved support points and their source/step/callee partition define every non-row ordinal; witness: B=0 has construction/commit/release and B=1 starts step support at allocation at, ordinal 0. [deps: ISA-3.6, ISA-5.2-P3, ISA-11.1-P22, ISA-11.1-P29] | INV-5 gap 3; 8ka; maintainer ratification pending | S | – |
 | K65 | §11 | **WHOLE-CLEANUP-CARRIER**. One non-emitting ordinal-0 carrier selects the whole explicit cleanup before expansion, even if empty; witness: reverse/recompute for quncopy share one carrier. [deps: ISA-6.2-P1, ISA-6.4-P1, ISA-11-P6] | INV-5 gap 8; 23g; maintainer ratification pending | S | – |
+| K66 | §9.2, §11, §11.1, §12.1 | **DEPENDENCY-ACCURACY**. Retarget release, matching, staging, construction and replay declarations to their semantic premises; witness: K28 cites ordinal/scratch P29 rather than activation P21. [deps: ISA-11.1-P29, ISA-11-P5, ISA-11-P6, ISA-11-P7, ISA-9.2-P4, ISA-12.1-P7] | SOL S1; COD S01/S02 (targeted) | E | – |
+| K67 | §12.1 | **LEGAL-REPLAY-WITNESS**. F=4 and W=8 with legal unused mapping give a 25-bit domain; witness: four singleton draws cover 1/33554432 with unchanged XOR outcomes. [deps: ISA-5.4, ISA-7.1, ISA-7.2, ISA-12.1-P8, ISA-12.2] | COD S03 | E | – |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -1174,10 +1176,6 @@ renumbered):
   qloop n while cond {A} ↦ flags computed forward as §4.6; adj A for i = n..1 under c_i; flags uncomputed
 ```
 
-Scheduled action adjoints use the source replacements above before
-reference-recipe instantiation, with the ordinal contract and `adj`
-adapter specified in §11.1 (K62). [deps: ISA-5.3-P4, ISA-11-P2, ISA-11.1-P29]
-
 **Control.** `ctl w @a` is controlled-U: workspace, regions and flags
 allocated unconditionally; every gate of the body and its cleanup runs
 under `w` in addition to the active predicate.
@@ -1199,6 +1197,10 @@ subsequent matching only when the §6.2 cleanup conditions hold; matching
 alone does not discharge an outstanding-reader or phase obligation, and
 a cell write always advances its cell version even when its value is
 restored. [deps: ISA-3.3-P3, ISA-6.1-P1, ISA-6.2]
+
+Scheduled action adjoints use the source replacements above before
+reference-recipe instantiation, with the ordinal contract and `adj`
+adapter specified in §11.1 (K62). [deps: ISA-5.3-P4, ISA-11-P2, ISA-11.1-P29]
 
 ### 5.4 Budgets and fault codes
 
@@ -1923,7 +1925,7 @@ for (4), with (5)–(6) empty, even when the data name itself is `data`,
 `layout` or `device`. [deps: ISA-9.1, ISA-16.2]
 Together with the fixed first three lines and the injective JCS array
 paths, these facts make the envelope parts recoverable without length
-prefixes; this is an encoding argument, not a claim of SHA-256 injectivity. [deps: ISA-9.1, ISA-16.1, ISA-16.2]
+prefixes; this is an encoding argument, not a claim of SHA-256 injectivity. [deps: ISA-9.1, ISA-16.1, ISA-16.2, ISA-9.2-P4]
 
 ### 9.3 Linking
 
@@ -2307,7 +2309,8 @@ the reference library `ref` (§17 item 7). §5.7 transformations under a
 schedule MUST keep the ordinals of the operations they keep and MAY
 remove only operations the library marks removable.
 
-**Schedule document** (JCS):
+**Schedule document** (JCS) has the following schema, including reserved
+support points and optional instance/call-occurrence selectors. [deps: ISA-11-P2, ISA-3.7-P5, ISA-11.1-P9, ISA-11.1-P22, ISA-11.1-P29]
 
 ```
   { "bindings": { "closure_hash", "target_hash", "region", "variant", "inherited_controls", "budget": [B,heap,stack,depth],
@@ -2372,6 +2375,109 @@ construction/commit/release outside the steps, only `step: "*"` and
 `generated` is the ordinal within the row's expansion in the bound
 library, or within its reserved support pseudo-point (K64), or the
 non-emitting cleanup carrier ordinal (K65). [deps: ISA-11-P2.S3, ISA-11.1-P5, ISA-11.1-P29, ISA-6.4]
+
+**Specificity** is the lexicographic tuple (path length, number of
+non-`*` iterations, step non-`*`, phase non-`*`, generated non-`*`);
+an entry applies iff all its selectors match, and among matching entries
+of the same kind the unique maximal one applies. [deps: ISA-11-P3, ISA-4.6]
+Two distinct entries (distinct array positions, even if identical)
+with equal maximal specificity for the same generated operation and
+kind make a tie; this is the meaning of "incomparable", and document
+order is never significant. [deps: ISA-11-P6.S1]
+A tie makes the schedule invalid for that operation under the validation
+stages below; overlapping equal-specificity entries do not make a tie
+where a more-specific matching entry applies, including coverage by a
+union of such entries. [deps: ISA-11-P6.S1, ISA-11-P6.S2, ISA-11-P7]
+Operations outside an invocation's own budget or inside a zero-trip
+loop are not generated and cannot witness a tie. [deps: ISA-5.2-P3, ISA-4.6]
+Selectors are resolved independently per `kind`.
+A `gate` entry matches only gate operations, an `alloc` entry only
+allocations, and a `start` entry every generated operation. [deps: ISA-11-P2.S1, ISA-11-P3]
+The applying entry supplies the decision: an omitted field with a
+default takes that default, never a value from a less-specific matching
+entry. [deps: ISA-11-P3, ISA-17]
+Defaults
+for uncovered operations: `reverse`; `native` if the gate matches a
+`gates` entry, else the first matching scheme; class = the first class
+declared in the target's `classes` object (JCS order) that has capacity
+for it; sequential timing in generated order.
+An operation uncovered for one kind, including in a nested invocation,
+takes that kind's default directly, without inserting an entry or
+altering any other operation's selected decision. [deps: ISA-8.3, ISA-17]
+There is no requirement that these defaults be expressible by additional
+entries in the single-`step`, single-`phase` selector language. [deps: ISA-11-P3, ISA-17]
+**Timing**: a `start` time
+MUST be ≥ the end of every operation the operation depends on (data,
+wire lifetime, region cell version, effect order); an entry violating
+this makes the schedule invalid. **Obligations**: satisfy §6; respect
+capacity; report every resource; be reproducible from the request plus
+scheduler version.
+
+**Validation stages (K55).** A consumer validates every binding and
+every path against the object, including the maximal-match condition
+at the stages specified here, and executes verbatim or rejects with
+`E_SCHEDULE_INFEASIBLE`. [deps: ISA-9.2, ISA-11-P5, ISA-11-P6.S1, ISA-11-P6.S2, ISA-11-P6.S3, ISA-11-P6.S4, ISA-11-P7.S2, ISA-11-P7.S3, ISA-11-P7.S7]
+For admission, a nested invocation budget is **object-derivable** exactly
+when substituting literal integer constants and signature-positional
+classical/token forwarding into the four operands of `budget.mint`
+yields one tuple for that call site; an unresolved root parameter,
+conflicting tuples or any other unresolved operand makes it
+non-derivable. [deps: ISA-4.1, ISA-3.7, ISA-5.4, ISA-10]
+Literal propagation initialises every nonliteral value to unknown,
+takes exact bit-vector values from `const.iN`, copies values through
+positional call/return and branch/block-parameter bindings to a fixed
+point, and joins all syntactic incoming values as unknown unless they
+are all the same known value; arithmetic, predicate reasoning and
+additional implementation-specific inference do not make a budget
+object-derivable for this staging rule. [deps: ISA-4.1, ISA-3.4, ISA-3.7, ISA-5.4]
+The root region's token parameters remain unresolved at object
+admission even if a CC/R caller in the object mints a literal-budget
+token, since that caller does not bind every invocation of the
+region. [deps: ISA-4.1, ISA-4.7, ISA-5.4, ISA-10]
+This derivation does not invert `params_hash`, assume a token id's
+tuple, or substitute an enclosing invocation's budget. [deps: ISA-9.2, ISA-12.3, ISA-5.4]
+A consumer MUST reject root-level ties and nested ties whose invocation
+domains are object-derivable at admission, and MUST reject a tie in a
+non-derivable nested domain at the first concrete operation in generated
+order having multiple maximal matching entries, before applying any realisation to
+that operation, with `E_SCHEDULE_INFEASIBLE` and the diagnostic
+"§11: multiple maximal matching schedule entries". [deps: ISA-11-P5, ISA-11-P6.S1, ISA-11-P6.S2, ISA-11-P6.S3, ISA-11-P7.S2, ISA-11-P7.S3, ISA-11-P7.S7, ISA-5.4, ISA-10]
+A nested domain is object-derivable only if every oracle budget on its
+invocation chain is object-derivable (the root uses the bound budget);
+admission quantifies over the generated operations of these domains,
+and defers the remaining domains without rejecting merely because
+some possible budget would contain a tie. [deps: ISA-5.2-P3, ISA-4.6, ISA-11-P5, ISA-11-P6.S1, ISA-11-P6.S2, ISA-11-P7.S2, ISA-11-P7.S3]
+Admission success therefore leaves the prescribed concrete checks in
+non-derivable domains outstanding, even when actual token values become
+available earlier; learning them does not move rejection to a different
+stage. [deps: ISA-5.4, ISA-10, ISA-11-P7.S2, ISA-11-P7.S6, ISA-11-P7.S7]
+Schedule decimal numbers and decimal strings denote the exact rational
+of their decimal text; equal values match and resolve identically
+regardless of spelling. [deps: ISA-8.1-P1, ISA-5.2-P1]
+Token parameters in `params_hash` use §12.3's canonical four-component
+tuple encoding, for host- and device-minted tokens alike. [deps: ISA-12.3, ISA-5.4]
+
+**Selection witnesses** *(non-normative)*. [deps: ISA-11-P3, ISA-5.2-P3] For root B=2 and nested B=3,
+nested step 3 exists; with nested B=2 it does not, independently of root
+B. [deps: ISA-5.2-P3, ISA-5.4] A path of `[]` with `step: 1` reads root step 1 even for an operation
+at nested step 3; a path through the nested call reads nested step 3. [deps: ISA-4.2, ISA-4.7, ISA-5.2-P3]
+Two `lift.call` sites p1/p2 into the same lproc row q give one row-q
+expansion per fixed instance per enclosing step, with neither p1 nor p2
+in its chain; different binding keys yield distinct instance components. [deps: ISA-3.6, ISA-3.7-P5, ISA-3.7-P6]
+An action-root X has no step/phase, including under adjoint. [deps: ISA-5.3, ISA-4.7]
+Equal maximal entries A/B reject; A/B fully covered by higher C or a
+union C1/C2 admit in every order; duplicate C entries reject. [deps: ISA-11-P3]
+An alloc entry cannot shadow a gate entry. [deps: ISA-11-P2.S1, ISA-11-P3]
+A more-specific realisation-only entry takes the default share even if
+a broad entry writes a share. [deps: ISA-11-P3, ISA-17]
+For root-step-1 scheme X and an uncovered root-step-2/nested-step-1
+gate, only the latter takes its default; no synthetic nested entry
+overrides the former. [deps: ISA-11-P3, ISA-17]
+An unknown nested budget permits admission, but if the first ambiguous
+operation is at nested step 3, B=3 rejects there before its realisation,
+whereas B=2 has no such operation; an object-derivable B=3 rejects at
+admission. [deps: ISA-11-P3, ISA-5.2-P3, ISA-5.4, ISA-10]
+Numeral 0 and strings `"0"`, `"0.0"`, `"0.000"` all denote zero. [deps: ISA-8.1-P1, ISA-5.2-P1]
 
 **Invocation-edge identity (K63).** Every invocation edge identifies the
 source call point, the containing fixed-binding instance (the §3.7 integer
@@ -2465,109 +2571,6 @@ For `d = qcopy s; quncopy s d`, selecting recompute at the quncopy point
 chooses fresh-copy/XOR/uncompute for the whole cleanup, while reverse
 chooses inverse-copy/release at the same carrier; an empty inverse
 sequence still has its ordinal-0 carrier at its release point. [deps: ISA-4.5, ISA-6.2-P1, ISA-6.4-P1, ISA-11-P6]
-
-**Specificity** is the lexicographic tuple (path length, number of
-non-`*` iterations, step non-`*`, phase non-`*`, generated non-`*`);
-an entry applies iff all its selectors match, and among matching entries
-of the same kind the unique maximal one applies. [deps: ISA-11-P3, ISA-4.6]
-Two distinct entries (distinct array positions, even if identical)
-with equal maximal specificity for the same generated operation and
-kind make a tie; this is the meaning of "incomparable", and document
-order is never significant. [deps: ISA-11-P3]
-A tie makes the schedule invalid for that operation under the validation
-stages below; overlapping equal-specificity entries do not make a tie
-where a more-specific matching entry applies, including coverage by a
-union of such entries. [deps: ISA-11-P3, ISA-5.2-P3]
-Operations outside an invocation's own budget or inside a zero-trip
-loop are not generated and cannot witness a tie. [deps: ISA-5.2-P3, ISA-4.6]
-Selectors are resolved independently per `kind`.
-A `gate` entry matches only gate operations, an `alloc` entry only
-allocations, and a `start` entry every generated operation. [deps: ISA-11-P2.S1, ISA-11-P3]
-The applying entry supplies the decision: an omitted field with a
-default takes that default, never a value from a less-specific matching
-entry. [deps: ISA-11-P3, ISA-17]
-Defaults
-for uncovered operations: `reverse`; `native` if the gate matches a
-`gates` entry, else the first matching scheme; class = the first class
-declared in the target's `classes` object (JCS order) that has capacity
-for it; sequential timing in generated order.
-An operation uncovered for one kind, including in a nested invocation,
-takes that kind's default directly, without inserting an entry or
-altering any other operation's selected decision. [deps: ISA-8.3, ISA-17]
-There is no requirement that these defaults be expressible by additional
-entries in the single-`step`, single-`phase` selector language. [deps: ISA-11-P3, ISA-17]
-**Timing**: a `start` time
-MUST be ≥ the end of every operation the operation depends on (data,
-wire lifetime, region cell version, effect order); an entry violating
-this makes the schedule invalid. **Obligations**: satisfy §6; respect
-capacity; report every resource; be reproducible from the request plus
-scheduler version.
-
-**Validation stages (K55).** A consumer validates every binding and
-every path against the object, including the maximal-match condition
-at the stages specified here, and executes verbatim or rejects with
-`E_SCHEDULE_INFEASIBLE`. [deps: ISA-11-P3, ISA-9.2, ISA-5.2-P3]
-For admission, a nested invocation budget is **object-derivable** exactly
-when substituting literal integer constants and signature-positional
-classical/token forwarding into the four operands of `budget.mint`
-yields one tuple for that call site; an unresolved root parameter,
-conflicting tuples or any other unresolved operand makes it
-non-derivable. [deps: ISA-4.1, ISA-3.7, ISA-5.4, ISA-10]
-Literal propagation initialises every nonliteral value to unknown,
-takes exact bit-vector values from `const.iN`, copies values through
-positional call/return and branch/block-parameter bindings to a fixed
-point, and joins all syntactic incoming values as unknown unless they
-are all the same known value; arithmetic, predicate reasoning and
-additional implementation-specific inference do not make a budget
-object-derivable for this staging rule. [deps: ISA-4.1, ISA-3.4, ISA-3.7, ISA-5.4]
-The root region's token parameters remain unresolved at object
-admission even if a CC/R caller in the object mints a literal-budget
-token, since that caller does not bind every invocation of the
-region. [deps: ISA-4.1, ISA-4.7, ISA-5.4, ISA-10]
-This derivation does not invert `params_hash`, assume a token id's
-tuple, or substitute an enclosing invocation's budget. [deps: ISA-9.2, ISA-12.3, ISA-5.4]
-A consumer MUST reject root-level ties and nested ties whose invocation
-domains are object-derivable at admission, and MUST reject a tie in a
-non-derivable nested domain at the first concrete operation in generated
-order having multiple maximal matching entries, before applying any realisation to
-that operation, with `E_SCHEDULE_INFEASIBLE` and the diagnostic
-"§11: multiple maximal matching schedule entries". [deps: ISA-11-P3, ISA-5.2-P3, ISA-5.4, ISA-10]
-A nested domain is object-derivable only if every oracle budget on its
-invocation chain is object-derivable (the root uses the bound budget);
-admission quantifies over the generated operations of these domains,
-and defers the remaining domains without rejecting merely because
-some possible budget would contain a tie. [deps: ISA-5.2-P3, ISA-4.6, ISA-11-P3]
-Admission success therefore leaves the prescribed concrete checks in
-non-derivable domains outstanding, even when actual token values become
-available earlier; learning them does not move rejection to a different
-stage. [deps: ISA-5.4, ISA-10, ISA-11-P3]
-Schedule decimal numbers and decimal strings denote the exact rational
-of their decimal text; equal values match and resolve identically
-regardless of spelling. [deps: ISA-8.1-P1, ISA-5.2-P1]
-Token parameters in `params_hash` use §12.3's canonical four-component
-tuple encoding, for host- and device-minted tokens alike. [deps: ISA-12.3, ISA-5.4]
-
-**Selection witnesses** *(non-normative)*. [deps: ISA-11-P3, ISA-5.2-P3] For root B=2 and nested B=3,
-nested step 3 exists; with nested B=2 it does not, independently of root
-B. [deps: ISA-5.2-P3, ISA-5.4] A path of `[]` with `step: 1` reads root step 1 even for an operation
-at nested step 3; a path through the nested call reads nested step 3. [deps: ISA-4.2, ISA-4.7, ISA-5.2-P3]
-Two `lift.call` sites p1/p2 into the same lproc row q give one row-q
-expansion per fixed instance per enclosing step, with neither p1 nor p2
-in its chain; different binding keys yield distinct instance components. [deps: ISA-3.6, ISA-3.7-P5, ISA-3.7-P6]
-An action-root X has no step/phase, including under adjoint. [deps: ISA-5.3, ISA-4.7]
-Equal maximal entries A/B reject; A/B fully covered by higher C or a
-union C1/C2 admit in every order; duplicate C entries reject. [deps: ISA-11-P3]
-An alloc entry cannot shadow a gate entry. [deps: ISA-11-P2.S1, ISA-11-P3]
-A more-specific realisation-only entry takes the default share even if
-a broad entry writes a share. [deps: ISA-11-P3, ISA-17]
-For root-step-1 scheme X and an uncovered root-step-2/nested-step-1
-gate, only the latter takes its default; no synthetic nested entry
-overrides the former. [deps: ISA-11-P3, ISA-17]
-An unknown nested budget permits admission, but if the first ambiguous
-operation is at nested step 3, B=3 rejects there before its realisation,
-whereas B=2 has no such operation; an object-derivable B=3 rejects at
-admission. [deps: ISA-11-P3, ISA-5.2-P3, ISA-5.4, ISA-10]
-Numeral 0 and strings `"0"`, `"0.0"`, `"0.000"` all denote zero. [deps: ISA-8.1-P1, ISA-5.2-P1]
 
 ### 11.1 Reference-library contract (K11)
 
@@ -2684,12 +2687,12 @@ interface and constructor body; the hash must match the linked closure,
 not an arbitrary supplied body. Exactly `{ "call": name, "args": [...] }`
 expands that symbol under a new invocation-path element identified by the
 call constructor's source point, containing fixed-binding instance and
-forward semantic-call occurrence number as serialized in §11. [deps: ISA-3.7-P5, ISA-3.7-P6, ISA-11-P5, ISA-11.1-P29]
+forward semantic-call occurrence number as serialized in §11. [deps: ISA-3.7-P5, ISA-3.7-P6, ISA-11, ISA-11.1-P29]
 It retains its own ordinal space starting at zero. [deps: ISA-11-P2, ISA-11.1-P29.S2]
 `invoke` is recipe composition within a row; `call` is a semantic symbol
 invocation and never flattens callee ordinals into the caller's space. [deps: ISA-11-P2, ISA-11.1-P29.S2]
 Repeated calls have distinct paths through their `call_index`, even when
-callee hash and arguments agree. [deps: ISA-11-P5, ISA-11.1-P29.S2]
+callee hash and arguments agree. [deps: ISA-11, ISA-11.1-P29.S2]
 
 The inherited effective-control set is always passed to callees and body
 splices. An `environment` actual uses the wire-actual grammar and adds
@@ -2867,7 +2870,7 @@ against the linked source declarations/layout before expansion:
   exists; frames 0..B-1. Omit only the layout state excluded by §7.2's
   memoryless-object rule. Counter widths/values are the reference widths
   and initial values of §3.7; all other non-image initial values are zero
-  except alloctab pre-entries. A table cell packs base[ptr_width],
+  except alloctab pre-entries. [deps: ISA-3.7] A table cell packs base[ptr_width],
   size[ptr_width], live, pinned, in that LSB-first order; pre-entries are
   in §3.7's layout order and unused entries are zero. Image-bearing mem
   and local regions have initial=0. Ordinary mem's I is exactly 2^H
@@ -2880,12 +2883,12 @@ against the linked source declarations/layout before expansion:
   acquired by this state list. A separate frame list has `index` integer
   and `frame:allocation`, ordered by index; it contains exactly B entries
   indexed 0..B-1, referring to the identical frame handles in the state
-  list, each with §3.6's fixed frame width and field order. Reject any
+  list, each with §3.6's fixed frame width and field order. [deps: ISA-3.6] Reject any
   mismatch of source state, image, width, class, order or identity. The
   construction acquires/initializes this list, invokes the catalog `step`
   once per frame, commits, then reverses frames and initialization before
   releasing the list in reverse order; source row/successor templates
-  supply rows, never a replacement dispatcher or construction body.
+  supply rows, never a replacement dispatcher or construction body. [deps: ISA-5.2-P3, ISA-3.6, ISA-11.1-P5, ISA-11.1-P22]
 
 Witness: byte records `(base=0,extent=1,cells=a[8])` and
 `(base=1,extent=2,cells=b[16])` bind addresses 0,1,2 to a[0..8),
@@ -3029,8 +3032,9 @@ The reverse-allocation release rule governs recipe scratch; an instruction whose
 witness whose two callee fixtures each contain one CX at callee ordinal 0;
 it illustrates caller ordinals and release order, rather than the complete
 `ref` expansion or cost of an ISA oracle. [deps: ISA-4.5-P5, ISA-11.1-P9, ISA-11.1-P22, ISA-11.1-P29.S1, ISA-11.1-P29.S2]
-For n=1, F=4 the private instruction trace is alloc t[1] (0), alloc f[4]
-(1), call G, swap x/t (2), call H, release t (3), release f (4), with
+For n=1, F=4 the private instruction trace is alloc t[1] at row ordinal 0,
+alloc f[4] at 1, call G, swap x/t at 2, call H, release t at 3,
+release f at 4, with
 each call's complete expansion in its own ordinal space. [deps: ISA-4.5-P5, ISA-5.4, ISA-11.1-P29.S1, ISA-11.1-P29.S2]
 The certified pair leaves t/f clean for both x values and both effective
 controls; allocations and releases are unconditional. [deps: ISA-4.5-P5, ISA-3.5, ISA-4.3]
@@ -3129,16 +3133,16 @@ self-comparison or default expected relation. Without a schedule the
 left side is the subject's reference semantics at the bound invocation;
 with one it is that invocation's realised operation. `expected: "oracle"`
 compares the realised operation to §5.2's reference oracle map and
-requires `schedule_hash`. `expected: {program: H}` independently runs
+requires `schedule_hash`. [deps: ISA-5.2, ISA-11, ISA-12.1-P11] `expected: {program: H}` independently runs
 the reference semantics of linked closure H at the **same** arguments,
 budget and interface tuple; its signature MUST be compatible.
 `expected: {table: rows}` compares to the explicit full-tuple rows
 below. The checker MUST compare every interface output, preserve inputs
 and borrowed systems, and verify clean workspace and exact +1 basis
 phase for a permutation assertion (T3); matching a target or fault
-projection alone, or a producer's claimed verdict, is insufficient.
+projection alone, or a producer's claimed verdict, is insufficient. [deps: ISA-14.3-P3, ISA-5.6]
 For a non-permutation realisation, use the existing numerical/channel
-claims rather than labeling basis observations a permutation proof.
+claims rather than labeling basis observations a permutation proof. [deps: ISA-12.1-P4, ISA-12.1-P5, ISA-14.2]
 K4's `expected: "inverse_pair"` retains its separate two-composition
 relation and entry/domain bindings; it is not a sampled proof option.
 
@@ -3178,19 +3182,24 @@ of D, including when the draws happen to cover all of D.
   "changed_arg_after":{"bundles":["1","0","3"],"borrowed":["1"],"regions":[["2","1"]]},
   "short_budget_after":{"bundles":["1","2","2"],"borrowed":["1"],"regions":[["2","1"]]},
   "sampler":{"algorithm":"xoshiro256**","seed":["1","0","0","0"],"count":4},
-  "sample_count":4,"distinct_samples":1,"covered_fraction":"1/2048","verdict":"evidence"
+  "widths":{"bundles":[2,2,4],"borrowed":[1],"regions":[[8,8]]},
+  "sample_count":4,"distinct_samples":1,"covered_fraction":"1/33554432","verdict":"evidence"
 }
 ```
 
 The subject is a two-row oracle body `r = lift.add x a;`
-`lift.retval r`, widths x = target = fault = a = 2, with a preserved
-one-bit dirty bundle and an unused two-cell, two-bit `in` interface
-region; no inherited controls. The **body** does not access memory;
-the interface cells remain part of D. The reference payload is
+`lift.retval r`, widths x = target = a = 2 and fault = 4, with a preserved
+one-bit dirty bundle and an unused two-cell, eight-bit `in` interface
+region; no inherited controls. [deps: ISA-5.4, ISA-7.2, ISA-12.1-P8] A legal layout has ptr_width=2, H=2, A_tab=1, S_cells=0,
+null_size=1, no globals, the interface mapped at base 1 with extent 2,
+heap_base=3 and heap_limit_max=0; the token is (2,0,0,0), and the unused
+mapping is retained even though the body has no load/store. [deps: ISA-7.1, ISA-7.2, ISA-5.4]
+The **body** does not access memory;
+the interface cells remain part of D. [deps: ISA-7.2, ISA-12.2] The reference payload is
 (1 + 2) mod 4 = 3: target 2 XOR 3 = 1 and fault 3 XOR 0 = 3.
 The singleton declared domain is precisely `row.before`, within the
-full 11-bit D. Four samples of singleton components draw no generator
-words and cover one of 2048 full tuples. An identity implementation
+full 25-bit D (2+2+4+1+16 bits). [deps: ISA-5.4, ISA-7.2, ISA-12.1-P8, ISA-12.2] Four samples of singleton components draw no generator
+words and cover one of 33554432 full tuples. [deps: ISA-12.1-P8, ISA-12.1-P13, ISA-12.2] An identity implementation
 would agree with itself but MUST fail against `row`; using `wrong_row`
 also MUST fail. At argument 1 the target is 2 XOR 2 = 0; at B = 1 the
 payload is zero and fault is 3 XOR 1 = 2. A certificate for argument 2,
@@ -3212,10 +3221,60 @@ resolved
 and, for an element inside an oracle, `"step"` (1..B) and `"phase"`
 (`"fwd"` or `"rev"`) added; contexts are enumerated in increasing
 bytewise order of the JCS encodings of their keys (wildcard selectors
-play no part). [deps: ISA-3.7-P5, ISA-3.7-P6, ISA-9.2-P1.S3, ISA-11-P5, ISA-11.1-P9]
+play no part). [deps: ISA-3.7-P5, ISA-3.7-P6, ISA-9.2-P1.S3, ISA-11, ISA-11.1-P9]
 Every claim bound and every
 `error` entry (§12.3) is a **common upper bound over all contexts** of
 its key; the multiplicity composition of §12.3 is sound for that reason.
+
+**Diamond-norm SDP** (Watrous, *Theory of Computing* 5 (2009), §4; the
+Hermiticity-preserving simplification). Let Φ = Φ_real − Φ_ref be the
+difference of the subject's realised channel and the reference channel
+(both on the subject's interface, controls included), d_in = d_out = d
+the dimension. The **Choi matrix** is J(Φ) = Σ_{i,j} |i⟩⟨j| ⊗ Φ(|i⟩⟨j|)
+(input factor first, output factor second, computational basis in
+allocation order, **unnormalised**). The witness is a Hermitian Y of
+dimension d² and a decimal mu. The checker accepts iff, with every
+matrix entry an interval and every test rigorous (an inconclusive test
+rejects): Y − J(Φ) ⪰ 0, Y + J(Φ) ⪰ 0, mu·I − Tr_out(Y) ⪰ 0 (partial trace
+over the output factor), and mu ≤ `bound`; then ‖Φ‖◇ ≤ mu (the dual of
+Watrous's SDP with Y₀ = Y₁ = Y; this is the diamond norm itself, not
+half of it). *(non-normative)* With this input-first Choi convention
+Tr_out traces the second factor, Tr[(ρ ⊗ I)Y] = Tr[ρ Tr_out(Y)]; a
+primal formulation that labels the input factor ρᵀ ranges over the same
+set of density matrices, so the bound is unchanged. Encoding: `Y` is a row-major array of entries `[re_lo, re_
+hi, im_lo, im_hi]` (decimal strings). **Positivity test.** The checker
+proves each of the three matrices **positive definite** by an interval
+Cholesky (or Hermitian LDL†) factorisation in which the interval lower
+bound of every pivot is strictly positive, and rejects otherwise; no
+other test is admitted (nonnegative leading principal minors do not
+imply positive semidefiniteness: diag(0, −1)). Producers make witnesses
+strictly feasible by replacing Y with Y + δI and mu with mu′ = mu + δ·(d
++ 1) for a small rational δ > 0 (any mu′ > mu + δ·d suffices): then Y ±
+J(Φ) ⪰ δI ≻ 0 and, since Tr_out(Y + δI) = Tr_out(Y) + δ·d·I, mu′·I −
+Tr_out(Y + δI) ⪰ δI ≻ 0; ‖Φ‖◇ ≤ mu′, which MUST be ≤ `bound`. That
+recipe assumes an exactly feasible witness. For a numerically obtained
+witness the producer first certifies lower bounds −η₊, −η₋, −η_s on the
+smallest eigenvalues of Y − J(Φ), Y + J(Φ) and mu·I − Tr_out(Y), chooses
+δ > max(η₊, η₋, η_s) and publishes Y′ = Y + δI and mu′ = mu + (d + 1)·δ:
+then Y′ ± J(Φ) ⪰ (δ − η±)I ≻ 0 and mu′·I − Tr_out(Y′) ⪰ (δ − η_s)I ≻ 0.
+These margins make the matrices positive definite; they do not make the
+interval test conclusive: every pivot enclosure the checker computes at
+`precision_bits` MUST still have a strictly positive lower endpoint,
+else the checker rejects (no fixed allowance such as 2^−`precision_bits`
+bounds the interval error, which depends on d and conditioning). **Interval
+arithmetic** at `precision_bits`
+means every operation rounds outward to `precision_bits`-bit binary
+rationals; transcendental entries (`rx ry rz`) are enclosed by a Taylor
+series with the Lagrange remainder bound (§17 item 8 fixes the term
+count). A `numerical` or `channel` subject's `schedule_hash` is required:
+it names the realisation the claim is about. K13 also requires it for
+`expected: "oracle"`; standalone reference relations use the explicit
+invocation binding instead.
+
+**Sampling.** For each domain component with range size R = hi − lo + 1,
+assemble m = ⌈⌈log₂ R⌉/64⌉ consecutive generator words (least-significant
+word first) into an integer, reduce modulo 2^⌈log₂ R⌉, reject and redraw
+if ≥ R, add `lo`; components are consumed in enumeration order.
 
 **Invocation identity witnesses (K63).** For `qinplace @G @G tk x`
 at action A's `entry:0`, the two call edges below are distinct even with
@@ -3281,56 +3340,6 @@ supplied separately as §11 selectors in the schedule form. [deps: ISA-11-P3, IS
   ]
 }
 ```
-
-**Diamond-norm SDP** (Watrous, *Theory of Computing* 5 (2009), §4; the
-Hermiticity-preserving simplification). Let Φ = Φ_real − Φ_ref be the
-difference of the subject's realised channel and the reference channel
-(both on the subject's interface, controls included), d_in = d_out = d
-the dimension. The **Choi matrix** is J(Φ) = Σ_{i,j} |i⟩⟨j| ⊗ Φ(|i⟩⟨j|)
-(input factor first, output factor second, computational basis in
-allocation order, **unnormalised**). The witness is a Hermitian Y of
-dimension d² and a decimal mu. The checker accepts iff, with every
-matrix entry an interval and every test rigorous (an inconclusive test
-rejects): Y − J(Φ) ⪰ 0, Y + J(Φ) ⪰ 0, mu·I − Tr_out(Y) ⪰ 0 (partial trace
-over the output factor), and mu ≤ `bound`; then ‖Φ‖◇ ≤ mu (the dual of
-Watrous's SDP with Y₀ = Y₁ = Y; this is the diamond norm itself, not
-half of it). *(non-normative)* With this input-first Choi convention
-Tr_out traces the second factor, Tr[(ρ ⊗ I)Y] = Tr[ρ Tr_out(Y)]; a
-primal formulation that labels the input factor ρᵀ ranges over the same
-set of density matrices, so the bound is unchanged. Encoding: `Y` is a row-major array of entries `[re_lo, re_
-hi, im_lo, im_hi]` (decimal strings). **Positivity test.** The checker
-proves each of the three matrices **positive definite** by an interval
-Cholesky (or Hermitian LDL†) factorisation in which the interval lower
-bound of every pivot is strictly positive, and rejects otherwise; no
-other test is admitted (nonnegative leading principal minors do not
-imply positive semidefiniteness: diag(0, −1)). Producers make witnesses
-strictly feasible by replacing Y with Y + δI and mu with mu′ = mu + δ·(d
-+ 1) for a small rational δ > 0 (any mu′ > mu + δ·d suffices): then Y ±
-J(Φ) ⪰ δI ≻ 0 and, since Tr_out(Y + δI) = Tr_out(Y) + δ·d·I, mu′·I −
-Tr_out(Y + δI) ⪰ δI ≻ 0; ‖Φ‖◇ ≤ mu′, which MUST be ≤ `bound`. That
-recipe assumes an exactly feasible witness. For a numerically obtained
-witness the producer first certifies lower bounds −η₊, −η₋, −η_s on the
-smallest eigenvalues of Y − J(Φ), Y + J(Φ) and mu·I − Tr_out(Y), chooses
-δ > max(η₊, η₋, η_s) and publishes Y′ = Y + δI and mu′ = mu + (d + 1)·δ:
-then Y′ ± J(Φ) ⪰ (δ − η±)I ≻ 0 and mu′·I − Tr_out(Y′) ⪰ (δ − η_s)I ≻ 0.
-These margins make the matrices positive definite; they do not make the
-interval test conclusive: every pivot enclosure the checker computes at
-`precision_bits` MUST still have a strictly positive lower endpoint,
-else the checker rejects (no fixed allowance such as 2^−`precision_bits`
-bounds the interval error, which depends on d and conditioning). **Interval
-arithmetic** at `precision_bits`
-means every operation rounds outward to `precision_bits`-bit binary
-rationals; transcendental entries (`rx ry rz`) are enclosed by a Taylor
-series with the Lagrange remainder bound (§17 item 8 fixes the term
-count). A `numerical` or `channel` subject's `schedule_hash` is required:
-it names the realisation the claim is about. K13 also requires it for
-`expected: "oracle"`; standalone reference relations use the explicit
-invocation binding instead.
-
-**Sampling.** For each domain component with range size R = hi − lo + 1,
-assemble m = ⌈⌈log₂ R⌉/64⌉ consecutive generator words (least-significant
-word first) into an integer, reduce modulo 2^⌈log₂ R⌉, reject and redraw
-if ≥ R, add `lo`; components are consumed in enumeration order.
 
 ### 12.2 Domains
 

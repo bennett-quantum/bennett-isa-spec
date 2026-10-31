@@ -148,8 +148,10 @@ fn binary64_angles_round_trip_and_numerical_adjoint_matrices() {
             assert_eq!(leaves[0].gate, g);
             assert_eq!(leaves[0].angles, [bits]);
             assert_eq!(f64::from_bits(leaves[0].angles[0]).to_bits(), bits);
+            // §5.3 negates the source angle before the adj adapter is bound.
+            let adj_bits = bits ^ (1 << 63);
             let body = json::parse(&format!(
-                r#"[[{{"gate":"{g}","wires":["r[0]"],"params":["0x{bits:016x}"]}}]]"#
+                r#"[[{{"gate":"{g}","wires":["r[0]"],"params":["0x{adj_bits:016x}"]}}]]"#
             ))
             .unwrap();
             let adj = e

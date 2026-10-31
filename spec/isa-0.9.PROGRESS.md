@@ -1,3 +1,47 @@
+## 2026-10-31 Council round 1 → 2 — item 4 and audit (K66/K67)
+
+| Suggestion | Disposition | Concept / reason |
+|---|---|---|
+| SOL S1 | addressed | K66: P29 scratch/ordinal edges replace stale P21 activation edges; matching and staging cite semantic premises |
+| SOL S2 | addressed | K63: instance keys in paths, context keys and scratch chains; once per fixed row instance per step |
+| SOL S3 | addressed | K62/K28: one-CX callees expressly synthetic, not full ref oracle.construct costs/ordinals |
+| COD-R1-S01 | addressed | K66: same release/matching/staging repair plus injective-path dependency in envelope lemma |
+| COD-R1-S02 | targeted repair; remainder recorded | K66: P9.S3–S6, P22.S5/S12/S14 and P7.S3/S6/S7 carry semantic markers; exhaustive audit of every other K1–K27 addition remains advisory in OPEN b-isa-spec-82i |
+| COD-R1-S03 | addressed | K67: F=4, W=8, legal byte mapping; unchanged XOR tuples; 25 bits / 33554432 full tuples |
+| COD-R1-S04 | addressed | K62/K28: same synthetic constructor-fixture correction as SOL S3 |
+
+The remaining S02 request is a historical sentence-by-sentence audit,
+not one of the two S0 implementation fixes. Filling every old marker by
+existence or by broad automatic section edges would repeat the defect;
+it needs a dedicated premise audit. No claim of complete historical
+K1–K27 coverage is made. All specifically identified omissions are fixed.
+The seven suggestions introduce two new concepts (K66 dependency accuracy,
+K67 legal replay witness); shared fixes reuse K62/K63 rather than adding
+one row per reviewer. Additional criterion-level requests for a new full
+executor vector, the §6.1 worked residual circuit and north-star rung
+crosslinks are not counted as the seven suggestions; the adjoint now has
+an actual bound qinplace/adj constructor vector with synthetic callees,
+while broader evidence and crosslinks remain outside this focused edit.
+
+Dependency audit uses the supplied statement catalog as ID authority.
+New §11 concepts are appended after the old paragraphs, retaining P5
+matching, P6 specificity and P7 staging; the §5.3 note follows the old
+paragraphs, retaining the table/control IDs; context examples follow the
+existing §12.1 paragraphs. Scratch rebuilds do not overwrite the sibling
+catalog. K66 edges were checked against sentence content: P29.S3 is inverse
+ordinal retention, P29.S5 scratch release, P6.S1 the unique maximum,
+P7.S2/S3 derivability, P7.S7 chain domains, and §9.2-P4 injective paths.
+The new schema is a code block with a declared prose introduction; it is
+not a prose sentence missing a marker.
+
+S0 / rule-10 cross-check: both certified orientations, repeated semantic
+calls, distinct/equal-valued fixed instances, arbitrary legal binding
+keys, zero-budget support, empty cleanup and both unitary realisations
+remain expressible. K64/K65 are draft mechanics pending ratification,
+not an omission or restriction of promised execution/charging scope.
+No accepted 0.8, interpreter, sibling graph/proof or public spec index
+bytes are edited by this implementation sub-agent.
+
 ## 2026-10-31 Council round 1 → 2 — item 3 (K64/K65)
 
 Both seats' G01 → K64 (8ka), G02 → K65 (23g), drafted for ratification;

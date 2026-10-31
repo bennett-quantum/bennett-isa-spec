@@ -61,20 +61,73 @@ fn k28_preserves_instruction_release_sequence_and_row_ordinals() {
 
 #[test]
 fn scheduled_action_adj_consumes_source_adjoint_with_fresh_ordinals() {
-    // §5.3 has already exchanged G/H; this is its private instruction trace.
-    // Callee expansions have independent spaces, so this vector isolates the
-    // five caller leaves and a nondefault alloc selector at generated=0.
-    let body = json::parse(r#"[{"alloc":"t","width":1,"class":"any","state":"clean"},{"alloc":"f","width":4,"class":"any","state":"clean"},{"gate":"swap","wires":["x[0]","t[0]"]},{"release":"t"},{"release":"f"}]"#).unwrap();
-    let leaves = Expander::new(include_str!("../../spec/ref-0.9-draft.json"), Registry::new())
-        .unwrap().expand("adj", &[body], &[("x", 1)]).unwrap();
-    assert_eq!(leaves.iter().map(|l| l.gate.as_str()).collect::<Vec<_>>(),
-               ["alloc", "alloc", "swap", "release", "release"]);
-    assert_eq!(leaves.iter().map(|l| l.ordinal).collect::<Vec<_>>(), [0,1,2,3,4]);
+    // Actual bound qinplace and adj recipes, with synthetic identity-map
+    // callees. The source replacement has exchanged the H/G adapters.
+    let g = "a".repeat(64);
+    let h = "b".repeat(64);
+    let root = "c".repeat(64);
+    let mut registry = Registry::new();
+    let params = r#"[{"name":"u","type":"wire","width":1},{"name":"v","type":"wire","width":1},{"name":"f","type":"wire","width":4}]"#;
+    registry.insert(g.clone(), json::parse(&format!(r#"{{"parameters":{params},"body":[{{"gate":"x","wires":["f[0]"]}},{{"gate":"x","wires":["f[0]"]}},{{"gate":"cx","wires":["u[0]","v[0]"]}}]}}"#)).unwrap());
+    registry.insert(
+        h.clone(),
+        json::parse(&format!(
+            r#"{{"parameters":{params},"body":[{{"gate":"cx","wires":["u[0]","v[0]"]}}]}}"#
+        ))
+        .unwrap(),
+    );
+    let adapter = |symbol: &str| {
+        format!(
+            r#"[{{"parameters":{params},"body":[{{"call":"{symbol}","args":["u","v","f"]}}]}}]"#
+        )
+    };
+    registry.insert(root.clone(), json::parse(&format!(r#"{{"parameters":[{{"name":"G","type":"symbol"}},{{"name":"H","type":"symbol"}},{{"name":"x","type":"wire","width":1}}],"body":[{{"invoke":"adj","args":[[{{"invoke":"qinplace","args":[1,4,"x",{}, {},[]]}}]]}}]}}"#, adapter("H"), adapter("G"))).unwrap());
+    let all = Expander::new(include_str!("../../spec/ref-0.9-draft.json"), registry)
+        .unwrap()
+        .expand(
+            &root,
+            &[
+                json::Json::Str(g),
+                json::Json::Str(h),
+                json::Json::Str("x".into()),
+            ],
+            &[("x", 1)],
+        )
+        .unwrap();
+    let calls = all
+        .iter()
+        .filter(|l| !l.invocation.is_empty())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        calls.iter().map(|l| l.gate.as_str()).collect::<Vec<_>>(),
+        ["cx", "x", "x", "cx"],
+        "H then G"
+    );
+    assert_ne!(calls[0].invocation, calls[1].invocation);
+    assert_eq!(
+        calls.iter().map(|l| l.ordinal).collect::<Vec<_>>(),
+        [0, 0, 1, 2]
+    );
+    let leaves = all
+        .iter()
+        .filter(|l| l.invocation.is_empty())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        leaves.iter().map(|l| l.gate.as_str()).collect::<Vec<_>>(),
+        ["alloc", "alloc", "swap", "release", "release"]
+    );
+    assert_eq!(
+        leaves.iter().map(|l| l.ordinal).collect::<Vec<_>>(),
+        [0, 1, 2, 3, 4]
+    );
     assert_eq!(leaves[0].allocation.as_ref().unwrap().1, 1);
     assert_eq!(leaves[1].allocation.as_ref().unwrap().1, 4);
     assert_eq!(leaves[0].allocation, leaves[3].allocation);
     assert_eq!(leaves[1].allocation, leaves[4].allocation);
-    let classes = leaves.iter().filter(|l| l.gate == "alloc")
-        .map(|l| if l.ordinal == 0 { "special" } else { "default" }).collect::<Vec<_>>();
+    let classes = leaves
+        .iter()
+        .filter(|l| l.gate == "alloc")
+        .map(|l| if l.ordinal == 0 { "special" } else { "default" })
+        .collect::<Vec<_>>();
     assert_eq!(classes, ["special", "default"]);
 }
