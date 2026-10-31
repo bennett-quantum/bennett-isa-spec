@@ -2,95 +2,94 @@
 
 Resume here. The whole accepted ISA 0.8 remains in scope; staged deliverables
 are not complete. Sole implementation sub-agent; owned interpreter and external
-round-20 response only. Never push. Every cargo invocation uses the headless
+round-21 response only. Never push. Every cargo invocation uses the headless
 prefix and TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/.tmp.
 
-## Round-20 fixes (2026-10-31)
+## Round-21 fixes (2026-10-31)
 
-Clean isolated baseline **412 passed / 0 failed / 5 ignored**, **118.60 s**
-runner sum across all **33** result blocks. Final **425 passed / 0 failed /
-5 ignored**, **176.88 s**, **16 unit + 409 integration**, 0 doctests. All round
-4–20 controls retained. The first before log observed one rebuilt R20 binary;
-it is superseded by the isolated baseline, not used for before/after totals.
+Baseline **425 passed / 0 failed / 5 ignored**, **105.24 s** runner sum across
+**33** result blocks. Final **436 passed / 0 failed / 5 ignored**, **139.44 s**
+across **34** blocks: **18 unit + 418 integration**, 0 doctests. All round 4–21
+controls retained. Focused R21: **11 passed / 0 failed**, **0.49 s** runner sum.
 
 | Blocker | RED tests | Status | Commit |
 |---|---|---|---|
-| SOL-R20-B01 | r1_literals::r20_pinned_extreme_const_widths_parse_and_hash_without_panic; cli_xam::r20_cli_pinned_extreme_const_widths_check_and_hash | GREEN | af52c9c |
+| CODEX-R21-B01 ≡ SOL-R21-B01 | r21_resources::r21_b01_claims_public_consumers: allocator SIGABRT child | GREEN | f931307 |
+| CODEX-R21-B02 | r21_resources::r21_b02_hostcall_public_consumer / r21_b02_console_public_consumer: allocator SIGABRT; r21_b02_cli_pinned_transfers: exact CLI capacity panic / exit 101 | GREEN | f931307 |
 
-Exact original const_literal RED: library 0/1; max−1 CLI exits 1 with a false
-§3.3 range error; max CLI exits 101 on unchecked N+1. Both reviewer files now
-parse/check/hash, preserve their 269-byte envelope pins and whole-file SHA-256s.
-`r20_pins.py` independently reconstructs them; reviewer cmp checks pass.
-`r20_extreme_const_execution_reports_host_resource` checks both execution
-engines return a cited host limit for actual unrepresentable storage.
-Ordinary i8 256/-129 still reject, 255/-128 still admit.
+`claims::Object::domain` now checked-adds and fallibly reserves all-cells
+components before expanding 2^A. Replay still materializes complete region
+states, so this uses the allowed checked-eager repair and returns a §12.2
+host-limit Result when unavailable, including count=1 on huge regions. No ISA
+A/W/count cap or range relabelling. Both seats' complete witnesses and small
+controls are retained byte-for-byte with independent pins. Small samples remain
+Evidence(1), and sol's eight-row exhaustive identity remains Proof.
 
-Design: object::const_literal parses only the decimal spelling's magnitude and
-compares its bit length to N; a negative N-bit magnitude must be a power of two.
-No N+1 arithmetic or destination-sized admission allocation remains. Fault-code
-and certificate endpoint admission share the unsigned magnitude check; errors
-propagate with range/resource separation. Signature dimensions follow §9.1's
-number/string boundary. Wire names, region images/cells, quantum identities,
-CLI buffers and claim-element storage reserve fallibly; products/cardinalities
-are checked. Representation/allocation failures cite the § and name the host
-limit. No ISA width/count cap or new spec reading is introduced.
+Classical memory/hostcall/console transfers reserve before reading bytes;
+console growth and the tape entry reserve before mutation. Failed transfers
+publish no request/output/tape entry, leave the complete prefix unchanged and
+reverse exactly. Sparse alloc remains legal through the 64-bit pointer range.
+Memory-range faults and entropy fault 10 keep their ISA meanings. Hostcall
+errors cite §10, console errors §7.3, direct memory queries §7.1.
 
-The sweep reproduced additional false large-width signature mismatches,
-wire-expansion capacity panics and certificate small-endpoint allocation with
-a misleading range wrapper. The arithmetic audit also repaired unchecked
-region products and eager exhaustive/sample collection, and normalized cited
-resource diagnostics for frames, counters, borrowed-capacity sums and CLI
-storage. Bead b-isa-spec-61i records this class.
+The wider audit reproduced another allocator abort in `oracle::region_bytes`.
+Nested transfers, replay region bytes/cells, memory loads, undo/reply/entropy,
+qreg slice/concat, CLI hex output and incremental trace growth now reserve
+fallibly or retain sparse/lazy traversal. Bead **b-isa-spec-3va** records the
+class and is closed. No spec gap or theorem assumption was introduced.
 
-**102 fixture-qualified paths / 1,113 generated cases**, plus separate pinned
-admission/execution controls. Every scalar path receives 0, 1, 2^63−1, 2^63,
-2^64−2, 2^64−1 in grammar-admitted spellings. Twenty descriptor spelling
-negatives include 00/+1/-0/1.0/2^64. All are under catch_unwind with preassigned
-admit/range/resource expectations and § citation. See the full path/validation/
-case inventory in external round-20 response.md.
+**24 tagged consumer paths / 186 generated cases**, separate from the retained
+R20 **102 fixture-qualified paths / 1,113 cases** (overlapping paths, not an
+additive 126-path claim). R20 checked scalar arithmetic and selected admission /
+direct consumers; it missed executable all-cells domains and classical transfer
+lengths. README corrects that coverage description. Full path/guard/case rows
+are in external round-21 response.md.
 
 | Family / consumers | Paths | Cases |
 |---|---:|---:|
-| r13_generated_derived_width_extremes_family: five fixtures' layout scalars + depth | 42 | 591 |
-| r20_generated_text_width_count_index_extremes | 8 | 90 |
-| r20_generated_descriptor_budget_storage_extremes | 15 | 110 |
-| r20_generated_qreg_descriptor_arithmetic_extremes | 4 | 24 |
-| r20_generated_cast_length_region_product_extremes | 5 | 30 |
-| r20_generated_borrow_capacity_sum_extremes | 1 | 6 |
-| r20_generated_certificate_width_bound_count_table_extremes | 10 | 60 |
-| r20_region_domain_extremes (direct semantic consumer) | 5 | 30 |
-| r20_exhaustive_domain_cardinality_extremes (exhaustive/sample direct consumers) | 2 | 12 |
-| r20_generated_schedule_count_selector_extremes | 8 | 48 |
-| r20_cli_interface_region_storage_extremes | 2 | 12 |
+| All-cells and explicit-list domains, both public claim entry points | 2 | 32 |
+| Exhaustive powers/products; samples; direct oracle replay | 4 | 30 |
+| Hostcall / console / memory query / undo / entropy / cumulative console | 6 | 42 |
+| Nested region transfer / memory load / symbolic table capacity / sparse allocation | 4 | 27 |
+| Sparse memory digest/snapshot consumers | 1 | 12 |
+| Qreg allocate/slice and dense amplitudes | 3 | 17 |
+| CLI region cells / sparse output / hex expansion / lazy sample count | 4 | 26 |
+| **Total** | **24** | **186** |
 
-S1 applied: all original **507** R13 inputs retained, **84** added. Independent
-§§7.1–7.2 range/non-overlap/capacity and §§3.7/5.4 width formulas assign legal,
-layout rejection, deterministic representation or allocation-dependent storage
-before production. Observed **167 constructed / 342 layout rejections / 82
-resource diagnostics**. Allocation-dependent cases allow success or a cited
-host allocation failure; this is finite boundary coverage, not an exhaustive
-resource-availability or full-u64 proof.
+Region exponents include 0/1/3/62/63/64/127/128; value exponents include
+1/2/3/62/63/64/127/128. Transfer lengths include 0/1/8/2^63−1/2^63/2^64−1.
+Every resource family runs under catch_unwind in a fresh Linux child with
+RLIMIT_AS=256 MiB and RLIMIT_CORE=0. The family distinguishes admission,
+cardinality, materialization, sparse/lazy traversal and range/fault results.
+Huge CLI sample counts enter lazily and stop on a downstream frame-storage
+error; no completed astronomical replay or general OOM proof is claimed.
+Pinned controls, exact reversals and successful concat controls are additional.
+Sol S1 applied; codex's nonblocking structured Error-category migration deferred
+because the public Error(pub String) API and contextual wrappers need a
+coordinated change. Display/CLI semantics remain unchanged.
 
-All **5 ignored release sweeps passed / 0 failed**, **106.12 s** runner sum:
+All **5 ignored release sweeps passed / 0 failed**, **88.31 s** runner sum:
 
 | Sweep | Full domain | Result / runner time |
 |---|---|---|
-| u8 division/remainder | 65,536 pairs × 4 = 262,144 executions | 1/0; 1.09 s |
-| 17-wire borrow | 131,072 entries | 1/0; 5.81 s |
-| checked borrow certificate | 262,144 elements, subject and expected program | 1/0; 23.01 s |
-| §6 differential | 200,000 programs: 70,931 accepted clean / 129,069 rejected | 1/0; 74.22 s |
-| recursive prefix reversal | 256 inputs × every completion/first-fault prefix | 1/0; 1.99 s |
+| u8 division/remainder | 65,536 pairs × 4 = 262,144 executions | 1/0; 0.39 s |
+| 17-wire borrow | 131,072 entries | 1/0; 2.12 s |
+| checked borrow certificate | 262,144 elements, subject and expected program | 1/0; 12.16 s |
+| §6 differential | 200,000 programs: 70,931 accepted clean / 129,069 rejected | 1/0; 71.22 s |
+| recursive prefix reversal | 256 inputs × every completion/first-fault prefix | 1/0; 2.42 s |
 
-Fmt/fmt --check, strict offline all-target Clippy (0 warnings), unchanged Python
-seed (2 examples / 2 envelopes), independent R20 pins and byte comparisons pass.
-Production/test inputs stayed fixed throughout the final full run and sweeps.
-Implementation commit **af52c9cd42965c1f7fd3fa0bcd4139673074e10c**; this block records final evidence.
-Logs: interpreter .tmp/r20-{baseline-clean,exact-red,class-red,allocation-red,
-cert-red,focused,widths,final,final-clippy,sweeps}.log.
+Fmt/fmt --check and strict offline all-target Clippy pass with zero warnings.
+Unchanged Python seed: 2 examples / 2 envelopes. Independent R20 pins and R21
+pins (9 complete objects / 2 envelopes) pass; all 9 reviewer-file byte comparisons
+pass. Production and test inputs stayed fixed throughout final tests/sweeps.
+Implementation commit **f931307a002877317fb6d35813e97023f0aa2917**. Logs: interpreter
+.tmp/r21-{baseline,red,transfer-consumer-red,nested-region-red,family,final,sweeps,
+final-clippy}.log. Early exploratory transfer logs with invalid generated pins
+are superseded by transfer-consumer-red and are not used as RED evidence.
 
-No new spec gap; no user decision needed for this repair. Deliverables 8–11
-remain staged/Unverified. Only owned paths committed; Beads auto-export left
-for the orchestrator. No foreign changes, worklog edits, push or Dolt sync.
+No user decision needed. Deliverables 8–11 remain staged/Unverified; the full ISA
+and open other-value theorem obligations remain. Only owned paths committed;
+Beads auto-export and worklog left for the orchestrator. No push or Dolt sync.
 
 ## Resume here: outstanding work, in priority order
 
@@ -106,7 +105,7 @@ its full verification obligation met yet. The entire ISA remains the scope.
    frame live ranges and borrowed library claims (recursive admission schemas
    are centralized and tested in metadata_schema.rs).
    Imports resolve by signature and pin, including data; linking is tested.
-3. Continue generalized-width and host-resource verification beyond the R20
+3. Continue generalized-width and host-resource verification beyond the R21
    finite boundary family. Lifted widths are u64 descriptors; concrete vectors
    and Q basis execution already exceed128. Audit remaining JSON/JCS numeric
    corner cases and spellings without an ISA width cap.
