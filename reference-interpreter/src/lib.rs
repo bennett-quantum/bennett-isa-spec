@@ -102,6 +102,7 @@ pub(crate) fn reserve_more<T>(
     rule: &str,
     what: &str,
 ) -> Result<()> {
+    preparation(rule, what)?;
     out.len()
         .checked_add(count)
         .ok_or_else(|| resource_error(rule, format!("{what} cumulative count exceeds usize")))?;
@@ -149,3 +150,46 @@ mod r21_tests {
         .expect("no derived-cardinality or transfer panic");
     }
 }
+
+// Test-only, thread-local stage injection: no global allocator replacement and
+// no interference with concurrent tests. Production preparation is a no-op.
+#[inline]
+pub(crate) fn preparation(rule: &str, stage: &str) -> Result<()> {
+    #[cfg(test)]
+    allocation_test::hit(rule, stage)?;
+    #[cfg(not(test))]
+    let _ = (rule, stage);
+    Ok(())
+}
+#[cfg(test)]
+pub(crate) mod allocation_test {
+    use std::cell::RefCell;
+    thread_local! {
+        static PLAN: RefCell<Option<(usize, usize, Vec<String>)>> = const { RefCell::new(None) };
+    }
+    pub fn start(fail_at: usize) {
+        PLAN.with(|p| *p.borrow_mut() = Some((fail_at, 0, Vec::new())));
+    }
+    pub fn finish() -> Vec<String> {
+        PLAN.with(|p| p.borrow_mut().take().expect("injection armed").2)
+    }
+    pub fn hit(rule: &str, stage: &str) -> crate::Result<()> {
+        PLAN.with(|p| {
+            if let Some((fail_at, count, stages)) = &mut *p.borrow_mut() {
+                stages.push(stage.to_owned());
+                let index = *count;
+                *count += 1;
+                if index == *fail_at {
+                    return Err(crate::resource_error(
+                        rule,
+                        format!("injected preparation {index}: {stage}"),
+                    ));
+                }
+            }
+            Ok(())
+        })
+    }
+}
+
+#[cfg(test)]
+mod r23_transaction;

@@ -639,3 +639,41 @@ execution or interval-verification deliverables. Borrow obligations remain
 separate: `validation.rs::validate_action_sequence` checks static cleanup and
 causal histories, `borrow.rs::decide_frames` checks full-frame factorisation,
 and `quantum.rs::audit_borrow_boundary` checks runtime return obligations.
+
+
+**Design (transactional steps, round 23).** `ClassicalMachine::step_once` and
+`reply` publish their memory, control, devices, pending request and retained
+history together. Execution prepares a private candidate while a checkpoint
+retains the pre-write shared sparse/console/tape owners. On any returned error,
+restoration moves those owners back and truncates candidate history; it never
+replays byte undo or asks an allocator to recover from a denied allocation.
+Nested `uncall` also checkpoints edited history flags and segments; measurement
+checkpoints the draw queue and RNG. Committed frames still retain byte deltas,
+not a complete memory image per frame. Observer payload clones remain shared;
+no new payload copy or ISA size limit is introduced. Sparse COW prepares final
+capacity once and reserves growth only for new resident addresses.
+
+After `HostResource`, the full snapshot, history length, console/effect tape and
+host transcript equal the pre-call prefix. Retrying executes the same opcode;
+reply rejection leaves the same pending request. `step_once_observed` and
+`reply_observed` prepare fallible trace data within this boundary; CLI trace
+records and reply-queue consumption publish only on success. Observer callbacks
+should return prepared values and publish external side effects after success.
+See [`r23_transaction`](tests/r23_transaction.rs) for both pinned 128 MiB COW
+witnesses, unchanged-prefix/repeated-denial checks, raised-limit retry and entry
+reversal, and [`src/r23_transaction.rs`](src/r23_transaction.rs) for stage-indexed
+failure injection across instruction, reply, trace and certificate preparation.
+These are explicit Result-path guarantees, not recovery from Rust's infallible
+metadata allocation aborts. All round 4–22 tests and 64 MiB controls remain.
+
+The R23 transactionality family has **533 indexed stage cases / 70 operation
+scenarios / 31 stage tags**: 340 instruction-stage cases, 27 reply/observer,
+7 standalone trace-observer, 144 immutable certificate-replay and 15 concrete
+CLI trace/reply cases. Each case rejects twice at the same stage, preserves the
+prefix (and CLI trace/reply queue where applicable), then succeeds after the
+injection is disabled. Counts refer to preparation boundaries, including
+capacity checks that may reuse storage, rather than physical allocator calls.
+Successful stores/loads additionally check literal byte/value semantics;
+reversible controls restore entry. Measurement remains irreversible. These
+counts are separate from the retained R22 12-stage/53-case transfer inventory.
+The public coverage extension adds 56 oracle-role/explicit-region-cell cases.

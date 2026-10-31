@@ -287,8 +287,7 @@ impl Memory {
             return err("§3.3", "store width must be a byte multiple");
         }
         let bytes = value.to_le_bytes();
-        self.bytes
-            .prepare(bytes.iter().filter(|b| **b != 0).count())?;
+        self.bytes.prepare_write(p, &bytes)?;
         for (i, b) in bytes.into_iter().enumerate() {
             self.set_byte(offset(p, i)?, b)?;
         }

@@ -113,6 +113,7 @@ impl ClassicalSnapshot {
         let m = &self.memory;
         let mut bytes = String::new();
         let mut append = |line: String| -> Result<()> {
+            crate::preparation("§7.1/§7.4", "memory digest bytes")?;
             bytes.try_reserve(line.len()).map_err(|e| {
                 crate::resource_error("§7.1/§7.4", format!("memory digest bytes: {e}"))
             })?;
@@ -601,6 +602,15 @@ impl<'a> ClassicalMachine<'a> {
     /// or None when the machine is not running (faulted, finished, or
     /// suspended at a host request).
     pub fn step_once(&mut self) -> Result<Option<StepPoint>> {
+        self.step_once_observed(|_, _, _| Ok(()))
+            .map(|value| value.map(|(point, ())| point))
+    }
+    /// Prepare a trace/observer value before publishing the step. A failed
+    /// observer leaves the machine at the same prefix, including its history.
+    pub fn step_once_observed<T>(
+        &mut self,
+        observe: impl FnOnce(&StepPoint, &ClassicalSnapshot, &ClassicalSnapshot) -> Result<T>,
+    ) -> Result<Option<(StepPoint, T)>> {
         if !self.is_running() {
             return Ok(None);
         }
@@ -618,8 +628,16 @@ impl<'a> ClassicalMachine<'a> {
             index: current.ip,
             instruction,
         };
-        self.step()?;
-        Ok(Some(point))
+        let op = point.instruction.op.as_str();
+        self.transaction(
+            op == "uncall",
+            matches!(op, "ret" | "uncall"),
+            |trial, before| {
+                trial.step_prepared()?;
+                let value = observe(&point, before, &trial.state)?;
+                Ok(Some((point, value)))
+            },
+        )
     }
     pub fn memory_bytes(&self, address: u128, len: usize) -> Result<Vec<u8>> {
         self.transfer_bytes(address, len, "§7.1")
@@ -645,6 +663,20 @@ impl<'a> ClassicalMachine<'a> {
         Ok(out)
     }
     pub fn reply(&mut self, payload: &[u8]) -> Result<()> {
+        self.reply_observed(payload, |_, _| Ok(()))
+    }
+    /// Prepare reply trace output before publishing memory, result and transcript.
+    pub fn reply_observed<T>(
+        &mut self,
+        payload: &[u8],
+        observe: impl FnOnce(&ClassicalSnapshot, &ClassicalSnapshot) -> Result<T>,
+    ) -> Result<T> {
+        self.transaction(true, false, |trial, before| {
+            trial.reply_prepared(payload)?;
+            observe(before, &trial.state)
+        })
+    }
+    fn reply_prepared(&mut self, payload: &[u8]) -> Result<()> {
         let request = self
             .state
             .pending
@@ -669,7 +701,7 @@ impl<'a> ClassicalMachine<'a> {
         let mut memory = self.state.memory.clone();
         memory
             .bytes
-            .prepare(payload[..count].iter().filter(|b| **b != 0).count())?;
+            .prepare_write(request.address, &payload[..count])?;
         for (n, b) in payload[..count].iter().enumerate() {
             memory.set_byte(request.address + n as u128, *b)?;
         }
@@ -999,6 +1031,7 @@ impl<'a> ClassicalMachine<'a> {
             .last()
             .ok_or_else(|| Error::new("§3.4: define without activation".into()))?
             .id;
+        crate::reserve_more(&mut undo.definitions, 1, "§7.4", "dynamic instance history")?;
         self.define_at(id, name, value, undo);
         Ok(())
     }
@@ -1135,12 +1168,15 @@ impl<'a> ClassicalMachine<'a> {
         {
             return Ok(Some(10));
         }
-        self.state
-            .devices
-            .tape
-            .prepare(0, "§7.3/§7.4", "effect tape")?
-            .try_reserve_exact(1)
-            .map_err(|e| crate::resource_error("§7.3/§7.4", format!("effect tape: {e}")))?;
+        crate::reserve_more(
+            self.state
+                .devices
+                .tape
+                .prepare(0, "§7.3/§7.4", "effect tape")?,
+            1,
+            "§7.3/§7.4",
+            "effect tape entry",
+        )?;
         let transferred = match (dev, operation) {
             ("console", "write") => {
                 let bytes = self.transfer_bytes(p, len, "§7.3")?;
@@ -1166,10 +1202,7 @@ impl<'a> ClassicalMachine<'a> {
                 let start = self.state.devices.entropy_position;
                 let mut bytes = crate::reserved(len, "§7.3", "entropy transfer bytes")?;
                 bytes.extend_from_slice(&self.entropy[start..start + len]);
-                self.state
-                    .memory
-                    .bytes
-                    .prepare(bytes.iter().filter(|b| **b != 0).count())?;
+                self.state.memory.bytes.prepare_write(p, &bytes)?;
                 undo.device = Some(DeviceUndo::Entropy(start));
                 for n in 0..len {
                     self.state
@@ -1188,10 +1221,7 @@ impl<'a> ClassicalMachine<'a> {
                     .get(&values[0])
                     .cloned()
                     .unwrap_or_else(|| vec![0; 512]);
-                self.state
-                    .memory
-                    .bytes
-                    .prepare(bytes.iter().filter(|b| **b != 0).count())?;
+                self.state.memory.bytes.prepare_write(p, &bytes)?;
                 for (n, b) in bytes.iter().enumerate() {
                     self.state.memory.set_byte(p + n as u128, *b)?;
                 }
@@ -1225,7 +1255,61 @@ impl<'a> ClassicalMachine<'a> {
         undo.tape = true;
         Ok(None)
     }
+    // All execution and observer work is private until this boundary returns.
+    // The checkpoint owns the pre-write sparse/console/tape buffers. Restoring
+    // it is assignment/drop only, never byte replay, COW or another allocation.
+    fn transaction<T>(
+        &mut self,
+        edits_history: bool,
+        edits_segments: bool,
+        run: impl FnOnce(&mut Self, &ClassicalSnapshot) -> Result<T>,
+    ) -> Result<T> {
+        let state = self.state.clone();
+        let history_len = self.history.len();
+        let history = edits_history.then(|| self.history.clone());
+        let segments_len = self.segments.len();
+        let segments = edits_segments.then(|| self.segments.clone());
+        let draws = self.measurement_draws.clone();
+        let rng = self.measurement_rng;
+        match run(self, &state) {
+            Ok(value) => Ok(value),
+            Err(error) => {
+                self.state = state;
+                if let Some(history) = history {
+                    self.history = history;
+                } else {
+                    self.history.truncate(history_len);
+                }
+                if let Some(segments) = segments {
+                    self.segments = segments;
+                } else {
+                    self.segments.truncate(segments_len);
+                }
+                self.measurement_draws = draws;
+                self.measurement_rng = rng;
+                Err(error)
+            }
+        }
+    }
     fn step(&mut self) -> Result<()> {
+        let current = self
+            .state
+            .control
+            .last()
+            .ok_or_else(|| Error::new("§3.4: no active function".into()))?;
+        let op = self.object.functions[&current.function].blocks[current.block]
+            .instructions
+            .get(current.ip)
+            .ok_or_else(|| Error::new("§3.4: fell off classical block".into()))?
+            .op
+            .as_str();
+        self.transaction(
+            op == "uncall",
+            matches!(op, "ret" | "uncall"),
+            |trial, _| trial.step_prepared(),
+        )
+    }
+    fn step_prepared(&mut self) -> Result<()> {
         let object = self.object;
         let current = self
             .state
@@ -1596,7 +1680,6 @@ impl<'a> ClassicalMachine<'a> {
             if e.0.starts_with(TRAP) {
                 fault = Some(4);
             } else {
-                self.undo_record(undo)?;
                 return Err(e);
             }
         }

@@ -374,11 +374,13 @@ impl QuantumState {
             Error::host_resource("§4.3: host limit: wire count exceeds usize".into())
         })?;
         let mut wires = crate::reserved(n, "§4.3", "wire identities")?;
+        crate::preparation("§4.3", "quantum wire map")?;
         self.ids
             .try_reserve(n)
             .map_err(|e| Error::host_resource(format!("§4.3: host limit: wire identities: {e}")))?;
         // New wires are |0> at the high positions: sparse keys are unchanged.
         if let State::Basis { bits, .. } = &mut self.state {
+            crate::preparation("§4.3", "quantum basis bits")?;
             bits.try_reserve(n).map_err(|e| {
                 Error::host_resource(format!("§4.3: host limit: wire allocation failed ({e})"))
             })?;

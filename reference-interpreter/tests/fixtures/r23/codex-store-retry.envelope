@@ -1,0 +1,21 @@
+isa=0.8
+ptr_width=64
+{"abi":"0.8","kind":"cc","params":[],"results":["i64"],"tier":"cc"}
+fn cc @f () (r:i64) () () ()
+^entry():
+n = const.i64 1048576
+p = alloc n
+r = hostcall org.bennett.test p n
+v = const.i8 2
+store.i8 p v
+s = load.i8 p
+t = zext.i64 s
+ret t
+layout A_tab 1
+layout H 64
+layout S_cells 1
+layout heap_base 1
+layout heap_limit_max "9223372036854775808"
+layout null_size 1
+layout ptr_width 64
+device org.bennett.test {"version":"1"}

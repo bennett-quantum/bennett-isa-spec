@@ -632,7 +632,7 @@ fn drive(
     let mut steps = 0u64;
     loop {
         if let Some(request) = machine.outcome().request {
-            let reply = replies.pop_front().ok_or_else(|| {
+            let reply = replies.front().ok_or_else(|| {
                 fail(format!(
                     "§10: HOST_REQUEST for service {} has no reply; --replies is exhausted (run left suspended, no result)",
                     request.service
@@ -659,13 +659,16 @@ fn drive(
                 }
                 return Err(Error::new(message));
             }
-            let before = trace.is_some().then(|| machine.snapshot());
-            machine.reply(&reply.reply)?;
-            if let (Some(trace), Some(before)) = (trace.as_deref_mut(), before) {
-                let delta = before.delta(&machine.snapshot())?;
-                if let Some(Json::Object(record)) = trace.last_mut() {
+            let record = machine.reply_observed(&reply.reply, |before, after| {
+                let Some(trace) = trace.as_deref() else {
+                    return Ok(None);
+                };
+                let delta = before.delta(after)?;
+                let mut record = trace.last().cloned();
+                if let Some(Json::Object(record)) = &mut record {
                     if let Some(Json::Array(registers)) = record.get_mut("registers") {
                         let more = delta_registers_json(&delta)?;
+                        cli_preparation("trace register records")?;
                         registers.try_reserve(more.len()).map_err(|e| {
                             Error::host_resource(format!(
                                 "§7.4: host limit: trace register records: {e}"
@@ -675,6 +678,7 @@ fn drive(
                     }
                     if let Some(Json::Array(memory)) = record.get_mut("memory") {
                         let more = delta_memory_json(&delta)?;
+                        cli_preparation("trace memory records")?;
                         memory.try_reserve(more.len()).map_err(|e| {
                             Error::host_resource(format!(
                                 "§7.4: host limit: trace memory records: {e}"
@@ -683,7 +687,12 @@ fn drive(
                         memory.extend(more);
                     }
                 }
+                Ok(record)
+            })?;
+            if let (Some(trace), Some(record)) = (trace.as_deref_mut(), record) {
+                *trace.last_mut().expect("retained hostcall trace") = record;
             }
+            replies.pop_front();
             continue;
         }
         if !machine.is_running() {
@@ -698,18 +707,24 @@ fn drive(
             ));
         }
         if let Some(trace) = trace.as_deref_mut() {
+            cli_preparation("CLI trace records")?;
             trace.try_reserve(1).map_err(|e| {
                 Error::host_resource(format!("§7.4: host limit: CLI trace records: {e}"))
             })?;
         }
-        let before = trace.is_some().then(|| machine.snapshot());
-        let point = machine
-            .step_once()?
+        let (_, record) = machine
+            .step_once_observed(|point, before, after| {
+                if trace.is_some() {
+                    let delta = before.delta(after)?;
+                    Ok(Some(trace_record(steps, point, &delta)?))
+                } else {
+                    Ok(None)
+                }
+            })?
             .ok_or_else(|| fail("§3.4: running machine took no step"))?;
         steps += 1;
-        if let (Some(trace), Some(before)) = (trace.as_deref_mut(), before) {
-            let delta = before.delta(&machine.snapshot())?;
-            trace.push(trace_record(steps - 1, &point, &delta)?);
+        if let (Some(trace), Some(record)) = (trace.as_deref_mut(), record) {
+            trace.push(record);
         }
     }
     Ok(steps)
@@ -2109,9 +2124,146 @@ fn copy_text(text: &str, what: &str) -> Result<String> {
 fn collect_output<T>(iter: impl Iterator<Item = Result<T>>, what: &str) -> Result<Vec<T>> {
     let mut out = Vec::new();
     for item in iter {
+        cli_preparation(what)?;
         out.try_reserve(1)
             .map_err(|e| Error::host_resource(format!("§7.4/§10: host limit: {what}: {e}")))?;
         out.push(item?);
     }
     Ok(out)
+}
+
+// Independent injection for the binary's concrete trace builders; library
+// preparation stages are exercised separately in src/r23_transaction.rs.
+#[inline]
+fn cli_preparation(stage: &str) -> Result<()> {
+    #[cfg(test)]
+    r23_cli::hit(stage)?;
+    #[cfg(not(test))]
+    let _ = stage;
+    Ok(())
+}
+#[cfg(test)]
+mod r23_cli {
+    use super::*;
+    use std::cell::RefCell;
+    thread_local! { static PLAN: RefCell<Option<(usize, Vec<String>)>> = const { RefCell::new(None) }; }
+    fn start(index: usize) {
+        PLAN.with(|p| *p.borrow_mut() = Some((index, Vec::new())));
+    }
+    fn finish() -> Vec<String> {
+        PLAN.with(|p| p.borrow_mut().take().unwrap().1)
+    }
+    pub fn hit(stage: &str) -> Result<()> {
+        PLAN.with(|p| {
+            if let Some((index, seen)) = &mut *p.borrow_mut() {
+                seen.push(stage.into());
+                if *index == seen.len() - 1 {
+                    return Err(Error::host_resource(format!(
+                        "§7.4/§10: injected CLI trace preparation {stage}"
+                    )));
+                }
+            }
+            Ok(())
+        })
+    }
+    #[test]
+    fn actual_cli_trace_preparations_are_transactional() {
+        let text = include_str!("../tests/fixtures/r23/codex-store-retry.bisa");
+        // Identity pins are tested separately; replace only the runtime length
+        // and regenerate its interface hash for these small CLI controls.
+        let text = text.replace("1048576", "8");
+        let parsed = Object::parse(&text).unwrap();
+        let old = parsed.symbols().unwrap()["0"]
+            .get("interface_hash")
+            .unwrap()
+            .string()
+            .unwrap()
+            .to_owned();
+        let hash = parsed.identity().unwrap().interface_hashes["f"].clone();
+        let o = Object::parse(&text.replace(&old, &hash)).unwrap();
+        o.check_hashes().unwrap();
+        let mut cases = 0;
+        for kind in ["store", "load", "reply"] {
+            let setup = || {
+                let mut m = ClassicalMachine::new(&o, "f", &[], &[]).unwrap();
+                m.run(3).unwrap();
+                let mut replies = VecDeque::new();
+                let mut trace = Vec::new();
+                if kind == "reply" {
+                    replies.push_back(Reply {
+                        service: "org.bennett.test".into(),
+                        payload: vec![0; 8],
+                        reply: vec![1; 8],
+                    });
+                    // A concrete hostcall trace row already retained at suspension.
+                    let mut pre = ClassicalMachine::new(&o, "f", &[], &[]).unwrap();
+                    pre.step_once().unwrap();
+                    pre.step_once().unwrap();
+                    let before = pre.snapshot();
+                    let point = pre.step_once().unwrap().unwrap();
+                    trace.push(
+                        trace_record(2, &point, &before.delta(&pre.snapshot()).unwrap()).unwrap(),
+                    );
+                } else {
+                    m.reply(&[1; 8]).unwrap();
+                    m.step_once().unwrap();
+                    if kind == "load" {
+                        m.step_once().unwrap();
+                    }
+                }
+                (m, replies, trace)
+            };
+            let run =
+                |m: &mut ClassicalMachine, replies: &mut VecDeque<Reply>, trace: &mut Vec<Json>| {
+                    drive(
+                        m,
+                        replies,
+                        100,
+                        Some(u64::from(kind != "reply")),
+                        Some(trace),
+                    )
+                };
+            let (mut good, mut replies, mut trace) = setup();
+            start(usize::MAX);
+            run(&mut good, &mut replies, &mut trace).unwrap();
+            let stages = finish();
+            let expected = good.snapshot();
+            let expected_trace = trace;
+            let expected_steps = good.outcome().steps;
+            for index in 0..stages.len() {
+                let (mut m, mut replies, mut trace) = setup();
+                let before = m.snapshot();
+                let before_trace = trace.clone();
+                let frames = m.outcome().steps;
+                let queue = replies.len();
+                for _ in 0..2 {
+                    start(index);
+                    assert_eq!(
+                        run(&mut m, &mut replies, &mut trace).unwrap_err().kind(),
+                        bennett_isa_ref::ErrorKind::HostResource
+                    );
+                    assert_eq!(finish(), stages[..=index]);
+                    assert_eq!(m.snapshot(), before);
+                    assert_eq!(m.outcome().steps, frames);
+                    assert_eq!(trace, before_trace);
+                    assert_eq!(replies.len(), queue);
+                }
+                run(&mut m, &mut replies, &mut trace).unwrap();
+                assert_eq!(m.snapshot(), expected);
+                assert_eq!(m.outcome().steps, expected_steps);
+                assert_eq!(trace, expected_trace);
+                assert!(replies.is_empty());
+                if kind == "store" {
+                    assert_eq!(m.memory_bytes(1, 1).unwrap(), [2]);
+                }
+                m.reverse().unwrap();
+                cases += 1;
+            }
+            eprintln!(
+                "R23 actual CLI {kind}: {} stage cases {stages:?}",
+                stages.len()
+            );
+        }
+        assert_eq!(cases, 15);
+    }
 }

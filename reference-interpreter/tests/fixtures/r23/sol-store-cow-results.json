@@ -1,0 +1,22 @@
+{
+  "8/128MiB": {
+    "exit": 0,
+    "stdout": "request 8\nreply done\nstore result=Ok(Some(StepPoint { function: \"f\", block: \"entry\", index: 4, instruction: Instruction { lhs: [], op: \"store.i8\", operands: [\"p\", \"z\"], bodies: [], line: 13 } })); prefix_equal=false; difference=Some(\"memory byte at address 1: 165 differs from 0\")\nretry=Ok(Some(StepPoint { function: \"f\", block: \"entry\", index: 5, instruction: Instruction { lhs: [], op: \"ret\", operands: [\"r\"], bodies: [], line: 14 } })); byte=Ok([0]); outcome=ClassicalOutcome { values: Retained { len: 1, .. }, fault: None, trapped: false, steps: 6, request: None }\nreverse=Ok(()); entry_equal=true; difference=None\n",
+    "stderr": ""
+  },
+  "1048576/128MiB": {
+    "exit": 0,
+    "stdout": "request 1048576\nreply done\nstore result=Ok(Some(StepPoint { function: \"f\", block: \"entry\", index: 4, instruction: Instruction { lhs: [], op: \"store.i8\", operands: [\"p\", \"z\"], bodies: [], line: 13 } })); prefix_equal=false; difference=Some(\"memory byte at address 1: 165 differs from 0\")\nretry=Ok(Some(StepPoint { function: \"f\", block: \"entry\", index: 5, instruction: Instruction { lhs: [], op: \"ret\", operands: [\"r\"], bodies: [], line: 14 } })); byte=Ok([0]); outcome=ClassicalOutcome { values: Retained { len: 1, .. }, fault: None, trapped: false, steps: 6, request: None }\nreverse=Ok(()); entry_equal=true; difference=None\n",
+    "stderr": ""
+  },
+  "1572864/128MiB": {
+    "exit": 0,
+    "stdout": "request 1572864\nreply done\nstore result=Err(Error(\"\u00a77.1/\u00a77.4/\u00a710: host limit: sparse memory retention allocation of 1572864 elements failed: memory allocation failed because the memory allocator returned an error\", HostResource)); prefix_equal=false; difference=Some(\"control: 1 activations / next_id 1 differs from 1 activations / next_id 1\")\nretry=Ok(Some(StepPoint { function: \"f\", block: \"entry\", index: 5, instruction: Instruction { lhs: [], op: \"ret\", operands: [\"r\"], bodies: [], line: 14 } })); byte=Ok([165]); outcome=ClassicalOutcome { values: Retained { len: 1, .. }, fault: None, trapped: false, steps: 5, request: None }\nreverse=Ok(()); entry_equal=true; difference=None\n",
+    "stderr": ""
+  },
+  "1572864/unlimited": {
+    "exit": 0,
+    "stdout": "request 1572864\nreply done\nstore result=Ok(Some(StepPoint { function: \"f\", block: \"entry\", index: 4, instruction: Instruction { lhs: [], op: \"store.i8\", operands: [\"p\", \"z\"], bodies: [], line: 13 } })); prefix_equal=false; difference=Some(\"memory byte at address 1: 165 differs from 0\")\nretry=Ok(Some(StepPoint { function: \"f\", block: \"entry\", index: 5, instruction: Instruction { lhs: [], op: \"ret\", operands: [\"r\"], bodies: [], line: 14 } })); byte=Ok([0]); outcome=ClassicalOutcome { values: Retained { len: 1, .. }, fault: None, trapped: false, steps: 6, request: None }\nreverse=Ok(()); entry_equal=true; difference=None\n",
+    "stderr": ""
+  }
+}

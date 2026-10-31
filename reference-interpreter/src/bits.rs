@@ -18,6 +18,7 @@ impl BitVector {
             )
         })? / 64;
         let mut words = Vec::new();
+        crate::preparation("§3.3", "bit-vector words")?;
         words.try_reserve_exact(count).map_err(|e| {
             Error::host_resource(format!(
                 "§3.3: host limit: bit-vector storage allocation failed: {e}"

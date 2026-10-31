@@ -167,6 +167,7 @@ impl Json {
 }
 
 fn append_text(out: &mut String, text: &str) -> Result<()> {
+    crate::preparation("§7.4/§10", "JSON output bytes")?;
     out.try_reserve(text.len())
         .map_err(|e| crate::resource_error("§7.4/§10", format!("JSON output bytes: {e}")))?;
     out.push_str(text);

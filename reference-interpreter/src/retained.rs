@@ -92,21 +92,33 @@ impl SparseBytes {
         self.0.is_empty()
     }
     pub fn prepare(&mut self, extra: usize) -> Result<()> {
-        // Reserve geometric growth when unique, to keep byte-at-a-time stores
-        // amortized. Snapshot COW still reserves the complete copy fallibly.
-        let data = self
-            .0
-            .prepare(0, "§7.1/§7.4/§10", "sparse memory retention")?;
-        data.try_reserve(extra).map_err(|e| {
-            crate::resource_error("§7.1/§7.4/§10", format!("sparse memory retention: {e}"))
-        })
+        // COW reserves the final capacity in one allocation; replacement of
+        // resident addresses does not request growth.
+        self.0
+            .prepare(extra, "§7.1/§7.4/§10", "sparse memory retention")?;
+        self.0.len -= extra;
+        Ok(())
+    }
+    pub fn prepare_write(&mut self, address: u128, bytes: &[u8]) -> Result<()> {
+        let extra = bytes
+            .iter()
+            .enumerate()
+            .filter(|(i, b)| **b != 0 && self.get(&(address + *i as u128)).is_none())
+            .count();
+        self.prepare(extra)
     }
     pub fn set(&mut self, address: u128, byte: u8) -> Result<()> {
         let found = self.0.binary_search_by_key(&address, |e| e.0);
         if (byte == 0 && found.is_err()) || found.is_ok_and(|i| self.0[i].1 == byte) {
             return Ok(());
         }
-        self.prepare(usize::from(byte != 0 && found.is_err()))?;
+        let extra = usize::from(byte != 0 && found.is_err());
+        if Arc::get_mut(&mut self.0.data).is_none()
+            || self.0.len != self.0.data.len()
+            || self.0.data.capacity() - self.0.len < extra
+        {
+            self.prepare(extra)?;
+        }
         let data = Arc::get_mut(&mut self.0.data).expect("prepared sparse memory");
         match (found, byte) {
             (Ok(i), 0) => {
@@ -130,6 +142,24 @@ impl<'a> IntoIterator for &'a SparseBytes {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn r23_existing_address_rewrite_reserves_no_growth() {
+        let mut bytes = SparseBytes::default();
+        bytes.prepare_write(1, &[1, 2, 3]).unwrap();
+        for (p, b) in [(1, 1), (2, 2), (3, 3)] {
+            bytes.set(p, b).unwrap();
+        }
+        let old = bytes.clone();
+        bytes.prepare_write(1, &[4, 5, 6]).unwrap();
+        // One exact COW allocation at resident count, no geometric re-growth.
+        assert_eq!(bytes.0.data.capacity(), 3);
+        for (p, b) in [(1, 4), (2, 5), (3, 6)] {
+            bytes.set(p, b).unwrap();
+        }
+        assert_eq!(bytes.0.len(), 3);
+        assert_eq!(&*bytes.0, [(1, 4), (2, 5), (3, 6)]);
+        assert_eq!(&*old.0, [(1, 1), (2, 2), (3, 3)]);
+    }
     #[test]
     fn r22_copy_on_write_retention_memory_limited() {
         if std::env::var_os("R22_COW_CHILD").is_none() {

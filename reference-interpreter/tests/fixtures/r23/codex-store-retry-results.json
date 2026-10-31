@@ -1,0 +1,14 @@
+[
+  {
+    "limit_mib": 128,
+    "exit": 0,
+    "stdout": "parse/hash OK; request+reply+v complete; frames=4 byte=[1]\nstore_result=Err(Error(\"\u00a77.1/\u00a77.4/\u00a710: host limit: sparse memory retention: memory allocation failed because the memory allocator returned an error\", HostResource)); prefix_equal=false; difference=Some(\"control: 1 activations / next_id 1 differs from 1 activations / next_id 1\"); frames=4\nafter releasing observer next_op=load.i8\ncompleted_result=Int(64, 1); byte=[1]; fault=None\nreversed_to_entry=true\n",
+    "stderr": ""
+  },
+  {
+    "limit_mib": 256,
+    "exit": 0,
+    "stdout": "parse/hash OK; request+reply+v complete; frames=4 byte=[1]\nstore_result=Ok(Some(StepPoint { function: \"f\", block: \"entry\", index: 4, instruction: Instruction { lhs: [], op: \"store.i8\", operands: [\"p\", \"v\"], bodies: [], line: 13 } })); prefix_equal=false; difference=Some(\"memory byte at address 1: 1 differs from 2\"); frames=5\nafter releasing observer next_op=load.i8\ncompleted_result=Int(64, 2); byte=[2]; fault=None\nreversed_to_entry=true\n",
+    "stderr": ""
+  }
+]
