@@ -889,3 +889,28 @@ maps. Remaining activation metadata is b-isa-spec-evi; afi and lph closed,
 1a4/3xe/1oa/82x carried with exact changes in bd. The completed step and
 qregion recipes bring the checkpoint to 195; no complete-library hash/count
 is asserted and the normative marker remains untouched.
+
+## 2026-10-31 REF completion II — K25–K27
+
+K25 shares ordered typed record binding between mapped byte layouts and
+activation locations/captures. K26 retains source region shape, role and
+origin through K24 closure vectors. K27 passes exact allocation classes and
+shared declarations through recipe calls, exposing output wires in the
+caller after acquisition, with explicit lifetimes and adjoint metadata.
+Witnesses: conformance/tests/ref_descriptors.rs; observed red for unknown
+formals/constructors before implementation. K23 already resolves 4nx; its
+LSB literal witness remains unchanged.
+
+Rejected: opaque caller memory/activation body dispatchers (outsource the
+catalog algorithm); flattening gaps or region shapes (loses source binding);
+using any for every class (changes resource identity); copying allocation
+status at invoke (breaks returned output lifetime); host ids for tokens
+(K24 already preserves value tuples). No 0.8 semantics are changed.
+
+82x is carried: §4.5 explicitly generates `qfree t; qfree f` after
+allocating t then f; §11.1 and ratified A1 require all library scratch
+released in reverse allocation order. Changing §4.5 would change accepted
+0.8 generated order; adding an instruction-private exception here would
+change the ratified A1 rule. Neither is a constructor-language extension.
+Stop on qinplace; require an explicit semantic/ratification decision.
+The two calls and both private bundles remain required and in scope.

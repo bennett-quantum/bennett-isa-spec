@@ -4,7 +4,16 @@ use crate::{
     json::{self, Json},
     ref_catalog::{index, scalar, Env},
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, BTreeSet},
+    rc::Rc,
+};
+#[derive(Clone)]
+struct Handle {
+    metadata: (String, usize, String, String),
+    live: bool,
+}
 pub type Wire = (String, usize);
 pub type Registry = BTreeMap<String, Json>;
 #[derive(Clone, Debug, PartialEq)]
@@ -22,6 +31,11 @@ pub struct Leaf {
 #[derive(Clone, Default)]
 struct Context {
     ints: Env,
+    records: BTreeMap<String, Vec<Context>>,
+    record_schemas: BTreeMap<String, Json>,
+    regions: BTreeMap<String, Json>,
+    classes: BTreeMap<String, String>,
+    handles: BTreeMap<String, Rc<RefCell<Handle>>>,
     wires: BTreeMap<String, Vec<Wire>>,
     angles: BTreeMap<String, u64>,
     bodies: BTreeMap<String, (Vec<Json>, Box<Context>)>,
@@ -36,6 +50,67 @@ struct Context {
     scratch_names: BTreeSet<String>,
     declarations: BTreeMap<String, Json>,
     allocations: BTreeMap<String, (String, usize, String, String)>,
+}
+impl Context {
+    fn has_name(&self, n: &str) -> bool {
+        self.ints.contains_key(n)
+            || self.wires.contains_key(n)
+            || self.handles.contains_key(n)
+            || self.classes.contains_key(n)
+            || self.regions.contains_key(n)
+            || self.angles.contains_key(n)
+            || self.bodies.contains_key(n)
+            || self.symbols.contains_key(n)
+            || self.events.contains_key(n)
+            || self.images.contains_key(n)
+            || self.templates.contains_key(n)
+            || self.arguments.contains_key(n)
+            || self.values.contains_key(n)
+            || self.records.contains_key(n)
+    }
+    fn clear_name(&mut self, n: &str) {
+        self.ints.remove(n);
+        self.wires.remove(n);
+        self.angles.remove(n);
+        self.bodies.remove(n);
+        self.symbols.remove(n);
+        self.events.remove(n);
+        self.images.remove(n);
+        self.templates.remove(n);
+        self.arguments.remove(n);
+        self.values.remove(n);
+        self.records.remove(n);
+        self.record_schemas.remove(n);
+        self.regions.remove(n);
+        self.classes.remove(n);
+        self.handles.remove(n);
+        self.allocations.remove(n);
+        self.declarations.remove(n);
+        self.scratch_names.remove(n);
+    }
+    fn record_schema(&self, n: &str) -> Result<Json, String> {
+        self.record_schemas
+            .get(n)
+            .cloned()
+            .ok_or("unbound record schema".into())
+    }
+    fn merge(&mut self, b: &Context) {
+        self.ints.extend(b.ints.clone());
+        self.wires.extend(b.wires.clone());
+        self.angles.extend(b.angles.clone());
+        self.bodies.extend(b.bodies.clone());
+        self.symbols.extend(b.symbols.clone());
+        self.events.extend(b.events.clone());
+        self.images.extend(b.images.clone());
+        self.templates.extend(b.templates.clone());
+        self.arguments.extend(b.arguments.clone());
+        self.values.extend(b.values.clone());
+        self.records.extend(b.records.clone());
+        self.record_schemas.extend(b.record_schemas.clone());
+        self.regions.extend(b.regions.clone());
+        self.classes.extend(b.classes.clone());
+        self.handles.extend(b.handles.clone());
+    }
 }
 fn f<'a>(j: &'a Json, k: &str) -> Result<&'a Json, String> {
     j.get(k).ok_or_else(|| format!("missing {k}"))
@@ -152,6 +227,33 @@ fn value(j: &Json, ty: &Json, c: &Context) -> Result<Json, String> {
     }
     Ok(j.clone())
 }
+fn class(j: &Json, c: &Context) -> Result<String, String> {
+    let name = if let Some(n) = j.as_str() {
+        c.classes.get(n).ok_or("unbound allocation class")?.clone()
+    } else {
+        keys(j, &["class"])?;
+        s(f(j, "class")?)?.to_string()
+    };
+    if name.is_empty() {
+        return Err("empty allocation class".into());
+    }
+    Ok(name)
+}
+fn named_wires(n: &str, c: &Context) -> Result<Vec<Wire>, String> {
+    if let Some(h) = c.handles.get(n) {
+        let h = h.borrow();
+        if !h.live {
+            return Err("allocation is not live".into());
+        }
+        return Ok((0..h.metadata.1)
+            .map(|i| (h.metadata.0.clone(), i))
+            .collect());
+    }
+    c.wires
+        .get(n)
+        .cloned()
+        .ok_or_else(|| format!("unbound wire {n}"))
+}
 fn wires(j: &Json, c: &Context) -> Result<Vec<Wire>, String> {
     match j {
         Json::Arr(v) => {
@@ -162,15 +264,12 @@ fn wires(j: &Json, c: &Context) -> Result<Vec<Wire>, String> {
             Ok(out)
         }
         Json::Str(v) => {
-            if let Some(ws) = c.wires.get(v) {
-                return Ok(ws.clone());
+            if c.wires.contains_key(v) || c.handles.contains_key(v) {
+                return named_wires(v, c);
             }
             let (n, i) = index(v, &c.ints)?;
-            if let Some(ws) = c.wires.get(&n) {
-                Ok(vec![ws.get(i).ok_or("wire index out of range")?.clone()])
-            } else {
-                Err(format!("unbound wire {n}"))
-            }
+            let ws = named_wires(&n, c)?;
+            Ok(vec![ws.get(i).ok_or("wire index out of range")?.clone()])
         }
         Json::Obj(_) => {
             keys(j, &["range", "from", "to"])?;
@@ -179,10 +278,7 @@ fn wires(j: &Json, c: &Context) -> Result<Vec<Wire>, String> {
                 usize::try_from(scalar(f(j, "from")?, &c.ints)?).map_err(|_| "negative range")?;
             let to =
                 usize::try_from(scalar(f(j, "to")?, &c.ints)?).map_err(|_| "negative range")?;
-            let ws = c
-                .wires
-                .get(name)
-                .ok_or_else(|| format!("unbound range {name}"))?;
+            let ws = named_wires(name, c)?;
             Ok(ws.get(from..to).ok_or("wire range out of bounds")?.to_vec())
         }
         _ => Err("invalid wire actual".into()),
@@ -199,6 +295,9 @@ fn validate_formals(ps: &[Json]) -> Result<(), String> {
                 p,
                 match ty {
                     "wire" => &["name", "type", "width"],
+                    "records" => &["name", "type", "fields", "order"],
+                    "region" => &["name", "type", "address", "cell", "role"],
+                    "class" | "allocation" => &["name", "type"],
                     "templates" => &["name", "type", "length"],
                     "arguments" => &["name", "type", "symbol"],
                     "value" => &["name", "type", "isa_type"],
@@ -208,6 +307,32 @@ fn validate_formals(ps: &[Json]) -> Result<(), String> {
                     _ => return Err("unknown formal type".into()),
                 },
             )?;
+            if ty == "records" {
+                let fields = a(f(p, "fields")?)?;
+                validate_formals(fields)?;
+                for field in fields {
+                    let ty = field
+                        .get("type")
+                        .and_then(Json::as_str)
+                        .unwrap_or("integer");
+                    if !matches!(ty, "integer" | "wire" | "region" | "class" | "allocation") {
+                        return Err("invalid record field type".into());
+                    }
+                }
+                let mut seen = BTreeSet::new();
+                for key in a(f(p, "order")?)? {
+                    let n = s(key)?;
+                    if !seen.insert(n)
+                        || !fields.iter().any(|f| {
+                            f.as_str() == Some(n)
+                                || (f.get("name").and_then(Json::as_str) == Some(n)
+                                    && f.get("type").and_then(Json::as_str) == Some("integer"))
+                        })
+                    {
+                        return Err("record order needs distinct integer fields".into());
+                    }
+                }
+            }
             s(f(p, "name")?)?
         };
         if !names.insert(name) {
@@ -218,7 +343,23 @@ fn validate_formals(ps: &[Json]) -> Result<(), String> {
 }
 fn validate_body(body: &[Json]) -> Result<(), String> {
     for c in body {
-        if c.get("image").is_some() {
+        if c.get("visit").is_some() {
+            keys(c, &["visit", "body"])?;
+            s(f(c, "visit")?)?;
+            validate_body(a(f(c, "body")?)?)?;
+        } else if c.get("declare").is_some() {
+            keys(c, &["declare", "width", "class", "state", "body"])?;
+            s(f(c, "declare")?)?;
+            validate_body(a(f(c, "body")?)?)?;
+        } else if c.get("acquire").is_some() || c.get("relinquish").is_some() {
+            let key = if c.get("acquire").is_some() {
+                "acquire"
+            } else {
+                "relinquish"
+            };
+            keys(c, &[key])?;
+            s(f(c, key)?)?;
+        } else if c.get("image").is_some() {
             keys(c, &["image", "wires"])?;
             s(f(c, "image")?)?;
         } else if c.get("apply").is_some() {
@@ -400,28 +541,47 @@ impl Expander {
         }
         let mut out = Vec::new();
         self.invoke(kind, args, &caller, &[], false, &mut Vec::new(), &mut out)?;
-        let mut lifetimes = Vec::new();
+        let mut live = BTreeMap::new();
+        let mut scratch = Vec::new();
         for leaf in &out {
             if let Some((name, _, _, _)) = &leaf.allocation {
                 if leaf.gate == "alloc" {
-                    lifetimes.push((name.clone(), leaf.scratch));
-                } else if lifetimes.pop().as_ref().map(|v| v.0.as_str()) != Some(name.as_str()) {
-                    return Err("release is not reverse allocation order".into());
+                    if live.insert(name.clone(), leaf.scratch).is_some() {
+                        return Err("duplicate live allocation identity".into());
+                    }
+                    if leaf.scratch {
+                        scratch.push(name.clone());
+                    }
+                } else {
+                    let is_scratch = live.remove(name).ok_or("release without allocation")?;
+                    if is_scratch && scratch.pop().as_ref() != Some(name) {
+                        return Err("release is not reverse allocation order".into());
+                    }
                 }
             }
         }
-        if lifetimes.iter().any(|(_, scratch)| *scratch) {
+        if !scratch.is_empty() {
             return Err("unreleased library scratch".into());
         }
 
         Ok(out)
     }
     fn bind(&self, r: &Json, args: &[Json], caller: &Context) -> Result<Context, String> {
+        self.bind_seeded(r, args, caller, &Env::new())
+    }
+    fn bind_seeded(
+        &self,
+        r: &Json,
+        args: &[Json],
+        caller: &Context,
+        seed: &Env,
+    ) -> Result<Context, String> {
         let ps = a(f(r, "parameters")?)?;
         if ps.len() != args.len() {
             return Err("parameter arity".into());
         }
         let mut c = Context {
+            ints: seed.clone(),
             controls: caller.controls.clone(),
             legacy: ps.iter().all(|p| matches!(p, Json::Str(_))),
             ..Context::default()
@@ -439,6 +599,170 @@ impl Expander {
                 (s(f(p, "name")?)?, s(f(p, "type")?)?)
             };
             match ty {
+                "class" => {
+                    c.classes.insert(name.into(), class(v, caller)?);
+                }
+                "allocation" => {
+                    c.handles.insert(
+                        name.into(),
+                        caller
+                            .handles
+                            .get(s(v)?)
+                            .cloned()
+                            .ok_or("unbound allocation declaration")?,
+                    );
+                }
+                "region" => {
+                    let region = if let Some(n) = v.as_str() {
+                        caller.regions.get(n).cloned().ok_or("unbound region")?
+                    } else {
+                        keys(v, &["address", "cell", "role", "origin", "cells"])?;
+                        let mut r = v.clone();
+                        if let Json::Obj(m) = &mut r {
+                            let ws = wires(f(v, "cells")?, caller)?;
+                            // Store canonical explicit wires separately from caller names.
+                            m.insert(
+                                "cells".into(),
+                                Json::Arr(
+                                    ws.iter()
+                                        .map(|(n, i)| Json::Str(format!("{n}[{i}]")))
+                                        .collect(),
+                                ),
+                            );
+                        }
+                        r
+                    };
+                    let aa = scalar(f(&region, "address")?, &Env::new())?;
+                    let ww = scalar(f(&region, "cell")?, &Env::new())?;
+                    if aa < 0
+                        || ww <= 0
+                        || aa != scalar(f(p, "address")?, &c.ints)?
+                        || ww != scalar(f(p, "cell")?, &c.ints)?
+                        || s(f(&region, "role")?)? != s(f(p, "role")?)?
+                        || !matches!(s(f(&region, "role")?)?, "in" | "mut")
+                        || !["local:", "interface:"].iter().any(|prefix| {
+                            s(f(&region, "origin").unwrap())
+                                .is_ok_and(|v| v.starts_with(prefix) && v.len() > prefix.len())
+                        })
+                    {
+                        return Err("region shape/role/origin mismatch".into());
+                    }
+                    let ws = if let Some(n) = v.as_str() {
+                        named_wires(n, caller)?
+                    } else {
+                        wires(f(v, "cells")?, caller)?
+                    };
+                    let count = 1usize
+                        .checked_shl(u32::try_from(aa).map_err(|_| "region exponent")?)
+                        .ok_or("region too large for checker")?;
+                    if count.checked_mul(ww as usize) != Some(ws.len()) {
+                        return Err("region width mismatch".into());
+                    }
+                    c.wires.insert(name.into(), ws);
+                    c.regions.insert(name.into(), region);
+                }
+                "records" => {
+                    let fields = a(f(p, "fields")?)?;
+                    let records = if let Some(n) = v.as_str() {
+                        // A forwarded descriptor retains its already validated field bindings.
+                        let rs = caller.records.get(n).cloned().ok_or("unbound records")?;
+                        // Schemas must match as well as runtime widths.
+                        if caller.record_schema(n)?
+                            != Json::Arr(vec![f(p, "fields")?.clone(), f(p, "order")?.clone()])
+                        {
+                            return Err("record schema mismatch".into());
+                        }
+                        rs
+                    } else {
+                        let mut result = Vec::new();
+                        for record in a(v)? {
+                            let names = fields
+                                .iter()
+                                .map(|p| {
+                                    p.as_str()
+                                        .or_else(|| p.get("name").and_then(Json::as_str))
+                                        .unwrap()
+                                })
+                                .collect::<Vec<_>>();
+                            keys(record, &names)?;
+                            let mut source = caller.clone();
+                            let mut bound = Context::default();
+                            for field in fields {
+                                let n = field
+                                    .as_str()
+                                    .or_else(|| field.get("name").and_then(Json::as_str))
+                                    .unwrap();
+                                // Width expressions can use outer integers and earlier record integers.
+                                let fake = Json::Obj(BTreeMap::from([(
+                                    "parameters".into(),
+                                    Json::Arr(vec![if field.as_str().is_some() {
+                                        Json::Obj(BTreeMap::from([
+                                            ("name".into(), field.clone()),
+                                            ("type".into(), Json::Str("integer".into())),
+                                        ]))
+                                    } else {
+                                        field.clone()
+                                    }]),
+                                )]));
+                                let mut b = self.bind_seeded(
+                                    &fake,
+                                    &[f(record, n)?.clone()],
+                                    &source,
+                                    &source.ints,
+                                )?;
+                                b.legacy = false;
+                                b.ints.retain(|key, _| key == n);
+                                source.merge(&b);
+                                bound.merge(&b);
+                            }
+                            result.push(bound);
+                        }
+                        result
+                    };
+                    let mut previous: Option<Vec<i64>> = None;
+                    for record in &records {
+                        let mut widths = c.ints.clone();
+                        for field in fields {
+                            let n = field
+                                .as_str()
+                                .or_else(|| field.get("name").and_then(Json::as_str))
+                                .unwrap();
+                            if field.as_str().is_some()
+                                || field.get("type").and_then(Json::as_str) == Some("integer")
+                            {
+                                widths.insert(
+                                    n.into(),
+                                    *record.ints.get(n).ok_or("missing integer field")?,
+                                );
+                            } else if field.get("type").and_then(Json::as_str) == Some("wire")
+                                && usize::try_from(scalar(f(field, "width")?, &widths)?).ok()
+                                    != Some(named_wires(n, record)?.len())
+                            {
+                                return Err("forwarded record width mismatch".into());
+                            }
+                        }
+                        let order = a(f(p, "order")?)?
+                            .iter()
+                            .map(|j| {
+                                record
+                                    .ints
+                                    .get(s(j)?)
+                                    .copied()
+                                    .ok_or("unbound order field".into())
+                            })
+                            .collect::<Result<Vec<_>, String>>()?;
+                        if !order.is_empty() && previous.as_ref().is_some_and(|prev| prev >= &order)
+                        {
+                            return Err("record order not strictly increasing".into());
+                        }
+                        previous = Some(order);
+                    }
+                    c.record_schemas.insert(
+                        name.into(),
+                        Json::Arr(vec![f(p, "fields")?.clone(), f(p, "order")?.clone()]),
+                    );
+                    c.records.insert(name.into(), records);
+                }
                 "value" => {
                     let ty = f(p, "isa_type")?;
                     c.values
@@ -669,7 +993,73 @@ impl Expander {
                 event: None,
                 scratch: false,
             };
-            if let Some(n) = j.get("image") {
+            if let Some(n) = j.get("visit") {
+                let mut records = c.records.get(s(n)?).cloned().ok_or("unbound records")?;
+                if rev {
+                    records.reverse();
+                }
+                for record in records {
+                    let mut local = c.clone();
+                    // Fields shadow all captured binding types, just like template formals.
+                    for n in record
+                        .ints
+                        .keys()
+                        .chain(record.wires.keys())
+                        .chain(record.handles.keys())
+                        .chain(record.classes.keys())
+                    {
+                        local.clear_name(n);
+                    }
+                    local.merge(&record);
+                    self.body(a(f(j, "body")?)?, &mut local, path, rev, chain, out)?;
+                }
+            } else if let Some(n) = j.get("declare") {
+                let n = s(n)?;
+                if c.has_name(n) {
+                    return Err("declaration shadows binding".into());
+                }
+                let width = usize::try_from(scalar(f(j, "width")?, &c.ints)?)
+                    .map_err(|_| "negative declaration width")?;
+                let cls = class(f(j, "class")?, c)?;
+                let state = s(f(j, "state")?)?;
+                if !matches!(state, "clean" | "borrowed") {
+                    return Err("invalid allocation state".into());
+                }
+                let h = Rc::new(RefCell::new(Handle {
+                    metadata: (
+                        format!("@{:?}/{}", path, self.serial),
+                        width,
+                        cls,
+                        state.into(),
+                    ),
+                    live: false,
+                }));
+                c.handles.insert(n.into(), h.clone());
+                self.body(a(f(j, "body")?)?, c, path, rev, chain, out)?;
+                if h.borrow().live {
+                    return Err("declaration exits with live allocation".into());
+                }
+                c.handles.remove(n);
+            } else if j.get("acquire").is_some() || j.get("relinquish").is_some() {
+                let acquire = j.get("acquire").is_some() != rev;
+                let n = s(j.get("acquire").or_else(|| j.get("relinquish")).unwrap())?;
+                let mut h = c
+                    .handles
+                    .get(n)
+                    .ok_or("unbound allocation declaration")?
+                    .borrow_mut();
+                if h.live == acquire {
+                    return Err("allocation lifetime mismatch".into());
+                }
+                h.live = acquire;
+                if acquire {
+                    h.metadata.0 = format!("@{:?}/{}", path, self.serial);
+                }
+                leaf.gate = if acquire { "alloc" } else { "release" }.into();
+                leaf.allocation = Some(h.metadata.clone());
+                leaf.controls.clear();
+                self.emit(leaf, false, out)?;
+            } else if let Some(n) = j.get("image") {
                 keys(j, &["image", "wires"])?;
                 let bytes = c.images.get(s(n)?).ok_or("unbound image")?;
                 let ws = wires(f(j, "wires")?, c)?;
@@ -709,30 +1099,9 @@ impl Expander {
                     } else {
                         s(f(p, "name")?)?
                     };
-                    local.ints.remove(name);
-                    local.wires.remove(name);
-                    local.angles.remove(name);
-                    local.bodies.remove(name);
-                    local.symbols.remove(name);
-                    local.events.remove(name);
-                    local.images.remove(name);
-                    local.templates.remove(name);
-                    local.arguments.remove(name);
-                    local.values.remove(name);
-                    local.allocations.remove(name);
-                    local.declarations.remove(name);
-                    local.scratch_names.remove(name);
+                    local.clear_name(name);
                 }
-                local.ints.extend(bound.ints);
-                local.wires.extend(bound.wires);
-                local.angles.extend(bound.angles);
-                local.bodies.extend(bound.bodies);
-                local.symbols.extend(bound.symbols);
-                local.events.extend(bound.events);
-                local.images.extend(bound.images);
-                local.templates.extend(bound.templates);
-                local.arguments.extend(bound.arguments);
-                local.values.extend(bound.values);
+                local.merge(&bound);
                 local.controls.extend(bound.controls);
                 local.controls.sort();
                 local.controls.dedup();

@@ -135,7 +135,10 @@ north star §3.1 requires).
 | K21 | §11.1 | **REF-IMAGE**. Bound image bytes emit unconditional LSB-ordered X leaves with an exact adjoint | b-isa-spec-afi | S | new |
 | K22 | §11.1 | **REF-TEMPLATES**. Indexed typed body templates bind explicit frame actuals while retaining lexical captures | b-isa-spec-lph | S | new |
 | K23 | §11.1 | **REF-LITERAL-BITS**. Exact nonnegative integer bit extraction fixes literal X emission | b-isa-spec-8r4 | S | new |
-| K24 | §11.1 | **REF-ARGUMENTS**. Closure-bound positional argument vectors and exact ISA classical/token values | b-isa-spec-1a4 (region-role binding carried) | S | new |
+| K24 | §11.1 | **REF-ARGUMENTS**. Closure-bound positional argument vectors and exact ISA classical/token values | b-isa-spec-1a4 | S | new |
+| K25 | §11.1 | **REF-DESCRIPTORS**. Ordered typed records for byte layouts and heterogeneous activation locations | b-isa-spec-1oa; b-isa-spec-evi | S | new |
+| K26 | §11.1 | **REF-REGIONS**. Shape, role, origin and cell bindings preserved in closure arguments | b-isa-spec-1a4 | S | new |
+| K27 | §11.1 | **REF-LIFETIMES**. Exact class actuals and shared allocation declarations across invocations | b-isa-spec-3xe | S | new |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -2271,9 +2274,11 @@ this draft does not claim that prose alone is an interchangeable file.
 with exactly these keys, except `wire`, which additionally requires
 `width`, and `templates`, which additionally requires `length` (integer
 expressions using earlier integer formals); `arguments` requires `symbol`,
-and `value` requires `isa_type`, as specified in K24. Types are `integer`,
+and `value` requires `isa_type`, as specified in K24; K25–K27 add
+`records`, `region`, `class`, and `allocation` with the keys specified there. Types are `integer`,
 `wire`, `angle`, `body`, `symbol`, `environment`, `event`, `image`,
-`templates`, `arguments`, and `value`. A bare name abbreviates an
+`templates`, `arguments`, `value`, `records`, `region`, `class`, and
+`allocation`. A bare name abbreviates an
 `integer` formal, retaining the printed witness bytes. Names are unique
 within a parameter list. Width expressions use only earlier integer
 formals. A wire formal of width n is the ordered list w[n], with
@@ -2424,6 +2429,129 @@ token, or an arguments vector for a different closure rejects. This
 binding rule does not replace §3.3's source interface region shape/role
 validation or the §9.2 linker obligation that the registry interface and
 body match the supplied closure hash.
+
+**Ordered descriptors (K25).** A `records` formal has exactly `name`,
+`type`, `fields`, `order`. `fields` is an ordered typed formal list;
+its types are `integer`, `wire`, `region`, `class`, or `allocation`.
+A field's width/shape expressions may use enclosing earlier integer
+formals and earlier integer fields, never later fields. `order` is an
+array of distinct integer field names. An actual is an array of objects
+whose keys are exactly the field names, or a bound records name with the
+identical field schema and order. Each field actual resolves in the
+actual's captured lexical environment; earlier integer fields additionally
+bind width/shape expressions. Forwarding preserves resolved identities,
+revalidates widths against the receiving enclosing integers, and never
+resolves a wire name again. With nonempty `order`, the tuples of those
+fields must be strictly increasing lexicographically; with empty `order`,
+array order is normative. Empty arrays are valid.
+`{"visit": name, "body": [...]}` visits records in array order, binding
+all their fields lexically for that body, shadowing outer names across
+all types and restoring them afterwards. An inverse visits the same
+records in reverse order and adjoints each body. No record iteration
+emits a leaf by itself. Reject extra/missing fields, an invalid schema,
+order mismatch, duplicate/out-of-order keys, or any invalid field actual,
+even for an unvisited list. Record iteration and K22 template application
+share the same capture, effective-control and occurrence-identity rules.
+
+The following descriptor schemas bind source metadata, rather than
+caller-supplied circuit bodies. Source formation MUST check every record
+against the linked source declarations/layout before expansion:
+
+* A byte-layout list has integer fields `base`, `extent`, then
+  `cells:wire[8*extent]`, ordered by `base`. Bases/extents are nonnegative
+  mathematical integers, extents positive. Form the list by partitioning
+  `[0,2^H)` at every mapped interface region endpoint. Each mapped interval
+  binds its region's cells, flattened by increasing cell index and then
+  LSB-first bit index. Each remaining maximal interval binds the same
+  address slice of ordinary `mem`. Adjacent mapped intervals remain
+  separate records. Require exact coverage, no overlap and no gap; mapped
+  cells have W=8 as §7.2 requires. Byte `base+j` is exactly wires
+  `cells[8*j .. 8*j+8)`. Ordinary `mem` under a mapped interval is never
+  selected by an access. Interface shape and origin use K26.
+* An activation location list has `id`, `width`, `slot` integers followed
+  by `location:wire[width]`, ordered by `id`. The ids and widths are
+  exactly §3.7's global ids and declared widths. For a selected instance,
+  `slot` is its zero-based declaration index in L_f, including parameters
+  and the result name; for a closure delivery list it is the declaration
+  index within the location's own instance. A capture list has `position`,
+  `width` integers followed by `source:wire[width]`,
+  `parameter:wire[width]`, `capture:wire[width]`, ordered by `position`.
+  Positions are 0..m-1 in source argument order; parameter and capture
+  are the corresponding callee location and frame displacement slot.
+  The stack low-width slice for location slot j starts at
+  `(old_sp+3+j)*W_cell` in C2 and `(restored_fp+3+j)*W_cell` in R3;
+  higher cell bits are untouched. Delivery scans the complete closure
+  list in global id order. Reject records inconsistent with those source
+  mappings. These lists add no locations for token/classical/region
+  arguments; those remain K24/K26 fixed bindings.
+
+Witness: byte records `(base=0,extent=1,cells=a[8])` and
+`(base=1,extent=2,cells=b[16])` bind addresses 0,1,2 to a[0..8),
+b[0..8),b[8..16), respectively. Visiting X on each first bit emits
+X a[0], X b[0]; inverse emits X b[0], X a[0]. A two-bit location
+id 0/slot 0 followed by a one-bit location id 1/slot 1 exchanges only
+the low 2 and low 1 bits of stack cells old_sp+3 and old_sp+4;
+return/inverse address them at restored_fp+3 and restored_fp+4.
+Exchanging the two record positions rejects for id order.
+
+**Source region bindings (K26).** A `region` formal has exactly `name`,
+`type`, `address`, `cell`, `role`; address/cell are integer expressions
+using earlier integers, with A>=0, W>0, and role is `in` or `mut`.
+Its actual is a bound region name or exactly
+`{"address": A, "cell": W, "role": role, "origin": origin, "cells": actual}`.
+A and W in the actual are nonnegative/positive integer literals, role
+must equal the formal role, and the cell wire actual has exactly 2^A*W
+wires, in cell-index/LSB-first order. Both shape components must equal
+the formal components, even if a different shape has the same total
+width. Origin is `interface:` followed by the canonical source operand
+name for a caller-owned interface, or `local:` followed by the local
+source declaration's occurrence identity. The suffix is nonempty and
+is checked against the linked source binding; a local origin cannot be
+substituted for an interface origin by changing its string. A region
+formal can be used as its flattened cells in any wire actual, while
+forwarding it as a region retains shape, role, origin and wire identities.
+K24 argument vectors validate regions in the linked signature's slot
+order just as wires/values; source role/overlap restrictions remain §3.3.
+Lifted calls accept only their permitted mapped/parameter origins (§4.2);
+action calls may accept local regions where §3.3 permits them. No rule
+infers source shape or role from total bit width.
+Witness: a region[1,3] in local:r over six wires forwards unchanged through
+two K24 calls. Binding it to region[0,6] in or region[1,3] mut rejects,
+despite equal total width. Invalid/missing origins also reject.
+
+**Classes and allocation declarations (K27).** A `class` formal has
+exactly `name`,`type`. A class actual is a bound class name or exactly
+`{"class": text}`, where text is the exact source class spelling (`any`
+included), never an empty string or a resolved substitute class.
+`{"declare": name, "width": scalar, "class": actual, "state": state,
+"body": [...]}` reserves a fresh allocation identity with nonnegative
+width, that class, and state `clean` or `borrowed`. It emits no leaf;
+it binds an initially inactive allocation declaration for its lexical
+body, including captured actual bodies. It may not shadow any binding.
+An `allocation` formal (exactly `name`,`type`) passes that declaration
+by identity, including metadata and live/inactive status. Exactly
+`{"acquire": name}` emits its unconditional allocation and changes it
+from inactive to live; exactly `{"relinquish": name}` emits its matching
+unconditional release and changes it from live to inactive. An acquire
+requires inactive, a relinquish requires live, and the declaration must
+be inactive when its lexical body exits. While live, its name is a wire
+actual of its declared width, including for subsequent caller constructors
+after `invoke` returns; while inactive any wire use rejects. Captures and
+invocations share the same status, not a copy of the lifetime. Inverse
+exchanges acquire/relinquish, using the same declaration metadata and
+occurrence identity. Reacquisition denotes a new allocation occurrence,
+with fresh identity even within one declaration. Clean release requires
+zero; borrowed release requires restoration on the full domain (§5.6),
+never zero. These are user/instruction allocation results; internal
+library scratch still obeys the clean LIFO rule below. Allocations are
+unconditional even under a false inherited control.
+Witness: declare out[2] of class ancilla; invoke an allocation recipe on
+out; apply two X gates to out[1] in separate caller/callee bodies; invoke
+its release recipe. All leaves refer to the one live allocation identity
+and release it clean. Wire use before acquisition/after release, double
+acquisition, unmatched release or leaving the declaration live rejects.
+A borrowed declaration preserves the exact class and both initial values
+of every borrowed bit; no conversion to class any is permitted.
 
 **Angles and quantum witnesses (K20).** An `angle` actual is a bound angle
 formal or a finite binary64 value. Reusing §12.3's bit-pattern encoding:

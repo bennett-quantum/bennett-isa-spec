@@ -282,3 +282,21 @@ This final bookkeeping commit records those hashes and the required bd
 export (84 issues). The final gate above covers all implementation changes;
 only progress/README bookkeeping and the export follow it. Parent 8r4 is
 open with the exact first row blocker; no push.
+
+## Completion II — contract pass
+
+K25 ordered records unify byte layout and activation metadata; K26 source
+region shape/role/origin completes K24 vectors; K27 preserves exact classes
+and shared declaration/output lifetimes through invokes. Six descriptor
+tests observed red before implementation, then green; existing K23 resolves
+4nx without changing literal circuits. Closed 1oa/evi (K25), 1a4 (K26),
+3xe (K27), 4nx (K23). These are language-gap closures, not yet catalog
+family certifications. Carry 82x: printed t/f releases conflict with A1
+LIFO scratch; changing accepted §4.5 order is outside this extension.
+
+Part 1 gate: 94 Rust tests, 0 fail; fmt/clippy green; harness 445/0/68.
+A final lifetime audit separates caller-owned output declarations from
+library scratch; scratch LIFO stays mandatory, caller output lifetimes may
+overlap. Language/completion/call-flag regression tests green after audit.
+Recipe bytes/checkpoint hash unchanged at 195 / 84e89406…3230; complete
+§11.1 hash/count marker and qxor witness untouched.
