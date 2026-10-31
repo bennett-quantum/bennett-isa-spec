@@ -246,6 +246,6 @@ for name, bead in [("E-ref-09-qxor-witness", "b-isa-spec-8r4"), ("E-topology-gri
     case = json.loads((root / "conformance/cases" / name[0] / name / "case.json").read_text())
     assert "unavailable pending 0.9" in case["unavailable"]["reason"]
     assert bead in case["unavailable"]["reason"]
-result = subprocess.run(["diff", "-u", str(accepted), str(root / "spec/Bennett-ISA-Spec-0.9-draft.md")], capture_output=True)
+result = subprocess.run(["diff", "-u", "--label", "a/spec/Bennett-ISA-Spec.md", "--label", "b/spec/Bennett-ISA-Spec-0.9-draft.md", str(accepted), str(root / "spec/Bennett-ISA-Spec-0.9-draft.md")], capture_output=True)  # stable labels: no absolute paths or mtimes in the committed diff
 assert result.returncode == 1
 assert result.stdout == (root / "spec/isa-0.8-to-0.9.diff").read_bytes()
