@@ -175,6 +175,8 @@ north star §3.1 requires).
 | K61 | §11 | **UNCOVERED-NESTED-DEFAULTS**. Uncovered operations take defaults directly; no synthetic entry or multi-level selector is required; witness: root step 1 keeps scheme X while an uncovered root-step-2/nested-step-1 gate takes its default. | INV-5 gap 17 | E | – |
 | K62 | §5.3, §11.1 | **SCHEDULED-ACTION-ADJOINT**. Source instruction replacements precede recipe instantiation; witness: adj(qinplace G H) allocates t[1] at 0 and f[4] at 1, calls H then G and releases t then f. [deps: ISA-5.3-P4, ISA-4.5-P5, ISA-11-P2, ISA-11.1-P29] | SOL09-R1-B01 | S | library |
 | K63 | §9.2, §11, §11.1, §12.1 | **INVOCATION-EDGE-IDENTITY**. Serialize fixed-binding instance and forward semantic-call occurrence independently of leaf ordinals; witness: qinplace G G has call_index 0/1; lproc keys [0]/[1] have distinct contexts. [deps: ISA-3.7-P5, ISA-3.7-P6, ISA-9.2-P1.S3, ISA-11.1-P9, ISA-12.1-P11] | COD-R1-B01; SOL S2 | S | – |
+| K64 | §11 | **NON-ROW-ADDRESSES**. Reserved support points and their source/step/callee partition define every non-row ordinal; witness: B=0 has construction/commit/release and B=1 starts step support at allocation at, ordinal 0. [deps: ISA-3.6, ISA-5.2-P3, ISA-11.1-P22, ISA-11.1-P29] | INV-5 gap 3; 8ka; maintainer ratification pending | S | – |
+| K65 | §11 | **WHOLE-CLEANUP-CARRIER**. One non-emitting ordinal-0 carrier selects the whole explicit cleanup before expansion, even if empty; witness: reverse/recompute for quncopy share one carrier. [deps: ISA-6.2-P1, ISA-6.4-P1, ISA-11-P6] | INV-5 gap 8; 23g; maintainer ratification pending | S | – |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -2311,7 +2313,7 @@ remove only operations the library marks removable.
   { "bindings": { "closure_hash", "target_hash", "region", "variant", "inherited_controls", "budget": [B,heap,stack,depth],
                   "params_hash", "epsilon", "expansion": { "name", "version", "hash" }, "scheduler": { "name", "version" } },
     "interface_vertices"?: [ [v, …], … ],
-    "entries": [ { "path": [ { "symbol": hex, "point": "<block>:<ordinal>", "iteration": [n, …] | "*",
+    "entries": [ { "path": [ { "symbol": hex, "point": "<block>:<ordinal>" | "$construct" | "$step" | "$commit" | "$release", "iteration": [n, …] | "*",
                               "instance"?: [n, …] | "*", "call_index"?: n | "*" }, … ],
                    "step": n | "*",  "phase": "fwd" | "rev" | "*",  "generated": n | "*",
                    "kind": "cleanup" | "gate" | "alloc" | "start",
@@ -2368,7 +2370,8 @@ construction/commit/release outside the steps, only `step: "*"` and
 `phase: "*"` match; an action's adjoint does not itself supply a
 `rev` phase. [deps: ISA-5.2-P3, ISA-5.3, ISA-4.7]
 `generated` is the ordinal within the row's expansion in the bound
-library. [deps: ISA-11-P2.S3, ISA-11.1-P5]
+library, or within its reserved support pseudo-point (K64), or the
+non-emitting cleanup carrier ordinal (K65). [deps: ISA-11-P2.S3, ISA-11.1-P5, ISA-11.1-P29, ISA-6.4]
 
 **Invocation-edge identity (K63).** Every invocation edge identifies the
 source call point, the containing fixed-binding instance (the §3.7 integer
@@ -2396,6 +2399,72 @@ entries still tie unless covered by a more-specific match. [deps: ISA-11-P6.S1, 
 The edge's source point selects the entered invocation for K52 exactly
 as before; adding instance and call occurrence does not introduce a
 `lift.call` invocation or another step level. [deps: ISA-11-P5.S5, ISA-11-P5.S6, ISA-11-P5.S7, ISA-3.7-P6]
+
+**Non-row addresses (K64).** Non-row support leaves have reserved
+pseudo-points `$construct`, `$step`, `$commit`, `$release` in their
+containing oracle; these are legal path points rather than user block
+names. [deps: ISA-3.6, ISA-5.2-P3, ISA-11-P2, ISA-11.1-P22]
+For the bound `oracle.construct` recipe, its initial `visit State`
+subtree has point `$construct`, each forward or inverse `step` invocation
+has point `$step`, the commit segment from allocation of `halt` through
+release of `halt` has point `$commit`, and the final inverse `visit State`
+subtree has point `$release`. [deps: ISA-5.2-P3, ISA-11.1-P22.S14, ISA-11.1-P29]
+Within `step`, dispatch comparisons, HALT successor support, pc/next/frame
+exchanges and dispatch cleanup stay at `$step`; `Rows[k]` and `Next[k]`
+source-template subtrees instead retain source row k's point and shared
+row ordinal space in traversal order, and semantic callees retain their
+own invocation chains and spaces. [deps: ISA-3.6, ISA-11.1-P14, ISA-11.1-P22.S14, ISA-11.1-P29]
+All nested helper `invoke`, loops and descriptor visits inherit their
+containing point unless they enter one of those source-row or semantic
+callee subtrees. [deps: ISA-11.1-P5, ISA-11.1-P9, ISA-11.1-P18, ISA-11.1-P22]
+Number support leaves from zero in instantiated expansion order within
+each pseudo-point, separately for each oracle step and phase at `$step`,
+excluding all source-row and callee subtrees; inverse traversal retains
+the corresponding forward step's ordinals and occurrence numbers. [deps: ISA-11.1-P29.S1, ISA-11.1-P29.S2, ISA-11.1-P29.S3, ISA-11.1-P9]
+Reversing a complete already expanded construction retains each leaf's
+forward pseudo-point and ordinal while adjointing its operation. [deps: ISA-11.1-P5, ISA-11.1-P29.S3]
+`$step` carries the containing oracle's t and fwd/rev phase; the other
+three points have no step or phase at that level and match only wildcard
+step/phase there, including when B=0. [deps: ISA-5.2-P3, ISA-11-P5.S8]
+A pseudo-point's own instance and source-qloop iteration vectors are
+`[]`; outer call edges retain their actual coordinates, and bound-library
+constructor loops do not create source-qloop iterations. [deps: ISA-3.7-P5, ISA-4.6, ISA-11-P5, ISA-11.1-P5]
+Path validation accepts exactly these reserved spellings for oracle
+support and validates their generated domains by the partition above;
+B=0 has no `$step` leaves but still has construction, commit and release.
+[deps: ISA-5.2-P3, ISA-11-P7, ISA-11.1-P22]
+These addresses annotate the bound event stream without removing,
+reordering or changing the charge of any emitted leaf. [deps: ISA-11-P2, ISA-8.2, ISA-11.1-P29]
+
+**Whole-cleanup selection (K65).** Each explicit computing-sequence/cleanup
+pair has one non-emitting cleanup carrier at its source cleanup point,
+identified before realisation expansion, even when the cleanup emits no
+leaves. [deps: ISA-6.2-P1, ISA-6.4-P1, ISA-11-P3]
+The point is the explicit `quncopy`, `qunload`, `lift.oracle_uncall` or
+adjoint-call point when that instruction is the cleanup; for an explicitly
+written inverse sequence ending in `qfree` or `qreturn`, it is that
+terminating release point (also for an empty inverse sequence). [deps: ISA-4.3, ISA-4.5, ISA-4.6, ISA-4.2, ISA-5.3, ISA-5.5, ISA-6.2-P1]
+The carrier uses that point's containing invocation chain, fixed-binding
+instance, source-qloop iteration vector and containing step/phase, with
+carrier ordinal 0; it creates no callee edge or leaf ordinal. [deps: ISA-11-P5, ISA-3.7-P5, ISA-4.6, ISA-11.1-P29]
+Only cleanup-kind entries match the carrier, with `generated: "*"` or
+`generated: 0`; other generated integers do not match, and gate, alloc
+and start entries do not match it. [deps: ISA-11-P3, ISA-11-P6.S5, ISA-11-P6.S6]
+Resolve the unique maximal cleanup entry or the reverse default before
+expanding that cleanup, and apply its reverse/recompute realisation to
+the entire paired cleanup, subject to §6's validity conditions. [deps: ISA-11-P6.S1, ISA-11-P6.S7, ISA-11-P6.S8, ISA-6.2, ISA-6.4]
+The carrier emits no gate, allocation, release, start event, resource
+charge or timing dependency; ordinary gate/alloc/start selection then
+applies to the chosen realisation's emitted leaves, and cleanup-kind
+entries do not match those leaves. [deps: ISA-8.2, ISA-11-P2, ISA-11-P6.S6, ISA-6.4]
+Internal constructor uncomputation, implicit qregion image restoration,
+loop-flag cleanup and the certified private qinplace t/f cleanup keep
+their instruction-defined expansions and do not add explicit-pair
+carriers. [deps: ISA-4.5-P5, ISA-4.6, ISA-11.1-P5, ISA-6.4]
+For `d = qcopy s; quncopy s d`, selecting recompute at the quncopy point
+chooses fresh-copy/XOR/uncompute for the whole cleanup, while reverse
+chooses inverse-copy/release at the same carrier; an empty inverse
+sequence still has its ordinal-0 carrier at its release point. [deps: ISA-4.5, ISA-6.2-P1, ISA-6.4-P1, ISA-11-P6]
 
 **Specificity** is the lexicographic tuple (path length, number of
 non-`*` iterations, step non-`*`, phase non-`*`, generated non-`*`);

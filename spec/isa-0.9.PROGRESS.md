@@ -1,3 +1,35 @@
+## 2026-10-31 Council round 1 → 2 — item 3 (K64/K65)
+
+Both seats' G01 → K64 (8ka), G02 → K65 (23g), drafted for ratification;
+council round 2. Both decision cells explicitly say maintainer ratification
+pending. Closure records drafting, not a maintainer decision.
+
+K64 selects $construct/$step/$commit/$release over $alloc:0 etc.: these
+are support phases, not invented source blocks with a fictitious row 0;
+$construct includes initialisation gates as well as allocations. The
+oracle.construct partition is exact: initial State, step invocations,
+halt-through-halt-release commit, final inverse State. Within step,
+Rows and Next retain their source row space; HALT successor, dispatch,
+exchanges and dispatch cleanup are support. Nested helpers inherit;
+semantic callees have their own chains. B=0 still has the three non-step
+points; B=1 starts $step at alloc at ordinal 0. Inverse steps retain
+forward t/ordinals; a raw inverse construction retains its partition.
+This is metadata on existing constructor traversal, no recipe-byte change.
+Rejected: arbitrary ad hoc points per implementation, source row ownership
+of dispatch, merging all non-row leaves into one row space, and excluding
+B=0 operations from scheduling/charging.
+
+K65 gives each explicit pair a stable source cleanup carrier, ordinal 0,
+with no emitted event or charge. Explicit cleanup instructions use their
+own point; written inverse/release sequences use the terminating release
+point. Reverse/recompute selection precedes expansion; ordinary emitted
+leaf decisions follow it. Empty and repeated cleanups retain carriers and
+source invocation/iteration coordinates. Internal fixed instruction
+cleanup (including certified qinplace) is not an explicit §6 pair.
+Rejected: first-realised-leaf carrier (choice-dependent, absent if empty),
+per-leaf cleanup selection (can split one cleanup), a charged artificial
+start/gate (changes resources), and removing either unitary realisation.
+
 ## 2026-10-31 Council round 1 → 2 — item 2 (K63)
 
 COD-R1-B01 / SOL S2 addressed: source point plus integer binding key and
