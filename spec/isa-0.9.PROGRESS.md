@@ -1,3 +1,55 @@
+## 2026-10-31 Final editorial pass IV — muse round 5 dispositions
+
+Source: council isa-09-2026-10-31 round-5 out-muse.json/report.md:
+accept, zero blockers, four S1 suggestions; no further muse round.
+Maintainer authorizes publication of the bound catalog here; making 0.9
+the current ISA remains the maintainer's next step. Bead b-isa-spec-4a4.
+Surgical edits only; K1–K75 and accepted 0.8 semantics/bytes retained.
+
+| Suggestion / proof step | Disposition | K | Clauses / existing coverage | Semantic premises | Bead status |
+|---|---|---|---|---|---|
+| 1 / §16.3 placeholders | a: fill all 25 symbol values, including repeated symbols and the printed SCC envelope; independent precheck reconstructs every envelope | existing §9.2 | §16.3; §0 example inventory | §9.2, §16.1–§16.2 | 4a4 IN_PROGRESS |
+
+Item 1 verification: the new independent stdlib precheck first failed on
+example 1's placeholder, then passed all ten objects and both fully
+printed envelopes. It builds layout paths as JCS arrays, preserves
+external-reference order, and applies SCC member wrapping only to `sum`.
+The read-only pinned review interpreter's `hash` rejects 0.9 objects with
+`§1: expected isa=0.8`; it cannot certify draft-version envelopes. No
+interpreter is changed, no 0.8 surrogate hash is substituted for 0.9.
+S0: values are determined by §9.2; no operation, interface or capability
+is changed. The obsolete placeholder prose is updated with the vectors.
+
+Filled §16.3 values (example / symbol):
+
+| Example / symbol | Interface hash |
+|---|---|
+| 1 / inc8 | `ed9865300b85a519c2379de98e36e635e72b5b78d8bdfca03dccf9a09aa3df5e` |
+| 2 / zero | `43e032f98d7aff20f6864d6368b20ab4ef9d810938999acff8d71ed16e6b17d7` |
+| 2 / sum | `cb52102decd586b7585b5d73b90841dcec75edac5a5a2d0f43c5efb34d4cceb1` |
+| 2 / sum_db | `3ad937b1cd867454989c5c5f58244681ef2c09dbabf7fce56515a68f63462ee6` |
+| 3 / borrow_demo | `6f4782e9bde4267acd1afddd650093722a056d9d50ee465b79cb86a4606b2a94` |
+| 4 / flip | `3860ea712b2d70fc495834586bb397656a467c85235aa069768318a06e9fa89b` |
+| 4 / ones | `ff8e49307d5ec9ab32eea2406339f878630bbb4501080829200433a18d6951cb` |
+| 5 / flip | `3860ea712b2d70fc495834586bb397656a467c85235aa069768318a06e9fa89b` |
+| 5 / scratch | `05525834cbe5a518aa97444912254f3c12c75dd86314a98ba550f45187208a0b` |
+| 5 / main | `5cebd5a72ee7873edda0d2c35afed2a5ab79eba60f2b242b2a856d5fa4074634` |
+| 6 / inc8 | `ed9865300b85a519c2379de98e36e635e72b5b78d8bdfca03dccf9a09aa3df5e` |
+| 6 / adaptive | `b80aed1639a9ac6a6856f02b0b3264d905e4eea3fa3f9081c01e56283ea398cf` |
+| 6 / overdraw | `c0d9835844fa882c1864044acc6fa26dba3935e0d6a9d33f9cdbf1e7c877d250` |
+| 7 / g | `0d65d926275688cfebf2831c1de960b03a6b8ea6400866e6d9fef8f393ca2c2e` |
+| 7 / ginv | `786f1970ca3d78ef3d5de795411ee276286711c89b756872757c24f9bd569cc9` |
+| 7 / addya | `5999b6d3d2362f8c1971ef6f37b404766aa5c18f6ba1880d767bfde351e47392` |
+| 7 / run | `562ab7270a0f508d6a2f4a757f3f90964da0b60541bac2c5efa421bad009056a` |
+| 8 / work | `d365ade0d8452d7d12b1a72c87e7106b06eef99e5958d0345133cf6eb0cbeb03` |
+| 8 / main | `dbf66e749a776cbb1ceccfc8b530caf664e24fb416fdf52ccf3942f4b89fdcf2` |
+| 9 / zero_cause | `badf7dd2a59afa879f092921946539dfb918cedd35f6fbbaa838c630577eaed4` |
+| 9 / zero_cc | `0403d76ff065acab57cb9165cfe1d3d73bbf8dad60bbc1348fb0305ee4f37611` |
+| 10 / plus_db | `c6e53733d87782414d05720d444734d9335244155518db4f60916e3d4b06dd1d` |
+| 10 / flip_arg | `bfa13d9a564e3f8562098c4ea39330d947efa64521310afad6a329dc594bd671` |
+| 10 / worker | `9bd5e97be1f600494476527fb2d7d088bffab607bdadac8e01f9b23d15f9dfe1` |
+| 10 / through | `4ee502a2d517d53d229f2ae21346505af06a228a2f0d2967938d48683e16d9e7` |
+
 ## 2026-10-31 INV-6 editorial pass III — final dispositions
 
 All 12 gaps: **8 a** (text changes), **4 b** (already covered by K13),

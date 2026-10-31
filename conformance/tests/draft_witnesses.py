@@ -258,3 +258,7 @@ for name, bead in [("E-ref-09-qxor-witness", "b-isa-spec-8r4"), ("E-topology-gri
 result = subprocess.run(["diff", "-u", "--label", "a/spec/Bennett-ISA-Spec.md", "--label", "b/spec/Bennett-ISA-Spec-0.9-draft.md", str(accepted), str(root / "spec/Bennett-ISA-Spec-0.9-draft.md")], capture_output=True)  # stable labels: no absolute paths or mtimes in the committed diff
 assert result.returncode == 1
 assert result.stdout == (root / "spec/isa-0.8-to-0.9.diff").read_bytes()
+
+# All ten normative objects and both printed §9.2 envelopes.
+import runpy
+runpy.run_path(str(root / "conformance/tools/draft_examples.py"))["check"](draft)

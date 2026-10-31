@@ -212,7 +212,7 @@ classical arguments and mapped regions.
 (K17), ISA-7 `fault C` and its fault-code table (K5), and Q1–Q13 as
 already applied. These decisions are recorded in the maintainer memo,
 Ratification section, 2026-10-30. Q12 keeps the §16.3 draft example
-hashes as placeholders until the 0.9 precheck; independently checked target/frame witness hashes
+hashes computed by the 0.9 precheck; independently checked target/frame witness hashes
 are published in §8.3 and §9.4.
 
 ### 0.3 Group 3: optional efficiency semantics (deferred)
@@ -3736,10 +3736,7 @@ other kinds of function or on block parameters or `regs` entries. The additional
 
 ### 16.3 Example objects (normative test vectors, suites A, C, F and G)
 
-**Hashes.** Every hash in this section is written `<to be computed by
-the 0.9 precheck: example k, name>`, one distinct placeholder per
-example and symbol: the 0.9 precheck (`spec/README.md`) computes and
-patches them before the draft is graded. Examples 1 and 2 are the 0.8
+**Hashes.** Every interface_hash in this section is the 64-hex value computed by §9.2 from the displayed envelope. Examples 1 and 2 are the 0.8
 objects with the version string changed and, for example 2's lproc,
 the three empty signature arrays required by Q14; their 0.8 hashes
 remain the 0.8 vectors.
@@ -3751,7 +3748,7 @@ has **six** canonical lines.
 bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
 
 section symbols
-{"0":{"interface_hash":"<to be computed by the 0.9 precheck: example 1, inc8>","kind":"oracle","name":"inc8","signature":{"abi":"0.9","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}}}
+{"0":{"interface_hash":"ed9865300b85a519c2379de98e36e635e72b5b78d8bdfca03dccf9a09aa3df5e","kind":"oracle","name":"inc8","signature":{"abi":"0.9","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}}}
 
 section functions
 oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
@@ -3790,7 +3787,7 @@ parameter, and a global accessed by address.
 bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
 
 section symbols
-{"0":{"interface_hash":"<to be computed by the 0.9 precheck: example 2, sum_db>","kind":"oracle","name":"sum_db","signature":{"abi":"0.9","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[{"A":4,"W":8,"role":"in"}],"tgt":8,"tier":"q"}},"1":{"interface_hash":"<to be computed by the 0.9 precheck: example 2, sum>","kind":"lproc","name":"sum","signature":{"abi":"0.9","args":[],"kind":"lproc","mem":[],"params":[8,8,32],"result":8,"tier":"q","tokens":[]}},"2":{"interface_hash":"<to be computed by the 0.9 precheck: example 2, zero>","kind":"data","name":"zero","signature":{"abi":"0.9","kind":"data","size":1,"tier":"-"}}}
+{"0":{"interface_hash":"3ad937b1cd867454989c5c5f58244681ef2c09dbabf7fce56515a68f63462ee6","kind":"oracle","name":"sum_db","signature":{"abi":"0.9","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[{"A":4,"W":8,"role":"in"}],"tgt":8,"tier":"q"}},"1":{"interface_hash":"cb52102decd586b7585b5d73b90841dcec75edac5a5a2d0f43c5efb34d4cceb1","kind":"lproc","name":"sum","signature":{"abi":"0.9","args":[],"kind":"lproc","mem":[],"params":[8,8,32],"result":8,"tier":"q","tokens":[]}},"2":{"interface_hash":"43e032f98d7aff20f6864d6368b20ab4ef9d810938999acff8d71ed16e6b17d7","kind":"data","name":"zero","signature":{"abi":"0.9","kind":"data","size":1,"tier":"-"}}}
 
 section functions
 oracle @sum_db (n:wire[8] in) (t:wire[8]) (f:wire[4]) (db:region[4,8] in) ()
@@ -3845,8 +3842,7 @@ is a data symbol and the `zero` global's image; `@sum` is a one-member
 SCC (its self-reference is written `@$0`, its `@zero` reference is
 replaced by `@` + the `zero` hash, which is its only part-(6) line; its
 closure set is the `zero` global's leaf and image), so its envelope is
-exactly the bytes below (the two `zero` placeholders stand for the
-64-hex `zero` hash), its `scc_hash` is their SHA-256 and its hash
+exactly the bytes below, its `scc_hash` is their SHA-256 and its hash
 is SHA-256 of the ASCII `<scc_hash hex>:0`:
 
 ```
@@ -3856,7 +3852,7 @@ ptr_width=32
 lproc @sum (n:reg[8], acc:reg[8], base:reg[32]) (r:reg[8]) () () ()
 regs { zp:reg[32], zv:reg[8], z:reg[1], one:reg[8], n2:reg[8], idx:reg[32], p:reg[32], v:reg[8], acc2:reg[8] }
 ^entry():
-zp = lift.addr @<to be computed by the 0.9 precheck: example 2, zero>
+zp = lift.addr @43e032f98d7aff20f6864d6368b20ab4ef9d810938999acff8d71ed16e6b17d7
 lift.boundscheck zp 1
 zv = lift.load.i8 zp
 z = lift.icmp.eq n zv
@@ -3875,7 +3871,7 @@ lift.ret r
 lift.ret acc
 data zero 00
 layout ["globals","zero"] {"base":16,"image":"zero","size":1}
-<to be computed by the 0.9 precheck: example 2, zero>
+43e032f98d7aff20f6864d6368b20ab4ef9d810938999acff8d71ed16e6b17d7
 ```
 
 The displayed `sum` envelope renders its global leaf path as
@@ -3886,10 +3882,10 @@ the `sum` hash in place of `@sum`, and the `sum` hash as its part-(6)
 line (`@db` is an interface region, not a symbol):
 
 ```
-inc8 = <to be computed by the 0.9 precheck: example 1, inc8>
-zero = <to be computed by the 0.9 precheck: example 2, zero>
-sum = <to be computed by the 0.9 precheck: example 2, sum>
-sum_db = <to be computed by the 0.9 precheck: example 2, sum_db>
+inc8 = ed9865300b85a519c2379de98e36e635e72b5b78d8bdfca03dccf9a09aa3df5e
+zero = 43e032f98d7aff20f6864d6368b20ab4ef9d810938999acff8d71ed16e6b17d7
+sum = cb52102decd586b7585b5d73b90841dcec75edac5a5a2d0f43c5efb34d4cceb1
+sum_db = 3ad937b1cd867454989c5c5f58244681ef2c09dbabf7fce56515a68f63462ee6
 ```
 
 **Example 3** (`borrow_demo`): a permutation action with a loop bound
@@ -3899,7 +3895,7 @@ and a borrow frame established by the translation lemma (§5.6).
 bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
 
 section symbols
-{"0":{"interface_hash":"<to be computed by the 0.9 precheck: example 3, borrow_demo>","kind":"perm_action","name":"borrow_demo","signature":{"abi":"0.9","args":[],"bounds":[1],"in":[1],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}}}
+{"0":{"interface_hash":"6f4782e9bde4267acd1afddd650093722a056d9d50ee465b79cb86a4606b2a94","kind":"perm_action","name":"borrow_demo","signature":{"abi":"0.9","args":[],"bounds":[1],"in":[1],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}}}
 
 section functions
 perm_action @borrow_demo (t:wire) (x:wire in) () () ()
@@ -3935,7 +3931,7 @@ stored to memory and reloaded, wires addressed by run-time slices.
 bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
 
 section symbols
-{"0":{"interface_hash":"<to be computed by the 0.9 precheck: example 4, ones>","kind":"cc","name":"ones","signature":{"abi":"0.9","kind":"cc","params":["i64"],"results":["i3"],"tier":"cc"}},"1":{"interface_hash":"<to be computed by the 0.9 precheck: example 4, flip>","kind":"perm_action","name":"flip","signature":{"abi":"0.9","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}}}
+{"0":{"interface_hash":"ff8e49307d5ec9ab32eea2406339f878630bbb4501080829200433a18d6951cb","kind":"cc","name":"ones","signature":{"abi":"0.9","kind":"cc","params":["i64"],"results":["i3"],"tier":"cc"}},"1":{"interface_hash":"3860ea712b2d70fc495834586bb397656a467c85235aa069768318a06e9fa89b","kind":"perm_action","name":"flip","signature":{"abi":"0.9","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}}}
 
 section functions
 fn cc @ones (n:i64) (m:i3) () () ()
@@ -3990,7 +3986,7 @@ function, used and released, then reversed.
 bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
 
 section symbols
-{"0":{"interface_hash":"<to be computed by the 0.9 precheck: example 5, main>","kind":"cc","name":"main","signature":{"abi":"0.9","kind":"cc","params":["i64"],"results":[],"tier":"cc"}},"1":{"interface_hash":"<to be computed by the 0.9 precheck: example 5, scratch>","kind":"r","name":"scratch","signature":{"abi":"0.9","kind":"r","params":["i64"],"results":[],"tier":"r"}},"2":{"interface_hash":"<to be computed by the 0.9 precheck: example 5, flip>","kind":"perm_action","name":"flip","signature":{"abi":"0.9","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}}}
+{"0":{"interface_hash":"5cebd5a72ee7873edda0d2c35afed2a5ab79eba60f2b242b2a856d5fa4074634","kind":"cc","name":"main","signature":{"abi":"0.9","kind":"cc","params":["i64"],"results":[],"tier":"cc"}},"1":{"interface_hash":"05525834cbe5a518aa97444912254f3c12c75dd86314a98ba550f45187208a0b","kind":"r","name":"scratch","signature":{"abi":"0.9","kind":"r","params":["i64"],"results":[],"tier":"r"}},"2":{"interface_hash":"3860ea712b2d70fc495834586bb397656a467c85235aa069768318a06e9fa89b","kind":"perm_action","name":"flip","signature":{"abi":"0.9","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}}}
 
 section functions
 fn cc @main (n:i64) () () () ()
@@ -4040,7 +4036,7 @@ run-time value.
 bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
 
 section symbols
-{"0":{"interface_hash":"<to be computed by the 0.9 precheck: example 6, adaptive>","kind":"cc","name":"adaptive","signature":{"abi":"0.9","kind":"cc","params":["i1","qreg[8]","qreg[8]","qreg[4]"],"results":[],"tier":"cc"}},"1":{"interface_hash":"<to be computed by the 0.9 precheck: example 6, overdraw>","kind":"cc","name":"overdraw","signature":{"abi":"0.9","kind":"cc","params":[],"results":[],"tier":"cc"}},"2":{"interface_hash":"<to be computed by the 0.9 precheck: example 6, inc8>","kind":"oracle","name":"inc8","signature":{"abi":"0.9","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}}}
+{"0":{"interface_hash":"b80aed1639a9ac6a6856f02b0b3264d905e4eea3fa3f9081c01e56283ea398cf","kind":"cc","name":"adaptive","signature":{"abi":"0.9","kind":"cc","params":["i1","qreg[8]","qreg[8]","qreg[4]"],"results":[],"tier":"cc"}},"1":{"interface_hash":"c0d9835844fa882c1864044acc6fa26dba3935e0d6a9d33f9cdbf1e7c877d250","kind":"cc","name":"overdraw","signature":{"abi":"0.9","kind":"cc","params":[],"results":[],"tier":"cc"}},"2":{"interface_hash":"ed9865300b85a519c2379de98e36e635e72b5b78d8bdfca03dccf9a09aa3df5e","kind":"oracle","name":"inc8","signature":{"abi":"0.9","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}}}
 
 section functions
 fn cc @adaptive (b:i1, x:qreg[8], t:qreg[8], f:qreg[4]) () () () ()
@@ -4085,7 +4081,7 @@ fails `bennett_budget`'s check, the run is `FAILED` with one record
 bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
 
 section symbols
-{"0":{"interface_hash":"<to be computed by the 0.9 precheck: example 7, g>","kind":"oracle","name":"g","signature":{"abi":"0.9","args":["i2"],"fault":4,"in":[2,2],"kind":"oracle","mem":[],"tgt":2,"tier":"q"}},"1":{"interface_hash":"<to be computed by the 0.9 precheck: example 7, ginv>","kind":"oracle","name":"ginv","signature":{"abi":"0.9","args":["i2"],"fault":4,"in":[2,2],"kind":"oracle","mem":[],"tgt":2,"tier":"q"}},"2":{"interface_hash":"<to be computed by the 0.9 precheck: example 7, addya>","kind":"perm_action","name":"addya","signature":{"abi":"0.9","args":["token","i2"],"bounds":[],"in":[2],"kind":"perm_action","mem":[],"mut":[2],"tier":"q"}},"3":{"interface_hash":"<to be computed by the 0.9 precheck: example 7, run>","kind":"cc","name":"run","signature":{"abi":"0.9","kind":"cc","params":["qreg[2]","qreg[2]","token","i2"],"results":[],"tier":"cc"}}}
+{"0":{"interface_hash":"0d65d926275688cfebf2831c1de960b03a6b8ea6400866e6d9fef8f393ca2c2e","kind":"oracle","name":"g","signature":{"abi":"0.9","args":["i2"],"fault":4,"in":[2,2],"kind":"oracle","mem":[],"tgt":2,"tier":"q"}},"1":{"interface_hash":"786f1970ca3d78ef3d5de795411ee276286711c89b756872757c24f9bd569cc9","kind":"oracle","name":"ginv","signature":{"abi":"0.9","args":["i2"],"fault":4,"in":[2,2],"kind":"oracle","mem":[],"tgt":2,"tier":"q"}},"2":{"interface_hash":"5999b6d3d2362f8c1971ef6f37b404766aa5c18f6ba1880d767bfde351e47392","kind":"perm_action","name":"addya","signature":{"abi":"0.9","args":["token","i2"],"bounds":[],"in":[2],"kind":"perm_action","mem":[],"mut":[2],"tier":"q"}},"3":{"interface_hash":"562ab7270a0f508d6a2f4a757f3f90964da0b60541bac2c5efa421bad009056a","kind":"cc","name":"run","signature":{"abi":"0.9","kind":"cc","params":["qreg[2]","qreg[2]","token","i2"],"results":[],"tier":"cc"}}}
 
 section functions
 oracle @g (x:wire[2] in, y:wire[2] in) (t:wire[2]) (f:wire[4]) () (a:i2)
@@ -4131,7 +4127,7 @@ reversal of the failed run.
 bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
 
 section symbols
-{"0":{"interface_hash":"<to be computed by the 0.9 precheck: example 8, main>","kind":"cc","name":"main","signature":{"abi":"0.9","kind":"cc","params":[],"results":[],"tier":"cc"}},"1":{"interface_hash":"<to be computed by the 0.9 precheck: example 8, work>","kind":"r","name":"work","signature":{"abi":"0.9","kind":"r","params":["ptr"],"results":[],"tier":"r"}}}
+{"0":{"interface_hash":"dbf66e749a776cbb1ceccfc8b530caf664e24fb416fdf52ccf3942f4b89fdcf2","kind":"cc","name":"main","signature":{"abi":"0.9","kind":"cc","params":[],"results":[],"tier":"cc"}},"1":{"interface_hash":"d365ade0d8452d7d12b1a72c87e7106b06eef99e5958d0345133cf6eb0cbeb03","kind":"r","name":"work","signature":{"abi":"0.9","kind":"r","params":["ptr"],"results":[],"tier":"r"}}}
 
 section functions
 fn cc @main () () () () ()
@@ -4170,7 +4166,7 @@ table, clock and tape at their entry values.
 bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
 
 section symbols
-{"0":{"interface_hash":"<to be computed by the 0.9 precheck: example 9, zero_cause>","kind":"oracle","name":"zero_cause","signature":{"abi":"0.9","args":[],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}},"1":{"interface_hash":"<to be computed by the 0.9 precheck: example 9, zero_cc>","kind":"cc","name":"zero_cc","signature":{"abi":"0.9","kind":"cc","params":[],"results":[],"tier":"cc"}}}
+{"0":{"interface_hash":"badf7dd2a59afa879f092921946539dfb918cedd35f6fbbaa838c630577eaed4","kind":"oracle","name":"zero_cause","signature":{"abi":"0.9","args":[],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}},"1":{"interface_hash":"0403d76ff065acab57cb9165cfe1d3d73bbf8dad60bbc1348fb0305ee4f37611","kind":"cc","name":"zero_cc","signature":{"abi":"0.9","kind":"cc","params":[],"results":[],"tier":"cc"}}}
 
 section functions
 oracle @zero_cause (x:wire in) (t:wire) (f:wire[4]) () ()
@@ -4200,7 +4196,7 @@ also as a token-typed `args` operand. All token uses preserve identity.
 bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
 
 section symbols
-{"0":{"interface_hash":"<to be computed by the 0.9 precheck: example 10, through>","kind":"oracle","name":"through","signature":{"abi":"0.9","args":["token","i2"],"fault":4,"in":[2],"kind":"oracle","mem":[{"A":0,"W":8,"role":"in"}],"tgt":2,"tier":"q"}},"1":{"interface_hash":"<to be computed by the 0.9 precheck: example 10, worker>","kind":"lproc","name":"worker","signature":{"abi":"0.9","args":["i2"],"kind":"lproc","mem":[{"A":0,"W":8,"role":"in"}],"params":[2],"result":2,"tier":"q","tokens":["token"]}},"2":{"interface_hash":"<to be computed by the 0.9 precheck: example 10, plus_db>","kind":"oracle","name":"plus_db","signature":{"abi":"0.9","args":["i2"],"fault":4,"in":[2],"kind":"oracle","mem":[{"A":0,"W":8,"role":"in"}],"tgt":2,"tier":"q"}},"3":{"interface_hash":"<to be computed by the 0.9 precheck: example 10, flip_arg>","kind":"perm_action","name":"flip_arg","signature":{"abi":"0.9","args":["token","i2"],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[2],"tier":"q"}}}
+{"0":{"interface_hash":"4ee502a2d517d53d229f2ae21346505af06a228a2f0d2967938d48683e16d9e7","kind":"oracle","name":"through","signature":{"abi":"0.9","args":["token","i2"],"fault":4,"in":[2],"kind":"oracle","mem":[{"A":0,"W":8,"role":"in"}],"tgt":2,"tier":"q"}},"1":{"interface_hash":"9bd5e97be1f600494476527fb2d7d088bffab607bdadac8e01f9b23d15f9dfe1","kind":"lproc","name":"worker","signature":{"abi":"0.9","args":["i2"],"kind":"lproc","mem":[{"A":0,"W":8,"role":"in"}],"params":[2],"result":2,"tier":"q","tokens":["token"]}},"2":{"interface_hash":"c6e53733d87782414d05720d444734d9335244155518db4f60916e3d4b06dd1d","kind":"oracle","name":"plus_db","signature":{"abi":"0.9","args":["i2"],"fault":4,"in":[2],"kind":"oracle","mem":[{"A":0,"W":8,"role":"in"}],"tgt":2,"tier":"q"}},"3":{"interface_hash":"bfa13d9a564e3f8562098c4ea39330d947efa64521310afad6a329dc594bd671","kind":"perm_action","name":"flip_arg","signature":{"abi":"0.9","args":["token","i2"],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[2],"tier":"q"}}}
 
 section functions
 oracle @through (x:wire[2] in) (t:wire[2]) (f:wire[4]) (db:region[0,8] in) (tk:token, a:i2)
