@@ -140,7 +140,6 @@ north star §3.1 requires).
 | K26 | §11.1 | **REF-REGIONS**. Shape, role, origin and cell bindings preserved in closure arguments | b-isa-spec-1a4 | S | new |
 | K27 | §11.1 | **REF-LIFETIMES**. Exact class actuals and shared allocation declarations across invocations | b-isa-spec-3xe | S | new |
 | K28 | §11.1 | **REF-INSTRUCTION-RELEASE**. Recipe scratch follows reverse allocation order; instruction-defined release sequences remain exact, with the qinplace ordinal witness. [deps: ISA-4.5-P5, ISA-11.1-P21] | b-isa-spec-82x; maintainer ruling 2026-10-31 | S | new |
-
 | K29 | §5.3 | **QIF-ADJOINT**. Complete-expansion inverse for cross-arm lifetimes; §5.1 matches lifetimes region-wide, not arm-wise; witness: `qif p { d = qalloc any 1 } { qfree d }` recreates d before freeing it in the inverse. | INV-1 gap 2; b-isa-spec-bdv; SQ 28 | S | +bytes |
 | K30 | §4.6 | **LOOP-BINDINGS**. Visit-local linear binding carry-over; witness: a body frees c then reallocates c, and the next visit uses the new c. | INV-1 gap 3; r9_mixed_loop_threads_reallocated_bindings | E | – |
 | K31 | §5.3 | **MATCHED-PAIRS**. Callees, classical/token values, operand versions and effective control sets identify adjoints; witness: opaque oracle pairs under stacks [p,q] and [q,p,p] match. | INV-1 gap 4; r10_equivalent_control_sets_preserve_opaque_inverse | E | – |
@@ -148,7 +147,6 @@ north star §3.1 requires).
 | K33 | §3.3 | **WIRE-DISTINCTNESS**. Distinct denoted wires, not spellings; witness: w and w[0] overlap, and two w[0] operands overlap. | INV-2 gap 2; tier_arity_aliasing_and_input_roles | E | – |
 | K34 | §3.3 | **REGISTER-FRESHNESS**. Fresh allocation disjoint from live/viewed registers; launch ids pairwise disjoint; witness: duplicate launch id returns E_ARG before execution, while from_id aliases remain references to one register. | INV-2 gap 3; register_handles_enforce_views_consumption_and_cleanliness | E | – |
 | K35 | §3.3 | **CALL-ALIASES**. Atomic CC/R fault for overlapping qreg call slots, including control/target overlap; witness: the same id in two slots faults without consuming a view or mutating wires. | INV-2 gap 4; r4_dynamic_interface_alias_is_an_atomic_reversible_cc_and_r_fault | E | – |
-
 | K36 | §6.1 | **REGION-PROVENANCE**. Image-relative cell version zero, perm, empty dependencies; witness: a nonzero image is the initial version, not outstanding garbage. | INV-3 gap 1; local_regions_require_explicit_restoration_and_load_pins_cell_versions | E | – |
 | K37 | §6.2 | **UNDONE-CHANGES**. Matched permutation pairs with intervening basis-value preservation; witness: X on a dependency followed by X reopens the original wire binding, but any cell write invalidates its old version. | INV-3 gap 2; cleanup_windows_and_linear_lifetimes | E | – |
 | K38 | §6.2 | **CLEANUP-VERSIONS**. Computation-time S and produced g versions current; witness: qcopy s then quncopy s d is legal without requiring the old zero d version. | INV-3 gap 3; cleanup_pins_predicate_versions_and_distinguishes_qif_polarity | E | – |
@@ -158,6 +156,10 @@ north star §3.1 requires).
 | K42 | §5.6 | **TRANSLATION-CONTROLS**. Effective context included in every gate control set; inverse V has the same set/versions; witness: inherited p lies in X, never in a W target or B. | INV-3 gap 7; translation_lemma_checks_all_four_required_negative_patterns | E | – |
 | K43 | §5.6 | **STATIC-FRAMES**. Maximality within containing qloop/qif static sequence, per lifetime; witness: outer touches and inner frame at ordinals 4–7 remain separate. | INV-3 gap 8; SQ 30; muse_r5_translation_frame_maximality_is_within_its_static_sequence | E | – |
 | K44 | §4.3 | **STATIC-FREE**. qalloc version or explicit legal cleanup output at release; witness: fresh qalloc/free and H/H/free pass, H/free fails. | INV-3 gap 9; other_scratch_requires_the_exact_adjoint_but_accepts_h_h | E | – |
+| K45 | §9.2 | **STRUCTURAL-OWNERSHIP**. Exact JSON owner/global keys determine closure selection; witness: oracle a excludes a.b even if its region suffix coincides. | INV-4 gap 1; r11_oracle_layout_ownership_uses_exact_names | E | – |
+| K46 | §9.2 | **LAYOUT-ORDER**. Emit every structured leaf once, sorted bytewise by its JCS path; witness: both a/c.db and a.c/db survive, independently of their base values. | INV-4 gap 2; b-isa-spec-4it; SQ 31 | S | +bytes |
+| K47 | §9.2, §16.3 | **INJECTIVE-PATHS**. JCS key-component arrays preserve leaf identity; witness: ["interface_regions","a","c.db"] differs from ["interface_regions","a.c","db"]. Prefer arrays: dialect §16.3 emits dotted block names and §12 Naming emits dotted temporaries; although its reference layout uses ref, no general ban on dotted oracle/region NAMEs is established, and a dot ban would narrow legal ISA names. Also disposes of INV-4 gap 5: structural selection is encoded regardless of any CC/R harm analysis. | INV-4 gaps 3, 5; b-isa-spec-ccv; SQ 31 | S | +bytes |
+| K48 | §9.2 | **ENVELOPE-BOUNDARIES**. Grammar distinguishes function/data payload and suffix classes without new length fields; witness: a lhs named layout gives `layout = …`, never a layout-array line, and a data symbol named data has one payload line selected by its signature kind. | INV-4 gap 4; §16.2 grammar lemma | E | – |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -413,7 +415,7 @@ another register while the program is loaded. **Handle transitions:**
 | `w = qreg.width q` | q live, not a view | w: `i64`, the width; no state change |
 | `id = qreg.id q` | q live, not a view | id: `i64`, the bits of q's id; no state change |
 | `q = qreg.from_id id` | `id` is the id of a register of the program that is live, not a view, and not owned by another run that is not CLOSED (§10) | q: `qreg[*]`, an alias of that register; no ledger state change; the run now owns the register (§10), which reversal does not undo (ownership ends when the run is CLOSED) |
-| region call (§4.7) with q as operand | q live (a view included); its width equals the slot's (§3.3 binding); the wire sets filling distinct wire/region slots are pairwise disjoint, and an explicit control is disjoint from targets and consumed/produced operands (read-only input overlap remains allowed), else CC trap / R fault FAULT_UB_TRAP before any effect, including any view consumption. [deps: ISA-3.3-P4, ISA-4.7, ISA-4.9] | q unchanged |
+| region call (§4.7) with q as operand | q live (a view included); its width equals the slot's (§3.3 binding); the wire sets filling distinct wire/region slots are pairwise disjoint, and an explicit control is disjoint from targets and consumed/produced operands (read-only input overlap remains allowed), else CC trap / R fault FAULT_UB_TRAP before any effect, including any view consumption. [deps: ISA-3.3-P4, ISA-4.7, ISA-4.9] | q unchanged. [deps: ISA-4.7] |
 | `r = measure q` / `r = measure.iN q` | q live, not a view; the form `measure.iN` (1 ≤ N ≤ 128) for a `qreg[*]`, whose width MUST be N (checked before measuring); for a `qreg[n]` either `measure` or `measure.iN` with N = n (checked statically) | q consumed, its wires released; r: `in` / `iN` |
 | reversal of a `qreg.*` frame (§7.4, §10) | – | the ledger state before that frame (below). A `measure` frame is **never reversed**: a segment containing one cannot be uncalled (§7.4) and a run containing one is not reversible (§10) |
 
@@ -1171,9 +1173,11 @@ and tuples, the same operand wires with the first's read-only input
 versions and produced target versions current at the second, and equal
 effective control sets including the versions of their wires; order and
 repetition in predicate stacks are irrelevant. [deps: ISA-2-P10, ISA-3.3-P3, ISA-4.5-P5, ISA-4.7, ISA-5.3-P4, ISA-5.4]
-A matched inverse restores the preceding wire-version bindings for
-subsequent matching, but a cell write always advances its cell version,
-even when its value is restored. [deps: ISA-3.3-P3, ISA-6.1-P1]
+A matched inverse restores preceding wire-version bindings for
+subsequent matching only when the §6.2 cleanup conditions hold; matching
+alone does not discharge an outstanding-reader or phase obligation, and
+a cell write always advances its cell version even when its value is
+restored. [deps: ISA-3.3-P3, ISA-6.1-P1, ISA-6.2]
 
 ### 5.4 Budgets and fault codes
 
@@ -1376,8 +1380,10 @@ leaves the computational-basis values of S and g unchanged; a cell
 version advance still closes the window even if its value is restored.
 [deps: ISA-5.3, ISA-6.1-P1, ISA-14.2]
 Each cleanup is bound to its exact computing sequence and requires the
-versions of S that sequence read, and the version of g it produced, to
-be current. [deps: ISA-3.3-P3, ISA-6.1-P1]
+external input versions that sequence read (the versions in S for a
+perm value), and the version of g it produced, to be current; g's
+pre-computation target versions are not required to be current.
+[deps: ISA-3.3-P3, ISA-6.1-P1]
 A cleanup runs under the same effective control set, at the same wire
 versions, as its computing sequence. [deps: ISA-2-P10, ISA-3.5, ISA-5.3-P5]
 Every perm value MUST be
@@ -1810,7 +1816,7 @@ through its last instruction line, lines joined by LF, no trailing LF.
   (3) the JCS signature
   (4) the canonical function bytes (with reference tokens replaced, below); for a data symbol: its data line NAME SP HEX
   (5a) for every data entry in the closure set, sorted by name bytewise:        "data " NAME " " HEX
-  (5b) for every layout leaf in the closure set, sorted by dotted path bytewise: "layout " <dotted path> " " <JCS value>
+  (5b) for every layout leaf in the closure set, sorted by JCS path bytes: "layout " <JCS key-component array> " " <JCS value>. [deps: ISA-9.1, ISA-16.1]
   (5c) for an R/CC function, for every device model and service it uses, sorted: "device " <name> " " <JCS entry>
   (6) for every referenced symbol outside the symbol's SCC, in order of first reference: its 64-hex hash
 ```
@@ -1861,6 +1867,41 @@ SHA-256 of the schedule's JCS bytes.
 ordinal within the block counting nested lines in text order)`.
 Executable certificates and caches bind to **closure hashes** (required,
 §12).
+
+A layout leaf's path is the JCS array of its original JSON key
+components from the layout root to the deepest schema-listed leaf,
+so a scalar has a one-component path and an interface-region leaf has
+path `["interface_regions","<oracle>","<region>"]`.
+[deps: ISA-9.1-P1, ISA-16.1]
+Part (5b) emits exactly one line for each structured leaf in the closure
+set, including distinct leaves whose dotted renderings coincide, ordered
+by the unsigned UTF-8 bytes of that JCS path array, independently of the
+leaf values; no dotted rendering is used as a key or an ordering key.
+[deps: ISA-9.1-P1, ISA-16.1]
+An oracle's own interface-region leaves and entries of other oracles
+are selected by equality of the original JSON key under
+`interface_regions` to the oracle's name, never by a prefix of a
+rendered path; an lproc's global leaves are selected by equality of
+the key under `globals` to the global name.
+[deps: ISA-3.7-P1, ISA-9.1-P1]
+
+**Envelope boundary lemma** (non-normative).
+For a function symbol, §16.2 requires a header beginning `fn `,
+`oracle `, `action `, `perm_action ` or `lproc `; following lines are
+`regs`, block labels, instructions, or structured closing braces. [deps: ISA-16.2]
+No §4 opcode is `data`, `layout` or `device`; a result with one of
+those names has ` = ` after the name, which cannot begin any part-(5)
+line (a data name, a JSON array, or a device name is required there). [deps: ISA-4.8, ISA-9.1, ISA-16.2]
+No canonical function line is a bare 64-hex string, so the first
+part-(5)/(6) line ends the function bytes unambiguously. [deps: ISA-4.8, ISA-16.2]
+The fixed `data `, `layout `, `device ` prefixes distinguish (5a–c),
+and a bare 64-hex line distinguishes (6); JSON strings escape LF. [deps: ISA-9.1, ISA-16.1]
+For a data symbol, the signature kind selects exactly one data line
+for (4), with (5)–(6) empty, even when the data name itself is `data`,
+`layout` or `device`. [deps: ISA-9.1, ISA-16.2]
+Together with the fixed first three lines and the injective JCS array
+paths, these facts make the envelope parts recoverable without length
+prefixes; this is an encoding argument, not a claim of SHA-256 injectivity. [deps: ISA-9.1, ISA-16.1, ISA-16.2]
 
 ### 9.3 Linking
 
@@ -3352,10 +3393,13 @@ lift.ret r
 ^done():
 lift.ret acc
 data zero 00
-layout globals.zero {"base":16,"image":"zero","size":1}
+layout ["globals","zero"] {"base":16,"image":"zero","size":1}
 <to be computed by the 0.9 precheck: example 2, zero>
 ```
 
+The displayed `sum` envelope renders its global leaf path as
+`["globals","zero"]`, preserving the original leaf value.
+[deps: ISA-9.1-P1, ISA-16.1]
 `@sum_db`'s envelope includes every layout leaf, the `zero` image, `@` +
 the `sum` hash in place of `@sum`, and the `sum` hash as its part-(6)
 line (`@db` is an interface region, not a symbol):

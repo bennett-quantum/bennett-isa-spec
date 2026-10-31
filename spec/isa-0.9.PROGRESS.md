@@ -1,3 +1,126 @@
+## 2026-10-31 Proof editorial pass — final disposition and validation
+
+All five requested beads resolved/closed; no NAD or carried blocker.
+The four defect rows are cross-listed with their proof gap, not counted twice.
+“60l”, etc. abbreviate b-isa-spec-60l; all bead ids in this table are closed.
+a = text addition/amendment; b = already covered/no additional sentence;
+the gap-5 analysis is moot under the injectivity repair, not a claim that
+the old encoding was harmless. IDs below are from the final scratch graph.
+The accepted/spec graphs and statements in the sibling are read-only.
+
+| Item | Disposition | K | Final clause(s) | Declared deps (union for concept) | Closed bead(s) |
+|---|---|---|---|---|---|
+| INV-1/1 | b | K4 | ISA-4.5-P5 (existing) | — existing | 60l |
+| INV-1/2; qif defect | a | K29 | ISA-5.3-P4/P6 | ISA-3.5, ISA-4.6-P7, ISA-5.1 | bdv; 60l |
+| INV-1/3 | a | K30 | ISA-4.6-P10 | ISA-3.3-P3, ISA-4.6-P8, ISA-4.6-P9 | 60l |
+| INV-1/4 | a | K31 | ISA-5.3-P7 | ISA-2-P10, ISA-3.3-P3, ISA-4.5-P5, ISA-4.7, ISA-5.3-P4, ISA-5.4, ISA-6.1-P1, ISA-6.2 | 60l |
+| INV-2/1 | a | K32 | ISA-3.7-P26 | ISA-3.3-P1, ISA-3.7-P1, ISA-16.2 | 60l |
+| INV-2/2 | a | K33 | ISA-3.3-P4 | ISA-3.3-P3, ISA-4.4 | 60l |
+| INV-2/3 | a | K34 | ISA-3.3-P8/P20 | ISA-3.3-P7, ISA-10 | 60l |
+| INV-2/4 | a | K35 | ISA-3.3-P15 | ISA-3.3-P4, ISA-4.7, ISA-4.9 | 60l |
+| INV-3/1 | a | K36 | ISA-6.1-P17 | ISA-4.6-P1 | 60l |
+| INV-3/2 | a | K37 | ISA-6.2-P1 | ISA-5.3, ISA-6.1-P1, ISA-14.2 | 60l |
+| INV-3/3 | a | K38 | ISA-6.2-P1 | ISA-3.3-P3, ISA-6.1-P1 | 60l |
+| INV-3/4 | a | K39 | ISA-6.2-P1 | ISA-2-P10, ISA-3.5, ISA-5.3-P5 | 60l |
+| INV-3/5; other-value defect | a | K40 | ISA-6.2-P1 | ISA-5.3, ISA-6.1, ISA-6.4 | 0jo; 60l |
+| INV-3/6 | a | K41 | ISA-6.1-P18 | ISA-3.3-P3, ISA-5.1, ISA-5.3-P1, ISA-6.1-P1, ISA-2-P10, ISA-3.5, ISA-4, ISA-14.2, ISA-5.2-P4, ISA-5.6-P1, ISA-4.4, ISA-6.3 | 0jo; 60l |
+| INV-3/7 | a | K42 | ISA-5.6-P8 | ISA-2-P10, ISA-3.5, ISA-5.3-P5 | 60l |
+| INV-3/8 | a | K43 | ISA-5.6-P8 | ISA-4.3-P2, ISA-4.3-P4, ISA-4.6, ISA-5.6-P2 | 60l |
+| INV-3/9 | a | K44 | ISA-4.3-P5 | ISA-3.3-P3, ISA-4.3-P1, ISA-5.1, ISA-6.4 | 60l |
+| INV-4/1 | a | K45 | ISA-9.2-P4 | ISA-3.7-P1, ISA-9.1-P1 | 60l |
+| INV-4/2; tie-order defect | a | K46 | ISA-9.2-P2/P4 | ISA-9.1, ISA-9.1-P1, ISA-16.1 | 4it; 60l |
+| INV-4/3; injectivity defect | a | K47 | ISA-9.2-P2/P4; ISA-16.3-P6/P7 | ISA-9.1, ISA-9.1-P1, ISA-16.1 | ccv; 60l |
+| INV-4/4 | a | K48 | ISA-9.2-P5 (non-normative lemma) | ISA-16.2, ISA-4.8, ISA-9.1, ISA-16.1 | 60l |
+| INV-4/5 | b | K47 | ISA-9.2-P4 (covered by injectivity repair; harm analysis moot) | ISA-9.1-P1, ISA-16.1 | 60l |
+
+Validation, headless Python -I and read-only conformance clause tooling:
+- Scratch baseline/current graphs and statement catalogs rebuilt outside the
+  sibling. Every changed/new normative prose sentence has a declared marker;
+  every new dependency id exists in the supplied baseline catalog; zero
+  unresolved declared dependencies. The two changed pseudocode sentences
+  also end with physical markers (the statement extractor treats code as a
+  single example block); the operative prose repeats their declared edges.
+  The non-normative grammar lemma also declares its reasoning dependencies.
+- 20 new rows, K29–K48, in one continuous table, each with a witness.
+  35 new physical dependency markers (43 total; 41 parsed outside fences).
+- Independent witnesses: old dotted collision reproduced; 16 key paths
+  distinct as JCS arrays; both cross-object collision and exchanged-base
+  collision separated; all 24 permutations of four leaves encode identically
+  and round-trip. Exact owner selection is structural.
+- qif lifetime-order counterexample checked: old inverse consumes before
+  produce; reversing the complete expansion is legal. Loop visit identities
+  advance. Independent exact CX/phase matrices fail I_G tensor V, while
+  CX/CX cancels; independent state vector gives clean d1 and dirty d0
+  probability 1/2 for SQ25. These are contract/witness checks, not 0.9
+  executor conformance or a completed mechanisation of the four proofs.
+- Source/progress git diff --check passes. Raw diff context spaces are
+  intentional and verified by exact regeneration, not whitespace stripping.
+- Accepted 0.8 SHA-256: 90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e.
+- Entire §11.1 SHA-256: eab3766ce4cfd301b447230d96b01b10932d6d86ebbefd770789583c3a636d10 (unchanged).
+  Library JSON bytes unchanged; 219 recipes and published envelope hash
+  fcb2f1e6d61aced0bf9689eab5f6d82c4ae42e9fea8d1b21ae9c7ffccda6f5ce
+  unchanged. No recipe-relevant edit or §11.1 gap required a blocker.
+- Final draft SHA-256: d75463a62232d574f5c5e946aec3b439e0fe3e312ca3afd95267c8cc717341bd.
+- Regenerated spec/isa-0.8-to-0.9.diff SHA-256:
+  2def9456deb35f9e7935d8e0900bbe50abdf3b3681a710a0c9624605249edcbf; stable a/spec/Bennett-ISA-Spec.md and
+  b/spec/Bennett-ISA-Spec-0.9-draft.md labels.
+- Group commits so far: 3b35aa3 (lifetimes/matching/alias rules),
+  91c60dd (cleanup/borrow soundness); final envelope/audit commit contains
+  this record, including S0 cross-check corrections to K31/K38.
+- bd export -o .beads/issues.jsonl performed for every group. No push,
+  remote sync, interpreter/conformance source edit, or worklog edit.
+
+Final soundness cross-check: K31 binding restoration is expressly
+conditional on legal §6.2 cleanup. Otherwise H;entangling reader;H could
+masquerade as a restored allocation version and bypass K40 through K44.
+Matching alone never removes a reader/phase obligation; opaque nested
+pairs still restore bindings once their own cleanup conditions hold.
+
+Final S0 reread: K38 names external input versions explicitly for other
+values too (which do not have a perm S), and excludes pre-computation
+targets; this prevents an undefined-set reading. Consolidated K29–K48
+into the existing §0.2 Markdown table, retaining one row per concept.
+
+## 2026-10-31 Proof editorial pass — group 3 (K45–K48)
+
+INV-4/1 a K45: exact original owner keys and exact lproc global keys.
+INV-4/2 + 4it a K46: emit every leaf, unique unsigned UTF-8 order of
+the JCS key-array bytes, independent of values. INV-4/3 + ccv a K47:
+render that array on the line. These replace dotted ordering and the
+SQ31 tie break together: a tie-break cannot preserve a lost key split.
+The two bases can be exchanged without losing ownership information.
+Scalar paths are arrays too; the example-2 sum envelope now prints
+layout ["globals","zero"] with its original leaf value. Draft example
+hashes retain the existing precheck placeholders.
+
+Dialect read-only check: §16.3 Names and layout uses ref as its reference
+oracle and shape-region keys; the same table explicitly emits dotted
+block names (^b<i>.s<j>, etc.), and §12 Naming uses %nz.<tag>.<r>.
+This does not prove interface-region keys can never have dots, and it
+does not justify restricting every legal ISA producer. Select JCS arrays
+as requested; reject the NAME narrowing, whole-line/value tie breaks,
+component tie breaks without encoded components, and lossy maps keyed by
+dotted paths. JCS array syntax plus LF-escaped values is injective on
+structured leaf/value pairs (not a claim that SHA-256 has no collisions).
+
+INV-4/4 a K48: non-normative grammar lemma next to §9.2 establishes
+recoverability without changing any envelope length framing. A function
+header/body line cannot be a data/layout/device suffix or a bare hash.
+Result names data/layout/device are followed by "="; in part (5a) the
+next token must be NAME, (5b) an array, and (5c) a name. §4 has none of
+those three opcodes. For a data symbol the known signature kind picks
+one payload line, and suffixes are empty. Prefix classes distinguish
+(5a–c); JSON LF is escaped. Reject unnecessary length prefixes (would
+change every symbol's bytes for no grammar need).
+INV-4/5 b K47: the requested harm assessment is explicitly moot after
+injective structural paths; no semantic decision relies on CC/R being
+unable to observe the lost distinction. The defect's encoding failure
+is repaired regardless. This is not a NAD claim about 0.8.
+
+No §16.1 NAME restriction, accepted 0.8 edit, or §11.1 edit. New rows
+this pass: K29–K48 = 20 (one per changed concept; K4 covers the already
+specified check timing, and K47 covers the moot analysis).
+
 ## 2026-10-31 Proof editorial pass — group 2 (K36–K44)
 
 INV-3 gaps 1–9 all disposition a; gap 5 also resolves b-isa-spec-0jo.
