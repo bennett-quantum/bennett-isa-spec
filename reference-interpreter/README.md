@@ -480,33 +480,41 @@ without a metadata field and staged target/interval consumers.
 
 **Design (schedule matching, round 18).** Specificity is the §11 lexicographic
 tuple; only ties at the actual maximum invalidate a schedule. Admission
-intersects equal-specificity selectors with invocation/loop domains, then
-subtracts the union of all strictly higher matching domains of the same kind.
-A nonempty remainder witnesses ambiguity. Step domains follow their owning
-invocation: the root oracle uses bindings.budget[0]; `lift.call` and lifted
-action gates stay in that machine. `lift.oracle_call`/`lift.oracle_uncall` and
-normalized `oracle_call` open token-governed invocations. Admission has only
-params_hash, not the token values, so nested steps stay symbolic over the
-ABI's positive u64 range; the root B never proves a nested step empty. A
-resolved token would supply that invocation's own bound. Action roots do not
-turn their schedule budget into an oracle step bound.
-Domains are boxes split at selector boundaries; loop/step counts are never
-expanded or capped. Every instruction (including calls) has its own generated
-operations. Shortest chains suffice once their entire symbolic step domain is
-covered; finite root domains additionally require checking call extensions
-that can enter a new oracle. Suffix call-graph states are memoized after all
-selector paths end, so recursive lprocs terminate without a depth cap. Empty
-paths split over real root instructions; zero-trip loops and root B=0 stay
-empty. Generated ordinal ranges remain symbolic for the expansion library.
-`Object::resolve_schedule` counts final maxima independently of document order.
+intersects equal-specificity selectors with known invocation/loop domains,
+then subtracts the union of all strictly higher matching domains of that kind.
+A nonempty remainder is a concrete maximal-tie witness. Step bounds follow
+the owning invocation: the root oracle uses bindings.budget[0]; lift.call and
+lifted action gates stay in that machine. lift.oracle_call/uncall and normalized
+oracle_call enter a new token-governed invocation, never bounded by root B.
+ISA 0.8 has no object-level token constant: every nested budget is a classical
+parameter, unavailable from params_hash. The derivable-nested-budget branch
+therefore cannot fire at admission in 0.8; whether 0.9 adds one is a spec
+decision (b-isa-spec-6hs). Admission checks root-owned domains exactly and
+**defers** unknown nested domains. Neither root clipping nor a symbolic
+"any budget" nested rejection is sound (INV-5 1.4.3; SPEC-QUESTIONS 33).
+`Object::check_schedule_matches_for_run` binds the actual tokens, including
+callee parameter forwarding, and uses their own budgets in the same domain
+algorithm. For each concrete ambiguity it calls `Object::resolve_schedule`,
+which counts final maxima independently of document order and raises the §11
+diagnostic before any realisation. This matching preflight runs before either
+oracle engine or action execution mutates state; it is not full target/timing
+execution. A valid token-B=2 run is never rejected for a tie only at step 3.
+Domains split at selector boundaries; step/loop bounds are never expanded or
+capped. Known finite step domains require checking call extensions that can
+enter a larger invocation. Suffix states (including bound arguments and budget)
+are memoized beyond the longest selector path, so recursive lprocs terminate
+without a depth cap. Empty paths split over real root instructions; zero-trip
+loops, root B=0 and zero-budget nested ancestors stay empty. Generated ordinal
+ranges remain symbolic for the staged expansion library.
 The retained R17 family checks 1,200 schedules and reversed orders against 54
-concrete selector partitions each. The R18 family adds 4,800 schedules and
-reversed orders over depth 1–3 oracle/lproc chains and action roots, with
-1,532 concrete budget assignments. Its independent oracle enumerates concrete
-nested operation partitions across those assignments, accounting for unknown
-token preimages; admission and all admitted resolver results agree 100%.
-These are finite selector families, not a claim to complete schedule execution.
-Union/partial coverage, recursive lprocs, and zero/large loop bounds have
+concrete selector partitions each. The R18 family adds 7,500 schedules and
+reversed orders over depth 1–3 oracle/lproc chains and action roots. It covers
+1,532 distinct concrete budget assignments, enumerating 569,910 operation
+partitions. Its oracle checks root-only admission separately from tie
+reachability under **each actual run's budgets**, and compares bound matching
+and concrete resolver results, including deferred errors: 100% agreement.
+These finite selector families do not claim full schedule/target execution.
+Union/partial coverage, parameter forwarding, and zero/large loop bounds have
 separate controls.
 
 `DerivedWidths::from_program` checks H+2, A_tab+1 and S_cells+1; a legal layout

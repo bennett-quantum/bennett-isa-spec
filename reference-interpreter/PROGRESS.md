@@ -8,78 +8,86 @@ prefix and TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/.tmp.
 ## Round-18 fixes (2026-10-31)
 
 Baseline **403 passed / 0 failed / 5 ignored**, summed over all 33 binaries
-(including 0-test main/doctests), **22.51 s** runner sum. Literal witness RED:
-**1 passed / 2 failed** (library admission and CLI check/hash wrongly accept;
-independent outer-two/nested-three execution already passes). All round 4–18
-positive and negative tests are retained, including every R17 permutation,
-union/partial-coverage and zero/large-loop test and byte pin.
+(including 0-test main/doctests), **22.51 s** runner sum. Original reviewer RED:
+**1 passed / 2 failed**, root-B clipping admits the nested tie. Initial local
+commit 9f7ea64 implemented the reviewer's symbolic-range remedy; superseded by
+the orchestrator's INV-5 addendum because that remedy over-rejects token B=2.
+Addendum RED: **0 passed / 1 failed**, literal deferred-admission test rejects
+under that symbolic-range commit. Both directions are repaired below.
 
 | Blocker | RED tests | Status | Commit |
 |---|---|---|---|
-| R18-B01 | metadata::r18_literal_nested_budget_ties_reject; cli_xam::r18_cli_literal_nested_budget_check_hash_reject | GREEN | pending owned-path commit |
+| R18-B01 | metadata::r18_literal_nested_budget_ties_defer_until_run (original admission-negative witness, revised by addendum); cli_xam::r18_cli_literal_nested_budget_check_hash_defer_and_run_reject | GREEN | pending bound-matching commit |
 
-Design: `metadata.rs::validate_schedule_details` passes a root bound only for
-an oracle root. `metadata/schedule_domains.rs::InvocationSteps` tracks root,
-nested-token and action domains through each chain. `chain_domain` keeps
-lift.call/lift.perm_call in the same machine; lifted oracle call/uncall and
-normalized oracle_call open a new invocation. params_hash supplies no token
-preimage: nested domains remain symbolic over positive u64 steps, never
-intersected with the root B. Known root B=0 and zero-trip ancestor loops remain
-empty. No execution budget, reference body or canonical schedule is changed.
-Only equal maxima with an uncovered selector-domain remainder reject; UNION
-subtraction and document-order-independent resolution are unchanged.
+Design: `metadata.rs::validate_schedule_details` supplies a bound only for an
+oracle root. `metadata/schedule_domains.rs::InvocationSteps` tracks root,
+nested-token and action domains. lift.call/lift.perm_call stay in the same
+machine; lifted oracle call/uncall and normalized oracle_call enter a new
+invocation. A nested step is NEVER clipped by root B. ISA 0.8 has no object-
+level token constant, only classical parameters: the derivable-budget branch
+cannot fire at admission. Unknown nested domains are DEFERRED, never taken as
+empty or universally quantified. Root domains still use exact union subtraction.
 
-The old shortest-chain coverage argument needed refinement too: a finite root
-step domain can be fully covered while a nested invocation's larger one is
-not. `has_uncovered_tie` visits call extensions until it reaches the symbolic
-nested domain. Beyond the longest selector path it memoizes suffix call-graph
-states, so recursive lprocs terminate without a depth/loop/step expansion cap.
-Once a whole symbolic domain is covered, its extensions cannot broaden it.
-The same-machine recursive sum_db control and the root-prefix union control
-exercise both cases.
+INV-5 steps 1.1.5, 1.4.2, 1.4.3 and Spec gaps item 10 determine the addendum:
+check/hash cannot decide actual nested-budget ties from object + params_hash.
+SPEC-QUESTIONS 33 records the 0.9 gap and both unsound alternatives; the
+orchestrator owns bead b-isa-spec-6hs. No token encoding or 0.8 amendment is
+invented. The bound Some branch is shared with admission so a future derivable
+budget can use it, if 0.9 defines one.
 
-Literal reviewer files and probe copied verbatim into tests/support/.
-Both B=2 and B=3 files reject with §11 multiple maximal matching schedule
-entries; CLI check/hash exit 1 with empty stdout. Single-entry positives keep
-object 8e6e852c…f815 and ignore interface=closure 9687f21a…89012.
-A/B with wildcard iterations and literal fully specific C admit and resolve C
-in all six orders, at generated 0, 1 and u128::MAX; CLI also checks all orders
-and identity pins at both root budgets. The literal duplicate's only remaining
-wildcard is generated, so a single concrete generated ordinal would NOT cover
-it; the covering control deliberately broadens A/B's iterations instead.
-Lproc-only root step 3 at B=2 stays empty; nested-oracle/lproc and action-root
-variants reject. Outer B=2 with token B=3 still executes payload=9/code=0/steps=2.
-Independent r18_pins.py checks file hashes, original nested fixture bytes,
-canonical schedule bytes and the exact token preimage hash. R17 pins still pass.
+`Object::check_schedule_matches_for_run` binds actual token arguments, forwards
+them by callee parameter (including permutations), and uses each invocation's
+own budget. It sends concrete uncovered selector-box witnesses to
+resolve_schedule, which errors §11 multiple maximal matching schedule entries
+before any realisation. Hooks precede mutation in both oracle engines and
+action execution. This is a matching preflight, not full target/timing/expansion
+execution. Known finite domains inspect call extensions; suffix states include
+bound arguments and budgets and terminate recursive lprocs without a depth cap.
+Zero-trip loops, root B=0 and zero-budget nested ancestors stay empty.
 
-`r18_nested_specificity_family_matches_brute_force` adds **4,800 schedules +
-4,800 reversed orders**, **3,873 admitted / 927 rejected**, **100% oracle
-agreement** for admission and every admitted resolver result. Fifteen shapes
-cover call depth 1–3, oracle prefixes/lproc suffixes (all mixes valid under
-§4.2), action roots, root B in {0,1,2,4} and independently varied per-token
-budgets 0..4: **1,532 assignments**, **121,182 concrete operation partitions**
-before deduplication. The oracle derives owning machines from O/L edges,
-enumerates static dispatch-row operations at each legal concrete step and
-both phases, then computes the literal specificity maximum without production
-matching/domain helpers. Steps 1..3 are named selector values and 4 is the
-residual; generated 0,1 and residual 2 exhaust this family's distinctions.
-Admission cannot invert params_hash, so expectations use the union over token
-assignments; a token-specific infeasibility is never credited as a proof of
-emptiness. This finite family does not claim full schedule/target execution.
-The original R17 family/distribution and all other prior assertions are intact.
+Literal reviewer files and probe copied verbatim into tests/support/. Both
+root B=2 and B=3 witnesses now pass check/hash with their original identities
+and bytes, and reject at run-oracle with token B=3 (exit 1, empty stdout,
+§11 diagnostic). Token B=2 runs clean: payload=0/code=0/steps=2; inc8 has not
+reached retval, and ignore intentionally does not propagate the nested fault.
+The unscheduled token-B=3 reference still gives payload=9/code=0/steps=2.
+Root step 3 is dead at B=2 and rejects a true root tie at B=3. Machine creation
+and action execution reject bound ties before mutation; the action's complete
+QuantumState remains equal. Single-entry positives and genuinely covering
+A/B/C entries admit, preserve object/closure pins and resolve C in all six
+orders. The literal duplicates are fully specific except generated="*";
+covering controls broaden A/B's iterations, not one generated ordinal.
 
-First full suite: **411 passed / 0 failed / 5 ignored**, **29.82 s** runner sum.
-Final full suite after the Clippy-only iterator spelling fix: **411 passed /
-0 failed / 5 ignored**, **28.65 s**, **14 unit + 397 integration**, 0 doctests,
-summed over all 33 binaries. Focused R18 tests: **8 passed / 0 failed**,
-including the 4,800-case family. Fmt/fmt --check and strict all-target Clippy
-pass with 0 warnings. Initial build-only corrections were a Rust-2021 let-chain
-spelling and a test helper name shadow; initial Clippy requested enumerate()
-in the new independent oracle loop. No production behavior or sweep input was
-changed for those corrections. All five ignored sweeps are running; production
-and test inputs/assertions are frozen from sweep start. Logs: interpreter .tmp/r18-{before,red,green,controls,family,
-full,clippy,sweeps}.log. Only owned paths; no foreign tests, dependency changes,
-push or Dolt sync. Full-ISA bead b-isa-spec-zq2 remains active for staged work.
+`r18_nested_specificity_family_matches_brute_force`: **7,500 schedules + 7,500
+reversed orders**, **6,894 admitted / 606 root-rejected**, **319 deferred ties
+materialise at binding / 6,575 bound-clean**. **100% oracle agreement** for
+root-only admission, actual-budget bound matching and concrete resolver results,
+including errors. Fifteen shapes cover depth 1–3 oracle prefixes/lproc suffixes,
+action roots, root B in {0,1,2,4}, and every independent token assignment 0..4:
+**1,532 distinct assignments**, **569,910 concrete operation partitions**.
+The oracle derives owning machines from O/L edges before calling production;
+steps 1..3 and residual 4, both phases, generated 0,1 and residual 2 exhaust
+this finite family's selector distinctions. It models EACH actual budget map,
+never their union. This does not claim a complete expansion-library executor.
+The original R17 1,200-schedule family/distribution and all six literal orders,
+union/partial coverage, zero/large loops, all defaults and pins remain green.
+All round 4–17 assertions are retained; R18 admission expectations follow the
+explicit addendum. r18_pins.py and r17_pins.py and all three reviewer cmp checks
+pass; no reference body, token budget or canonical witness byte was altered.
+
+Final full suite after the addendum: **412 passed / 0 failed / 5 ignored**,
+**31.66 s** runner sum, **14 unit + 398 integration**, 0 doctests, over all
+33 binaries. Focused final R18: **9 passed / 0 failed**, family 10.47 s.
+Fmt/fmt --check and strict all-target Clippy pass with 0 warnings. The earlier
+411-test full runs/sweeps preceded the addendum and are not final evidence.
+All five ignored sweeps are being rerun against the final bound-matching code;
+production, test inputs and assertions are frozen from their start.
+
+Logs: interpreter .tmp/r18-{before,red,addendum-red,addendum-green,bound-full,
+bound-clippy,bound-final,bound-sweeps}.log. Only owned interpreter paths and
+external response; no foreign tests, dependency changes, push or Dolt sync.
+Concurrent spec/conformance/Beads changes are untouched. Full-ISA bead
+b-isa-spec-zq2 remains active for staged work.
 
 ## Resume here: outstanding work, in priority order
 

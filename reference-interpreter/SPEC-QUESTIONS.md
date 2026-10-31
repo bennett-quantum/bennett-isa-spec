@@ -294,3 +294,39 @@ changed in response to the council's round-1 review
     layout.globals; it may share a name with a function symbol."
     The old global-collision negative remains in r1_linking; the unambiguous
     self-named positive is r12_interface_region_may_share_function_name.
+
+33. **Nested schedule budgets and validation time (§11, §9.2)** *new (round 18;
+    0.9 spec gap, bead b-isa-spec-6hs)*. Question: how can object-only admission
+    decide maximal matching ties when nested invocation budgets are supplied
+    by run-time tokens, while the schedule contains only params_hash?
+    [INV-5-schedule-selection.md](../../bennett-conformance/proofs/INV-5-schedule-selection.md),
+    steps **1.1.5**, **1.4.2** and **1.4.3** (and Spec gaps item 10), shows
+    that exact matching depends on the actual token-budget map. The R18 nested
+    step-3 tie exists with token B=3 and is dead with token B=2. Root-B clipping
+    under-rejects the former (and can over-reject smaller-token runs); a symbolic
+    "any budget" nested range over-rejects the latter. params_hash does not
+    recover a token's budget; §9.2 also does not define its JCS interchange value.
+
+    ISA 0.8 has **no object-level encoding of a token constant**: oracle-call
+    tokens are classical parameters. Thus the derivable-nested-budget branch
+    cannot fire at admission under 0.8. Whether 0.9 adds such an encoding is a
+    spec decision; none is invented here. Reading directed for this round:
+    admission checks root-owned domains exactly (including same-machine
+    lift.call rows), and defers every unknown nested domain without treating
+    it as either empty or universally quantified over budgets. The bound
+    matching gate uses actual token arguments and forwarding, checks each
+    invocation's own budget, and sends a concrete maximal-tie witness to
+    resolve_schedule before any realisation is applied. The resolver errors
+    loudly with §11 multiple maximal matching schedule entries; it never
+    chooses document order. Known bounds use the same domain/union-subtraction
+    path, so a future derivable bound could be checked at admission.
+
+    *Proposed 0.9 decision:* explicitly permit deferred matching until token
+    binding, or require independently recoverable per-invocation token budgets
+    in schedule bindings; define the JCS token value and when validation must
+    finish. Neither proposed encoding nor an ISA 0.8 amendment is imposed here.
+    Full target/timing/expansion execution remains staged. Pins:
+    metadata::r18_literal_nested_budget_ties_defer_until_run,
+    cli_xam::r18_cli_literal_nested_budget_check_hash_defer_and_run_reject,
+    metadata::r18_nested_specificity_family_matches_brute_force. The orchestrator
+    owns bead b-isa-spec-6hs; the interpreter's full-ISA bead remains active.

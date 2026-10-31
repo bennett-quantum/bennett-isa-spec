@@ -351,6 +351,7 @@ impl<'a> OracleVectorMachine<'a> {
         budget: Budget,
     ) -> Result<Self> {
         object.validate_budget(budget)?;
+        object.check_schedule_matches_for_run(name, budget, &input.args)?;
         let program = Program::new(object, name)?;
         let widths = DerivedWidths::from_program(object, &program, budget)?;
         let root = &object.functions[name];

@@ -526,6 +526,7 @@ impl Object {
         budget: Budget,
     ) -> Result<OracleVectorOutcome> {
         self.validate_budget(budget)?;
+        self.check_schedule_matches_for_run(name, budget, &input.args)?;
         let program = Program::new(self, name)?;
         let root = &self.functions[name];
         if input.ins.len() != root.params[0].len() || input.args.len() != root.params[4].len() {

@@ -6,17 +6,17 @@ type Domain = Vec<(u128, u128)>;
 #[derive(Clone, Copy)]
 enum InvocationSteps {
     Root(u128),
-    // A token is a classical argument; its preimage is absent at admission.
-    // Still respect the ABI's u64 step limit, independently of the root B.
-    Nested,
+    // None is deferred, never an empty domain or an "any budget" proof.
+    // ISA 0.8 has no object-level constant token; Some is populated at binding.
+    Nested(Option<u128>),
     Action,
 }
 impl InvocationSteps {
-    fn upper(self) -> u128 {
+    fn upper(self) -> Option<u128> {
         match self {
-            Self::Root(budget) => budget,
-            Self::Nested => u128::from(u64::MAX),
-            Self::Action => u128::MAX,
+            Self::Root(budget) => Some(budget),
+            Self::Nested(budget) => budget,
+            Self::Action => Some(u128::MAX),
         }
     }
 }
@@ -97,16 +97,17 @@ impl Object {
         &self,
         chain: &[Json],
         root_budget: Option<u128>,
-    ) -> Result<Option<(Domain, InvocationSteps)>> {
+        arguments: Option<&std::collections::BTreeMap<String, crate::Argument>>,
+    ) -> Result<Option<(Domain, InvocationSteps, String)>> {
         let mut domain = Vec::new();
         // The step owner persists through lift.call and lifted action gates.
         // Only an oracle call opens a new token-governed invocation (§11).
         let mut steps = root_budget.map_or(InvocationSteps::Action, InvocationSteps::Root);
-        let mut opens_oracle = false;
+        let mut arguments = arguments.cloned();
         if root_budget == Some(0) {
             return Ok(None);
         }
-        for element in chain {
+        for (index, element) in chain.iter().enumerate() {
             let (block, ordinal) = element
                 .get("point")?
                 .string()?
@@ -119,14 +120,58 @@ impl Object {
                     .parse()
                     .map_err(|_| Error("§11: invalid point ordinal".into()))?,
             )?;
-            if opens_oracle {
-                steps = InvocationSteps::Nested;
+            if index + 1 < chain.len() {
+                // lift.call stays in the same oracle/argument environment.
+                let call = if matches!(
+                    point.instruction.op.as_str(),
+                    "lift.oracle_call" | "lift.oracle_uncall" | "lift.perm_call"
+                ) {
+                    Some(point.instruction.clone())
+                } else {
+                    normalize_call(point.instruction)
+                        .ok()
+                        .map(|c| c.instruction)
+                };
+                if let Some(call) = call {
+                    let oracle = matches!(
+                        call.op.as_str(),
+                        "lift.oracle_call" | "lift.oracle_uncall" | "oracle_call"
+                    );
+                    if oracle {
+                        steps = InvocationSteps::Nested(arguments.as_ref().and_then(|a| {
+                            match a.get(&call.operands[1]) {
+                                Some(crate::Argument::Token(budget)) => {
+                                    Some(u128::from(budget.steps))
+                                }
+                                _ => None,
+                            }
+                        }));
+                    }
+                    if steps.upper() == Some(0) {
+                        return Ok(None);
+                    }
+                    if let Some(old) = arguments.take() {
+                        let callee = &self.functions[call.operands[0].trim_start_matches('@')];
+                        let group = if oracle { 4 } else { 3 };
+                        let operands =
+                            crate::object::list(&call.operands[if oracle { 6 } else { 4 }])?;
+                        arguments = Some(
+                            callee.params[group]
+                                .iter()
+                                .zip(operands)
+                                .map(|(p, n)| {
+                                    old.get(&n)
+                                        .cloned()
+                                        .map(|v| (p.name.clone(), v))
+                                        .ok_or_else(|| {
+                                            Error(format!("§11: unresolved classical argument {n}"))
+                                        })
+                                })
+                                .collect::<Result<_>>()?,
+                        );
+                    }
+                }
             }
-            opens_oracle = matches!(
-                point.instruction.op.as_str(),
-                "lift.oracle_call" | "lift.oracle_uncall"
-            ) || normalize_call(point.instruction)
-                .is_ok_and(|call| call.instruction.op == "oracle_call");
             for bound in point.loops {
                 if bound == 0 {
                     return Ok(None);
@@ -136,8 +181,16 @@ impl Object {
         }
         // Generated ordinals belong to the bound expansion library. Admission
         // does not execute it; retain the whole ordinal selector domain.
-        domain.extend([(1, steps.upper()), (0, 1), (0, u128::MAX)]);
-        Ok(Some((domain, steps)))
+        // Unknown is DEFERRED under INV-5 1.4.3, not a proof of emptiness.
+        // A future object-derived token bound can use the same Some branch.
+        let Some(upper) = steps.upper() else {
+            return Ok(None);
+        };
+        if upper == 0 {
+            return Ok(None);
+        }
+        domain.extend([(1, upper), (0, 1), (0, u128::MAX)]);
+        Ok(Some((domain, steps, format!("{arguments:?}"))))
     }
 
     fn entry_domain(&self, entry: &Json, chain: &[Json], base: &Domain) -> Result<Option<Domain>> {
@@ -201,6 +254,20 @@ impl Object {
         region: &str,
         root_budget: Option<u128>,
     ) -> Result<bool> {
+        Ok(self
+            .tie_witness(a, b, entries, region, root_budget, None)?
+            .is_some())
+    }
+
+    fn tie_witness(
+        &self,
+        a: &Json,
+        b: &Json,
+        entries: &[Json],
+        region: &str,
+        root_budget: Option<u128>,
+        arguments: Option<&std::collections::BTreeMap<String, crate::Argument>>,
+    ) -> Result<Option<Json>> {
         let mut chains = self.shortest_chains(a.get("path")?, region)?;
         let max_path = entries
             .iter()
@@ -214,10 +281,12 @@ impl Object {
         // lprocs without a call-depth, step, or loop expansion cap.
         let mut suffixes = std::collections::BTreeSet::new();
         while let Some(chain) = chains.pop() {
-            let Some((base, steps)) = self.chain_domain(&chain, root_budget)? else {
+            let Some((base, steps, bound_arguments)) =
+                self.chain_domain(&chain, root_budget, arguments)?
+            else {
                 continue;
             };
-            if matches!(steps, InvocationSteps::Root(_)) {
+            if !matches!(steps, InvocationSteps::Action) {
                 let last = chain
                     .last()
                     .ok_or_else(|| Error("§11: empty operation chain".into()))?;
@@ -250,7 +319,12 @@ impl Object {
                     })
                 };
                 let boundary = chain[..chain.len().min(max_path)].to_vec();
-                let key = (Json::Array(boundary).canonical(), last.canonical());
+                let key = (
+                    Json::Array(boundary).canonical(),
+                    last.canonical(),
+                    steps.upper(),
+                    bound_arguments,
+                );
                 if chain.len() < max_path || suffixes.insert(key) {
                     if let Some(callee) = callee.filter(|name| self.functions.contains_key(name)) {
                         for suffix in self.shortest_chains(&Json::Array(vec![]), &callee)? {
@@ -286,10 +360,118 @@ impl Object {
                     }
                 }
             }
-            if !remaining.is_empty() {
-                return Ok(true);
+            if let Some(uncovered) = remaining.first() {
+                return Ok(Some(self.concrete_witness(&chain, uncovered)?));
             }
         }
-        Ok(false)
+        Ok(None)
+    }
+
+    fn concrete_witness(&self, chain: &[Json], domain: &Domain) -> Result<Json> {
+        let mut path = chain.to_vec();
+        let mut offset = 0;
+        for element in &mut path {
+            let (block, ordinal) = element
+                .get("point")?
+                .string()?
+                .rsplit_once(':')
+                .ok_or_else(|| Error("§11: invalid point".into()))?;
+            let depth = self
+                .point(
+                    element.get("symbol")?.string()?,
+                    block,
+                    ordinal
+                        .parse()
+                        .map_err(|_| Error("§11: invalid ordinal".into()))?,
+                )?
+                .loops
+                .len();
+            let iterations = domain[offset..offset + depth]
+                .iter()
+                .map(|d| Json::Number(d.0.to_string()))
+                .collect();
+            if let Json::Object(fields) = element {
+                fields.insert("iteration".into(), Json::Array(iterations));
+            }
+            offset += depth;
+        }
+        Ok(Json::Object(std::collections::BTreeMap::from([
+            ("path".into(), Json::Array(path)),
+            ("step".into(), Json::Number(domain[offset].0.to_string())),
+            (
+                "phase".into(),
+                Json::String(
+                    if domain[offset + 1].0 == 0 {
+                        "fwd"
+                    } else {
+                        "rev"
+                    }
+                    .into(),
+                ),
+            ),
+            (
+                "generated".into(),
+                Json::Number(domain[offset + 2].0.to_string()),
+            ),
+        ])))
+    }
+
+    /// Check matching with the actual run's tokens, before any realisation.
+    /// This is the §11 matching gate, not staged target/timing execution.
+    /// Unbound admission defers nested domains (SPEC-QUESTIONS 33 / INV-5 1.4.3).
+    pub fn check_schedule_matches_for_run(
+        &self,
+        region: &str,
+        budget: crate::Budget,
+        args: &[crate::Argument],
+    ) -> Result<()> {
+        let Some(schedule) = self.section("schedule") else {
+            return Ok(());
+        };
+        if schedule
+            .get("bindings")?
+            .get("region")?
+            .string()?
+            .trim_start_matches('@')
+            != region
+        {
+            return Ok(());
+        }
+        let function = &self.functions[region];
+        let parameters = &function.params[if function.kind == "oracle" { 4 } else { 3 }];
+        if parameters.len() != args.len() {
+            return err("§11", "schedule argument count mismatch");
+        }
+        let arguments = parameters
+            .iter()
+            .zip(args)
+            .map(|(p, v)| {
+                crate::oracle::check_argument(self, &p.ty, v)?;
+                Ok((p.name.clone(), v.clone()))
+            })
+            .collect::<Result<std::collections::BTreeMap<_, _>>>()?;
+        let entries = schedule.get("entries")?.array()?;
+        let root_budget = (function.kind == "oracle").then_some(u128::from(budget.steps));
+        for (i, a) in entries.iter().enumerate() {
+            for b in &entries[i + 1..] {
+                if a.get("kind")? == b.get("kind")?
+                    && specificity(a)? == specificity(b)?
+                    && overlaps(a, b)?
+                {
+                    if let Some(operation) =
+                        self.tie_witness(a, b, entries, region, root_budget, Some(&arguments))?
+                    {
+                        // Never choose or apply a realisation on an ambiguous
+                        // concrete operation. The resolver owns the diagnostic.
+                        self.resolve_schedule(&operation, a.get("kind")?.string()?)?;
+                        return err(
+                            "§11",
+                            "internal maximal-tie witness did not resolve to a tie",
+                        );
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }

@@ -2230,7 +2230,7 @@ fn r17_cli_malformed_gate_share_rejects() {
 }
 
 #[test]
-fn r18_cli_literal_nested_budget_check_hash_reject() {
+fn r18_cli_literal_nested_budget_check_hash_defer_and_run_reject() {
     for (budget, source, pin) in [
         (
             2,
@@ -2246,11 +2246,37 @@ fn r18_cli_literal_nested_budget_check_hash_reject() {
         assert_eq!(bennett_isa_ref::sha256_hex(source.as_bytes()), pin);
         let path = tmp_file(&format!("r18-nested-{budget}.bisa"), source);
         for command in ["check", "hash"] {
-            fails(
-                &[command, &path],
-                "§11: multiple maximal matching schedule entries",
-            );
+            let result = ok(&[command, &path]);
+            assert_eq!(text(&result, "object_hash"), support::r18::OH);
         }
+        fails(
+            &[
+                "run-oracle",
+                &path,
+                "ignore",
+                "--input",
+                "8",
+                "--budget",
+                &budget.to_string(),
+                "--arg",
+                "token:3,0,0,0",
+            ],
+            "§11: multiple maximal matching schedule entries",
+        );
+        let result = ok(&[
+            "run-oracle",
+            &path,
+            "ignore",
+            "--input",
+            "8",
+            "--budget",
+            &budget.to_string(),
+            "--arg",
+            "token:2,0,0,0",
+        ]);
+        assert_eq!(uint(&result, "code"), 0);
+        assert_eq!(uint(&result, "payload"), 0);
+        assert_eq!(uint(&result, "steps"), 2);
     }
 }
 
@@ -2323,14 +2349,7 @@ fn r18_cli_single_covering_and_context_controls() {
             &support::r18::document(&o, &s),
         );
         for command in ["check", "hash"] {
-            if i == 0 {
-                ok(&[command, &path]);
-            } else {
-                fails(
-                    &[command, &path],
-                    "§11: multiple maximal matching schedule entries",
-                );
-            }
+            ok(&[command, &path]);
         }
     }
 }

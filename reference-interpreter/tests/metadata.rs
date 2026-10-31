@@ -805,16 +805,44 @@ fn r17_loop_iteration_union_and_empty_domains() {
 }
 
 #[test]
-fn r18_literal_nested_budget_ties_reject() {
-    for source in [
-        include_str!("support/r18-nested-budget-2.bisa"),
-        include_str!("support/r18-nested-budget-3.bisa"),
-    ] {
-        let e = Object::parse(source).expect_err("nested step 3 must not use root B=2");
+fn r18_literal_nested_budget_ties_defer_until_run() {
+    use bennett_isa_ref::{Argument, Budget, OracleInput};
+    for (root, source) in [(2, support::r18::TWO), (3, support::r18::THREE)] {
+        let o = Object::parse(source).expect("token budgets are unknown at admission");
+        o.check_hashes().unwrap();
+        assert_eq!(o.identity().unwrap().object_hash, support::r18::OH);
+        let mut input = OracleInput::bits(&[8]);
+        input.args.push(Argument::Token(Budget::steps(3)));
+        let e = o
+            .run_oracle("ignore", &input, Budget::steps(root))
+            .unwrap_err();
         assert!(
             e.to_string()
                 .contains("§11: multiple maximal matching schedule entries"),
             "{e}"
+        );
+        assert!(
+            bennett_isa_ref::OracleMachine::new(&o, "ignore", &input, Budget::steps(root))
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("§11: multiple maximal")
+        );
+        input.args[0] = Argument::Token(Budget::steps(2));
+        let r = o.run_oracle("ignore", &input, Budget::steps(root)).unwrap();
+        assert_eq!((r.payload, r.code, r.steps), (0, 0, 2));
+    }
+    // Root-owned ties remain exact at admission, independent of the unknown
+    // nested token: step 3 is outside B=2 and inside B=3.
+    for (root, source) in [(2, support::r18::TWO), (3, support::r18::THREE)] {
+        let mut s = support::r17::schedule(source);
+        let mut a = s.get("entries").unwrap().array().unwrap()[0].clone();
+        let path = a.get("path").unwrap().array().unwrap()[..1].to_vec();
+        set(&mut a, "path", Json::Array(path));
+        set(&mut s, "entries", Json::Array(vec![a.clone(), a]));
+        assert_eq!(
+            Object::parse(&support::r17::document(source, &s)).is_err(),
+            root == 3
         );
     }
 }
@@ -885,13 +913,47 @@ fn r18_lproc_action_root_and_prefix_domain_controls() {
         let mut s = support::r18::schedule(&o, 2, &[3]);
         let e = gate(&path, json("3"));
         set(&mut s, "entries", Json::Array(vec![e.clone(), e]));
-        let parsed = Object::parse(&document(&o, &s));
+        let parsed = Object::parse(&document(&o, &s)).unwrap();
+        let budget = bennett_isa_ref::Budget {
+            steps: 2,
+            heap: 0,
+            stack: 256,
+            depth: 16,
+        };
+        let args: Vec<_> = edges
+            .iter()
+            .filter(|&&edge| edge == 'O')
+            .map(|_| {
+                bennett_isa_ref::Argument::Token(bennett_isa_ref::Budget { steps: 3, ..budget })
+            })
+            .collect();
+        if action {
+            let mut q = bennett_isa_ref::QuantumState::new();
+            let mut bindings = bennett_isa_ref::QuantumBindings::default();
+            for (name, width) in [("t", 8), ("f", 4), ("x", 8)] {
+                bindings
+                    .bundles
+                    .insert(name.into(), q.allocate(width).unwrap());
+            }
+            bindings.args.insert("tk0".into(), args[0].clone());
+            let before = q.clone();
+            let e = parsed
+                .execute_action("n0", &mut q, &bindings, false, &[])
+                .unwrap_err();
+            assert!(e.to_string().contains("§11: multiple maximal"));
+            assert_eq!(
+                q, before,
+                "schedule tie must reject before any action realisation"
+            );
+        }
+        let bound = parsed.check_schedule_matches_for_run("n0", budget, &args);
         if edges == ['L'] {
-            // lift.call shares root B=2: root step 3 really is empty.
-            parsed.unwrap();
+            bound.unwrap();
         } else {
-            let e = parsed.unwrap_err();
-            assert!(e.to_string().contains("§11: multiple maximal"), "{e}");
+            assert!(bound
+                .unwrap_err()
+                .to_string()
+                .contains("§11: multiple maximal"));
         }
     }
     // A prefix is not confined to the root's domain when it matches nested
@@ -901,7 +963,19 @@ fn r18_lproc_action_root_and_prefix_domain_controls() {
     let a = gate(&[], json(r#""*""#));
     let entries = vec![a.clone(), a, gate(&[], json("1")), gate(&[], json("2"))];
     set(&mut s, "entries", Json::Array(entries));
-    assert!(Object::parse(&document(&o, &s))
+    let parsed = Object::parse(&document(&o, &s)).unwrap();
+    let budget = bennett_isa_ref::Budget {
+        steps: 2,
+        heap: 0,
+        stack: 256,
+        depth: 16,
+    };
+    let args = [bennett_isa_ref::Argument::Token(bennett_isa_ref::Budget {
+        steps: 3,
+        ..budget
+    })];
+    assert!(parsed
+        .check_schedule_matches_for_run("n0", budget, &args)
         .unwrap_err()
         .to_string()
         .contains("§11: multiple maximal"));
@@ -914,14 +988,13 @@ fn r18_lproc_action_root_and_prefix_domain_controls() {
 
 #[test]
 fn r18_nested_specificity_family_matches_brute_force() {
-    use std::collections::BTreeMap;
     use support::r18::*;
     // Derive operations from explicit O/L shapes and concrete budgets BEFORE
     // admission. Every oracle dispatch expands each static row at t=1..B,
     // including gated-off rows; L shares that dispatch, O starts its own.
-    // Tokens are not recoverable from params_hash. Enumerate their assignments
-    // 0..4 and take the union: selectors name steps 1..3, and 4 is the residual.
-    // This exhausts this family's symbolic step partitions, not all executions.
+    // Tokens are not recoverable from params_hash: admission sees only root
+    // domains; bound matching and the concrete resolver use EACH actual token
+    // assignment, never the union over possible token values (INV-5 1.4.3).
     fn enumerate(edges: &[char], action: bool, hashes: &[String], budgets: &[u64]) -> Vec<Json> {
         let mut out = Vec::new();
         let mut prefix = Vec::new();
@@ -971,6 +1044,7 @@ fn r18_nested_specificity_family_matches_brute_force() {
         seed % n
     };
     let (mut cases, mut admitted, mut assignments, mut operations) = (0, 0, 0, 0);
+    let mut bound_ties = 0;
     for depth in 1..=3 {
         for oracles in 0..=depth {
             let edges: Vec<_> = (0..depth)
@@ -986,27 +1060,16 @@ fn r18_nested_specificity_family_matches_brute_force() {
                     .map(|i| id.interface_hashes[&format!("n{i}")].clone())
                     .collect();
                 for root in [0, 1, 2, 4] {
-                    let mut union = BTreeMap::new();
-                    for encoded in 0..5usize.pow(oracles as u32) {
-                        let mut n = encoded;
-                        let mut budgets = vec![root];
-                        for _ in 0..oracles {
-                            budgets.push((n % 5) as u64);
-                            n /= 5;
-                        }
-                        assignments += 1;
-                        for op in enumerate(&edges, action, &hashes, &budgets) {
-                            operations += 1;
-                            union.insert(op.canonical(), op);
-                        }
-                    }
-                    let concrete: Vec<_> = union.into_values().collect();
+                    assignments += 5usize.pow(oracles as u32);
+                    let mut root_budgets = vec![root];
+                    root_budgets.extend(vec![0; oracles]);
+                    let root_operations = enumerate(&edges, action, &hashes, &root_budgets);
                     // Even with B=0 there are no root oracle operations. Build
                     // selectors independently so empty domains are exercised.
                     let leaf: Vec<_> = (0..=depth)
                         .map(|i| point(&hashes[i], if i == depth { 2 } else { 0 }))
                         .collect();
-                    for case in 0..80 {
+                    for case in 0..125 {
                         let mut entries = Vec::new();
                         for _ in 0..(2 + draw(3)) {
                             let mut path = leaf[..draw((depth + 2) as u64) as usize].to_vec();
@@ -1065,10 +1128,39 @@ fn r18_nested_specificity_family_matches_brute_force() {
                             );
                             entries = vec![a.clone(), a, gate(&leaf, json(r#""*""#))];
                         }
+                        let mut encoded = case % 5usize.pow(oracles as u32);
+                        let tokens: Vec<_> = (0..oracles)
+                            .map(|_| {
+                                let value = (encoded % 5) as u64;
+                                encoded /= 5;
+                                value
+                            })
+                            .collect();
+                        let mut budgets = vec![root];
+                        budgets.extend(&tokens);
+                        let concrete = enumerate(&edges, action, &hashes, &budgets);
+                        operations += concrete.len();
                         let expected: Vec<_> =
                             concrete.iter().map(|op| winners(&entries, op)).collect();
                         let ambiguous = expected.iter().any(|w| w.len() > 1);
-                        let tokens: Vec<_> = (0..oracles).map(|_| draw(5)).collect();
+                        let root_ambiguous = root_operations
+                            .iter()
+                            .any(|op| winners(&entries, op).len() > 1);
+                        let limits = bennett_isa_ref::Budget {
+                            steps: root,
+                            heap: 0,
+                            stack: 256,
+                            depth: 16,
+                        };
+                        let args: Vec<_> = tokens
+                            .iter()
+                            .map(|&steps| {
+                                bennett_isa_ref::Argument::Token(bennett_isa_ref::Budget {
+                                    steps,
+                                    ..limits
+                                })
+                            })
+                            .collect();
                         let mut s = support::r18::schedule(&o, root, &tokens);
                         for reverse in [false, true] {
                             let mut ordered = entries.clone();
@@ -1077,16 +1169,33 @@ fn r18_nested_specificity_family_matches_brute_force() {
                             }
                             set(&mut s, "entries", Json::Array(ordered));
                             let parsed = Object::parse(&document(&o, &s));
-                            assert_eq!(parsed.is_err(), ambiguous, "edges={edges:?}, action={action}, root={root}, case={case}, reverse={reverse}: {}", s.canonical());
+                            assert_eq!(parsed.is_err(), root_ambiguous, "edges={edges:?}, action={action}, root={root}, case={case}, reverse={reverse}: {}", s.canonical());
                             if let Ok(parsed) = parsed {
                                 if !reverse {
                                     admitted += 1;
+                                    if ambiguous {
+                                        bound_ties += 1;
+                                    }
+                                }
+                                let bound =
+                                    parsed.check_schedule_matches_for_run("n0", limits, &args);
+                                assert_eq!(bound.is_err(),ambiguous,"bound edges={edges:?}, action={action}, budgets={budgets:?}, case={case}: {}",s.canonical());
+                                if let Err(e) = bound {
+                                    assert!(e.to_string().contains("§11: multiple maximal"), "{e}");
                                 }
                                 for (op, w) in concrete.iter().zip(&expected) {
-                                    assert_eq!(
-                                        parsed.resolve_schedule(op, "gate").unwrap(),
-                                        w.first().map(|i| &entries[*i])
-                                    );
+                                    let resolution = parsed.resolve_schedule(op, "gate");
+                                    if w.len() > 1 {
+                                        assert!(resolution
+                                            .unwrap_err()
+                                            .to_string()
+                                            .contains("§11: multiple maximal"));
+                                    } else {
+                                        assert_eq!(
+                                            resolution.unwrap(),
+                                            w.first().map(|i| &entries[*i])
+                                        );
+                                    }
                                 }
                             } else {
                                 assert!(parsed
@@ -1101,8 +1210,8 @@ fn r18_nested_specificity_family_matches_brute_force() {
             }
         }
     }
-    assert_eq!(cases, 4800);
-    eprintln!("R18 nested family: {cases} schedules + {cases} reversed orders, {admitted} admitted / {} rejected; {assignments} concrete budget assignments, {operations} concrete operations before partition deduplication; admission and all admitted resolver results: oracle agreement 100%",cases-admitted);
+    assert_eq!(cases, 7500);
+    eprintln!("R18 nested family: {cases} schedules + {cases} reversed orders, {admitted} admitted / {} root-rejected, {bound_ties} deferred ties materialise at binding; {assignments} distinct concrete budget assignments, {operations} concrete operations; root admission, actual-budget bound matching and all concrete resolver results: oracle agreement 100%",cases-admitted);
 }
 
 #[test]
@@ -1125,4 +1234,51 @@ fn r18_recursive_lproc_keeps_root_budget_without_depth_cap() {
     // Exploring extensions must terminate at a call-graph fixpoint; recursive
     // lift.call does not create a token-governed machine or a fresh step range.
     Object::parse(&document(&o, &s)).unwrap();
+}
+
+#[test]
+fn r18_bound_tokens_forward_by_parameter_and_zero_ancestor_is_empty() {
+    use bennett_isa_ref::{Argument, Budget, OracleInput};
+    use support::r18::*;
+    let o = chain(&['O', 'O'], false);
+    let reversed = o.text.replace(
+        "lift.oracle_call @n1 tk0 (x) r fr () (tk0, tk1)",
+        "lift.oracle_call @n1 tk0 (x) r fr () (tk1, tk0)",
+    );
+    assert_ne!(reversed, o.text);
+    let swapped = support::rehash(&reversed);
+    for (o, tokens, tie) in [
+        (&swapped, [4, 2], true),
+        (&swapped, [2, 4], false),
+        (&o, [0, 4], false),
+    ] {
+        let id = o.identity().unwrap();
+        let path: Vec<_> = (0..=2)
+            .map(|i| {
+                point(
+                    &id.interface_hashes[&format!("n{i}")],
+                    if i == 2 { 2 } else { 0 },
+                )
+            })
+            .collect();
+        let e = gate(&path, json("3"));
+        let mut s = support::r18::schedule(o, 2, &tokens);
+        set(&mut s, "entries", Json::Array(vec![e.clone(), e]));
+        let parsed = Object::parse(&document(o, &s)).unwrap();
+        let limits = Budget {
+            steps: 2,
+            heap: 0,
+            stack: 256,
+            depth: 16,
+        };
+        let mut input = OracleInput::bits(&[8]);
+        input.args = tokens
+            .map(|steps| Argument::Token(Budget { steps, ..limits }))
+            .to_vec();
+        let result = parsed.run_oracle("n0", &input, limits);
+        assert_eq!(result.is_err(), tie);
+        if let Err(e) = result {
+            assert!(e.to_string().contains("§11: multiple maximal"));
+        }
+    }
 }

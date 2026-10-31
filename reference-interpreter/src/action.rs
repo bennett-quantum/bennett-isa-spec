@@ -258,6 +258,13 @@ impl Object {
             // §3.3 classical types, ptr included (ptr_width bits).
             crate::oracle::check_argument(self, &p.ty, arg)?;
         }
+        if self.section("schedule").is_some() {
+            let arguments = f.params[3]
+                .iter()
+                .map(|p| bindings.args[&p.name].clone())
+                .collect::<Vec<_>>();
+            self.check_schedule_matches_for_run(name, crate::Budget::steps(0), &arguments)?;
+        }
         let mut env = Environment {
             bindings: bindings.clone(),
             predicates: Vec::new(),
