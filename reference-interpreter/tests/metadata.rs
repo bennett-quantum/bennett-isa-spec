@@ -427,8 +427,7 @@ fn r16_default_expansion_preserves_witness_and_identity() {
 fn r16_present_expansion_still_requires_closed_descriptor() {
     for descriptor in support::r16::malformed() {
         let e = Object::parse(&support::r16::expansion(descriptor))
-            .err()
-            .expect("malformed present expansion");
+            .expect_err("malformed present expansion");
         assert!(
             e.to_string().contains("§9.1") && e.to_string().contains("§11"),
             "{e}"

@@ -1,6 +1,7 @@
 //! Literal R16 reviewer witness and descriptor-only mutations; no rehash.
 use super::json;
-pub use super::r15::{IH, OH};
+pub const IH: &str = super::r15::IH;
+pub const OH: &str = super::r15::OH;
 use bennett_isa_ref::json::Json;
 pub const DEFAULT: &str = include_str!("r16-default-expansion.bisa");
 pub const SH: &str = "d5ba44577e812d158265a048d8e4f8843b5a472cad120f47a893c6bbc9dfb99d";
