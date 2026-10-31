@@ -149,6 +149,16 @@ north star §3.1 requires).
 | K34 | §3.3 | **REGISTER-FRESHNESS**. Fresh allocation disjoint from live/viewed registers; launch ids pairwise disjoint; witness: duplicate launch id returns E_ARG before execution, while from_id aliases remain references to one register. | INV-2 gap 3; register_handles_enforce_views_consumption_and_cleanliness | E | – |
 | K35 | §3.3 | **CALL-ALIASES**. Atomic CC/R fault for overlapping qreg call slots, including control/target overlap; witness: the same id in two slots faults without consuming a view or mutating wires. | INV-2 gap 4; r4_dynamic_interface_alias_is_an_atomic_reversible_cc_and_r_fault | E | – |
 
+| K36 | §6.1 | **REGION-PROVENANCE**. Image-relative cell version zero, perm, empty dependencies; witness: a nonzero image is the initial version, not outstanding garbage. | INV-3 gap 1; local_regions_require_explicit_restoration_and_load_pins_cell_versions | E | – |
+| K37 | §6.2 | **UNDONE-CHANGES**. Matched permutation pairs with intervening basis-value preservation; witness: X on a dependency followed by X reopens the original wire binding, but any cell write invalidates its old version. | INV-3 gap 2; cleanup_windows_and_linear_lifetimes | E | – |
+| K38 | §6.2 | **CLEANUP-VERSIONS**. Computation-time S and produced g versions current; witness: qcopy s then quncopy s d is legal without requiring the old zero d version. | INV-3 gap 3; cleanup_pins_predicate_versions_and_distinguishes_qif_polarity | E | – |
+| K39 | §6.2 | **CLEANUP-CONTROLS**. Computing and cleanup effective control sets/versions agree; witness: compute under p, cleanup under q cannot discharge the obligation. | INV-3 gap 4; cleanup_pins_predicate_versions_and_distinguishes_qif_polarity | E | – |
+| K40 | §6.2 | **OTHER-READERS**. SQ 25 outstanding-reader condition; witness: H d0; CCX d0 p d1; CX d1 t; CCX d0 p d1; H d0 cannot release d0. | INV-3 gap 5; b-isa-spec-0jo; SQ 25 | S | – |
+| K41 | §6.1 | **OUTSTANDING-DEPENDENCE**. Exact residual-operator factorisation defines dependency jointly on live/interface values and phases, retaining transitive effects through cleaned scratch; witness: t still depends on d0 after d1 is cleaned, and S on d0 leaves a phase until SDG cancels it. | INV-3 gap 6; SQ 25; cleanup_adjoint_cannot_skip_an_entangling_reader | S | – |
+| K42 | §5.6 | **TRANSLATION-CONTROLS**. Effective context included in every gate control set; inverse V has the same set/versions; witness: inherited p lies in X, never in a W target or B. | INV-3 gap 7; translation_lemma_checks_all_four_required_negative_patterns | E | – |
+| K43 | §5.6 | **STATIC-FRAMES**. Maximality within containing qloop/qif static sequence, per lifetime; witness: outer touches and inner frame at ordinals 4–7 remain separate. | INV-3 gap 8; SQ 30; muse_r5_translation_frame_maximality_is_within_its_static_sequence | E | – |
+| K44 | §4.3 | **STATIC-FREE**. qalloc version or explicit legal cleanup output at release; witness: fresh qalloc/free and H/H/free pass, H/free fails. | INV-3 gap 9; other_scratch_requires_the_exact_adjoint_but_accepts_h_h | E | – |
+
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
 `lift.call`; mapped-region parameters preserve the complete lifted-call
@@ -899,6 +909,12 @@ optimisation is extensionally equal on D (T6).
 | `qfree` | `qfree w` | release a `qalloc`ed bundle clean on every basis configuration |
 | `qreturn` | `qreturn w` | matched inverse of `qborrow` after its frame |
 
+In addition to §3.3's operand rules, `qfree d` is well-formed iff
+every wire's current version is its `qalloc` version (including a
+version restored by a matched inverse) or the clean output of an
+explicit §6.4 cleanup of the value occupying that wire.
+[deps: ISA-3.3-P3, ISA-4.3-P1, ISA-5.1, ISA-6.4]
+
 ### 4.4 Gates
 
 ```
@@ -1283,6 +1299,14 @@ Suite F contains the negative tests `cx b y; cx y z; cx b y` (V;W;V⁻¹),
 (target outside B), and `W = swap y z; cx b y` (swap excluded). Oracles
 are one frame verified by their own T3 claim over D.
 
+For (i)–(iii), every gate's controls include its effective control
+context, and V⁻¹ runs under the same effective control set and wire
+versions as V. [deps: ISA-2-P10, ISA-3.5, ISA-5.3-P5]
+Maximality of a frame inside a `qloop` or `qif` body is judged within
+that body's static instruction sequence, separately for each borrowed
+lifetime, not across unrolled visits or across distinct arm sequences.
+[deps: ISA-4.3-P2, ISA-4.3-P4, ISA-4.6, ISA-5.6-P2]
+
 ### 5.7 Executor transformations
 
 Inlining, structure recovery, dispatch re-indexing and simplification
@@ -1316,6 +1340,29 @@ every write. Π is the effective control context at the instruction.
 | non-permutation `action_call` | every mut and every `mut`-region cell: other |
 | `qinplace @g @ginv tk x (ins) (mem) (args)` | x: perm with S_x ∪ ins ∪ cells(every region in `mem`) ∪ Π if x was perm, else other; the `ins` wires and `mem` cells are unchanged |
 | lifted rows | each written location/cell: perm with the union of its read operands' sets ∪ Π; written cells' versions advance |
+| `qregion` creation | every cell: version 0, perm, S = ∅, with the declared image as its initial value. [deps: ISA-4.6-P1] |
+
+**Outstanding dependence** (for `other` cleanup) extends the dependency
+test beyond workspace provenance sets to the joint state of all other
+live values, including interface `mut` wires, region cells, borrowed
+wires and outstanding diagonal phases. [deps: ISA-3.3-P3, ISA-5.1, ISA-5.3-P1, ISA-6.1-P1]
+For a proposed inverse of the computing sequence C of g, let G be g's
+wires and M the composed intervening operation after C and before that
+inverse, retaining every intervening gate and its effective controls,
+with internal clean and borrowed lifetimes interpreted as in §14.2.
+[deps: ISA-2-P10, ISA-3.5, ISA-4, ISA-14.2]
+The remaining values or phases **depend on g** iff there is no single
+operator V on the remaining wires such that M = I_G ⊗ V for every state
+of G and every input in the remaining wires' declared domain, including
+arbitrary external entanglement and the exact global phase.
+[deps: ISA-5.2-P4, ISA-5.3-P1, ISA-5.6-P1, ISA-14.2]
+This is a joint, transitive test on the composed operation: cleaning or
+releasing an intermediate value does not erase its already-transferred
+dependence, and a diagonal use remains an outstanding phase unless its
+inverse cancels it in M. [deps: ISA-4.4, ISA-6.3, ISA-14.2]
+Dependency-set propagation through reads supplies such transitive paths,
+but absence of a direct provenance edge to g alone does not establish
+the required factorisation. [deps: ISA-6.1-P1, ISA-14.2]
 
 ### 6.2 Window and obligations
 
@@ -1323,12 +1370,23 @@ A perm value g with set S is **in its window** from its computation
 until the first of: a non-diagonal gate on a wire in S or in g; a version
 advance of a cell in S; a non-permutation action call touching a wire in
 S; a permutation change to a wire in S not undone before g's cleanup.
+A permutation change to a wire of S is **undone** when it and its
+undoing form a matched pair (§5.3), and every intervening operation
+leaves the computational-basis values of S and g unchanged; a cell
+version advance still closes the window even if its value is restored.
+[deps: ISA-5.3, ISA-6.1-P1, ISA-14.2]
 Each cleanup is bound to its exact computing sequence and requires the
-versions that sequence read to be current. Every perm value MUST be
+versions of S that sequence read, and the version of g it produced, to
+be current. [deps: ISA-3.3-P3, ISA-6.1-P1]
+A cleanup runs under the same effective control set, at the same wire
+versions, as its computing sequence. [deps: ISA-2-P10, ISA-3.5, ISA-5.3-P5]
+Every perm value MUST be
 cleaned within its window and before its region exits; otherwise the
 region is **ill-formed** (closed-window measurement-based cleanup is not
-admitted). `other` values are released only by the adjoint of the
-sequence that produced them.
+admitted). `other` values are released only by the adjoint of their
+computing sequence, and only while no other live value, interface wire
+or outstanding diagonal phase depends on them, as defined in §6.1.
+[deps: ISA-5.3, ISA-6.1, ISA-6.4]
 
 ### 6.3 T5
 

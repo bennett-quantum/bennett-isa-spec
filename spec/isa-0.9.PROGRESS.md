@@ -1,3 +1,46 @@
+## 2026-10-31 Proof editorial pass — group 2 (K36–K44)
+
+INV-3 gaps 1–9 all disposition a; gap 5 also resolves b-isa-spec-0jo.
+Nine separate concepts/K rows preserve the provenance table, window
+conditions, exact control identity, and the SQ 25 soundness correction.
+
+K41 defines “depends on” by an exact joint residual-operator condition
+M = I_G tensor V, with arbitrary G/rest/reference states, phase included.
+This is the semantic meaning of no outstanding reader, rather than an
+implementation-private approximation to a dependency graph. Transitive
+reads through cleaned scratch are retained by composition. Checking
+exactly or proving factorisation structurally/library-wise is a checker
+mechanism; two conformant implementations have the same predicate.
+It is applied to other values only: perm values still permit diagonal
+readers and their declared phases (T5). No measurement-based cleanup,
+inert non-permutation call, or basis-only test substitutes for it.
+The complete computing sequence can include its reader and uncompute,
+so valid larger compute/uncompute constructions remain expressible.
+
+Witness derivation: with p=1 and t=0, after H(d0), CCX(d0,p,d1),
+CX(d1,t), CCX(d0,p,d1), d1 is zero but t=d0. The middle operator on
+d0/t is CX, not I(d0) tensor V(t), so K40 forbids the final H cleanup;
+H;H with no middle operation is permitted. A diagonal S on d0 also
+fails the factorisation, while S;SDG restores it exactly (phase included).
+
+K37's “undone” requires matched changes and basis-preserving intervening
+operations, not mere equal final bit patterns. K38 pins the produced g
+version, rather than the impossible pre-computation target version.
+K39 binds the computing control set/versions explicitly. K42 includes
+inherited predicates in translation-lemma side conditions. K43 chooses
+SQ 30 static-body maximality and never joins separate borrowed lifetimes.
+K44 states the static qfree test alongside its existing dynamic clean
+condition; matched inverses restore the allocation version. K36's version
+zero is relative to the image, including a nonzero image.
+
+Rejected: allowing H cleanup with an entangled interface reader; deleting
+a transitive dependency when its intermediate scratch is cleaned; ignoring
+diagonal/global phases; imposing the other-value rule on perm cleanup;
+using current bit equality to roll back cell version counters; lexical
+predicate-stack identity; maximality across dynamic loop visits.
+Witnesses are on K36–K44. Entire §11.1 and the 219-recipe library remain
+byte-identical; none of these clauses changes a recipe.
+
 ## 2026-10-31 Proof editorial pass — group 1 (K29–K35)
 
 Sole implementation editor; owned draft/diff/progress/beads only. Read all
