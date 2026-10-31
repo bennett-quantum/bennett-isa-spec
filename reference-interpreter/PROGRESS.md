@@ -14,8 +14,8 @@ round 4–13 positives/negatives retained; the R13 type family is replaced.
 
 | Blocker | RED tests | Status | Commit |
 |---|---|---|---|
-| R14-B01 | metadata::r14_y_endpoints_require_decimal_strings; cli_xam::r14_cli_rejects_numeric_y_endpoints | GREEN | pending commit |
-| R14-B02 | metadata::r14_table_rows_and_components_are_typed_at_admission; cli_xam::r14_cli_rejects_malformed_table_rows_and_cells | GREEN | pending commit |
+| R14-B01 | metadata::r14_y_endpoints_require_decimal_strings; cli_xam::r14_cli_rejects_numeric_y_endpoints | GREEN | 7f834d0 |
+| R14-B02 | metadata::r14_table_rows_and_components_are_typed_at_admission; cli_xam::r14_cli_rejects_malformed_table_rows_and_cells | GREEN | 7f834d0 |
 
 Design: src/metadata_schema.rs::TABLE is the sole recursive grammar, with
 clauses on all productions. It covers every accepted JSON metadata section
@@ -39,12 +39,20 @@ above u128 remains admissible; table truth/cardinality remain verifier work.
 CLI negatives exit 1 with empty stdout and §9.1/§12 diagnostics.
 
 The derived family is metadata_schema::tests::r14_generated_metadata_schema_type_family
-(src/metadata_schema/tests.rs). It generates positives and recursive mutations
-from TABLE, including populated maps/arrays, every union/enum alternative,
-optional fields, and integer/decimal edges. Wrong-kind expectations come from
-Shape, independently of the validator's result. Both admission paths and
-full parse of 26 independently pinned objects are exercised. Final counts
-and sweep results will be recorded at the verification checkpoint.
+(src/metadata_schema/tests.rs), derived from **162 productions**. It exercises
+**9,754 generated positives, 1,632 unique typed paths, 26,354 grammar negatives**;
+**1,992** of those run through BOTH admission validators (and certificate
+negatives also call validate_certificate_details directly). Another **26 pinned
+objects, 2,393 parse path visits, 17,173 full-parse negatives** exercise real
+admission before identities. Total negative cases: **43,527** (dual-validator
+assertions are a subset, not added again). Empty/nonempty containers, optional
+absence, every union/enum alternative, canonical large integers and decimal
+edges are represented. Wrong-kind expectations derive from Shape independently
+of observed validator results. The old R13 family/union is removed, not retained
+as a second schema. The width family remains **507: 159 constructed, 286 layout
+rejections, 62 resource diagnostics**. The reviewer's nonblocking S1 request
+for stronger independent width-outcome assertions is left as future work;
+no width behavior or existing assertion is changed this round.
 
 Observed normal gates: 379/0/5 after replacement and 379/0/5 after final
 schema/positive-family changes. Initial full run failed only because malformed
@@ -52,10 +60,35 @@ reviewer objects were placed in the valid fixture inventory; moved them to
 support without weakening the fixture audit. The first pin script assumed
 r14-table-bool was action-based; corrected it to read its inc8 symbol. All
 supplied pins match unchanged. Clippy's redundant unit-expression finding
-was corrected; final gates and ignored sweeps are in progress.
+was corrected. Final post-style suite: **379 passed / 0 failed / 5 ignored**,
+9 unit + 370 integration, 0 doctests, 22.84 s summed runner time. Baseline was
+18.32 s. Fmt and strict all-target Clippy pass (0 warnings). The final family
+and width gate passed 5 tests (two generated families plus three retained width
+regressions); 5.21 s schema + 0.07 s widths.
+
+All **5 ignored sweeps passed / 0 failed**, **100.56 s** summed runner time.
+
+| Sweep | Full domain | Observed result / runner time |
+|---|---|---|
+| u8 division/remainder | 65,536 operand pairs × 4 = 262,144 executions | 1/0; 0.52 s |
+| 17-wire borrow | 131,072 entries | 1/0; 2.71 s |
+| checked borrow certificate | 262,144 elements, subject and expected program | 1/0; 14.81 s |
+| §6 differential | 200,000 programs: 70,931 accepted (all clean), 129,069 rejected | 1/0; 80.11 s |
+| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 1/0; 2.41 s |
+
+No production/test edits after the final normal suite or sweep start.
+All three generated corpora reproduce byte-identically; all six copied
+reviewer files match the originals. Owned diff --check is clean.
+
+Supplemental exact RED replay builds e3ae1af sources with headless rustc under
+reference-interpreter/.tmp (no checkout/current-source changes): 0/2 library
+tests on exact Y-number/row-bool; all ten exact negative check/hash calls
+wrongly exit 0. The same ten calls on the current binary exit 1, empty stdout,
+with §9.1/§12; the singleton positive pin is unchanged.
+Logs: .tmp/r14-exact-{red-replay,cli-green}.log.
 
 Logs: repo .tmp/r14-{before,red,green,schema-full,family,full,final,final2,
-clippy,clippy-final}.log. No spec/conformance edits or execution, dependency,
+clippy,clippy-final,families-final,sweeps}.log. No spec/conformance edits or execution, dependency,
 Beads mutation/export, push or Dolt sync. Concurrent changes are untouched.
 Historical round evidence is in council/response-round-N.md and git history.
 
@@ -90,4 +123,3 @@ its full verification obligation met yet. The entire ISA remains the scope.
 7. Persist new discipline/borrow objects as canonical fixtures with hand
    expectations; cover every path/fault. Rerun ignored sweeps, strict Clippy,
    fmt, unchanged Python seed and documented CLI after substantive changes.
-

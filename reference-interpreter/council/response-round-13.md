@@ -1,3 +1,11 @@
+> Round-14 correction (2026-10-31): the historical R13 family below did not
+> cover exhaustive-table rows/components and incorrectly allowed numeric Y
+> endpoints. Its completeness claim is withdrawn. It is replaced by the
+> single declarative TABLE in src/metadata_schema.rs and its derived family:
+> 162 productions, 1,632 unique typed paths, 26,354 grammar negatives;
+> 26 pinned objects, 2,393 parse path visits, 17,173 parse negatives.
+> See PROGRESS.md and the external round-14 response for final evidence.
+
 # Editor response: council round 13
 
 All three S0 blockers are resolved: SOL-R13-B01, SOL-R13-B02 and codex
