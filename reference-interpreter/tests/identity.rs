@@ -231,3 +231,79 @@ fn council_r4_cc_envelope_includes_service_but_not_unused_model() {
     assert_eq!(id.envelopes["mix"], expected);
     assert_eq!(id.interface_hashes["mix"], sha256_hex(expected.as_bytes()));
 }
+
+#[test]
+fn r11_oracle_layout_ownership_uses_exact_names() {
+    let expected = concat!(
+        "isa=0.8\nptr_width=32\n",
+        "{\"abi\":\"0.8\",\"args\":[],\"fault\":4,\"in\":[1],\"kind\":\"oracle\",\"mem\":[],\"tgt\":1,\"tier\":\"q\"}\n",
+        "oracle @a (x:wire in) (t:wire) (f:wire[4]) () ()\n^entry():\nlift.retval x\n",
+        "layout A_tab 0\nlayout H 4\nlayout S_cells 0\nlayout heap_base 1\nlayout heap_limit_max 0\nlayout null_size 1\nlayout ptr_width 32\n"
+    );
+    assert_eq!(
+        sha256_hex(expected.as_bytes()),
+        "1b593b9027243623bfb18cc5b34c51d7df81d23526bc4987c14a5da2806b9521"
+    );
+    for tag in ["sol-layout-2", "sol-layout-3"] {
+        let o = Object::parse(&support::r11_text(tag)).unwrap();
+        assert_eq!(o.identity().unwrap().envelopes["a"], expected);
+        support::r11_pin(tag);
+    }
+}
+
+#[test]
+fn r11_dotted_oracle_layout_ownership() {
+    let expected = concat!(
+        "isa=0.8\nptr_width=32\n",
+        "{\"abi\":\"0.8\",\"args\":[],\"fault\":4,\"in\":[8],\"kind\":\"oracle\",\"mem\":[{\"A\":0,\"W\":8,\"role\":\"in\"}],\"tgt\":8,\"tier\":\"q\"}\n",
+        "oracle @a (x:wire[8] in) (t:wire[8]) (f:wire[4]) (db:region[0,8] in) ()\n^entry():\nlift.retval x\n",
+        "layout A_tab 1\nlayout H 8\nlayout S_cells 0\nlayout heap_base 128\nlayout heap_limit_max 0\n",
+        "layout interface_regions.a.db {\"base\":16}\nlayout null_size 1\nlayout ptr_width 32\n"
+    );
+    assert_eq!(
+        sha256_hex(expected.as_bytes()),
+        "4671ca551ee57390d7f69d362e83180a1f3b29a3b8d2f45e2cd80962c6692aec"
+    );
+    for tag in ["codex-layout-32", "codex-layout-48"] {
+        let o = Object::parse(&support::r11_text(tag)).unwrap();
+        assert_eq!(o.identity().unwrap().envelopes["a"], expected);
+        let o = support::r11_pin(tag);
+        let mut input = bennett_isa_ref::OracleInput::bits(&[7]);
+        input.regions.insert("db".into(), vec![0]);
+        let result = o
+            .run_oracle("a", &input, bennett_isa_ref::Budget::steps(1))
+            .unwrap();
+        assert_eq!((result.payload, result.code, result.steps), (7, 0, 1));
+    }
+    let changed = support::r11_text("codex-layout-32").replace("\"base\":16", "\"base\":17");
+    assert_ne!(
+        Object::parse(&changed)
+            .unwrap()
+            .identity()
+            .unwrap()
+            .interface_hashes["a"],
+        sha256_hex(expected.as_bytes())
+    );
+}
+
+#[test]
+fn r11_dotted_owner_and_region_family() {
+    for owner in ["a", "a.b", "a.b.c"] {
+        let mut envelopes = vec![];
+        for base in [32, 48] {
+            let tag = format!("deep-{owner}-{base}");
+            let o = support::r11_pin(&tag);
+            envelopes.push(o.identity().unwrap().envelopes[owner].clone());
+            let changed = support::r11_text(&tag).replace("\"base\":16", "\"base\":17");
+            assert_ne!(
+                Object::parse(&changed)
+                    .unwrap()
+                    .identity()
+                    .unwrap()
+                    .envelopes[owner],
+                envelopes[0]
+            );
+        }
+        assert_eq!(envelopes[0], envelopes[1]);
+    }
+}

@@ -70,7 +70,7 @@ for base, pin, op in [(32,"26455a8ebeb96ca9ef90972709611ad6eed2bd2cb18f61aa36831
     case("codex-layout-"+str(base),[oracle("a",8,"db"),oracle("a.b",8,"other")],layout,
          ({"a":"4671ca551ee57390d7f69d362e83180a1f3b29a3b8d2f45e2cd80962c6692aec","a.b":pin},op))
 # Dotted region names can render colliding paths across owners. Filter first.
-for a, b in [("a","a.b"),("a.b","a.b.c"),("a.b.c","a.b.c.d")]:
+for a, b in [("a","a.c"),("a.b","a.b.c"),("a.b.c","a.b.c.c")]:
     for base in (32,48):
         layout = dict(A_tab=1,H=8,S_cells=0,globals={},heap_base=128,heap_limit_max=0,
                       interface_regions={a:{"c.db":{"base":16}},b:{"db":{"base":base}}},

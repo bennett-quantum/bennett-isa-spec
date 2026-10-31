@@ -223,18 +223,23 @@ impl Object {
         let mut leaves = BTreeMap::new();
         let mut images = BTreeSet::new();
         if let Some(layout) = self.section("layout") {
-            let all = layout_leaves(layout)?;
-            match kind {
-                "oracle" => {
-                    for (k, v) in all {
-                        if !k.starts_with("interface_regions.")
-                            || k.starts_with(&format!("interface_regions.{n}."))
-                        {
-                            leaves.insert(k, v);
-                        }
-                    }
+            // §9.2 ownership is a JSON key, not a prefix of a rendered path.
+            // NAME and region names may contain dots (§16.1), including paths
+            // that would collide if foreign owners were flattened first.
+            let mut selected = layout.clone();
+            if kind == "oracle" {
+                let regions = layout.get("interface_regions")?.object()?;
+                let own = regions
+                    .get(n)
+                    .map(|entry| BTreeMap::from([(n.to_string(), entry.clone())]))
+                    .unwrap_or_default();
+                if let Json::Object(fields) = &mut selected {
+                    fields.insert("interface_regions".into(), Json::Object(own));
                 }
-                "cc" | "r" => leaves = all,
+            }
+            let all = layout_leaves(&selected)?;
+            match kind {
+                "oracle" | "cc" | "r" => leaves = all,
                 "lproc" => {
                     for line in &body {
                         if let Some(g) = line.split_once("lift.addr @").map(|(_, g)| g) {

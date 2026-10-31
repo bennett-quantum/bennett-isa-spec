@@ -1879,3 +1879,46 @@ fn r11_cli_producer_and_argument_controls() {
         }
     }
 }
+
+#[test]
+fn r11_cli_exact_oracle_layout_owners() {
+    for tag in [
+        "sol-layout-2",
+        "sol-layout-3",
+        "codex-layout-32",
+        "codex-layout-48",
+    ] {
+        let path = tmp_file(&format!("r11-{tag}.bisa"), &support::r11_text(tag));
+        for cmd in ["check", "hash"] {
+            let v = ok(&[cmd, &path]);
+            assert_eq!(text(&v, "status"), "ok");
+            let c = support::r11_case(tag);
+            assert_eq!(
+                text(&v, "object_hash"),
+                c.get("object_hash").unwrap().string().unwrap()
+            );
+            for (name, hash) in c.get("hashes").unwrap().object().unwrap() {
+                let symbol = field(&v, "symbols").get(name).unwrap();
+                assert_eq!(text(symbol, "interface_hash"), hash.string().unwrap());
+                assert_eq!(text(symbol, "closure_hash"), hash.string().unwrap());
+            }
+        }
+        if tag.starts_with("codex") {
+            let v = ok(&[
+                "run-oracle",
+                &path,
+                "a",
+                "--input",
+                "7",
+                "--mem",
+                "db=00",
+                "--budget",
+                "1,0,0,0",
+            ]);
+            assert_eq!(
+                (uint(&v, "payload"), uint(&v, "code"), uint(&v, "steps")),
+                (7, 0, 1)
+            );
+        }
+    }
+}

@@ -15,8 +15,8 @@ including malformed objects, without interpreter calls or pin corrections.
 
 | Blocker | RED tests | Status | Commit |
 |---|---|---|---|
-| SOL-R11-B01 ≡ R11-B01 | parser::r11_action_regs_do_not_produce_wires / r11_action_regs_cannot_invent_angles; CLI wire/angle counterparts | GREEN, 6 targeted pass; full suite 344/0/5 | this step |
-| SOL-R11-B02 ≡ R11-B02 | literal exact-owner envelope witnesses prepared | pending | — |
+| SOL-R11-B01 ≡ R11-B01 | parser::r11_action_regs_do_not_produce_wires / r11_action_regs_cannot_invent_angles; CLI wire/angle counterparts | GREEN, 6 targeted pass; full suite 344/0/5 | d3e3c21 |
+| SOL-R11-B02 ≡ R11-B02 | identity::r11_oracle_layout_ownership_uses_exact_names / r11_dotted_oracle_layout_ownership; CLI counterpart | GREEN; full suite 348/0/5 | this step |
 | SOL-R11-B03 ≡ R11-B03 | qinplace and rounded-angle fixture claims | pending | — |
 
 B01 RED: parser 0 passed / 3 failed, CLI 1 passed / 1 failed;
@@ -36,7 +36,14 @@ No runtime default, count cap or scope reduction.
 
 Logs: .tmp/r11-{baseline,b01-red,b01-angle-cli-red,b01-green,b01-full,pins}.log.
 Only crate tests with absolute offline manifest; no conformance execution.
-Remaining work: B02 exact structured ownership, B03 fixture audit/fixes,
+B02 RED: 3 identity failures (both literal envelopes plus family), CLI 3 passed /
+1 failed (§9.2 mismatch). GREEN: 7/0 including 3 retained B01 CLI tests.
+Exact structured key selection precedes flattening; all non-interface leaves
+remain. Six dotted-name positives plus three own-base sensitivity controls
+include colliding rendered paths. Both member pin sets match without correction.
+Initial test build used the wrong OracleInput field; fixed before semantic RED.
+Logs: .tmp/r11-b02-{red,green,full}.log.
+Remaining work: B03 fixture audit/fixes,
 README Design, final gates and five sweeps, external response and commits.
 
 ## Round-10 fixes (2026-10-30)
