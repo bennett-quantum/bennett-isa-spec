@@ -60,3 +60,14 @@ pub(crate) fn err<T>(rule: &str, message: impl std::fmt::Display) -> Result<T> {
 pub fn version() -> &'static str {
     "0.8"
 }
+
+/// Reserve text-derived storage fallibly before iteration or initialization.
+pub(crate) fn reserved<T>(count: usize, rule: &str, what: &str) -> Result<Vec<T>> {
+    let mut out = Vec::new();
+    out.try_reserve_exact(count).map_err(|e| {
+        Error(format!(
+            "{rule}: host limit: {what} allocation of {count} elements failed: {e}"
+        ))
+    })?;
+    Ok(out)
+}

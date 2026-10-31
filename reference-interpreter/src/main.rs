@@ -913,19 +913,26 @@ fn build_action_state(
         let cells = (a < 63)
             .then(|| 1usize.checked_shl(a as u32))
             .flatten()
-            .ok_or_else(|| fail("host limit: interface region exceeds host memory"))?;
-        let cell_width =
-            usize::try_from(w).map_err(|_| fail("host limit: cell width exceeds host storage"))?;
+            .ok_or_else(|| fail("§3.3: host limit: interface region exceeds host memory"))?;
+        let cell_width = usize::try_from(w)
+            .map_err(|_| fail("§3.3: host limit: cell width exceeds host storage"))?;
         let cell_bytes = cell_width.div_ceil(8);
-        let mut values = (0..cells)
-            .map(|_| BitVector::zero(cell_width))
-            .collect::<Result<Vec<_>>>()?;
+        let byte_count = cells
+            .checked_mul(cell_bytes)
+            .ok_or_else(|| fail("§3.3: host limit: interface region byte count exceeds usize"))?;
+        let mut values = Vec::new();
+        values
+            .try_reserve_exact(cells)
+            .map_err(|e| fail(format!("§3.3: host limit: interface region cells: {e}")))?;
+        for _ in 0..cells {
+            values.push(BitVector::zero(cell_width)?);
+        }
         if let Some((_, bytes)) = options.mem.iter().find(|(n, _)| *n == p.name) {
-            if bytes.len() != cells * cell_bytes {
+            if bytes.len() != byte_count {
                 return Err(fail(format!(
                     "§5.1: region {} needs {} bytes ({} cells of {}), --mem gave {}",
                     p.name,
-                    cells * cell_bytes,
+                    byte_count,
                     cells,
                     cell_bytes,
                     bytes.len()
@@ -1316,9 +1323,10 @@ fn parse_oracle_options(
             let n = (a < 64)
                 .then(|| 1usize.checked_shl(a as u32))
                 .flatten()
-                .ok_or_else(|| fail("host limit: interface region exceeds host memory"))?;
+                .ok_or_else(|| fail("§3.3: host limit: interface region exceeds host memory"))?;
             let mut zero = Vec::new();
-            zero.try_reserve_exact(n).map_err(fail)?;
+            zero.try_reserve_exact(n)
+                .map_err(|e| fail(format!("§3.3: host limit: interface region storage: {e}")))?;
             zero.resize(n, 0);
             regions.insert(p.name.clone(), zero);
         }
@@ -1845,9 +1853,10 @@ fn run() -> Result<()> {
             let n = (a < 64)
                 .then(|| 1usize.checked_shl(a as u32))
                 .flatten()
-                .ok_or_else(|| fail("host limit: interface region exceeds host memory"))?;
+                .ok_or_else(|| fail("§3.3: host limit: interface region exceeds host memory"))?;
             let mut zero = Vec::new();
-            zero.try_reserve_exact(n).map_err(fail)?;
+            zero.try_reserve_exact(n)
+                .map_err(|e| fail(format!("§3.3: host limit: interface region storage: {e}")))?;
             zero.resize(n, 0);
             input.regions.insert(p.name.clone(), zero);
         }

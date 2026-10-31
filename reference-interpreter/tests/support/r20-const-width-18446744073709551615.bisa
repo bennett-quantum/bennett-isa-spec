@@ -1,0 +1,11 @@
+bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"97eb756124446d26628e2abbe5fb74223cbad5eb7902aacd31b7a309069f48f1","kind":"oracle","name":"o","signature":{"abi":"0.8","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}}}
+
+section functions
+oracle @o (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
+regs { huge:reg[18446744073709551615] }
+^entry():
+huge = lift.const.i18446744073709551615 1
+lift.retval x

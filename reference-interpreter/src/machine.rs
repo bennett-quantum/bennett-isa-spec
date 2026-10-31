@@ -62,7 +62,7 @@ impl DerivedWidths {
         let depth_plus_two = budget
             .depth
             .checked_add(2)
-            .ok_or_else(|| Error("§5.4: depth limit exceeds the counter range".into()))?;
+            .ok_or_else(|| Error("§5.4: host limit: depth plus two exceeds u128".into()))?;
         // ceil(log2(d + 2)) = bits(d + 1).
         let dc = bits_for(depth_plus_two - 1);
         let p = bits_for(program.halt as u128);
@@ -387,7 +387,7 @@ impl<'a> OracleVectorMachine<'a> {
         let memory = Memory::initial(object, root, &input.regions)?;
         let atop = memory.allocations.len() as u128;
         let count = usize::try_from(budget.steps)
-            .map_err(|_| Error("host limit: B frames exceed host address space".into()))?;
+            .map_err(|_| Error("§3.7: host limit: B frames exceed host address space".into()))?;
         let frame = Frame {
             old_pc: 0,
             slots: widths
@@ -401,7 +401,7 @@ impl<'a> OracleVectorMachine<'a> {
         let mut frames = Vec::new();
         frames
             .try_reserve_exact(count)
-            .map_err(|e| Error(format!("host limit: cannot allocate B frames: {e}")))?;
+            .map_err(|e| Error(format!("§3.7: host limit: cannot allocate B frames: {e}")))?;
         frames.resize(count, frame);
         let target = root.params[1][0].ty.bits(object.ptr_width)?;
         let fault = root.params[2][0].ty.bits(object.ptr_width)?;
@@ -655,7 +655,7 @@ impl<'a> OracleVectorMachine<'a> {
     }
     fn live_entries(&self) -> Result<&[Allocation]> {
         let atop = usize::try_from(number(&self.state.atop)?)
-            .map_err(|_| Error("host limit: atop exceeds host address space".into()))?;
+            .map_err(|_| Error("§3.7: host limit: atop exceeds host address space".into()))?;
         let entries = &self.state.memory.allocations;
         Ok(&entries[..atop.min(entries.len())])
     }
@@ -900,7 +900,7 @@ impl<'a> OracleVectorMachine<'a> {
             Destination::EntryAtop => {
                 // alloctab[atop], addressed with the counter value current now (§3.6).
                 let index = usize::try_from(number(&self.state.atop)?)
-                    .map_err(|_| Error("host limit: alloctab index exceeds usize".into()))?;
+                    .map_err(|_| Error("§3.7: host limit: alloctab index exceeds usize".into()))?;
                 let entries = &mut self.state.memory.allocations;
                 let clean = Allocation {
                     base: 0,

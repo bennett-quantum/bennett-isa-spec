@@ -403,17 +403,17 @@ impl Compiler<'_> {
         }
         Ok(w[0].clone())
     }
-    fn fresh(&mut self, width: usize) -> Vec<String> {
+    fn fresh(&mut self, width: usize) -> Result<Vec<String>> {
         let generation = self.generation;
         self.generation += 1;
-        (0..width)
-            .map(|bit| format!("v{generation}_{bit}"))
-            .collect()
+        let mut wires = crate::reserved(width, "§3.3", "borrow compiler wire names")?;
+        wires.extend((0..width).map(|bit| format!("v{generation}_{bit}")));
+        Ok(wires)
     }
-    fn produce(&mut self, name: &str, width: usize) -> Vec<String> {
-        let wires = self.fresh(width);
+    fn produce(&mut self, name: &str, width: usize) -> Result<Vec<String>> {
+        let wires = self.fresh(width)?;
         self.bundles.insert(name.into(), wires.clone());
-        wires
+        Ok(wires)
     }
     /// The address condition `a == i` as literals on the address wires.
     fn address(&self, a: &str, i: usize) -> Result<Vec<(String, bool)>> {
@@ -431,7 +431,7 @@ impl Compiler<'_> {
             let w = crate::object::host_count(&a[2], "qregion cell width")? as usize;
             let cells = crate::oracle::power_of_two(aw as u128)
                 .and_then(|n| usize::try_from(n).ok())
-                .ok_or_else(|| Error("host limit: region exceeds host address space".into()))?;
+                .ok_or_else(|| Error("§4.6: host limit: region cell count exceeds usize".into()))?;
             let image = match a.get(3) {
                 Some(img) => self
                     .object
@@ -439,11 +439,18 @@ impl Compiler<'_> {
                     .get(img.trim_start_matches('@'))
                     .cloned()
                     .ok_or_else(|| Error("§4.6: unresolved qregion image".into()))?,
-                None => vec![0; (cells * w).div_ceil(8)],
+                None => {
+                    let bits = cells.checked_mul(w).ok_or_else(|| {
+                        Error("§4.6: host limit: region bit count exceeds usize".into())
+                    })?;
+                    let mut image = crate::reserved(bits.div_ceil(8), "§4.6", "region image")?;
+                    image.resize(bits.div_ceil(8), 0);
+                    image
+                }
             };
-            let mut all = Vec::new();
+            let mut all = crate::reserved(cells, "§4.6", "region cells")?;
             for _ in 0..cells {
-                all.push(self.fresh(w));
+                all.push(self.fresh(w)?);
             }
             let flat: Vec<String> = all.iter().flatten().cloned().collect();
             out.push(Node::Alloc(flat.clone()));
@@ -536,7 +543,9 @@ impl Compiler<'_> {
             n.wires(&mut all);
         }
         for from in all {
-            wires.entry(from).or_insert_with(|| self.fresh(1).remove(0));
+            if let std::collections::btree_map::Entry::Vacant(entry) = wires.entry(from) {
+                entry.insert(self.fresh(1)?.remove(0));
+            }
         }
         self.borrowed
             .extend(transfer.borrowed.iter().map(|w| wires[w].clone()));
@@ -674,7 +683,7 @@ impl Compiler<'_> {
             match op {
                 "qalloc" | "qborrow" => {
                     let n = crate::object::host_count(&a[1], "allocation width")? as usize;
-                    let wires = self.produce(&i.lhs[0], n);
+                    let wires = self.produce(&i.lhs[0], n)?;
                     if op == "qborrow" {
                         self.borrowed.extend(wires.iter().cloned());
                         self.live_borrowed.extend(wires.iter().cloned());
@@ -705,7 +714,7 @@ impl Compiler<'_> {
                     let source = self.bundle(&a[0])?;
                     let target = match op {
                         "qcopy" => {
-                            let w = self.produce(&i.lhs[0], source.len());
+                            let w = self.produce(&i.lhs[0], source.len())?;
                             out.push(Node::Alloc(w.clone()));
                             w
                         }
@@ -768,7 +777,7 @@ impl Compiler<'_> {
                         .cloned()
                         .ok_or_else(|| Error("§4.6: unknown region".into()))?;
                     let value = if op == "qload" {
-                        let w = self.produce(&i.lhs[0], cells.first().map_or(0, Vec::len));
+                        let w = self.produce(&i.lhs[0], cells.first().map_or(0, Vec::len))?;
                         out.push(Node::Alloc(w.clone()));
                         w
                     } else {
@@ -1686,15 +1695,18 @@ impl Object {
         for p in f.params.iter().flatten() {
             match p.ty {
                 Type::Wire(width) => {
-                    compiler.produce(&p.name, width as usize);
+                    compiler.produce(&p.name, width as usize)?;
                 }
                 Type::Region(a, w) => {
                     let cells = crate::oracle::power_of_two(a as u128)
                         .and_then(|n| usize::try_from(n).ok())
                         .ok_or_else(|| {
-                            Error("host limit: region exceeds host address space".into())
+                            Error("§4.6: host limit: region cell count exceeds usize".into())
                         })?;
-                    let all = (0..cells).map(|_| compiler.fresh(w as usize)).collect();
+                    let mut all = crate::reserved(cells, "§4.6", "region cells")?;
+                    for _ in 0..cells {
+                        all.push(compiler.fresh(w as usize)?);
+                    }
                     compiler.regions.insert(p.name.clone(), (a, all));
                 }
                 _ => {}

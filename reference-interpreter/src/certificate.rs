@@ -111,17 +111,16 @@ fn domain(value: &Json, f: &Function) -> Result<()> {
                 return err("§12.2", "repeated domain component");
             }
             let width = b.get("width")?.uint()?;
-            let bits =
-                usize::try_from(width).map_err(|_| Error("host limit: domain width".into()))?;
             if width == 0 {
                 return err("§12.2", "zero-width domain component");
             }
-            // Bounds are exact integers of any size, within the bundle width.
-            let lo = crate::BitVector::parse_unsigned_exact(bits, b.get("lo")?.uint_text()?)
-                .map_err(|e| Error(format!("§12.2: domain lo outside bundle width: {e}")))?;
-            let hi = crate::BitVector::parse_unsigned_exact(bits, b.get("hi")?.uint_text()?)
-                .map_err(|e| Error(format!("§12.2: domain hi outside bundle width: {e}")))?;
-            if lo.unsigned_cmp(&hi)? == std::cmp::Ordering::Greater {
+            // Admission compares the spelling's magnitude, never allocates width
+            // bits for an endpoint. Resource errors retain their own diagnostic.
+            let lo = b.get("lo")?.uint_text()?;
+            let hi = b.get("hi")?.uint_text()?;
+            crate::object::unsigned_literal(lo, width)?;
+            crate::object::unsigned_literal(hi, width)?;
+            if (lo.len(), lo) > (hi.len(), hi) {
                 return err("§12.2", "domain interval with lo > hi");
             }
             if group == "bundles" {
@@ -158,6 +157,9 @@ fn domain(value: &Json, f: &Function) -> Result<()> {
                 }
             })
             .ok_or_else(|| Error("§12.2: unknown domain interface region".into()))?;
+        if w == 0 {
+            return err("§12.2", "zero-width domain cell");
+        }
         let cells = region.get("cells")?;
         if cells == &Json::String("all".into()) {
             continue;
@@ -165,12 +167,13 @@ fn domain(value: &Json, f: &Function) -> Result<()> {
         let mut indices = BTreeSet::new();
         for cell in cells.array()? {
             let index = cell.get("index")?.uint()?;
-            let bits = usize::try_from(w).map_err(|_| Error("host limit: cell width".into()))?;
-            let lo = crate::BitVector::parse_unsigned_exact(bits, cell.get("lo")?.uint_text()?)?;
-            let hi = crate::BitVector::parse_unsigned_exact(bits, cell.get("hi")?.uint_text()?)?;
+            let lo = cell.get("lo")?.uint_text()?;
+            let hi = cell.get("hi")?.uint_text()?;
+            crate::object::unsigned_literal(lo, w as u128)?;
+            crate::object::unsigned_literal(hi, w as u128)?;
             if crate::oracle::power_of_two(a as u128).is_some_and(|cells| index >= cells)
                 || !indices.insert(index)
-                || lo.unsigned_cmp(&hi)? == std::cmp::Ordering::Greater
+                || (lo.len(), lo) > (hi.len(), hi)
             {
                 return err("§12.2", "invalid domain cell interval");
             }
@@ -328,5 +331,59 @@ impl Object {
             _ => return err("§12.1", "unknown certificate claim kind"),
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod r20_tests {
+    use super::*;
+    #[test]
+    fn r20_region_domain_extremes() {
+        let values = [0u64, 1, (1 << 63) - 1, 1 << 63, u64::MAX - 1, u64::MAX];
+        let mut cases = 0;
+        for n in values {
+            for path in ["A", "W", "index", "lo", "hi"] {
+                let (a, w, index, lo, hi) = match path {
+                    "A" => (n, 1, 0, 0, 1),
+                    "W" => (0, n, 0, 0, 1),
+                    "index" => (1, 1, n, 0, 1),
+                    "lo" => (0, 1, 0, n, n),
+                    _ => (0, 1, 0, 0, n),
+                };
+                let mut f = Function::from_signature("o", &Json::parse(r#"{"abi":"0.8","args":[],"fault":4,"in":[],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}"#).unwrap()).unwrap();
+                f.params[3].push(crate::Param {
+                    name: "r".into(),
+                    ty: Type::Region(a, w),
+                    role: Some("in".into()),
+                });
+                let meta = |n: u64| {
+                    if n <= 9_007_199_254_740_991 {
+                        n.to_string()
+                    } else {
+                        format!("\"{n}\"")
+                    }
+                };
+                let d = Json::parse(&format!(r#"{{"bundles":[],"borrowed":[],"regions":[{{"name":"r","cells":[{{"index":{},"lo":{},"hi":{}}}]}}]}}"#,meta(index),meta(lo),meta(hi))).unwrap();
+                let admit = match path {
+                    "A" => true,
+                    "W" => n > 0,
+                    "index" => n < 2,
+                    _ => n < 2,
+                };
+                let result = std::panic::catch_unwind(|| domain(&d, &f)).expect("no domain panic");
+                if admit {
+                    result.unwrap();
+                } else {
+                    let e = result.unwrap_err().to_string();
+                    assert!(
+                        e.contains('§') && !e.contains("host limit"),
+                        "{path}={n}: {e}"
+                    );
+                }
+                cases += 1;
+            }
+        }
+        assert_eq!(cases, 30);
+        eprintln!("R20 region domains: 5 paths, {cases} cases");
     }
 }

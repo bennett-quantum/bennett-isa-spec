@@ -2353,3 +2353,62 @@ fn r18_cli_single_covering_and_context_controls() {
         }
     }
 }
+
+#[test]
+fn r20_cli_pinned_extreme_const_widths_check_and_hash() {
+    for (i, (source, pin, file_pin)) in support::r20::CASES.into_iter().enumerate() {
+        assert_eq!(bennett_isa_ref::sha256_hex(source.as_bytes()), file_pin);
+        let path = tmp_file(&format!("r20-const-{i}.bisa"), source);
+        for command in ["check", "hash"] {
+            let result = ok(&[command, &path]);
+            if command == "check" {
+                assert_eq!(text(&result, "status"), "ok");
+            }
+            let o = Object::parse(source).unwrap();
+            assert_eq!(
+                text(&result, "object_hash"),
+                o.identity().unwrap().object_hash
+            );
+            assert!(result.canonical().contains(pin));
+        }
+    }
+}
+
+#[test]
+fn r20_cli_interface_region_storage_extremes() {
+    let mut cases = 0;
+    for n in [0u64, 1, (1 << 63) - 1, 1 << 63, u64::MAX - 1, u64::MAX] {
+        let meta = |n: u64| {
+            if n <= 9_007_199_254_740_991 {
+                n.to_string()
+            } else {
+                format!("\"{n}\"")
+            }
+        };
+        for (a, w) in [(n, 1), (0, n)] {
+            let sig = format!(
+                r#"{{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"action","mem":[{{"A":{},"W":{},"role":"mut"}}],"mut":[1],"tier":"q"}}"#,
+                meta(a),
+                meta(w)
+            );
+            let source=support::object(&[("a",&sig,&format!("action @a (t:wire mut) () (r:region[{a},{w}] mut) () ()\n^entry():\nx t\nx t"))],"{}","\nsection layout\n{\"A_tab\":0,\"H\":0,\"S_cells\":0,\"globals\":{},\"heap_base\":1,\"heap_limit_max\":0,\"interface_regions\":{},\"null_size\":1,\"ptr_width\":32}\n");
+            if w == 0 {
+                assert!(Object::parse(&source)
+                    .unwrap_err()
+                    .to_string()
+                    .contains("§3.3"));
+            } else {
+                let o = support::rehash(&source);
+                let path = tmp_file(&format!("r20-region-{a}-{w}.bisa"), &o.text);
+                if n <= 1 {
+                    ok(&["run-action", &path, "a", "--mut", "0"]);
+                } else {
+                    fails(&["run-action", &path, "a", "--mut", "0"], "host limit");
+                }
+            }
+            cases += 1;
+        }
+    }
+    assert_eq!(cases, 12);
+    eprintln!("R20 CLI interface storage: 2 paths, {cases} cases");
+}

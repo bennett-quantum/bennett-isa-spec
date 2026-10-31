@@ -468,7 +468,7 @@ pub(crate) fn region_bytes(memory: &Memory, n: &str, address_width: u64) -> Resu
         .ok_or_else(|| Error(format!("§4.2: mem operand {n} is not a mapped region")))?;
     let len = power_of_two(address_width as u128)
         .and_then(|n| usize::try_from(n).ok())
-        .ok_or_else(|| Error("host limit: region exceeds host address space".into()))?;
+        .ok_or_else(|| Error("§4.2: host limit: region exceeds host address space".into()))?;
     (0..len)
         .map(|i| Ok(memory.byte(offset(base, i)?)))
         .collect()
@@ -486,7 +486,7 @@ impl Object {
             // depth_limit < 2^Dc - 1 holds for the derived Dc = ceil(log2(d + 2))
             // whenever d + 2 is representable (§3.7, §5.4).
             if b.depth.checked_add(2).is_none() {
-                return err("§5.4", "depth limit exceeds the counter range");
+                return err("§5.4", "host limit: depth plus two exceeds u128");
             }
         } else if b.heap != 0 || b.stack != 0 || b.depth != 0 {
             return err(

@@ -517,11 +517,29 @@ These finite selector families do not claim full schedule/target execution.
 Union/partial coverage, parameter forwarding, and zero/large loop bounds have
 separate controls.
 
+**Design (round 20).** `const_literal` validates canonical decimal magnitude
+using storage proportional to its spelling, then compares bit length with N;
+negative literals at the signed minimum additionally require a single set bit.
+It never constructs N+1 bits or adds to N. The same magnitude check serves
+fault codes and certificate endpoints; admission of small constants/intervals
+at huge widths needs no destination-sized storage. `Function::signature` emits
+large dimensions as decimal strings under §9.1. Concrete wire names, region
+images/cells, quantum identities, claim elements and CLI interface buffers
+reserve storage fallibly, with checked products/cardinalities. Range errors
+cite their ISA clause; representation/allocation failures additionally name the
+host limit, without an ISA width cap.
+
 `DerivedWidths::from_program` checks H+2, A_tab+1 and S_cells+1; a legal layout
 whose counters exceed host representation returns a cited host-limit error.
 Admission and sequential B=0 semantics remain independent of that host limit.
 The depth addition and bit-vector limb/storage sizing also use checked
-arithmetic. No ISA exponent cap is introduced.
+arithmetic. The R13 family retains its 507 inputs and adds the 2^63 boundaries
+(591 cases), assigning expected layout/range, deterministic representation,
+legal and allocation-dependent outcomes before execution. Its R20 siblings
+cover text descriptors, casts, counts, bounds, region products, storage,
+schedules and certificate domains: 102 fixture-qualified paths / 1,113 cases
+total, with catch_unwind and cited range/resource distinctions. This is a
+finite extreme-value sweep, not an exhaustive proof over all objects.
 
 | Schema / rule | Load-time validator | Positive and negative controls |
 |---|---|---|

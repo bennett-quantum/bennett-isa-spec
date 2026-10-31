@@ -1282,3 +1282,197 @@ fn r18_bound_tokens_forward_by_parameter_and_zero_ancestor_is_empty() {
         }
     }
 }
+
+#[test]
+fn r20_generated_certificate_width_bound_count_table_extremes() {
+    // §9.1 spelling, §12.2 exact endpoints; small intervals at every width.
+    // Expectations are assigned before admission, never learned from errors.
+    let values = [0u64, 1, (1 << 63) - 1, 1 << 63, u64::MAX - 1, u64::MAX];
+    let mut cases = 0;
+    for n in values {
+        let raw = if n <= 9_007_199_254_740_991 {
+            n.to_string()
+        } else {
+            format!("\"{n}\"")
+        };
+        for path in [
+            "borrowed.width",
+            "bundle.lo",
+            "bundle.hi",
+            "borrowed.lo",
+            "borrowed.hi",
+            "sampler.count",
+            "table.cell",
+            "frame.width",
+            "bounds",
+            "gate.count",
+        ] {
+            let mut c = certificate();
+            let mut claim = json(
+                r#"{"kind":"exhaustive","domain":{"bundles":[],"borrowed":[],"regions":[]},"expected":{"table":[]}}"#,
+            );
+            let admit = match path {
+                "borrowed.width" => {
+                    set(
+                        &mut claim,
+                        "domain",
+                        json(&format!(
+                            r#"{{"bundles":[],"borrowed":[{{"name":"b","width":{raw},"lo":0,"hi":1}}],"regions":[]}}"#
+                        )),
+                    );
+                    n > 0
+                }
+                "bundle.lo" | "bundle.hi" | "borrowed.lo" | "borrowed.hi" => {
+                    let group = if path.starts_with("bundle.") {
+                        "bundles"
+                    } else {
+                        "borrowed"
+                    };
+                    let width = if group == "bundles" { 8 } else { 1 };
+                    let name = if group == "bundles" { "x" } else { "b" };
+                    let (lo, hi) = if path.ends_with(".lo") {
+                        (raw.clone(), raw.clone())
+                    } else {
+                        ("0".into(), raw.clone())
+                    };
+                    let mut d = json(r#"{"bundles":[],"borrowed":[],"regions":[]}"#);
+                    set(
+                        &mut d,
+                        group,
+                        json(&format!(
+                            r#"[{{"name":"{name}","width":{width},"lo":{lo},"hi":{hi}}}]"#
+                        )),
+                    );
+                    set(&mut claim, "domain", d);
+                    n < (1 << width)
+                }
+                "sampler.count" => {
+                    set(&mut claim, "kind", json("\"sampled\""));
+                    if let Json::Object(m) = &mut claim {
+                        m.remove("expected");
+                    }
+                    set(
+                        &mut claim,
+                        "sampler",
+                        json(&format!(
+                            r#"{{"algorithm":"xoshiro256**","seed":["1","0","0","0"],"count":{raw}}}"#
+                        )),
+                    );
+                    true
+                }
+                "table.cell" => {
+                    set(
+                        &mut claim,
+                        "expected",
+                        json(&format!(r#"{{"table":[[{raw}]]}}"#)),
+                    );
+                    true
+                }
+                "frame.width" => {
+                    let Json::Object(r) = region_mut(&mut c) else {
+                        panic!("region")
+                    };
+                    let Json::Object(frame) = r.get_mut("frame").unwrap() else {
+                        panic!("frame")
+                    };
+                    frame.insert(
+                        "interface".into(),
+                        json(&format!(r#"[{{"role":"in","width":{raw},"class":"any"}}]"#)),
+                    );
+                    n > 0
+                }
+                "bounds" => {
+                    set(region_mut(&mut c), "bounds", json(&format!("[{raw}]")));
+                    false
+                }
+                "gate.count" => {
+                    set(
+                        region_mut(&mut c),
+                        "gates_used",
+                        json(&format!(r#"{{"x":{{"count":{raw}}}}}"#)),
+                    );
+                    true
+                }
+                _ => unreachable!(),
+            };
+            set(region_mut(&mut c), "claims", Json::Array(vec![claim]));
+            let result = std::panic::catch_unwind(|| Object::parse(&with("certificate", &c)))
+                .expect("certificate must not panic");
+            if admit {
+                result.unwrap_or_else(|e| panic!("{path}={n}: {e}"));
+            } else {
+                let e = result.unwrap_err().to_string();
+                assert!(
+                    e.contains('§') && !e.contains("host limit"),
+                    "{path}={n}: {e}"
+                );
+            }
+            cases += 1;
+        }
+    }
+    assert_eq!(cases, 60);
+    eprintln!("R20 certificate: 10 paths, {cases} cases");
+}
+
+#[test]
+fn r20_generated_schedule_count_selector_extremes() {
+    let mut cases = 0;
+    for n in [0u64, 1, (1 << 63) - 1, 1 << 63, u64::MAX - 1, u64::MAX] {
+        let raw = if n <= 9_007_199_254_740_991 {
+            n.to_string()
+        } else {
+            format!("\"{n}\"")
+        };
+        for path in [
+            "B",
+            "heap",
+            "stack",
+            "depth",
+            "controls",
+            "step",
+            "generated",
+            "ordinal",
+        ] {
+            let mut s = schedule();
+            let mut admit = true;
+            if let Json::Object(fields) = &mut s {
+                let b = fields.get_mut("bindings").unwrap();
+                if let Some(i) = ["B", "heap", "stack", "depth"]
+                    .iter()
+                    .position(|p| *p == path)
+                {
+                    let mut budget = vec![json("3"), json("0"), json("0"), json("0")];
+                    budget[i] = json(&raw);
+                    set(b, "budget", Json::Array(budget));
+                    admit = i == 0 || n == 0;
+                } else if path == "controls" {
+                    set(b, "inherited_controls", json(&raw));
+                } else {
+                    let mut e = entry("entry:0", "[]");
+                    if path == "ordinal" {
+                        e = entry(&format!("entry:{n}"), "[]");
+                        admit = n < 3;
+                    } else {
+                        set(&mut e, path, json(&raw));
+                        admit = path != "step" || n > 0;
+                    }
+                    set(&mut s, "entries", Json::Array(vec![e]));
+                }
+            }
+            let result = std::panic::catch_unwind(|| Object::parse(&with("schedule", &s)))
+                .expect("no selector/count panic");
+            if admit {
+                result.unwrap_or_else(|e| panic!("{path}={n}: {e}"));
+            } else {
+                let e = result.unwrap_err().to_string();
+                assert!(
+                    e.contains('§') && !e.contains("host limit"),
+                    "{path}={n}: {e}"
+                );
+            }
+            cases += 1;
+        }
+    }
+    assert_eq!(cases, 48);
+    eprintln!("R20 schedule counts/selectors: 8 paths, {cases} cases");
+}

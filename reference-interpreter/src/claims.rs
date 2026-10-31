@@ -72,7 +72,22 @@ fn json_bits(value: &Json, width: usize) -> Result<BitVector> {
 }
 /// Every element of the domain, last component fastest (§12.2).
 fn enumerate(domain: &Domain) -> Result<Vec<Vec<BitVector>>> {
-    let mut out = Vec::new();
+    let mut count = 1u128;
+    for (_, _, lo, hi) in &domain.components {
+        let span = hi.binary("sub", lo)?.to_u128().map_err(|_| {
+            Error("§12.2: host limit: exhaustive interval cardinality exceeds u128".into())
+        })?;
+        count = span
+            .checked_add(1)
+            .and_then(|span| count.checked_mul(span))
+            .ok_or_else(|| {
+                Error("§12.2: host limit: exhaustive domain cardinality exceeds u128".into())
+            })?;
+    }
+    let count = usize::try_from(count).map_err(|_| {
+        Error("§12.2: host limit: exhaustive domain cardinality exceeds usize".into())
+    })?;
+    let mut out = crate::reserved(count, "§12.2", "exhaustive domain elements")?;
     let mut current: Vec<BitVector> = domain.components.iter().map(|c| c.2.clone()).collect();
     loop {
         out.push(current.clone());
@@ -104,6 +119,12 @@ fn decimal_json(v: &BitVector) -> Json {
         Ok(n) if n <= 9_007_199_254_740_991 => Json::Number(n.to_string()),
         _ => Json::String(v.to_decimal()),
     }
+}
+
+fn sample_elements(count: u128) -> Result<Vec<Vec<BitVector>>> {
+    let count = usize::try_from(count)
+        .map_err(|_| Error("§12.1: host limit: sample count exceeds usize".into()))?;
+    crate::reserved(count, "§12.1", "sampled domain elements")
 }
 
 /// xoshiro256** (Blackman and Vigna), the §12.1 sampler.
@@ -178,7 +199,7 @@ impl Object {
             for b in d.get(group)?.array()? {
                 let name = b.get("name")?.string()?.to_string();
                 let width = usize::try_from(b.get("width")?.uint()?)
-                    .map_err(|_| Error("host limit: domain width".into()))?;
+                    .map_err(|_| Error("§12.2: host limit: domain width".into()))?;
                 let lo = json_bits(b.get("lo")?, width)?;
                 let hi = json_bits(b.get("hi")?, width)?;
                 full &= lo.is_zero() && hi == ones(width)?;
@@ -210,7 +231,7 @@ impl Object {
                 .ok_or_else(|| Error(format!("§12.2: unknown domain region {name}")))?;
             let cells = crate::oracle::power_of_two(a as u128)
                 .and_then(|n| usize::try_from(n).ok())
-                .ok_or_else(|| Error("host limit: region cells".into()))?;
+                .ok_or_else(|| Error("§12.2: host limit: region cells".into()))?;
             listed.insert(name.clone());
             match r.get("cells")? {
                 Json::String(s) if s == "all" => {
@@ -297,7 +318,7 @@ impl Object {
             };
             let cells = crate::oracle::power_of_two(a as u128)
                 .and_then(|n| usize::try_from(n).ok())
-                .ok_or_else(|| Error("host limit: region cells".into()))?;
+                .ok_or_else(|| Error("§12.2: host limit: region cells".into()))?;
             Ok((cells, w as usize))
         };
         if f.kind == "oracle" {
@@ -472,7 +493,7 @@ impl Object {
                         "expected \"oracle\" compares a realisation under a schedule (target/schedule executor staged)".into(),
                     ));
                 }
-                let mut elements = Vec::new();
+                let mut elements;
                 if kind == "exhaustive" {
                     for lo in &domain.components {
                         if lo.2.unsigned_cmp(&lo.3)? == std::cmp::Ordering::Greater {
@@ -493,7 +514,9 @@ impl Object {
                         })
                         .collect::<Result<Vec<_>>>()?;
                     let mut rng = Xoshiro256([seed[0], seed[1], seed[2], seed[3]]);
-                    for _ in 0..sample_count(sampler)? {
+                    let count = sample_count(sampler)?;
+                    elements = sample_elements(count)?;
+                    for _ in 0..count {
                         elements.push(
                             domain
                                 .components
@@ -796,5 +819,50 @@ impl Object {
             by_rest.insert(rest, outputs);
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod r20_tests {
+    use super::*;
+    #[test]
+    fn r20_exhaustive_domain_cardinality_extremes() {
+        let mut cases = 0;
+        for hi in [
+            0u128,
+            1,
+            (1 << 63) - 1,
+            1 << 63,
+            u64::MAX as u128 - 1,
+            u64::MAX as u128,
+        ] {
+            let d = Domain {
+                covers_d: false,
+                components: vec![(
+                    Component::Bundle(0, 0),
+                    64,
+                    BitVector::zero(64).unwrap(),
+                    BitVector::from_u128(64, hi).unwrap(),
+                )],
+            };
+            let result = std::panic::catch_unwind(|| enumerate(&d)).expect("no cardinality panic");
+            if hi <= 1 {
+                assert_eq!(result.unwrap().len(), hi as usize + 1);
+            } else {
+                let e = result.unwrap_err().to_string();
+                assert!(e.contains("§12.2") && e.contains("host limit"), "{e}");
+            }
+            let sampled =
+                std::panic::catch_unwind(|| sample_elements(hi)).expect("no sample count panic");
+            if hi <= 1 {
+                sampled.unwrap();
+            } else {
+                let e = sampled.unwrap_err().to_string();
+                assert!(e.contains("§12.1") && e.contains("host limit"), "{e}");
+            }
+            cases += 2;
+        }
+        assert_eq!(cases, 12);
+        eprintln!("R20 exhaustive/sample storage: 2 paths, {cases} cases");
     }
 }

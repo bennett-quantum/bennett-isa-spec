@@ -370,19 +370,23 @@ impl QuantumState {
         let end = self
             .next
             .checked_add(n as u64)
-            .ok_or_else(|| Error("§4.3: wire identity overflow".into()))?;
+            .ok_or_else(|| Error("§4.3: host limit: wire identity exceeds u64".into()))?;
         let total = self
             .ids
             .len()
             .checked_add(n)
-            .ok_or_else(|| Error("§4.3: wire count overflow".into()))?;
+            .ok_or_else(|| Error("§4.3: host limit: wire count exceeds usize".into()))?;
+        let mut wires = crate::reserved(n, "§4.3", "wire identities")?;
+        self.ids
+            .try_reserve(n)
+            .map_err(|e| Error(format!("§4.3: host limit: wire identities: {e}")))?;
         // New wires are |0> at the high positions: sparse keys are unchanged.
         if let State::Basis { bits, .. } = &mut self.state {
             bits.try_reserve(n)
-                .map_err(|e| Error(format!("host limit: wire allocation failed ({e})")))?;
+                .map_err(|e| Error(format!("§4.3: host limit: wire allocation failed ({e})")))?;
             bits.resize(total, false);
         }
-        let wires: Vec<_> = (self.next..end).collect();
+        wires.extend(self.next..end);
         self.next = end;
         self.ids.extend(&wires);
         Ok(wires)
@@ -408,7 +412,7 @@ impl QuantumState {
         let n = self.ids.len();
         if n >= usize::BITS as usize - 1 {
             return err(
-                "host limit",
+                "§4.3: host limit",
                 format!("2^{n} dense amplitudes exceed the host address space"),
             );
         }
@@ -416,7 +420,7 @@ impl QuantumState {
         let mut out = Vec::new();
         out.try_reserve_exact(len).map_err(|e| {
             Error(format!(
-                "host limit: cannot allocate {len} amplitudes ({e})"
+                "§4.3: host limit: cannot allocate {len} amplitudes ({e})"
             ))
         })?;
         out.resize(len, Complex::ZERO);

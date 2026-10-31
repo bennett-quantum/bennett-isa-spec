@@ -146,12 +146,13 @@ impl Object {
         fn scan(seq: &[Instruction], count: &mut usize, children: &mut Vec<String>) -> Result<()> {
             for i in seq {
                 if i.op == "qborrow" {
-                    *count =
-                        count
-                            .checked_add(i.operands[1].parse::<usize>().map_err(|_| {
-                                Error("§5.6: borrow count exceeds host storage".into())
-                            })?)
-                            .ok_or_else(|| Error("§5.6: borrow capacity overflow".into()))?;
+                    *count = count
+                        .checked_add(i.operands[1].parse::<usize>().map_err(|_| {
+                            Error("§5.6: host limit: borrow count exceeds usize".into())
+                        })?)
+                        .ok_or_else(|| {
+                            Error("§5.6: host limit: borrow capacity sum exceeds usize".into())
+                        })?;
                 }
                 if let Ok(call) = normalize_call(i) {
                     if call.instruction.op == "action_call" {
@@ -282,11 +283,11 @@ impl Object {
             let count = crate::oracle::power_of_two(a as u128)
                 .and_then(|n| usize::try_from(n).ok())
                 .ok_or_else(|| {
-                    Error("host limit: local region exceeds host address space".into())
+                    Error("§4.6: host limit: local region exceeds host address space".into())
                 })?;
             let n = count
                 .checked_mul(w as usize)
-                .ok_or_else(|| Error("§4.6: region bit size overflow".into()))?;
+                .ok_or_else(|| Error("§4.6: host limit: region bit count exceeds usize".into()))?;
             let wires = q.allocate(n)?;
             let image = if i.operands.len() == 4 {
                 self.data[i.operands[3].trim_start_matches('@')].clone()

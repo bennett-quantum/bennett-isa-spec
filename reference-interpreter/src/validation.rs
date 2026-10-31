@@ -1133,10 +1133,9 @@ impl Object {
                     if f.kind != "cc" || a[0] == a[1] {
                         return err("§3.3", "concat tier/alias");
                     }
-                    result = Some(Type::Qreg(
-                        n.checked_add(m)
-                            .ok_or_else(|| Error("§3.3: qreg size overflow".into()))?,
-                    ));
+                    result = Some(Type::Qreg(n.checked_add(m).ok_or_else(|| {
+                        Error("§3.3: host limit: qreg descriptor sum exceeds u64".into())
+                    })?));
                 }
                 "measure" => {
                     arity(1, 1)?;
@@ -1364,7 +1363,11 @@ impl Discipline {
             }
             Ok(vec![format!("{base}[{i}]")])
         } else {
-            Ok((0..w).map(|i| format!("{base}[{i}]")).collect())
+            let count = usize::try_from(w)
+                .map_err(|_| Error("§3.3: host limit: wire count exceeds usize".into()))?;
+            let mut wires = crate::reserved(count, "§3.3", "wire names")?;
+            wires.extend((0..w).map(|i| format!("{base}[{i}]")));
+            Ok(wires)
         }
     }
     fn disjoint(&self, operands: &[&str]) -> Result<()> {

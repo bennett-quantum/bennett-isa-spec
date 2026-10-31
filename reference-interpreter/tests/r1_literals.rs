@@ -178,3 +178,46 @@ fn classical_call_has_one_spelling() {
     support::rehash(&caller("r = call @f x"));
     rejects(&caller("r = call @f (x)"), "§16.2");
 }
+
+#[test]
+fn r20_pinned_extreme_const_widths_parse_and_hash_without_panic() {
+    for (source, pin, file_pin) in support::r20::CASES {
+        assert_eq!(bennett_isa_ref::sha256_hex(source.as_bytes()), file_pin);
+        let o = std::panic::catch_unwind(|| Object::parse(source))
+            .expect("§3.3: admission must never panic")
+            .unwrap();
+        o.check_hashes().unwrap();
+        let id = o.identity().unwrap();
+        assert_eq!(id.interface_hashes["o"], pin);
+        assert_eq!(id.closure_hashes["o"].as_deref(), Some(pin));
+    }
+}
+
+#[test]
+fn r20_extreme_const_execution_reports_host_resource() {
+    use bennett_isa_ref::{BitVector, Budget, OracleVectorInput, OracleVectorMachine};
+    for (source, _, _) in support::r20::CASES {
+        let o = Object::parse(source).unwrap();
+        let input = OracleVectorInput {
+            ins: vec![BitVector::from_u128(8, 8).unwrap()],
+            ..Default::default()
+        };
+        let sequential =
+            std::panic::catch_unwind(|| o.run_oracle_vectors("o", &input, Budget::steps(1)))
+                .expect("no execution panic")
+                .unwrap_err();
+        let machine = std::panic::catch_unwind(|| {
+            OracleVectorMachine::new(&o, "o", &input, Budget::steps(1))
+        })
+        .expect("no machine construction panic")
+        .err()
+        .expect("host limit");
+        for e in [sequential, machine] {
+            let s = e.to_string();
+            assert!(
+                s.contains('§') && s.contains("host limit") && !s.contains("outside"),
+                "{s}"
+            );
+        }
+    }
+}

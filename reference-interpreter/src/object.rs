@@ -37,7 +37,7 @@ pub(crate) fn host_count(s: &str, what: &str) -> Result<u64> {
     }
     s.parse::<u64>().map_err(|_| {
         Error(format!(
-            "host limit: {what} {s} exceeds the host's 64-bit descriptor range (not an ISA rule)"
+            "§3.3: host limit: {what} {s} exceeds the host's 64-bit descriptor range (not an ISA rule)"
         ))
     })
 }
@@ -95,7 +95,7 @@ impl Type {
         let w = self.width(ptr)?;
         usize::try_from(w).map_err(|_| {
             Error(format!(
-                "host limit: width {w} exceeds the host address space (not an ISA rule)"
+                "§3.3: host limit: width {w} exceeds the host address space (not an ISA rule)"
             ))
         })
     }
@@ -273,13 +273,20 @@ impl Function {
         self.blocks.iter().flat_map(|b| &b.instructions)
     }
     pub fn signature(&self) -> Json {
+        let uint = |n: u64| {
+            if n <= 9_007_199_254_740_991 {
+                Json::Number(n.to_string())
+            } else {
+                Json::String(n.to_string())
+            }
+        };
         let widths = |p: &[Param]| {
             Json::Array(
                 p.iter()
                     .map(|p| {
-                        Json::Number(match &p.ty {
-                            Type::Wire(n) | Type::Reg(n) => n.to_string(),
-                            _ => "0".into(),
+                        uint(match &p.ty {
+                            Type::Wire(n) | Type::Reg(n) => *n,
+                            _ => 0,
                         })
                     })
                     .collect(),
@@ -297,8 +304,8 @@ impl Function {
                         };
                         Json::Object(
                             [
-                                ("A".into(), Json::Number(a.to_string())),
-                                ("W".into(), Json::Number(w.to_string())),
+                                ("A".into(), uint(a)),
+                                ("W".into(), uint(w)),
                                 (
                                     "role".into(),
                                     Json::String(p.role.clone().unwrap_or_default()),
@@ -1196,10 +1203,7 @@ impl Object {
         };
         let code = |s: &str| -> Result<()> {
             let fw = self.fault_width(f)?;
-            crate::BitVector::parse_unsigned_exact(
-                usize::try_from(fw).map_err(|_| Error("host limit: fault width".into()))?,
-                s,
-            )?;
+            unsigned_literal(s, fw as u128)?;
             Ok(())
         };
         if let Some(n) = op.strip_prefix("lift.const.i") {
@@ -1566,23 +1570,47 @@ pub(crate) fn const_literal(s: &str, width: u64) -> Result<()> {
     if !integer(s) {
         return err("§16.1", format!("invalid or noncanonical INT literal {s}"));
     }
-    let w = usize::try_from(width).map_err(|_| Error("host limit: const width".into()))?;
-    let magnitude = s.trim_start_matches('-');
-    let in_range = match crate::BitVector::parse_unsigned_exact(w + 1, magnitude) {
-        Ok(m) if s.starts_with('-') => {
-            // |c| <= 2^(N-1): bits >= N-1 must be zero, except exactly 2^(N-1).
-            let mut limit = crate::BitVector::zero(w + 1)?;
-            limit.set(w - 1, true)?;
-            m.unsigned_cmp(&limit)? != std::cmp::Ordering::Greater
-        }
-        Ok(m) => !m.bit(w)?,
-        Err(_) => false,
-    };
+    let (bits, power_of_two) = literal_magnitude(s.trim_start_matches('-'))?;
+    // For negative c, |c| <= 2^(N-1): either fewer than N bits, or exactly
+    // N bits with only the high bit set. Compare in u128, never N+1 or N-1.
+    let in_range = width > 0
+        && if s.starts_with('-') {
+            bits < width as u128 || (bits == width as u128 && power_of_two)
+        } else {
+            bits <= width as u128
+        };
     if !in_range {
         return err(
             "§3.3",
             format!("const literal {s} is outside [-2^(N-1), 2^N) for N = {width}"),
         );
+    }
+    Ok(())
+}
+/// Inspect only the spelling's magnitude, using fewer than four bits per
+/// decimal digit plus word padding. Destination widths never drive storage.
+fn literal_magnitude(s: &str) -> Result<(u128, bool)> {
+    let generous = s
+        .len()
+        .checked_mul(4)
+        .ok_or_else(|| Error("§3.3: host limit: literal spelling size exceeds usize".into()))?;
+    let value = crate::BitVector::parse_decimal(generous, s)?;
+    let mut bits = 0;
+    let mut ones = 0usize;
+    for i in 0..generous {
+        if value.bit(i)? {
+            bits = i as u128 + 1;
+            ones += 1;
+        }
+    }
+    Ok((bits, ones == 1))
+}
+pub(crate) fn unsigned_literal(s: &str, width: u128) -> Result<()> {
+    if !integer(s) || s.starts_with('-') {
+        return err("§16.1", "unsigned canonical INT required");
+    }
+    if literal_magnitude(s)?.0 > width {
+        return err("§3.3", "integer literal exceeds declared width");
     }
     Ok(())
 }

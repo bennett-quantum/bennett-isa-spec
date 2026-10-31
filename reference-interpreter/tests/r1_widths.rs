@@ -311,6 +311,8 @@ fn r13_generated_derived_width_extremes_family() {
         64,
         127,
         128,
+        (1u128 << 63) - 1,
+        1u128 << 63,
         u64::MAX as u128 - 64,
         u64::MAX as u128 - 63,
         u64::MAX as u128 - 2,
@@ -381,11 +383,16 @@ fn r13_generated_derived_width_extremes_family() {
                 let mut l = layout.clone();
                 put(&mut l, &path, n);
                 let mutated = text.replace(&layout.canonical(), &l.canonical());
+                let expected = r20_extremes::layout_expected(&l, &o);
                 let result = std::panic::catch_unwind(|| -> bennett_isa_ref::Result<bool> {
                     let object = match Object::parse(&mutated) {
                         Ok(o) => o,
                         Err(e) => {
-                            assert!(e.to_string().contains('§'), "{e}");
+                            assert!(
+                                e.to_string().contains('§')
+                                    && !e.to_string().contains("host limit"),
+                                "{e}"
+                            );
                             return Ok(false);
                         }
                     };
@@ -421,10 +428,24 @@ fn r13_generated_derived_width_extremes_family() {
                     Ok(true)
                 });
                 match result.unwrap_or_else(|_| panic!("panic for {root} {path:?}={n}")) {
-                    Ok(true) => admitted += 1,
-                    Ok(false) => rejected += 1,
+                    Ok(true) => {
+                        assert!(
+                            ["legal", "allocation"].contains(&expected),
+                            "{root} {path:?}={n}: expected {expected}"
+                        );
+                        admitted += 1;
+                    }
+                    Ok(false) => {
+                        assert_eq!(expected, "layout", "{root} {path:?}={n}");
+                        rejected += 1;
+                    }
                     Err(e) => {
                         assert!(e.to_string().contains('§'), "{root} {path:?}={n}: {e}");
+                        assert!(
+                            ["representation", "allocation"].contains(&expected),
+                            "{root} {path:?}={n}: expected {expected}: {e}"
+                        );
+                        assert!(e.to_string().contains("host limit"), "{e}");
                         host_limits += 1;
                     }
                 }
@@ -448,6 +469,7 @@ fn r13_generated_derived_width_extremes_family() {
             depth,
             ..Budget::steps(0)
         };
+        let expected_resource = depth > u128::MAX - 2;
         let result = std::panic::catch_unwind(|| -> bennett_isa_ref::Result<()> {
             let d = bennett_isa_ref::DerivedWidths::derive(&o, "inc8", b)?;
             let expected = (128 - (depth + 1).leading_zeros() as usize).max(1);
@@ -457,14 +479,25 @@ fn r13_generated_derived_width_extremes_family() {
         })
         .expect("depth arithmetic must not panic");
         match result {
-            Ok(()) => admitted += 1,
+            Ok(()) => {
+                assert!(!expected_resource);
+                admitted += 1;
+            }
             Err(e) => {
-                assert!(e.to_string().contains('§'), "{e}");
+                assert!(
+                    expected_resource
+                        && e.to_string().contains("host limit")
+                        && e.to_string().contains('§'),
+                    "{e}"
+                );
                 host_limits += 1;
             }
         }
     }
     eprintln!("R13 widths: {cases} cases; {admitted} constructed, {rejected} layout rejections, {host_limits} resource diagnostics");
-    assert_eq!(cases, 507);
+    assert_eq!(cases, 591);
     assert_eq!(cases, admitted + rejected + host_limits);
 }
+
+#[path = "support/r20_extremes.rs"]
+mod r20_extremes;

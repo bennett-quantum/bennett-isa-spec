@@ -12,14 +12,15 @@ impl BitVector {
         if width == 0 {
             return err("§3.3", "bit-vector width must be positive");
         }
-        let count = width
-            .checked_add(63)
-            .ok_or_else(|| Error("§3.3: bit-vector width overflow".into()))?
-            / 64;
+        let count = width.checked_add(63).ok_or_else(|| {
+            Error("§3.3: host limit: bit-vector width plus word padding exceeds usize".into())
+        })? / 64;
         let mut words = Vec::new();
-        words
-            .try_reserve_exact(count)
-            .map_err(|e| Error(format!("§3.3: bit-vector storage: {e}")))?;
+        words.try_reserve_exact(count).map_err(|e| {
+            Error(format!(
+                "§3.3: host limit: bit-vector storage allocation failed: {e}"
+            ))
+        })?;
         words.resize(count, 0);
         Ok(Self { width, words })
     }
@@ -120,7 +121,7 @@ impl BitVector {
         let generous = s
             .len()
             .checked_mul(4)
-            .ok_or_else(|| Error("§3.3: literal size overflow".into()))?
+            .ok_or_else(|| Error("§3.3: host limit: literal spelling size exceeds usize".into()))?
             .max(width);
         let value = Self::parse_decimal(generous, s)?;
         if (width..generous).any(|i| value.get(i)) {
