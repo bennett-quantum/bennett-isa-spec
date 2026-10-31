@@ -25,6 +25,8 @@ commands write one JSON object to stdout and exit 0; `help`/`--help` prints
 plain usage. Diagnostics go to stderr with exit status 1, and ISA diagnostics
 cite their rule. Integers above 2^53 − 1 are decimal strings (§9.1).
 
+> **Council status (2026-11-01):** accepted by the sol and codex seats in round 24 of run `isa-ref-2026-10-29` on snapshot ad84e75 (461 tests, five exhaustive sweeps; rounds 1–24 under `bennett/docs/council/isa-ref-2026-10-29/`). Staged deliverables 8–11 remain disclosed as staged. Muse seat held.
+
 ## Commands
 
 `check <object>` parses and validates the object, computes identities, and
