@@ -421,6 +421,13 @@ coincide. Sort by rendered path bytewise, then by original components bytewise
 the oracle envelope. Lprocs select exact global keys and their images; actions
 and data retain their existing closure exclusions.
 
+Identity classifies references by instruction and operand context in both the
+dependency graph and envelope replacement. A declaring oracle's lift.addr
+interface operand stays literal even if its spelling names a function, data
+symbol or import. Calls, qregion images and actual globals remain symbol
+references. Only the separate global/interface address ambiguity retains its
+existing rejection (SPEC-QUESTIONS 32).
+
 Fixture hand derivations must distinguish exact semantic support, rounded
 diagnostic amplitudes and token preconditions. A finite binary64 angle is
 never symbolic pi. Probability-one interference uses an exact discrete

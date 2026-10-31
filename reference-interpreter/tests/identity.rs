@@ -418,3 +418,145 @@ fn r12_dotted_global_lproc_keeps_exact_closure_selection() {
         .values()
         .all(|env| !env.contains("layout ")));
 }
+
+#[test]
+fn r12_interface_address_is_not_a_function_dependency() {
+    let expected = concat!(
+        "isa=0.8\nptr_width=32\n",
+        "{\"abi\":\"0.8\",\"args\":[],\"fault\":4,\"in\":[],\"kind\":\"oracle\",\"mem\":[{\"A\":0,\"W\":8,\"role\":\"in\"}],\"tgt\":32,\"tier\":\"q\"}\n",
+        "oracle @o () (t:wire[32]) (f:wire[4]) (o:region[0,8] in) ()\n",
+        "regs { p:reg[32] }\n^entry():\np = lift.addr @o\nlift.retval p\n",
+        "layout A_tab 0\nlayout H 6\nlayout S_cells 0\nlayout heap_base 48\nlayout heap_limit_max 0\n",
+        "layout interface_regions.o.o {\"base\":16}\nlayout null_size 1\nlayout ptr_width 32\n"
+    );
+    for region in ["o", "db"] {
+        let c = support::r12_address_case(region);
+        let expected = expected
+            .replace("(o:region", &format!("({region}:region"))
+            .replace("lift.addr @o", &format!("lift.addr @{region}"))
+            .replace(
+                "interface_regions.o.o ",
+                &format!("interface_regions.o.{region} "),
+            );
+        assert_eq!(
+            sha256_hex(expected.as_bytes()),
+            c.get("hash").unwrap().string().unwrap()
+        );
+        let o = Object::parse(&support::r12_address_text(region)).unwrap();
+        let id = o.identity().unwrap();
+        assert_eq!(id.envelopes["o"], expected);
+        assert_eq!(
+            id.interface_hashes["o"],
+            c.get("hash").unwrap().string().unwrap()
+        );
+        assert_eq!(
+            id.closure_hashes["o"].as_deref(),
+            Some(c.get("hash").unwrap().string().unwrap())
+        );
+        assert_eq!(
+            id.object_hash,
+            c.get("object_hash").unwrap().string().unwrap()
+        );
+        // No false recursive ":0" hashing or part-(6) dependency line.
+        assert_eq!(id.interface_hashes["o"], id.scc_hashes["o"]);
+        o.check_hashes().unwrap();
+    }
+}
+
+#[test]
+fn r12_interface_symbol_kind_family() {
+    let mut count = 0;
+    for kind in [
+        "cc",
+        "r",
+        "oracle",
+        "lproc",
+        "action",
+        "perm_action",
+        "data",
+    ] {
+        for imported in ["False", "True"] {
+            let c = support::r12_address_case(&format!("family-{kind}-{imported}"));
+            let o = Object::parse(c.get("text").unwrap().string().unwrap()).unwrap();
+            let id = o.identity().unwrap();
+            assert_eq!(
+                id.envelopes["o"],
+                c.get("envelope").unwrap().string().unwrap()
+            );
+            assert_eq!(
+                id.interface_hashes["o"],
+                c.get("hash").unwrap().string().unwrap()
+            );
+            assert_eq!(
+                id.closure_hashes["o"].as_deref(),
+                Some(c.get("hash").unwrap().string().unwrap())
+            );
+            o.check_hashes().unwrap();
+            count += 1;
+        }
+    }
+    assert_eq!(count, 14);
+}
+
+#[test]
+fn r12_call_operand_stays_a_dependency_beside_local_address() {
+    let mut hashes = vec![];
+    for value in [0, 1] {
+        let c = support::r12_address_case(&format!("call-{value}"));
+        let o = Object::parse(c.get("text").unwrap().string().unwrap()).unwrap();
+        let id = o.identity().unwrap();
+        let env = &id.envelopes["o"];
+        assert_eq!(env, c.get("envelope").unwrap().string().unwrap());
+        assert!(env.contains("p = lift.addr @alias\n"));
+        assert!(env.contains(&format!(
+            "r = lift.call @{} ()\n",
+            id.interface_hashes["alias"]
+        )));
+        assert_eq!(env.lines().last().unwrap(), id.interface_hashes["alias"]);
+        assert_eq!(
+            id.interface_hashes["o"],
+            c.get("hash").unwrap().string().unwrap()
+        );
+        assert_eq!(
+            id.closure_hashes["o"].as_deref(),
+            Some(c.get("hash").unwrap().string().unwrap())
+        );
+        o.check_hashes().unwrap();
+        hashes.push(id.interface_hashes["o"].clone());
+    }
+    assert_ne!(hashes[0], hashes[1]);
+}
+
+#[test]
+fn r12_global_and_qregion_operands_remain_symbol_references() {
+    for (tag, name) in [("global", "o"), ("image", "a")] {
+        let c = support::r12_address_case(tag);
+        let o = Object::parse(c.get("text").unwrap().string().unwrap()).unwrap();
+        let id = o.identity().unwrap();
+        assert_eq!(
+            id.envelopes[name],
+            c.get("envelope").unwrap().string().unwrap()
+        );
+        assert_eq!(
+            id.interface_hashes[name],
+            c.get("hash").unwrap().string().unwrap()
+        );
+        assert_eq!(
+            id.closure_hashes[name].as_deref(),
+            Some(c.get("hash").unwrap().string().unwrap())
+        );
+        assert_eq!(
+            id.envelopes[name].lines().last().unwrap(),
+            id.interface_hashes["alias"]
+        );
+        o.check_hashes().unwrap();
+        if tag == "global" {
+            let mut input = bennett_isa_ref::OracleInput::bits(&[]);
+            input.regions.insert("db".into(), vec![0]);
+            let r = o
+                .run_oracle("o", &input, bennett_isa_ref::Budget::steps(2))
+                .unwrap();
+            assert_eq!((r.payload, r.code, r.steps), (24, 0, 2));
+        }
+    }
+}

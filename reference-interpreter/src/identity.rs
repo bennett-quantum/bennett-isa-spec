@@ -1,4 +1,4 @@
-use crate::{err, json::Json, sha256_hex, Error, Object, Result};
+use crate::{err, json::Json, object::Function, sha256_hex, Error, Object, Result};
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Debug)]
@@ -54,6 +54,26 @@ fn references(line: &str) -> Vec<(usize, usize, &str)> {
     out
 }
 
+/// Classify the operand in its validated canonical instruction context. Only
+/// the sole operand of lift.addr may denote this oracle's interface (§4.2).
+/// Calls, qregion images and metadata still use ordinary symbol references.
+fn symbol_references<'a>(
+    line: &'a str,
+    function: Option<&Function>,
+) -> Vec<(usize, usize, &'a str)> {
+    if let Some(f) = function.filter(|f| f.kind == "oracle") {
+        if let Some(region) = line
+            .split_once(" = ")
+            .and_then(|(_, rhs)| rhs.strip_prefix("lift.addr @"))
+        {
+            if f.params[3].iter().any(|p| p.name == region) {
+                return Vec::new();
+            }
+        }
+    }
+    references(line)
+}
+
 impl Object {
     pub fn identity(&self) -> Result<Identity> {
         let symbols: BTreeMap<_, _> = self
@@ -72,12 +92,12 @@ impl Object {
             let mut deps = Vec::new();
             if let Some(f) = self.functions.get(n) {
                 for line in f.lines.iter().skip(1) {
-                    for (_, _, r) in references(line) {
+                    for (_, _, r) in symbol_references(line, Some(f)) {
                         if symbols.contains_key(r) || imports.contains_key(r) {
                             if !deps.iter().any(|s| s == r) {
                                 deps.push(r.to_string());
                             }
-                        } else if !(f.kind == "oracle" && f.params[3].iter().any(|p| p.name == r)) {
+                        } else {
                             return err("§9.3", format!("unresolved undeclared reference @{r}"));
                         }
                     }
@@ -260,10 +280,10 @@ impl Object {
             }
         }
         let mut refs = Vec::new();
-        let replace = |line: &str, refs: &mut Vec<String>| -> String {
+        let replace = |line: &str, function: Option<&Function>, refs: &mut Vec<String>| -> String {
             let mut out = String::new();
             let mut previous = 0;
-            for (start, end, r) in references(line) {
+            for (start, end, r) in symbol_references(line, function) {
                 out.push_str(&line[previous..start]);
                 if let Some(index) = comp.iter().position(|n| n == r) {
                     out.push_str(&format!("@${index}"));
@@ -283,7 +303,7 @@ impl Object {
         };
         if self.functions.contains_key(n) {
             for line in body.iter_mut().skip(1) {
-                *line = replace(line, &mut refs);
+                *line = replace(line, self.functions.get(n), &mut refs);
             }
         }
         let mut lines = vec![
@@ -297,11 +317,16 @@ impl Object {
                 .data
                 .get(&img)
                 .ok_or_else(|| Error(format!("§9.2: missing closure data {img}")))?;
-            lines.push(replace(&format!("data {img} {}", hex(bytes)), &mut refs));
+            lines.push(replace(
+                &format!("data {img} {}", hex(bytes)),
+                None,
+                &mut refs,
+            ));
         }
         for leaf in leaves {
             lines.push(replace(
                 &format!("layout {} {}", leaf.path, leaf.value.canonical()),
+                None,
                 &mut refs,
             ));
         }

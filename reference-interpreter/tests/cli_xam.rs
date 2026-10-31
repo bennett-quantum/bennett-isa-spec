@@ -1970,3 +1970,50 @@ fn r12_cli_checks_lossless_layout_envelopes() {
         }
     }
 }
+
+#[test]
+fn r12_cli_interface_region_may_share_function_name() {
+    for region in ["o", "db"] {
+        let c = support::r12_address_case(region);
+        let path = tmp_file(
+            &format!("r12-address-{region}.bisa"),
+            &support::r12_address_text(region),
+        );
+        for cmd in ["hash", "check"] {
+            let v = ok(&[cmd, &path]);
+            assert_eq!(text(&v, "status"), "ok");
+            assert_eq!(
+                text(&v, "object_hash"),
+                c.get("object_hash").unwrap().string().unwrap()
+            );
+            let s = field(&v, "symbols").get("o").unwrap();
+            for field in ["interface_hash", "closure_hash"] {
+                assert_eq!(text(s, field), c.get("hash").unwrap().string().unwrap());
+            }
+        }
+        let mem = format!("{region}=00");
+        for (budget, expected) in [
+            ("2,0,0,0", r#"{"code":0,"payload":16,"steps":2}"#),
+            ("1,0,0,0", r#"{"code":1,"payload":0,"steps":1}"#),
+        ] {
+            let v = ok(&[
+                "run-oracle",
+                &path,
+                "o",
+                "--input",
+                "",
+                "--mem",
+                &mem,
+                "--budget",
+                budget,
+            ]);
+            assert_eq!(v.canonical(), expected);
+            let v = ok(&[
+                "reverse", &path, "o", "--input", "", "--mem", &mem, "--budget", budget,
+            ]);
+            assert_eq!(text(&v, "status"), "REVERSED");
+            assert_eq!(field(&v, "equals_entry"), &Json::Bool(true));
+            assert_eq!(field(&v, "frames_clean"), &Json::Bool(true));
+        }
+    }
+}

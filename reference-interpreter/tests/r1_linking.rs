@@ -172,3 +172,47 @@ fn r8_unsigned_multiplicity_composition() {
     );
     linked.check_hashes().unwrap();
 }
+
+#[test]
+fn r12_interface_region_may_share_function_name() {
+    use bennett_isa_ref::{Budget, OracleInput};
+    for region in ["o", "db"] {
+        let o = Object::parse(&support::r12_address_text(region)).unwrap();
+        o.check_hashes().unwrap();
+        let mut input = OracleInput::bits(&[]);
+        input.regions.insert(region.into(), vec![0]);
+        for (steps, payload, code) in [(2, 16, 0), (1, 0, 1)] {
+            let r = o.run_oracle("o", &input, Budget::steps(steps)).unwrap();
+            assert_eq!((r.payload, r.code, r.steps), (payload, code, steps));
+        }
+    }
+}
+
+#[test]
+fn r12_non_declaring_oracle_cannot_resolve_a_foreign_interface() {
+    let raw = support::r12_address_text("o");
+    let mut o = Object::parse(&raw).unwrap();
+    let mut syms = o.section("symbols").unwrap().clone();
+    let mut other = syms.get("0").unwrap().clone();
+    if let Json::Object(s) = &mut other {
+        s.insert("name".into(), Json::String("other".into()));
+    }
+    if let Json::Object(s) = &mut syms {
+        s.insert("1".into(), other);
+    }
+    let mut layout = o.section("layout").unwrap().clone();
+    if let Json::Object(l) = &mut layout {
+        if let Json::Object(regions) = l.get_mut("interface_regions").unwrap() {
+            regions.insert("other".into(), support::json(r#"{"db":{"base":16}}"#));
+        }
+    }
+    let body = "oracle @other () (t:wire[32]) (f:wire[4]) (db:region[0,8] in) ()\nregs { p:reg[32] }\n^entry():\np = lift.addr @o\nlift.retval p\n";
+    o.text = raw
+        .replace(raw.lines().nth(3).unwrap(), &syms.canonical())
+        .replace("\nsection layout\n", &format!("{body}\nsection layout\n"));
+    o.text = o
+        .text
+        .replace(raw.lines().last().unwrap(), &layout.canonical());
+    let e = Object::parse(&o.text).unwrap_err().to_string();
+    assert!(e.contains("§4.2") && e.contains("in other"), "{e}");
+}

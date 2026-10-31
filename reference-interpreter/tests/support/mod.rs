@@ -720,3 +720,18 @@ pub fn r12_pin(tag: &str) -> Object {
     o.check_hashes().unwrap();
     o
 }
+
+pub fn r12_address_case(region: &str) -> Json {
+    json(include_str!("r12_address_cases.json"))
+        .get(region)
+        .unwrap()
+        .clone()
+}
+pub fn r12_address_text(region: &str) -> String {
+    r12_address_case(region)
+        .get("text")
+        .unwrap()
+        .string()
+        .unwrap()
+        .into()
+}

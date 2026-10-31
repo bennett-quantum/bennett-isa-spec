@@ -14,8 +14,8 @@ All cargo/Python commands headless with repository .tmp; only crate tests.
 
 | Blocker | RED tests | Status | Commit |
 |---|---|---|---|
-| SOL-R12-B01 ≡ R12-B01 | identity::r12_cc_r_colliding_dotted_leaves / r12_cc_r_layout_paths_preserve_colliding_leaves / r12_dotted_leaf_collision_family; cli_xam::r12_cli_checks_lossless_layout_envelopes | GREEN; full suite 358/0/5 | this step |
-| R12-B02 | contextual interface-reference witnesses | independent pins verified; implementation follows B01 |
+| SOL-R12-B01 ≡ R12-B01 | identity::r12_cc_r_colliding_dotted_leaves / r12_cc_r_layout_paths_preserve_colliding_leaves / r12_dotted_leaf_collision_family; cli_xam::r12_cli_checks_lossless_layout_envelopes | GREEN; full suite 358/0/5 | 76714aa |
+| R12-B02 | identity::r12_interface_address_is_not_a_function_dependency; r1_linking::r12_interface_region_may_share_function_name; cli_xam::r12_cli_interface_region_may_share_function_name | GREEN; full suite 365/0/5 | this step |
 
 B01 RED: 0 passed / 4 failed across identity and CLI; omitted duplicate
 layout lines and wrong main pin. Independent support/r12_pins.py reproduces
@@ -32,6 +32,28 @@ select by structural keys, sort by rendered path then original components,
 emit every leaf once. SPEC-QUESTIONS 31 records sol's exact tie wording for
 0.9. Exact oracle-owner filtering and lproc closure selection are unchanged.
 No spec/conformance edits or execution, no push, no new scope restriction.
+
+B02 RED: 0 passed / 3 failed, §9.2 namespace ban (2 library, 1 CLI).
+Removing the ban alone gives a second RED (0/1): false @$0 in the envelope.
+Both exact self-named and db controls reproduce the supplied literal envelope,
+interface/closure and object pins independently in r12_address_pins.py.
+GREEN: 12 targeted R12 tests; final normal **365 passed / 0 failed / 5 ignored**.
+Runtime (payload,code,steps) at B=2 is (16,0,2), at B=1 (0,1,1); CLI reversal
+restores entry and cleans frames for both budgets and both local names.
+Fourteen family cases admit local overlap with each of the seven symbol kinds,
+defined and imported (unresolved imports do not contaminate @o's closure).
+Call variants retain their actual dependency and change root identity when
+callee changes; global and qregion image operands remain data references.
+A non-declaring oracle rejects §4.2; actual-global resolution returns base 24.
+The family generator initially omitted CC/R's foreign-owner leaf in the extra
+symbol's envelope; corrected the independent expectation, not implementation.
+No supplied member pin needed correction. Every previous test is retained.
+Design: graph and replacer use the same contextual token classification;
+only a lift.addr operand naming the current oracle's interface stays literal.
+Object admission drops symbol/import bans, retaining only the existing actual
+layout.globals ambiguity (recorded narrowly in SPEC-QUESTIONS 32, as codex
+requests). No new rejection or rule-10 blocker; no Beads issues created/closed.
+Logs: .tmp/r12-b02-{red,cli-red,graph-red,green,family,full}.log.
 
 ## Round-11 fixes (2026-10-31)
 

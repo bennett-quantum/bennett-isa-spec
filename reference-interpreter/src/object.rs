@@ -1001,24 +1001,22 @@ impl Object {
         {
             return err("§9.1", "definition without symbol");
         }
-        // §9.2: "An @name naming an interface region (in lift.addr) is not a
-        // symbol reference and is left unchanged" -- so a region name may not
-        // also name a symbol or import, or the envelope would be ambiguous.
-        let imported: BTreeSet<&str> = self
-            .section("imports")
-            .and_then(|i| i.object().ok())
-            .map(|i| i.keys().map(String::as_str).collect())
-            .unwrap_or_default();
-        for f in self.functions.values().filter(|f| f.kind == "oracle") {
-            for p in &f.params[3] {
-                if names.contains(p.name.as_str()) || imported.contains(p.name.as_str()) {
-                    return err(
-                        "§9.2",
-                        format!(
-                            "interface region {} of @{} also names a symbol",
-                            p.name, f.name
-                        ),
-                    );
+        // Only a global/interface address collision lacks a resolution rule.
+        // Function/data/import names do not by themselves denote global addresses.
+        // Keep the narrow global ambiguity diagnostic (SPEC-QUESTIONS 32).
+        if let Some(layout) = self.section("layout") {
+            let globals = layout.get("globals")?.object()?;
+            for f in self.functions.values().filter(|f| f.kind == "oracle") {
+                for p in &f.params[3] {
+                    if globals.contains_key(&p.name) {
+                        return err(
+                            "§9.2",
+                            format!(
+                                "interface region {} of @{} also names a global",
+                                p.name, f.name
+                            ),
+                        );
+                    }
                 }
             }
         }

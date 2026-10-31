@@ -263,3 +263,16 @@ changed in response to the council's round-1 review
     break ties bytewise by the sequence of original JSON key components."
     Pins: identity::r12_cc_r_colliding_dotted_leaves and
     r12_cc_r_layout_paths_preserve_colliding_leaves; no accepted-spec edit.
+
+32. **Global/interface address namespace (§4.2, §9.2)** *new (round 12)*.
+    Question: both a layout global and an oracle's own interface region can
+    supply a base for the same lift.addr spelling, but no precedence is given.
+    Reading: retain the existing rejection only for names in layout.globals;
+    function symbols, non-global data symbols and imports may share interface
+    names. Classify lift.addr in its declaring oracle as an interface address;
+    call operands and qregion images remain symbol references. This narrows the
+    former rejection, never extends it. *Proposed 0.9 draft (codex's wording):*
+    "An oracle interface region must not share a name with a global in
+    layout.globals; it may share a name with a function symbol."
+    The old global-collision negative remains in r1_linking; the unambiguous
+    self-named positive is r12_interface_region_may_share_function_name.
