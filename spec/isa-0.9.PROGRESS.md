@@ -1,3 +1,22 @@
+## 2026-10-31 Council round 1 → 2 — item 2 (K63)
+
+COD-R1-B01 / SOL S2 addressed: source point plus integer binding key and
+forward semantic-call occurrence is serialized in §11 paths and §12.1
+context keys, and included in scratch chains. Fields are instance and
+call_index; omitted selectors are wildcards. The existing specificity
+tuple is retained, including its ties. K49 now says once per fixed row
+instance per step; K52 still changes oracle level only at a call edge
+which is a proper prefix of the operation chain. No dynamic lift.call
+history returns. Full JSON examples distinguish qinplace G G calls 0/1
+and f instances [0]/[1], even for equal values.
+
+Rejected: restoring lift.call histories (breaks static padded rows),
+using generated leaf ordinals as call occurrence (callee-local and can
+be identical), hashing arguments to identify instances (equal values
+must not merge positional keys), synthetic point strings (obscure source
+validation). Explicit fields preserve independently checkable source
+points. These are address annotations, with no further recipe changes.
+
 ## 2026-10-31 Council round 1 → 2 — item 1 (K62)
 
 SOL09-R1-B01 addressed: canonical action adjoints apply the §5.3 source

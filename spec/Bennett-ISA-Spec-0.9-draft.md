@@ -160,10 +160,10 @@ north star §3.1 requires).
 | K46 | §9.2 | **LAYOUT-ORDER**. Emit every structured leaf once, sorted bytewise by its JCS path; witness: both a/c.db and a.c/db survive, independently of their base values. | INV-4 gap 2; b-isa-spec-4it; SQ 31 | S | +bytes |
 | K47 | §9.2, §16.3 | **INJECTIVE-PATHS**. JCS key-component arrays preserve leaf identity; witness: ["interface_regions","a","c.db"] differs from ["interface_regions","a.c","db"]. Prefer arrays: dialect §16.3 emits dotted block names and §12 Naming emits dotted temporaries; although its reference layout uses ref, no general ban on dotted oracle/region NAMEs is established, and a dot ban would narrow legal ISA names. Also disposes of INV-4 gap 5: structural selection is encoded regardless of any CC/R harm analysis. | INV-4 gaps 3, 5; b-isa-spec-ccv; SQ 31 | S | +bytes |
 | K48 | §9.2 | **ENVELOPE-BOUNDARIES**. Grammar distinguishes function/data payload and suffix classes without new length fields; witness: a lhs named layout gives `layout = …`, never a layout-array line, and a data symbol named data has one payload line selected by its signature kind. | INV-4 gap 4; §16.2 grammar lemma | E | – |
-| K49 | §11 | **INVOCATION-CHAINS**. Only region calls open schedule invocations; lproc rows retain their enclosing oracle chain; witness: two lift.call sites reaching the same lproc row give the same chain. | INV-5 gap 1 | S | – |
+| K49 | §11 | **INVOCATION-CHAINS**. Only region calls open schedule invocations; each fixed lproc row instance expands once per step and retains its enclosing oracle chain; witness: two lift.call sites with the same key share that row instance, while keys [0]/[1] remain distinct. [deps: ISA-3.7-P5, ISA-3.7-P6, ISA-11.1-P9] | INV-5 gap 1 | S | – |
 | K50 | §11 | **NESTED-BUDGETS**. Each nested oracle uses its token budget, independently of its parent; witness: root B=2 and nested B=3 include nested step 3; nested B=2 excludes it. | INV-5 gap 2 | E | – |
 | K51 | §11 | **NONSTEP-SELECTORS**. Absent oracle coordinates match only wildcard step/phase; witness: an action-root X matches */* but neither step 1 nor phase rev, including adjoint X. | INV-5 gap 4 | E | – |
-| K52 | §11 | **SELECTOR-LEVEL**. The last oracle-call element in the entry path selects the invocation whose step/phase it reads; witness: path [] step 1 reads the root even inside nested step 3; a path ending at the nested call reads nested step 3. | INV-5 gap 5 | S | – |
+| K52 | §11 | **SELECTOR-LEVEL**. The last oracle-call element in the entry path selects the invocation whose step/phase it reads; witness: path [] step 1 reads the root even inside nested step 3; a path ending at the nested call edge (including its instance and call_index) reads nested step 3. [deps: ISA-11-P5.S5, ISA-11-P5.S6, ISA-11-P5.S7, ISA-11.1-P9] | INV-5 gap 5 | S | – |
 | K53 | §11 | **MAXIMAL-TIES**. Equal maximal lexicographic tuples at distinct array positions tie; shadowed overlaps do not; witness: duplicate C rejects; tied A/B covered by higher C (or a union of higher entries) admit in every order. | INV-5 gap 6 | S | – |
 | K54 | §11 | **KIND-DOMAINS**. Gate, allocation and start decisions match only their operation classes; witness: gate and alloc entries with identical selectors cannot tie with each other. | INV-5 gap 7 | E | – |
 | K55 | §11 | **TIE-CHECK-STAGES**. Admission checks known invocation domains; unknown nested domains check the first ambiguous concrete operation before its realisation; witness: unknown nested B=3 rejects at nested step 3; B=2 never generates it; a derivable B=3 rejects at admission. | INV-5 gap 9–10; b-isa-spec-6hs | S | – |
@@ -174,6 +174,7 @@ north star §3.1 requires).
 | K60 | §11 | **SCHEDULE-DECIMALS**. Schedule decimal values are exact rationals, independent of spelling; witness: 0, "0", "0.0" and "0.000" all denote exact zero. | INV-5 gap 16 | E | – |
 | K61 | §11 | **UNCOVERED-NESTED-DEFAULTS**. Uncovered operations take defaults directly; no synthetic entry or multi-level selector is required; witness: root step 1 keeps scheme X while an uncovered root-step-2/nested-step-1 gate takes its default. | INV-5 gap 17 | E | – |
 | K62 | §5.3, §11.1 | **SCHEDULED-ACTION-ADJOINT**. Source instruction replacements precede recipe instantiation; witness: adj(qinplace G H) allocates t[1] at 0 and f[4] at 1, calls H then G and releases t then f. [deps: ISA-5.3-P4, ISA-4.5-P5, ISA-11-P2, ISA-11.1-P29] | SOL09-R1-B01 | S | library |
+| K63 | §9.2, §11, §11.1, §12.1 | **INVOCATION-EDGE-IDENTITY**. Serialize fixed-binding instance and forward semantic-call occurrence independently of leaf ordinals; witness: qinplace G G has call_index 0/1; lproc keys [0]/[1] have distinct contexts. [deps: ISA-3.7-P5, ISA-3.7-P6, ISA-9.2-P1.S3, ISA-11.1-P9, ISA-12.1-P11] | COD-R1-B01; SOL S2 | S | – |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -1818,8 +1819,9 @@ and every forwarded operand list are canonical function bytes; changing
 them changes the envelope and, through references, the caller's closure
 hash. Fixed binding instances are derived per oracle (§3.7), not new
 symbols or separately hashed bodies; instance rows share the source
-row's program-point id, and invocation paths distinguish their uses
-(§12.1). Entry argument values and token tuples bind invocations through
+row's program-point id and expand once per fixed row instance per step,
+while the instance and semantic-call occurrence components in §11
+invocation paths and §12.1 context keys distinguish their uses. [deps: ISA-3.7-P5, ISA-3.7-P6, ISA-11.1-P9, ISA-12.1-P11] Entry argument values and token tuples bind invocations through
 `params_hash`, not through the lproc's interface hash (this section).
 Imports must match all five groups; validation and instance formation
 are repeated after linking (§9.3).
@@ -2309,7 +2311,8 @@ remove only operations the library marks removable.
   { "bindings": { "closure_hash", "target_hash", "region", "variant", "inherited_controls", "budget": [B,heap,stack,depth],
                   "params_hash", "epsilon", "expansion": { "name", "version", "hash" }, "scheduler": { "name", "version" } },
     "interface_vertices"?: [ [v, …], … ],
-    "entries": [ { "path": [ { "symbol": hex, "point": "<block>:<ordinal>", "iteration": [n, …] | "*" }, … ],
+    "entries": [ { "path": [ { "symbol": hex, "point": "<block>:<ordinal>", "iteration": [n, …] | "*",
+                              "instance"?: [n, …] | "*", "call_index"?: n | "*" }, … ],
                    "step": n | "*",  "phase": "fwd" | "rev" | "*",  "generated": n | "*",
                    "kind": "cleanup" | "gate" | "alloc" | "start",
                    "cleanup": { "realisation": "reverse" | "recompute" },
@@ -2337,14 +2340,16 @@ leaf, including scheme leaves, MUST satisfy §8.3 adjacency, else
 the program points of the region calls and `lift.oracle_call`s that led
 to it, outermost first, ending in its own point. [deps: ISA-4.7, ISA-4.2, ISA-3.6]
 `lift.call` adds no element: an lproc row in an oracle's closure generates
-its expansion once per step under its dispatch predicate, independently
-of which `lift.call` reached that row or the recursion depth. [deps: ISA-3.6, ISA-3.7]
+its expansion once per fixed row instance per step under its dispatch
+predicate, independently of which `lift.call` reached that instance or
+the recursion depth. [deps: ISA-3.6, ISA-3.7-P5, ISA-3.7-P6]
 `path` matches
 an operation iff it is a **prefix** of that chain, element by element:
 `symbol` and `point` equal, and `iteration` either `*` or equal to the
 vector of 0-based dynamic repetition counts of the `qloop`s enclosing
 that point (outermost first; its length is the point's loop nesting
-depth, `[]` outside every loop).
+depth, `[]` outside every loop); `instance` and `call_index` match as
+specified below. [deps: ISA-4.6, ISA-3.7-P5, ISA-11.1-P9]
 An oracle invocation's forward step coordinate is t ∈ 1..B and its
 inverse step t has `phase: rev`; the root B is `bindings.budget[0]`
 and a nested oracle's B is the steps component of its own call token,
@@ -2364,6 +2369,33 @@ construction/commit/release outside the steps, only `step: "*"` and
 `rev` phase. [deps: ISA-5.2-P3, ISA-5.3, ISA-4.7]
 `generated` is the ordinal within the row's expansion in the bound
 library. [deps: ISA-11-P2.S3, ISA-11.1-P5]
+
+**Invocation-edge identity (K63).** Every invocation edge identifies the
+source call point, the containing fixed-binding instance (the §3.7 integer
+binding key, or `[]` outside an lproc instance), and the zero-based
+semantic-call occurrence within that source row expansion, serialized as
+`instance` and `call_index` alongside `symbol`, `point`, `iteration`.
+[deps: ISA-3.7-P5, ISA-3.7-P6, ISA-9.2-P1.S3, ISA-11.1-P9]
+Number semantic calls in forward instantiated constructor traversal order
+before descending into callees, counting `call` constructors rather than
+`invoke`/`apply` recipe composition, independently of leaf ordinals;
+inverse traversal retains forward occurrence numbers. [deps: ISA-11.1-P5, ISA-11.1-P9, ISA-11.1-P29.S3]
+The operation's terminal point also carries its containing `instance`,
+but has no `call_index` unless it is an invocation edge into a callee.
+[deps: ISA-3.7-P5, ISA-11-P5, ISA-11.1-P9]
+In schedule path elements each new selector may be `*`, and omission
+means `*`; a concrete `instance` matches that exact integer array, and
+a concrete `call_index` matches only an edge with that occurrence number.
+[deps: ISA-11-P3, ISA-3.7-P5, ISA-11.1-P9]
+Validate concrete instance keys against §3.7 source instance formation
+and concrete call indices against the bound-library expansion at that
+source point and instance, including static repetitions. [deps: ISA-3.7-P5, ISA-3.7-P6, ISA-11.1-P5, ISA-11.1-P9]
+These selectors do not add specificity components: the existing
+lexicographic tuple is unchanged, so equally specific overlapping
+entries still tie unless covered by a more-specific match. [deps: ISA-11-P6.S1, ISA-11-P6.S2, ISA-11-P6.S3]
+The edge's source point selects the entered invocation for K52 exactly
+as before; adding instance and call occurrence does not introduce a
+`lift.call` invocation or another step level. [deps: ISA-11-P5.S5, ISA-11-P5.S6, ISA-11-P5.S7, ISA-3.7-P6]
 
 **Specificity** is the lexicographic tuple (path length, number of
 non-`*` iterations, step non-`*`, phase non-`*`, generated non-`*`);
@@ -2451,7 +2483,8 @@ nested step 3 exists; with nested B=2 it does not, independently of root
 B. [deps: ISA-5.2-P3, ISA-5.4] A path of `[]` with `step: 1` reads root step 1 even for an operation
 at nested step 3; a path through the nested call reads nested step 3. [deps: ISA-4.2, ISA-4.7, ISA-5.2-P3]
 Two `lift.call` sites p1/p2 into the same lproc row q give one row-q
-expansion per enclosing step, with neither p1 nor p2 in its chain. [deps: ISA-3.6, ISA-3.7]
+expansion per fixed instance per enclosing step, with neither p1 nor p2
+in its chain; different binding keys yield distinct instance components. [deps: ISA-3.6, ISA-3.7-P5, ISA-3.7-P6]
 An action-root X has no step/phase, including under adjoint. [deps: ISA-5.3, ISA-4.7]
 Equal maximal entries A/B reject; A/B fully covered by higher C or a
 union C1/C2 admit in every order; duplicate C entries reject. [deps: ISA-11-P3]
@@ -2581,10 +2614,13 @@ formal. The linked closure registry supplies that symbol's own typed
 interface and constructor body; the hash must match the linked closure,
 not an arbitrary supplied body. Exactly `{ "call": name, "args": [...] }`
 expands that symbol under a new invocation-path element identified by the
-call constructor's expansion occurrence. It retains its own ordinal
-space starting at zero. `invoke` is recipe composition within a row;
-`call` is a semantic symbol invocation and never flattens callee ordinals
-into the caller's space. Repeated calls have distinct paths.
+call constructor's source point, containing fixed-binding instance and
+forward semantic-call occurrence number as serialized in §11. [deps: ISA-3.7-P5, ISA-3.7-P6, ISA-11-P5, ISA-11.1-P29]
+It retains its own ordinal space starting at zero. [deps: ISA-11-P2, ISA-11.1-P29.S2]
+`invoke` is recipe composition within a row; `call` is a semantic symbol
+invocation and never flattens callee ordinals into the caller's space. [deps: ISA-11-P2, ISA-11.1-P29.S2]
+Repeated calls have distinct paths through their `call_index`, even when
+callee hash and arguments agree. [deps: ISA-11-P5, ISA-11.1-P29.S2]
 
 The inherited effective-control set is always passed to callees and body
 splices. An `environment` actual uses the wire-actual grammar and adds
@@ -2906,8 +2942,9 @@ callee ordinal space; `step` and `phase` select the invocation's oracle
 step as in §11. The inverse of a row visits the forward ordinals in
 reverse order, retaining each ordinal under `phase: rev`; it does not
 renumber them. Scratch identity is `(invocation chain, step, recipe
-expansion path, allocation ordinal, bit index)`; allocations in repeated
-bodies have their expanded occurrence path. All library scratch is
+expansion path, allocation ordinal, bit index)`; the chain includes
+fixed-binding instance and semantic-call occurrence, and allocations in
+repeated bodies have their expanded occurrence path. [deps: ISA-3.7-P5, ISA-11-P5, ISA-11.1-P9] All library scratch is
 clean, allocated unconditionally and released in reverse allocation
 order after uncomputation; borrowed user operands remain borrowed.
 `removable` is an explicit array of leaf ordinals and MUST be empty
@@ -3100,13 +3137,81 @@ including invocations that no schedule entry names and defaults alone
 cover (§11) — with the classical arguments, budget, `epsilon_share`s and
 cleanup realisations resolved for it. An invocation's **context key** is
 its concrete invocation chain (§11), outermost first, each element `{
-"symbol", "point", "iteration" }` with every iteration index resolved
+"symbol", "point", "iteration", "instance", "call_index" }` with every
+iteration index, fixed-binding key and forward semantic-call occurrence
+resolved
 and, for an element inside an oracle, `"step"` (1..B) and `"phase"`
 (`"fwd"` or `"rev"`) added; contexts are enumerated in increasing
 bytewise order of the JCS encodings of their keys (wildcard selectors
-play no part). Every claim bound and every
+play no part). [deps: ISA-3.7-P5, ISA-3.7-P6, ISA-9.2-P1.S3, ISA-11-P5, ISA-11.1-P9]
+Every claim bound and every
 `error` entry (§12.3) is a **common upper bound over all contexts** of
 its key; the multiplicity composition of §12.3 is sound for that reason.
+
+**Invocation identity witnesses (K63).** For `qinplace @G @G tk x`
+at action A's `entry:0`, the two call edges below are distinct even with
+identical arguments, and each prefix is also a round-trippable schedule
+path selecting that invocation's descendants. [deps: ISA-4.5-P5, ISA-11-P5, ISA-11.1-P9, ISA-12.1-P11]
+For two `lift.call` sites forwarding root token positions 0 and 1 into
+lproc f, whose `entry:0` contains one `lift.oracle_call`, the next two
+keys distinguish the row instances at outer step 1, even if token values
+happen to agree. [deps: ISA-3.7-P5, ISA-3.7-P6, ISA-9.2-P1.S3, ISA-12.1-P11]
+The `instance`/`call_index` fields are present in both schedule path
+prefixes and context keys; context-only step/phase fields below are
+supplied separately as §11 selectors in the schedule form. [deps: ISA-11-P3, ISA-11-P5, ISA-12.1-P11]
+
+```json
+{
+  "qinplace_context_keys": [
+    [
+      {
+        "symbol": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "point": "entry:0",
+        "iteration": [],
+        "instance": [],
+        "call_index": 0
+      }
+    ],
+    [
+      {
+        "symbol": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "point": "entry:0",
+        "iteration": [],
+        "instance": [],
+        "call_index": 1
+      }
+    ]
+  ],
+  "lproc_context_keys": [
+    [
+      {
+        "symbol": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "point": "entry:0",
+        "iteration": [],
+        "instance": [
+          0
+        ],
+        "call_index": 0,
+        "step": 1,
+        "phase": "fwd"
+      }
+    ],
+    [
+      {
+        "symbol": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "point": "entry:0",
+        "iteration": [],
+        "instance": [
+          1
+        ],
+        "call_index": 0,
+        "step": 1,
+        "phase": "fwd"
+      }
+    ]
+  ]
+}
+```
 
 **Diamond-norm SDP** (Watrous, *Theory of Computing* 5 (2009), §4; the
 Hermiticity-preserving simplification). Let Φ = Φ_real − Φ_ref be the
