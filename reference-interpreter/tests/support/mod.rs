@@ -683,3 +683,40 @@ pub fn r11_pin(tag: &str) -> Object {
     o.check_hashes().unwrap();
     o
 }
+
+pub fn r12_case(tag: &str) -> Json {
+    json(include_str!("r12_cases.json"))
+        .get(tag)
+        .unwrap()
+        .clone()
+}
+pub fn r12_text(tag: &str) -> String {
+    r12_case(tag).get("text").unwrap().string().unwrap().into()
+}
+pub fn r12_pin(tag: &str) -> Object {
+    let c = r12_case(tag);
+    let o = Object::parse(c.get("text").unwrap().string().unwrap()).unwrap();
+    let id = o.identity().unwrap();
+    assert_eq!(
+        id.object_hash,
+        c.get("object_hash").unwrap().string().unwrap()
+    );
+    for (name, hash) in c.get("hashes").unwrap().object().unwrap() {
+        assert_eq!(
+            id.envelopes[name],
+            c.get("envelopes")
+                .unwrap()
+                .get(name)
+                .unwrap()
+                .string()
+                .unwrap()
+        );
+        assert_eq!(id.interface_hashes[name], hash.string().unwrap());
+        assert_eq!(
+            id.closure_hashes[name].as_deref(),
+            Some(hash.string().unwrap())
+        );
+    }
+    o.check_hashes().unwrap();
+    o
+}

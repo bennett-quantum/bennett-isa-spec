@@ -220,48 +220,42 @@ impl Object {
         } else {
             vec![format!("{n} {}", hex(&self.data[n]))]
         };
-        let mut leaves = BTreeMap::new();
+        let mut leaves = Vec::new();
         let mut images = BTreeSet::new();
         if let Some(layout) = self.section("layout") {
-            // §9.2 ownership is a JSON key, not a prefix of a rendered path.
-            // NAME and region names may contain dots (§16.1), including paths
-            // that would collide if foreign owners were flattened first.
-            let mut selected = layout.clone();
-            if kind == "oracle" {
-                let regions = layout.get("interface_regions")?.object()?;
-                let own = regions
-                    .get(n)
-                    .map(|entry| BTreeMap::from([(n.to_string(), entry.clone())]))
-                    .unwrap_or_default();
-                if let Json::Object(fields) = &mut selected {
-                    fields.insert("interface_regions".into(), Json::Object(own));
-                }
-            }
-            let all = layout_leaves(&selected)?;
+            let all = layout_leaves(layout)?;
             match kind {
-                "oracle" | "cc" | "r" => leaves = all,
+                "cc" | "r" => leaves = all,
+                // Ownership is an original JSON key, never a dotted prefix.
+                "oracle" => {
+                    leaves = all
+                        .into_iter()
+                        .filter(|leaf| leaf.keys[0] != "interface_regions" || leaf.keys[1] == n)
+                        .collect();
+                }
                 "lproc" => {
-                    for line in &body {
-                        if let Some(g) = line.split_once("lift.addr @").map(|(_, g)| g) {
-                            let k = format!("globals.{g}");
-                            if let Some(v) = all.get(&k) {
-                                leaves.insert(k, v.clone());
-                            }
-                        }
-                    }
+                    let globals: BTreeSet<_> = self.functions[n]
+                        .instructions()
+                        .filter(|i| i.op == "lift.addr")
+                        .filter_map(|i| i.operands[0].strip_prefix('@').map(str::to_owned))
+                        .collect();
+                    leaves = all
+                        .into_iter()
+                        .filter(|leaf| leaf.keys[0] == "globals" && globals.contains(&leaf.keys[1]))
+                        .collect();
                 }
                 _ => {}
             }
-            for v in leaves.values() {
-                if let Json::Object(o) = v {
+            for leaf in &leaves {
+                if let Json::Object(o) = &leaf.value {
                     if let Some(img) = o.get("image") {
                         images.insert(img.string()?.to_string());
                     }
                 }
             }
             if matches!(kind, "oracle" | "cc" | "r") {
-                if let Some(img) = leaves.get("block_image") {
-                    images.insert(img.string()?.to_string());
+                if let Some(leaf) = leaves.iter().find(|leaf| leaf.keys == ["block_image"]) {
+                    images.insert(leaf.value.string()?.to_string());
                 }
             }
         }
@@ -305,9 +299,9 @@ impl Object {
                 .ok_or_else(|| Error(format!("§9.2: missing closure data {img}")))?;
             lines.push(replace(&format!("data {img} {}", hex(bytes)), &mut refs));
         }
-        for (path, v) in leaves {
+        for leaf in leaves {
             lines.push(replace(
-                &format!("layout {path} {}", v.canonical()),
+                &format!("layout {} {}", leaf.path, leaf.value.canonical()),
                 &mut refs,
             ));
         }
@@ -359,27 +353,41 @@ struct HashPass {
 pub(crate) fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
-pub(crate) fn layout_leaves(layout: &Json) -> Result<BTreeMap<String, Json>> {
-    let mut leaves = BTreeMap::new();
+/// A dotted rendering is not injective (§16.1 permits dots in NAME).
+/// Keep structural identity through selection and emit every leaf once.
+struct LayoutLeaf {
+    keys: Vec<String>,
+    path: String,
+    value: Json,
+}
+fn layout_leaves(layout: &Json) -> Result<Vec<LayoutLeaf>> {
+    let mut leaves = Vec::new();
+    let mut push = |keys: Vec<String>, value: &Json| {
+        leaves.push(LayoutLeaf {
+            path: keys.join("."),
+            keys,
+            value: value.clone(),
+        });
+    };
     for (k, v) in layout.object()? {
         match k.as_str() {
             "globals" => {
                 for (n, e) in v.object()? {
-                    leaves.insert(format!("globals.{n}"), e.clone());
+                    push(vec![k.clone(), n.clone()], e);
                 }
             }
             "interface_regions" => {
                 for (n, rs) in v.object()? {
                     for (r, e) in rs.object()? {
-                        leaves.insert(format!("interface_regions.{n}.{r}"), e.clone());
+                        push(vec![k.clone(), n.clone(), r.clone()], e);
                     }
                 }
             }
-            _ => {
-                leaves.insert(k.clone(), v.clone());
-            }
+            _ => push(vec![k.clone()], v),
         }
     }
+    // §9.2 dotted-path order; value-independent tie reading in SPEC-QUESTIONS 31.
+    leaves.sort_by(|a, b| a.path.cmp(&b.path).then_with(|| a.keys.cmp(&b.keys)));
     Ok(leaves)
 }
 fn components(graph: &BTreeMap<String, Vec<String>>) -> Vec<Vec<String>> {

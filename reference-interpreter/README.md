@@ -414,8 +414,12 @@ An empty regs line remains legal and carries loop bounds. A named rotation
 angle must be an f64 classical argument fixed at region entry (§3.1).
 
 Oracle identity selects interface_regions by exact structured JSON owner key
-before flattening layout leaves (§9.2); dots remain legal in owner and region
-names. Every non-interface leaf remains in the oracle envelope.
+in a lossless collection of original components, rendered path and value (§9.2).
+Every selected structural leaf is emitted once, even when dotted renderings
+coincide. Sort by rendered path bytewise, then by original components bytewise
+(SPEC-QUESTIONS 31); dots remain legal. Every non-interface leaf remains in
+the oracle envelope. Lprocs select exact global keys and their images; actions
+and data retain their existing closure exclusions.
 
 Fixture hand derivations must distinguish exact semantic support, rounded
 diagnostic amplitudes and token preconditions. A finite binary64 angle is

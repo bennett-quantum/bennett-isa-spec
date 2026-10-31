@@ -6,6 +6,33 @@ under `reference-interpreter/`; commit own paths
 (`git add -A -- reference-interpreter && git commit -- reference-interpreter`),
 never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
+## Round-12 fixes (2026-10-31)
+
+Sole implementation sub-agent; owned interpreter and external round-12 response.
+Baseline: **353 passed / 0 failed / 5 ignored**, summed over all binaries.
+All cargo/Python commands headless with repository .tmp; only crate tests.
+
+| Blocker | RED tests | Status | Commit |
+|---|---|---|---|
+| SOL-R12-B01 ≡ R12-B01 | identity::r12_cc_r_colliding_dotted_leaves / r12_cc_r_layout_paths_preserve_colliding_leaves / r12_dotted_leaf_collision_family; cli_xam::r12_cli_checks_lossless_layout_envelopes | GREEN; full suite 358/0/5 | this step |
+| R12-B02 | contextual interface-reference witnesses | independent pins verified; implementation follows B01 |
+
+B01 RED: 0 passed / 4 failed across identity and CLI; omitted duplicate
+layout lines and wrong main pin. Independent support/r12_pins.py reproduces
+all supplied oracle/main/object pins with literal LF envelopes, no rehash.
+GREEN: six exact CC/R objects and 30 depth-2–3 collision-family objects;
+equal, ascending and descending values, both-leaf sensitivity and foreign-owner
+invariance. Noncolliding dotted global/lproc image selection and action/data
+closure exclusions retained. Added lproc control initially moved a region
+into the heap; corrected its test-only address to a disjoint range before
+GREEN. First full run stopped on that setup error; final full B01 is 358/0/5.
+All round 4–11 tests retained. Logs: .tmp/r12-b01-{red,green,full}.log.
+Design: each leaf carries original JSON key components, rendered path, value;
+select by structural keys, sort by rendered path then original components,
+emit every leaf once. SPEC-QUESTIONS 31 records sol's exact tie wording for
+0.9. Exact oracle-owner filtering and lproc closure selection are unchanged.
+No spec/conformance edits or execution, no push, no new scope restriction.
+
 ## Round-11 fixes (2026-10-31)
 
 Tracking b-isa-spec-x02; sole implementer; owned interpreter and external

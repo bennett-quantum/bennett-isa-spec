@@ -250,3 +250,16 @@ changed in response to the council's round-1 review
     `r1_certificates::muse_r5_translation_frame_maximality_is_within_its_static_sequence`
     has two pre-loop identity touches followed by a loop-body frame at ordinals
     4–7; the structural claim proves that complete inner frame.
+
+31. **Coincident dotted layout paths (§9.2, §16.1)** *new (round 12)*.
+    Question: legal dotted owner/region names can give distinct structural
+    leaves the same rendered dotted path; §9.2 (5b) supplies no tie order.
+    Reading: retain every leaf; sort by rendered path bytewise, then by the
+    original JSON key components in structural order, component-wise bytewise.
+    The order is independent of the values. Exact oracle ownership and lproc
+    global selection use structural keys. *Proposed 0.9 draft, §9.2 (sol's
+    wording):* "Emit one line for every structured layout leaf, including leaves
+    with coincident dotted renderings. Sort by the rendered dotted path bytewise;
+    break ties bytewise by the sequence of original JSON key components."
+    Pins: identity::r12_cc_r_colliding_dotted_leaves and
+    r12_cc_r_layout_paths_preserve_colliding_leaves; no accepted-spec edit.

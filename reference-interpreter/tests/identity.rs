@@ -307,3 +307,114 @@ fn r11_dotted_owner_and_region_family() {
         assert_eq!(envelopes[0], envelopes[1]);
     }
 }
+
+#[test]
+fn r12_cc_r_colliding_dotted_leaves() {
+    // Codex's equal values make multiplicity independent of the tie reading.
+    let expected = concat!(
+        "isa=0.8\nptr_width=32\n",
+        "{\"abi\":\"0.8\",\"kind\":\"cc\",\"params\":[],\"results\":[],\"tier\":\"cc\"}\n",
+        "fn cc @main () () () () ()\n^entry():\nret\n",
+        "layout A_tab 0\nlayout H 6\nlayout S_cells 0\nlayout heap_base 48\nlayout heap_limit_max 0\n",
+        "layout interface_regions.a.b.c {\"base\":16}\n",
+        "layout interface_regions.a.b.c {\"base\":16}\n",
+        "layout null_size 1\nlayout ptr_width 32\n"
+    );
+    for tier in ["cc", "r"] {
+        let expected = expected
+            .replace("\"cc\"", &format!("\"{tier}\""))
+            .replace("fn cc ", &format!("fn {tier} "));
+        let o = Object::parse(&support::r12_text(&format!("codex-{tier}"))).unwrap();
+        assert_eq!(o.identity().unwrap().envelopes["main"], expected);
+        support::r12_pin(&format!("codex-{tier}"));
+    }
+}
+
+#[test]
+fn r12_cc_r_layout_paths_preserve_colliding_leaves() {
+    // Sol deep-a-32 + @main: a < a.c in original-component order.
+    let expected = concat!(
+        "isa=0.8\nptr_width=32\n",
+        "{\"abi\":\"0.8\",\"kind\":\"cc\",\"params\":[],\"results\":[],\"tier\":\"cc\"}\n",
+        "fn cc @main () () () () ()\n^entry():\nret\n",
+        "layout A_tab 1\nlayout H 8\nlayout S_cells 0\nlayout heap_base 128\nlayout heap_limit_max 0\n",
+        "layout interface_regions.a.c.db {\"base\":16}\n",
+        "layout interface_regions.a.c.db {\"base\":32}\n",
+        "layout null_size 1\nlayout ptr_width 32\n"
+    );
+    for tier in ["cc", "r"] {
+        for base in [16, 17] {
+            let expected = expected
+                .replace("\"cc\"", &format!("\"{tier}\""))
+                .replace("fn cc ", &format!("fn {tier} "))
+                .replace("\"base\":16", &format!("\"base\":{base}"));
+            let tag = format!("sol-{tier}-{base}");
+            let o = Object::parse(&support::r12_text(&tag)).unwrap();
+            assert_eq!(o.identity().unwrap().envelopes["main"], expected);
+            support::r12_pin(&tag);
+        }
+    }
+}
+
+#[test]
+fn r12_dotted_leaf_collision_family() {
+    for owner in ["a", "a.b", "a.b.c"] {
+        for tier in ["cc", "r"] {
+            let mut ids = vec![];
+            for (b1, b2) in [(16, 16), (16, 32), (32, 16), (17, 32), (16, 33)] {
+                let o = support::r12_pin(&format!("family-{owner}-{tier}-{b1}-{b2}"));
+                let id = o.identity().unwrap();
+                let lines: Vec<_> = id.envelopes["main"]
+                    .lines()
+                    .filter(|l| l.starts_with("layout interface_regions."))
+                    .collect();
+                assert_eq!(
+                    lines,
+                    [
+                        format!("layout interface_regions.{owner}.c.db {{\"base\":{b1}}}"),
+                        format!("layout interface_regions.{owner}.c.db {{\"base\":{b2}}}")
+                    ]
+                );
+                ids.push(id);
+            }
+            for changed in [3, 4] {
+                assert_ne!(
+                    ids[1].interface_hashes["main"],
+                    ids[changed].interface_hashes["main"]
+                );
+            }
+            assert_eq!(ids[1].envelopes[owner], ids[4].envelopes[owner]);
+            assert_eq!(
+                ids[1].envelopes[&format!("{owner}.c")],
+                ids[3].envelopes[&format!("{owner}.c")]
+            );
+        }
+    }
+}
+
+#[test]
+fn r12_dotted_global_lproc_keeps_exact_closure_selection() {
+    let raw = include_str!("fixtures/sum_db.bisa").replace("zero", "global.with.dots");
+    let o = Object::parse(&raw).unwrap();
+    let id = o.identity().unwrap();
+    let env = &id.envelopes["sum"];
+    assert!(env.contains(
+        "layout globals.global.with.dots {\"base\":16,\"image\":\"global.with.dots\",\"size\":1}\n"
+    ));
+    assert!(env.contains("data global.with.dots 00\n"));
+    assert_eq!(env.lines().filter(|s| s.starts_with("layout ")).count(), 1);
+    let changed = Object::parse(&raw.replace("\"base\":4096", "\"base\":4095"))
+        .unwrap()
+        .identity()
+        .unwrap();
+    assert_eq!(env, &changed.envelopes["sum"]);
+    assert!(!id.envelopes["global.with.dots"].contains("layout "));
+    let actions = Object::parse(include_str!("fixtures/actions.bisa"))
+        .unwrap()
+        .identity()
+        .unwrap();
+    assert!(actions
+        .envelopes
+        .values()
+        .all(|env| !env.contains("layout ")));
+}

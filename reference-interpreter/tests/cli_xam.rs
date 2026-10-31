@@ -1942,3 +1942,31 @@ fn r11_cli_rounded_and_exact_phase_probes() {
         }
     }
 }
+
+#[test]
+fn r12_cli_checks_lossless_layout_envelopes() {
+    for tag in [
+        "codex-cc",
+        "codex-r",
+        "sol-cc-16",
+        "sol-cc-17",
+        "sol-r-16",
+        "sol-r-17",
+    ] {
+        let c = support::r12_case(tag);
+        let path = tmp_file(&format!("r12-{tag}.bisa"), &support::r12_text(tag));
+        for cmd in ["hash", "check"] {
+            let v = ok(&[cmd, &path]);
+            assert_eq!(text(&v, "status"), "ok");
+            assert_eq!(
+                text(&v, "object_hash"),
+                c.get("object_hash").unwrap().string().unwrap()
+            );
+            for (name, hash) in c.get("hashes").unwrap().object().unwrap() {
+                let symbol = field(&v, "symbols").get(name).unwrap();
+                assert_eq!(text(symbol, "interface_hash"), hash.string().unwrap());
+                assert_eq!(text(symbol, "closure_hash"), hash.string().unwrap());
+            }
+        }
+    }
+}
