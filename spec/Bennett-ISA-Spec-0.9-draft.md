@@ -110,7 +110,7 @@ north star §3.1 requires).
 | E17.16 | §3.6, §4.2 | `qjumpr` to an in-range index that is not a block's first row enters that row (the kept 0.8 sentence read "any other index faults" under block indexing); re-indexing preserves every reachable row index | review of this draft (after E1) | E | – |
 | E17.17 | §2, §3.3, §10, §17 item 14 | **Verifying** versus non-verifying executors defined; cleanliness tests (`qreg.free`, host prepare/free) stated for both | review of this draft | E | – |
 | D1 | §17 item 15, §8.2–§8.3, §11 | Routing/movement cost deferred to 0.10; optional topology and placement decided by K14 | zsw.16; b-isa-spec-wr7 | S | – |
-| D2 | – | Deferred r8 suggestions: zsw.4 (the controlled-action target/schedule/certificate fixture waits for `ref`, §17 item 7), zsw.5 (citation unverified), zsw.14 (`ref` artefact, §17 item 7) | zsw.4, .5, .14 | – | – |
+| D2 | – | r8 suggestions: zsw.4 (controlled-action fixture published, §17 item 7), zsw.5 (citation unverified), zsw.14 (`ref` catalog published, §17 item 7) | zsw.4, .5, .14 | – | – |
 
 ### 0.2 Group 2: capability contracts
 
@@ -2598,15 +2598,16 @@ sequence still has its ordinal-0 carrier at its release point. [deps: ISA-4.5, I
 ### 11.1 Reference-library contract (K11)
 
 **ISA-REF-LIB** (K11; b-isa-spec-8r4, from bennett-vm-47t).
-This is the decided 0.9 contract. The complete serialized constructor
-catalog `spec/ref-0.9-draft.json` is produced by a separate job under
-b-isa-spec-8r4; `ref/` is published after 0.9 acceptance. Until the
-bound library is available, consumers report `E_SCHEDULE_INFEASIBLE`
-as §11 requires; staged conformance cases remain unavailable naming
-b-isa-spec-8r4. The witness below is not a full-library hash.
+This is the decided 0.9 contract. The catalog bound as ref version 0.9
+is the file `spec/ref-0.9.json` whose four-line envelope hashes to
+`5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`.
+It is a byte-identical publication of the complete 219-recipe
+`spec/ref-0.9-draft.json`. Consumers lacking the bound library report
+`E_SCHEDULE_INFEASIBLE` as §11 requires. The witness below is not a
+full-library hash.
 
-**Serialization and identity.** Publish `ref/README.md` and
-`ref/ref-0.9.json` after acceptance. The JSON file is RFC 8785 canonical
+**Serialization and identity.** The schema and family witnesses are
+documented in `spec/ref-0.9-draft.README.md`. The JSON file is RFC 8785 canonical
 UTF-8, with no trailing LF, containing exactly `isa`, `name`, `version`
 and `recipes`. The first three are strings `0.9`, `ref`, `0.9`.
 `recipes` is an array in bytewise `kind` order, then increasing parameter
@@ -4292,12 +4293,14 @@ the item is revised. Items 1–5 are asserted non-semantic.
    equally for omission and an explicit binding. [deps: ISA-11.1-P3, ISA-11.1-P4, ISA-11.1]
    §11.1 fixes its schema, ordinals, scratch identities, empty removable
    sets and deterministic decomposition algorithms. [deps: ISA-11.1]
-   Serialization as `spec/ref-0.9-draft.json` is a separate job under
-   b-isa-spec-8r4; publication in `ref/` follows 0.9 acceptance. The
-   worked controlled-action target/schedule/certificate fixture bound to
-   it (zsw.4) is pending;
-   until then two consumers agree on every order fixed above gate level
-   (§11).
+   The bound catalog is published as `spec/ref-0.9.json`. The worked
+   `ctl` action fixture (zsw.4) is in
+   `conformance/fixtures/controlled-action-09/`: `controlled.bisa`,
+   `target.json`, `leaves.json`, `schedule.json`, `frame.json` and
+   `certificate.json`. It contains one exact controlled-X leaf, starts
+   at time 0 and ends at time 1, with two live fast-class interface wires
+   and no workspace. Its README records derivation and the pinned 0.8
+   compatibility check separately from the 0.9 bindings.
 8. **Enclosure procedure for transcendental entries** (§12.1). Default:
    Taylor series of sin and cos to the first term whose Lagrange
    remainder bound is below 2^−(`precision_bits` + 2), argument reduced

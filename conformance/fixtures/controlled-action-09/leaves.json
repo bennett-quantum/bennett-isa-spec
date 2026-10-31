@@ -1,0 +1,1 @@
+[{"class":"fast","controls":["c[0]"],"end":1,"gate":"x","generated":0,"path":[{"iteration":[],"point":"entry:0","symbol":"df131e972083b8d3b3b7d9341342b55252ca7a1963c4b7b6f702b9cdf3fbde12"},{"iteration":[],"point":"entry:0","symbol":"7ff7153a2ad3b857ec9eb86ca99b9bcbc605f60093d28e99fb749ed16d13274b"}],"phase":"*","start":0,"step":"*","target_entry":0,"wires":["t[0]"]}]

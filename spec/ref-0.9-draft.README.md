@@ -1,5 +1,7 @@
 # ref 0.9 constructor catalog — complete under draft 0.9
 
+Published byte-identically as [ref-0.9.json](ref-0.9.json) after council acceptance (2026-10-31); the status below records the draft completion checkpoint.
+
 Status: **complete under draft 0.9 — 219 recipes; publication remains gated
 on accepted 0.9**. Every row in the disposition table below is bound.
 The complete-library hash/count is recorded once in draft §11.1. No ref/

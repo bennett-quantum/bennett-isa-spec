@@ -124,7 +124,7 @@
 +| E17.16 | §3.6, §4.2 | `qjumpr` to an in-range index that is not a block's first row enters that row (the kept 0.8 sentence read "any other index faults" under block indexing); re-indexing preserves every reachable row index | review of this draft (after E1) | E | – |
 +| E17.17 | §2, §3.3, §10, §17 item 14 | **Verifying** versus non-verifying executors defined; cleanliness tests (`qreg.free`, host prepare/free) stated for both | review of this draft | E | – |
 +| D1 | §17 item 15, §8.2–§8.3, §11 | Routing/movement cost deferred to 0.10; optional topology and placement decided by K14 | zsw.16; b-isa-spec-wr7 | S | – |
-+| D2 | – | Deferred r8 suggestions: zsw.4 (the controlled-action target/schedule/certificate fixture waits for `ref`, §17 item 7), zsw.5 (citation unverified), zsw.14 (`ref` artefact, §17 item 7) | zsw.4, .5, .14 | – | – |
++| D2 | – | r8 suggestions: zsw.4 (controlled-action fixture published, §17 item 7), zsw.5 (citation unverified), zsw.14 (`ref` catalog published, §17 item 7) | zsw.4, .5, .14 | – | – |
 +
 +### 0.2 Group 2: capability contracts
 +
@@ -1956,7 +1956,7 @@
  
  ```c
  typedef struct bennett_sched_request_t bennett_sched_request_t;   typedef struct bennett_sched_response_t bennett_sched_response_t;
-@@ -1247,69 +2332,920 @@
+@@ -1247,69 +2332,921 @@
  schedule MUST keep the ordinals of the operations they keep and MAY
  remove only operations the library marks removable.
  
@@ -2248,15 +2248,16 @@
 +### 11.1 Reference-library contract (K11)
 +
 +**ISA-REF-LIB** (K11; b-isa-spec-8r4, from bennett-vm-47t).
-+This is the decided 0.9 contract. The complete serialized constructor
-+catalog `spec/ref-0.9-draft.json` is produced by a separate job under
-+b-isa-spec-8r4; `ref/` is published after 0.9 acceptance. Until the
-+bound library is available, consumers report `E_SCHEDULE_INFEASIBLE`
-+as §11 requires; staged conformance cases remain unavailable naming
-+b-isa-spec-8r4. The witness below is not a full-library hash.
++This is the decided 0.9 contract. The catalog bound as ref version 0.9
++is the file `spec/ref-0.9.json` whose four-line envelope hashes to
++`5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`.
++It is a byte-identical publication of the complete 219-recipe
++`spec/ref-0.9-draft.json`. Consumers lacking the bound library report
++`E_SCHEDULE_INFEASIBLE` as §11 requires. The witness below is not a
++full-library hash.
 +
-+**Serialization and identity.** Publish `ref/README.md` and
-+`ref/ref-0.9.json` after acceptance. The JSON file is RFC 8785 canonical
++**Serialization and identity.** The schema and family witnesses are
++documented in `spec/ref-0.9-draft.README.md`. The JSON file is RFC 8785 canonical
 +UTF-8, with no trailing LF, containing exactly `isa`, `name`, `version`
 +and `recipes`. The first three are strings `0.9`, `ref`, `0.9`.
 +`recipes` is an array in bytewise `kind` order, then increasing parameter
@@ -2906,7 +2907,7 @@
  `error` entry (§12.3) is a **common upper bound over all contexts** of
  its key; the multiplicity composition of §12.3 is sound for that reason.
  
-@@ -1325,7 +3261,10 @@
+@@ -1325,7 +3262,10 @@
  rejects): Y − J(Φ) ⪰ 0, Y + J(Φ) ⪰ 0, mu·I − Tr_out(Y) ⪰ 0 (partial trace
  over the output factor), and mu ≤ `bound`; then ‖Φ‖◇ ≤ mu (the dual of
  Watrous's SDP with Y₀ = Y₁ = Y; this is the diamond norm itself, not
@@ -2918,7 +2919,7 @@
  hi, im_lo, im_hi]` (decimal strings). **Positivity test.** The checker
  proves each of the three matrices **positive definite** by an interval
  Cholesky (or Hermitian LDL†) factorisation in which the interval lower
-@@ -1335,33 +3274,251 @@
+@@ -1335,33 +3275,251 @@
  strictly feasible by replacing Y with Y + δI and mu with mu′ = mu + δ·(d
  + 1) for a small rational δ > 0 (any mu′ > mu + δ·d suffices): then Y ±
  J(Φ) ⪰ δI ≻ 0 and, since Tr_out(Y + δI) = Tr_out(Y) + δ·d·I, mu′·I −
@@ -3177,7 +3178,7 @@
                                                     fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
              cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },
              error:   { "<variant>:<inherited_controls>": { local: { "operator_norm"?: v, "diamond"?: v }, inclusive: { "operator_norm"?: v, "diamond"?: v } } },
-@@ -1369,6 +3526,63 @@
+@@ -1369,6 +3527,63 @@
    composition { multiplicities: { "<hash>:<variant>:<inherited_controls>": n (from the realised schedule) }, epsilon_total: { "diamond": v }, method: "sum_over_multiplicities" }
  ```
  
@@ -3241,7 +3242,7 @@
  `inclusive(R, key) = local(R, key) + Σ_callees n_c × inclusive(c, key_c)`
  **per metric**, keyed like `cleanup` by `<variant>:<inherited_controls>`
  (the realised error depends on both); every `local` value is a verified
-@@ -1380,27 +3594,41 @@
+@@ -1380,27 +3595,41 @@
  variants) require `operator_norm` bounds throughout. A controlled
  unitary variant requires a `numerical` claim; an ε > 0 realisation
  compared as a channel requires a `channel` claim. Executable claims
@@ -3289,7 +3290,7 @@
  ### 14.2 Quantum state semantics
  
  The state of a Q region is a vector in ⊗ over live wires in allocation
-@@ -1422,10 +3650,20 @@
+@@ -1422,10 +3651,20 @@
  - **T3 (permutation theorem).** If the realised unitary V of a circuit on
    span(D) is a permutation matrix and the final basis tuple equals P(x)
    for every x ∈ D, then V|span(D) = P.
@@ -3314,7 +3315,7 @@
  - **T5.** As §6.3.
  - **T6 (executor agreement).** Two executors conforming to §3–§7 on one
    target with the same schedule produce on every x ∈ D the same final
-@@ -1439,14 +3677,14 @@
+@@ -1439,14 +3678,14 @@
  
  | Suite | Class | Tests |
  |---|---|---|
@@ -3336,7 +3337,7 @@
  
  ## 16. Canonical textual form (normative)
  
-@@ -1458,7 +3696,17 @@
+@@ -1458,7 +3697,17 @@
  `INT := -?(0|[1-9][0-9]*)`; `FLOAT :=` shortest round-trip decimal with
  `.` or exponent, finite; `STRING := "…"` with escapes `\"`, `\\`, `\n`;
  `HEX := ([0-9a-f]{2})*`. Metadata lines are RFC 8785 canonical JSON
@@ -3355,7 +3356,7 @@
  
  ### 16.2 Grammar
  
-@@ -1472,10 +3720,10 @@
+@@ -1472,10 +3721,10 @@
    dataline  := NAME SP HEX NL
    function  := fhead NL regs? block+
    fhead     := ("fn" SP ("cc"|"r") | "oracle" | "action" | "perm_action" | "lproc") SP "@" NAME SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")"
@@ -3369,7 +3370,7 @@
    regs      := "regs" SP "{" SP (NAME ":" type ("," SP NAME ":" type)*)? SP "}" (SP "bounds" SP "{" INT ("," SP INT)* "}")? NL
    block     := "^" NAME "(" plist "):" NL instr+
    instr     := (lhs SP "=" SP)? OPCODE (SP operand)* (SP "{" NL instr+ "}" (SP "{" NL instr+ "}")?)? NL
-@@ -1485,16 +3733,29 @@
+@@ -1485,16 +3734,29 @@
    VER       := INT "." INT
  ```
  
@@ -3402,7 +3403,7 @@
  
  section functions
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
-@@ -1509,9 +3770,9 @@
+@@ -1509,9 +3771,9 @@
  empty and its envelope is exactly these bytes (each line LF-terminated):
  
  ```
@@ -3414,7 +3415,7 @@
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
  regs { one:reg[8], r:reg[8] }
  ^entry():
-@@ -1521,17 +3782,19 @@
+@@ -1521,17 +3783,19 @@
  ```
  
  With B ≥ 3 every x yields `(x + 1 mod 256, 0)` (`result_val` = 0 ⊕ r);
@@ -3437,7 +3438,7 @@
  
  section functions
  oracle @sum_db (n:wire[8] in) (t:wire[8]) (f:wire[4]) (db:region[4,8] in) ()
-@@ -1590,13 +3853,13 @@
+@@ -1590,13 +3854,13 @@
  is SHA-256 of the ASCII `<scc_hash hex>:0`:
  
  ```
@@ -3454,7 +3455,7 @@
  lift.boundscheck zp 1
  zv = lift.load.i8 zp
  z = lift.icmp.eq n zv
-@@ -1614,21 +3877,390 @@
+@@ -1614,21 +3878,390 @@
  ^done():
  lift.ret acc
  data zero 00
@@ -3851,7 +3852,7 @@
  ## 17. Decisions deferred to implementation, with defaults
  
  Each item is one an implementer must decide to build; any decision is
-@@ -1652,15 +4284,58 @@
+@@ -1652,15 +4285,60 @@
     level. Default: the library `ref` published by `bennett-isa-spec`
     (ripple-carry adders and comparators, linear `inrange` scans,
     one-hot address dispatch, clean scratch released in reverse order);
@@ -3865,12 +3866,14 @@
 +   equally for omission and an explicit binding. [deps: ISA-11.1-P3, ISA-11.1-P4, ISA-11.1]
 +   §11.1 fixes its schema, ordinals, scratch identities, empty removable
 +   sets and deterministic decomposition algorithms. [deps: ISA-11.1]
-+   Serialization as `spec/ref-0.9-draft.json` is a separate job under
-+   b-isa-spec-8r4; publication in `ref/` follows 0.9 acceptance. The
-+   worked controlled-action target/schedule/certificate fixture bound to
-+   it (zsw.4) is pending;
-+   until then two consumers agree on every order fixed above gate level
-+   (§11).
++   The bound catalog is published as `spec/ref-0.9.json`. The worked
++   `ctl` action fixture (zsw.4) is in
++   `conformance/fixtures/controlled-action-09/`: `controlled.bisa`,
++   `target.json`, `leaves.json`, `schedule.json`, `frame.json` and
++   `certificate.json`. It contains one exact controlled-X leaf, starts
++   at time 0 and ends at time 1, with two live fast-class interface wires
++   and no workspace. Its README records derivation and the pinned 0.8
++   compatibility check separately from the 0.9 bindings.
  8. **Enclosure procedure for transcendental entries** (§12.1). Default:
     Taylor series of sin and cos to the first term whose Lagrange
     remainder bound is below 2^−(`precision_bits` + 2), argument reduced
@@ -3914,7 +3917,7 @@
  10. **`any`-class resolution** (§11). Default: the first class in JCS
      order with capacity.
  11. **Occupancy rate of a class absent from `rate`** (§8.2). Default: 1.
-@@ -1669,7 +4344,65 @@
+@@ -1669,7 +4347,65 @@
  13. **Suite sizes** (§15): the exhaustive widths of suite C and the
      sample counts of `sampled` claims. Default: exhaustive for ≤ 16
      interface bits; 2^16 samples above.

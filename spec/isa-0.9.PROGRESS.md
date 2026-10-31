@@ -11,6 +11,39 @@ Surgical edits only; K1–K75 and accepted 0.8 semantics/bytes retained.
 | 1 / §16.3 placeholders | a: fill all 25 symbol values, including repeated symbols and the printed SCC envelope; independent precheck reconstructs every envelope | existing §9.2 | §16.3; §0 example inventory | §9.2, §16.1–§16.2 | 4a4 IN_PROGRESS |
 | 2 / §5.5 matched cleanup | a: clarify that ins writes invalidate the pair, while mem-cell writes only remove the clearing guarantee | existing E17.5 | §5.5 first paragraph | §4.2, §5.5 later paragraph | 4a4 IN_PROGRESS |
 | 3 / INV-3 1.4.2–1.4.3, gaps 5–6 | a: add muse's permissive sufficient dependency-set test; failure is inconclusive | existing K41 | §6.1 outstanding dependence | §6.1 transfer, §14.2; INV-3 1.4 | 4a4 IN_PROGRESS |
+| 4 / §11.1 and §17 item 7 | a: publish byte-identical bound catalog and worked ctl-X fixture; replace pending publication references | existing K11, K19–K28 | §11.1 serialization; §17.7; §0 D2 | §9.2, §9.4, §11, §11.1, §12.1–§12.3 | 4a4 IN_PROGRESS |
+
+Item 4 verification/S0 check:
+- `spec/ref-0.9.json` is byte-identical to `spec/ref-0.9-draft.json`.
+  Python -I ref_catalog.py --check PASS: 219 recipes, four-line envelope
+  5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197.
+  Rust independently agrees with that envelope hash. No recipe changes.
+- `conformance/fixtures/controlled-action-09/` publishes the complete
+  object, target, one leaf event, schedule, root frame and certificate;
+  both root and controlled-callee region records include numerical
+  zero-error claims and the required root invocation/composition. Root
+  table has all four full before/after tuples. No allocation is needed;
+  resources: time 1, peak_qubits 2, qubit_second 2, fast class.
+- Existing conformance Expander instantiates the published ctl/action_call
+  recipes through the displayed flip body. Exact matrix checker PASS:
+  every basis column in both root and inherited-control-first callee
+  ordering; exact global phase, zero V†U-I and Frobenius bound.
+- The fixture generator's --check compares every derived byte. Pinned
+  read-only review binary check/hash PASS on compat-0.8.bisa, and all
+  8 forward/adjoint basis runs PASS. Its 0.8-only version gate prevents
+  direct admission of controlled.bisa (0.9), just as for §16.3. The
+  compatibility object has its own 0.8 identities, frame/table encoding
+  and default ref binding; it never substitutes for the 0.9 catalog.
+  `check` is identity/metadata admission, not certificate-claim replay;
+  a scratch altered-table probe confirmed that limit. No pinned 0.9
+  executor/interval-checker conformance is claimed. The fixture README
+  records the scope and exact reproduction commands.
+- Library-unavailable rejection remains binding. Publishing an existing
+  deterministic artifact and one complete witness adds no restriction
+  on source algorithms, interfaces, controls, widths or target choices.
+  The old README gets only one line pointing to the published copy.
+- Draft witness precheck PASS, including byte-exact diff, accepted 0.8
+  fingerprint, catalog and fixture checks.
 
 Item 3 proof/S0 check: read INV-3 in bennett-conformance read-only. Its
 1.4.2 counterexample transfers d0 through d1 to interface t. Cleaning d1

@@ -76,7 +76,7 @@ def hashes(source):
                 globals_used = re.findall(r"lift\.addr @([\w.]+)", bodies[member])
                 selected = [(path, value) for path, value in leaves if path[0] == "globals" and path[1] in globals_used]
             images = sorted({value["image"] for path, value in selected if isinstance(value, dict) and "image" in value}, key=lambda n: n.encode())
-            lines = ["isa=0.9", "ptr_width=" + re.search(r"ptr_width=(\d+)", source)[1], jcs(sym["signature"]), body]
+            lines = ["isa=" + re.search(r"isa=([0-9.]+)", source)[1], "ptr_width=" + re.search(r"ptr_width=(\d+)", source)[1], jcs(sym["signature"]), body]
             lines += ["data " + n + " " + data[n] for n in images]
             lines += ["layout " + jcs(path) + " " + jcs(value) for path, value in selected]
             if kind in ("cc", "r"):

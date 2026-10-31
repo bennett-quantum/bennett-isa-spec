@@ -59,7 +59,10 @@ envelope = "isa=0.9\nexpansion=ref\nversion=0.9\n" + payload + "\n"
 hash_value = hashlib.sha256(envelope.encode()).hexdigest()
 assert "Witness envelope SHA-256: `" + hash_value + "`." in draft
 assert "### 11.1 Reference-library contract (K11)" in draft
-assert not (root / "ref").exists(), "publication is gated on accepted 0.9"
+published = (root / "spec/ref-0.9.json").read_bytes()
+assert published == (root / "spec/ref-0.9-draft.json").read_bytes()
+assert len(json.loads(published)["recipes"]) == 219
+assert hashlib.sha256(b"isa=0.9\nexpansion=ref\nversion=0.9\n" + published + b"\n").hexdigest() == "5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197"
 print("draft witnesses: eps boundaries, block sectors, 16 qxor tuples, ordinals/hash; unchanged 0.8")
 
 # hsd/clw witnesses: exact scheduled aggregation and replay independent of the VM.
@@ -262,3 +265,26 @@ assert result.stdout == (root / "spec/isa-0.8-to-0.9.diff").read_bytes()
 # All ten normative objects and both printed §9.2 envelopes.
 import runpy
 runpy.run_path(str(root / "conformance/tools/draft_examples.py"))["check"](draft)
+
+# Published worked fixture bytes and pinned 0.8 compatibility execution.
+fixture = runpy.run_path(str(root / "conformance/tools/controlled_action_fixture.py"))
+for name, raw in fixture["artifacts"]().items():
+    assert (fixture["DIR"] / name).read_bytes() == raw, name
+pinned = root.parent / "bennett-isa-spec-review/reference-interpreter/target/debug/bennett-isa-ref"
+compat = fixture["DIR"] / "compat-0.8.bisa"
+for command in ("check", "hash"):
+    result = subprocess.run([str(pinned), command, str(compat)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    identity = json.loads(result.stdout)
+    assert identity["object_hash"] == fixture["derive"]("0.8")["certificate"]["bindings"]["object_hash"]
+for t in range(2):
+    for c in range(2):
+        for adjoint in (False, True):
+            command = [str(pinned), "run-action", str(compat), "controlled", "--mut", str(t), "--in", str(c)]
+            if adjoint:
+                command.append("--adjoint")
+            result = subprocess.run(command, capture_output=True, text=True)
+            assert result.returncode == 0, result.stderr
+            state = json.loads(result.stdout)
+            assert state["mut"] == [t ^ c] and state["in"] == [c] and state["wires"] == 2
+print("published catalog: 219 recipes, bound envelope hash; ctl fixture: exact bytes, pinned 0.8 check/hash and 8 forward/adjoint tuples")
