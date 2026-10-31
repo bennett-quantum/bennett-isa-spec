@@ -673,10 +673,10 @@ impl Expander {
                 keys(j, &["image", "wires"])?;
                 let bytes = c.images.get(s(n)?).ok_or("unbound image")?;
                 let ws = wires(f(j, "wires")?, c)?;
-                if ws.len() != bytes.len() * 8 {
+                if !bytes.is_empty() && ws.len() != bytes.len() * 8 {
                     return Err("image width mismatch".into());
                 }
-                let mut indices = (0..ws.len()).collect::<Vec<_>>();
+                let mut indices = (0..bytes.len() * 8).collect::<Vec<_>>();
                 if rev {
                     indices.reverse();
                 }
@@ -696,8 +696,33 @@ impl Expander {
                     .map_err(|_| "negative template index")?;
                 let t = ts.get(index).ok_or("template index out of bounds")?;
                 // Actuals resolve at the apply site, free names at capture.
-                let bound = self.bind(t, a(f(j, "args")?)?, c)?;
+                let mut bound = self.bind(t, a(f(j, "args")?)?, c)?;
+                // Bare integer template formals are abbreviations, not the
+                // legacy recipe API's implicit apply-site wire environment.
+                if bound.legacy {
+                    bound.wires.clear();
+                }
                 let mut local = *captured;
+                for p in a(f(t, "parameters")?)? {
+                    let name = if let Json::Str(n) = p {
+                        n.as_str()
+                    } else {
+                        s(f(p, "name")?)?
+                    };
+                    local.ints.remove(name);
+                    local.wires.remove(name);
+                    local.angles.remove(name);
+                    local.bodies.remove(name);
+                    local.symbols.remove(name);
+                    local.events.remove(name);
+                    local.images.remove(name);
+                    local.templates.remove(name);
+                    local.arguments.remove(name);
+                    local.values.remove(name);
+                    local.allocations.remove(name);
+                    local.declarations.remove(name);
+                    local.scratch_names.remove(name);
+                }
                 local.ints.extend(bound.ints);
                 local.wires.extend(bound.wires);
                 local.angles.extend(bound.angles);

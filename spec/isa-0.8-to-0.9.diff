@@ -1,5 +1,5 @@
 --- /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/Bennett-ISA-Spec.md	2026-10-28 15:10:07.903399463 +0100
-+++ /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/Bennett-ISA-Spec-0.9-draft.md	2026-10-31 07:54:45.282583881 +0100
++++ /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/Bennett-ISA-Spec-0.9-draft.md	2026-10-31 08:04:01.756976744 +0100
 @@ -1,25 +1,194 @@
 -# Bennett Virtual ISA — Specification, draft 0.8
 +# Bennett Virtual ISA — Specification, draft 0.9
@@ -1718,7 +1718,7 @@
  **Matching.** Every generated operation has an **invocation chain**: the
  program points of the region calls, `lift.call`s and `lift.oracle_call`s
  that led to it, outermost first, ending in its own point. `path` matches
-@@ -1291,25 +2198,440 @@
+@@ -1291,25 +2198,441 @@
  against the object and executes verbatim or rejects (`E_SCHEDULE_
  INFEASIBLE`).
  
@@ -1875,9 +1875,10 @@
 +
 +**Image binding (K21).** An `image` actual is a bound image formal or
 +an even-length string of lowercase hexadecimal byte pairs in data-image
-+byte order, including the empty string. Exactly
-+`{ "image": name, "wires": actual }` requires exactly eight wires per
-+byte; bit 8j+i of the flattened wire list is bit i of byte j (i=0..7).
++byte order. The empty string denotes the absent/default-zero image,
++including on a wire list whose width is not byte-aligned. Exactly
++`{ "image": name, "wires": actual }` emits no leaf for the empty image;
++a nonempty image requires exactly eight wires per byte; bit 8j+i of the flattened wire list is bit i of byte j (i=0..7).
 +It emits one X leaf for each one bit in increasing bit order, with an
 +empty effective-control set regardless of inherited controls. This
 +constructor denotes only the unconditional data-image preparation or
@@ -2167,7 +2168,7 @@
  `error` entry (§12.3) is a **common upper bound over all contexts** of
  its key; the multiplicity composition of §12.3 is sound for that reason.
  
-@@ -1325,7 +2647,10 @@
+@@ -1325,7 +2648,10 @@
  rejects): Y − J(Φ) ⪰ 0, Y + J(Φ) ⪰ 0, mu·I − Tr_out(Y) ⪰ 0 (partial trace
  over the output factor), and mu ≤ `bound`; then ‖Φ‖◇ ≤ mu (the dual of
  Watrous's SDP with Y₀ = Y₁ = Y; this is the diamond norm itself, not
@@ -2179,7 +2180,7 @@
  hi, im_lo, im_hi]` (decimal strings). **Positivity test.** The checker
  proves each of the three matrices **positive definite** by an interval
  Cholesky (or Hermitian LDL†) factorisation in which the interval lower
-@@ -1335,13 +2660,25 @@
+@@ -1335,13 +2661,25 @@
  strictly feasible by replacing Y with Y + δI and mu with mu′ = mu + δ·(d
  + 1) for a small rational δ > 0 (any mu′ > mu + δ·d suffices): then Y ±
  J(Φ) ⪰ δI ≻ 0 and, since Tr_out(Y + δI) = Tr_out(Y) + δ·d·I, mu′·I −
@@ -2208,7 +2209,7 @@
  
  **Sampling.** For each domain component with range size R = hi − lo + 1,
  assemble m = ⌈⌈log₂ R⌉/64⌉ consecutive generator words (least-significant
-@@ -1350,18 +2687,22 @@
+@@ -1350,18 +2688,22 @@
  
  ### 12.2 Domains
  
@@ -2235,7 +2236,7 @@
                                                     fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
              cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },
              error:   { "<variant>:<inherited_controls>": { local: { "operator_norm"?: v, "diamond"?: v }, inclusive: { "operator_norm"?: v, "diamond"?: v } } },
-@@ -1369,6 +2710,63 @@
+@@ -1369,6 +2711,63 @@
    composition { multiplicities: { "<hash>:<variant>:<inherited_controls>": n (from the realised schedule) }, epsilon_total: { "diamond": v }, method: "sum_over_multiplicities" }
  ```
  
@@ -2299,7 +2300,7 @@
  `inclusive(R, key) = local(R, key) + Σ_callees n_c × inclusive(c, key_c)`
  **per metric**, keyed like `cleanup` by `<variant>:<inherited_controls>`
  (the realised error depends on both); every `local` value is a verified
-@@ -1380,27 +2778,41 @@
+@@ -1380,27 +2779,41 @@
  variants) require `operator_norm` bounds throughout. A controlled
  unitary variant requires a `numerical` claim; an ε > 0 realisation
  compared as a channel requires a `channel` claim. Executable claims
@@ -2347,7 +2348,7 @@
  ### 14.2 Quantum state semantics
  
  The state of a Q region is a vector in ⊗ over live wires in allocation
-@@ -1422,10 +2834,20 @@
+@@ -1422,10 +2835,20 @@
  - **T3 (permutation theorem).** If the realised unitary V of a circuit on
    span(D) is a permutation matrix and the final basis tuple equals P(x)
    for every x ∈ D, then V|span(D) = P.
@@ -2372,7 +2373,7 @@
  - **T5.** As §6.3.
  - **T6 (executor agreement).** Two executors conforming to §3–§7 on one
    target with the same schedule produce on every x ∈ D the same final
-@@ -1439,14 +2861,14 @@
+@@ -1439,14 +2862,14 @@
  
  | Suite | Class | Tests |
  |---|---|---|
@@ -2394,7 +2395,7 @@
  
  ## 16. Canonical textual form (normative)
  
-@@ -1458,7 +2880,17 @@
+@@ -1458,7 +2881,17 @@
  `INT := -?(0|[1-9][0-9]*)`; `FLOAT :=` shortest round-trip decimal with
  `.` or exponent, finite; `STRING := "…"` with escapes `\"`, `\\`, `\n`;
  `HEX := ([0-9a-f]{2})*`. Metadata lines are RFC 8785 canonical JSON
@@ -2413,7 +2414,7 @@
  
  ### 16.2 Grammar
  
-@@ -1472,10 +2904,10 @@
+@@ -1472,10 +2905,10 @@
    dataline  := NAME SP HEX NL
    function  := fhead NL regs? block+
    fhead     := ("fn" SP ("cc"|"r") | "oracle" | "action" | "perm_action" | "lproc") SP "@" NAME SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")"
@@ -2427,7 +2428,7 @@
    regs      := "regs" SP "{" SP (NAME ":" type ("," SP NAME ":" type)*)? SP "}" (SP "bounds" SP "{" INT ("," SP INT)* "}")? NL
    block     := "^" NAME "(" plist "):" NL instr+
    instr     := (lhs SP "=" SP)? OPCODE (SP operand)* (SP "{" NL instr+ "}" (SP "{" NL instr+ "}")?)? NL
-@@ -1485,16 +2917,32 @@
+@@ -1485,16 +2918,32 @@
    VER       := INT "." INT
  ```
  
@@ -2463,7 +2464,7 @@
  
  section functions
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
-@@ -1509,9 +2957,9 @@
+@@ -1509,9 +2958,9 @@
  empty and its envelope is exactly these bytes (each line LF-terminated):
  
  ```
@@ -2475,7 +2476,7 @@
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
  regs { one:reg[8], r:reg[8] }
  ^entry():
-@@ -1521,17 +2969,19 @@
+@@ -1521,17 +2970,19 @@
  ```
  
  With B ≥ 3 every x yields `(x + 1 mod 256, 0)` (`result_val` = 0 ⊕ r);
@@ -2498,7 +2499,7 @@
  
  section functions
  oracle @sum_db (n:wire[8] in) (t:wire[8]) (f:wire[4]) (db:region[4,8] in) ()
-@@ -1586,17 +3036,18 @@
+@@ -1586,17 +3037,18 @@
  SCC (its self-reference is written `@$0`, its `@zero` reference is
  replaced by `@` + the `zero` hash, which is its only part-(6) line; its
  closure set is the `zero` global's leaf and image), so its envelope is
@@ -2521,7 +2522,7 @@
  lift.boundscheck zp 1
  zv = lift.load.i8 zp
  z = lift.icmp.eq n zv
-@@ -1615,7 +3066,7 @@
+@@ -1615,7 +3067,7 @@
  lift.ret acc
  data zero 00
  layout globals.zero {"base":16,"image":"zero","size":1}
@@ -2530,7 +2531,7 @@
  ```
  
  `@sum_db`'s envelope includes every layout leaf, the `zero` image, `@` +
-@@ -1623,12 +3074,378 @@
+@@ -1623,12 +3075,378 @@
  line (`@db` is an interface region, not a symbol):
  
  ```
@@ -2913,7 +2914,7 @@
  ## 17. Decisions deferred to implementation, with defaults
  
  Each item is one an implementer must decide to build; any decision is
-@@ -1653,7 +3470,14 @@
+@@ -1653,7 +3471,14 @@
     (ripple-carry adders and comparators, linear `inrange` scans,
     one-hot address dispatch, clean scratch released in reverse order);
     a schedule that names no `expansion` binds `ref` at the ISA's own
@@ -2929,7 +2930,7 @@
  8. **Enclosure procedure for transcendental entries** (§12.1). Default:
     Taylor series of sin and cos to the first term whose Lagrange
     remainder bound is below 2^−(`precision_bits` + 2), argument reduced
-@@ -1669,7 +3493,65 @@
+@@ -1669,7 +3494,65 @@
  13. **Suite sizes** (§15): the exhaustive widths of suite C and the
      sample counts of `sampled` claims. Default: exhaustive for ≤ 16
      interface bits; 2^16 samples above.

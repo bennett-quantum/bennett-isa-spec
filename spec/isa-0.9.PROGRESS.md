@@ -879,3 +879,13 @@ ordinals with symbol calls. 1a4 is carried until source region shape/role
 metadata is encoded (the vector mechanism itself is now implemented); it
 shares that remaining descriptor gap with 1oa. No flattened wire shape is
 misrepresented as a complete region interface.
+
+K21 default-image clarification: absent image is the empty string and emits
+no X even on non-byte-aligned regions (one to four total wires included in
+the witnesses); nonempty images retain exact byte/wire length checks. K22
+lexical audit reproduced and fixed legacy integer-template wire import and
+cross-type shadow leakage; formal names now shadow across all captured name
+maps. Remaining activation metadata is b-isa-spec-evi; afi and lph closed,
+1a4/3xe/1oa/82x carried with exact changes in bd. The completed step and
+qregion recipes bring the checkpoint to 195; no complete-library hash/count
+is asserted and the normative marker remains untouched.

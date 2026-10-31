@@ -1,0 +1,37 @@
+{
+  "id": "E-ref-09-step-templates",
+  "suite": "E",
+  "spec": "§3.6; §11.1 K22",
+  "derivation": "Exact BDD arithmetic check of heterogeneous assignment, fault and direct rows, HALT idle frames, successor order and reverse restoration. Repeated steps use explicit frame slices and distinct allocation occurrence identities to finite fixpoint.",
+  "scenario": {
+    "widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "row_counts": [
+      0,
+      1,
+      2,
+      3,
+      17
+    ],
+    "bounds": [
+      0,
+      1,
+      2,
+      3,
+      17
+    ],
+    "checker": "ref_step.rs"
+  },
+  "expected_outcome": {
+    "step_tuples": 1218560,
+    "repeated_tuples": 3400
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-8r4; complete catalog and accepted constructor language required; independent Rust witnesses run separately"
+  }
+}

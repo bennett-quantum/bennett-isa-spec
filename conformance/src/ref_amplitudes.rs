@@ -301,3 +301,141 @@ pub fn numerical_rotation_column(
     }
     Ok(v)
 }
+
+/// Sparse exact columns, retaining every allocated coordinate while avoiding
+/// dense 2^workspace storage. Interface columns are still returned densely.
+pub fn sparse_column(
+    leaves: &[Leaf],
+    inputs: &[Wire],
+    basis: usize,
+) -> Result<Vec<Complex>, String> {
+    if inputs.len() > 20 || basis >= 1usize << inputs.len() {
+        return Err("sparse witness interface/basis capacity".into());
+    }
+    let mut ids = inputs
+        .iter()
+        .cloned()
+        .enumerate()
+        .map(|(i, w)| (w, i))
+        .collect::<BTreeMap<_, _>>();
+    let mut count = inputs.len();
+    for l in leaves {
+        if l.gate == "alloc" {
+            let (name, width, _, state) = l.allocation.as_ref().ok_or("missing allocation")?;
+            if state != "clean" {
+                return Err("borrowed wires require explicit interface inputs".into());
+            }
+            for bit in 0..*width {
+                ids.entry((name.clone(), bit)).or_insert_with(|| {
+                    let i = count;
+                    count += 1;
+                    i
+                });
+            }
+        }
+    }
+    let mut entry = vec![false; count];
+    for (bit, v) in entry.iter_mut().take(inputs.len()).enumerate() {
+        *v = basis >> bit & 1 != 0;
+    }
+    let mut state = BTreeMap::from([(entry, Complex::one())]);
+    fn add(out: &mut BTreeMap<Vec<bool>, Complex>, key: Vec<bool>, value: Complex) {
+        let v = out.entry(key.clone()).or_default();
+        *v = v.plus(value);
+        if *v == Complex::default() {
+            out.remove(&key);
+        }
+    }
+    for l in leaves {
+        if matches!(l.gate.as_str(), "alloc" | "release") {
+            let (name, width, _, _) = l.allocation.as_ref().ok_or("missing allocation")?;
+            for bit in 0..*width {
+                let id = *ids.get(&(name.clone(), bit)).ok_or("unknown allocation")?;
+                if state.keys().any(|key| key[id]) {
+                    return Err("dirty scratch boundary".into());
+                }
+            }
+            continue;
+        }
+        let ws = l
+            .wires
+            .iter()
+            .map(|w| ids.get(w).copied().ok_or("unknown wire"))
+            .collect::<Result<Vec<_>, _>>()?;
+        let controls = l
+            .controls
+            .iter()
+            .map(|w| ids.get(w).copied().ok_or("unknown control"))
+            .collect::<Result<Vec<_>, _>>()?;
+        let target = *ws.last().ok_or("empty gate")?;
+        let mut next = BTreeMap::new();
+        for (mut key, amplitude) in state {
+            if !controls.iter().all(|i| key[*i]) {
+                add(&mut next, key, amplitude);
+                continue;
+            }
+            match l.gate.as_str() {
+                "x" | "cx" | "ccx" | "mcx" => {
+                    if ws[..ws.len() - 1].iter().all(|i| key[*i]) {
+                        key[target] = !key[target];
+                    }
+                    add(&mut next, key, amplitude);
+                }
+                "swap" => {
+                    key.swap(ws[0], target);
+                    add(&mut next, key, amplitude);
+                }
+                "h" => {
+                    let one = key[target];
+                    let q = Complex {
+                        re: Real::new(0, 1, 1),
+                        im: Real::integer(0),
+                    };
+                    key[target] = false;
+                    add(&mut next, key.clone(), amplitude.times(q));
+                    key[target] = true;
+                    add(
+                        &mut next,
+                        key,
+                        if one { amplitude.negated() } else { amplitude }.times(q),
+                    );
+                }
+                "s" | "sdg" | "t" | "tdg" | "cz" => {
+                    let q = Real::new(0, 1, 1);
+                    let phase = if !key[target] || (l.gate == "cz" && !key[ws[0]]) {
+                        Complex::one()
+                    } else {
+                        match l.gate.as_str() {
+                            "s" => Complex {
+                                re: Real::integer(0),
+                                im: Real::integer(1),
+                            },
+                            "sdg" => Complex {
+                                re: Real::integer(0),
+                                im: Real::integer(-1),
+                            },
+                            "t" => Complex { re: q, im: q },
+                            "tdg" => Complex { re: q, im: q.neg() },
+                            _ => Complex::one().negated(),
+                        }
+                    };
+                    add(&mut next, key, amplitude.times(phase));
+                }
+                _ => return Err(format!("not an exact algebraic gate {}", l.gate)),
+            }
+        }
+        state = next;
+    }
+    let mut out = vec![Complex::default(); 1usize << inputs.len()];
+    for (key, amp) in state {
+        if key[inputs.len()..].iter().any(|v| *v) {
+            return Err("unclean final workspace".into());
+        }
+        let index = key[..inputs.len()]
+            .iter()
+            .enumerate()
+            .fold(0, |acc, (i, v)| acc | ((*v as usize) << i));
+        out[index] = amp;
+    }
+    Ok(out)
+}

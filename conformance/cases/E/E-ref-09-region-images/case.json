@@ -1,0 +1,29 @@
+{
+  "id": "E-ref-09-region-images",
+  "suite": "E",
+  "spec": "§3.5; §4.6; §11.1 K21/K22",
+  "derivation": "Complete local-region scope allocates unconditionally, binds image bytes LSB first, applies a typed cells template under inherited control, restores image unconditionally and releases clean. Sparse exact amplitudes retain every allocation coordinate; entangled Clifford+T columns agree with the dense checker.",
+  "scenario": {
+    "cell_widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "cell_counts": [
+      1,
+      8
+    ],
+    "image_configurations": 272,
+    "checker": "ref_region.rs"
+  },
+  "expected_outcome": {
+    "basis_tuples": 1088,
+    "exact_matrix_columns": 1088,
+    "dense_sparse_columns": 4
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-8r4; complete catalog and accepted constructor language required; independent Rust witnesses run separately"
+  }
+}

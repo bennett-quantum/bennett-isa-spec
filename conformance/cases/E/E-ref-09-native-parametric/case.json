@@ -1,0 +1,38 @@
+{
+  "id": "E-ref-09-native-parametric",
+  "suite": "E",
+  "spec": "§4.4; §3.7 call predicate; §11.1 K20/K24",
+  "derivation": "Exact Clifford+T full-basis matrices, all input tuples for variadic MCX, exact binary64 angle binding/adjoint sign and stated numerical matrix residual. Generic call predicate checks widened no-wrap counters, including the exact §16.3 example; this is not complete activation evidence.",
+  "scenario": {
+    "widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "mcx_controls": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      17
+    ],
+    "checker": [
+      "ref_native.rs",
+      "ref_call_flag.rs"
+    ]
+  },
+  "expected_outcome": {
+    "exact_matrix_columns": 356,
+    "numerical_columns": 1440,
+    "mcx_tuples": 524412,
+    "typed_permutation_tuples": 36,
+    "call_flag_tuples": 43200,
+    "example_call_tuples": 131072
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-8r4; complete catalog and accepted constructor language required; independent Rust witnesses run separately"
+  }
+}

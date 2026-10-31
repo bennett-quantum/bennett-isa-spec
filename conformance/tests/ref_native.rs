@@ -124,7 +124,7 @@ fn binary64_angles_round_trip_and_numerical_adjoint_matrices() {
     let bytes = include_str!("../../spec/ref-0.9-draft.json");
     let mut e = Expander::new(bytes, Registry::new()).unwrap();
     let mut count = 0;
-    // Every bit pattern round-trips through the required encoding; these eight
+    // Each representative bit pattern round-trips through the required encoding; these eight
     // representative finite angles include both zeros, subnormal and extrema.
     for bits in [
         0u64,

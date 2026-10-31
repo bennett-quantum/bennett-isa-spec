@@ -1,249 +1,112 @@
-# ref 0.9 constructor checkpoint — NOT a binding library
+# ref 0.9 constructor catalog — incomplete, not publishable
 
-This is resumable work for b-isa-spec-8r4, not a complete catalog or a
-publishable `ref@0.9`. No complete-library hash is asserted. Publication and
-the draft's full-catalog hash/count edit remain blocked on b-isa-spec-cbk
-(wire/body bindings and structured expansion) and b-isa-spec-8sc (native
-rotation/variadic parameters and quantum witnesses). See the progress file.
+Current checkpoint: **195 recipes**. The complete-library hash/count marker
+in draft §11.1 remains untouched. No ref/ publication or schedule binding is
+claimed. Historical checkpoints and family witness counts are retained in
+[the progress file](ref-0.9-draft.PROGRESS.md). No interpreter source was read
+or copied into the checker.
 
-The top-level schema and closed constructor keys follow draft §11.1.
-Recipes are sorted by bytewise kind; parameters use §11.1 typed formals (legacy names abbreviate integers).
-`N >= 1` is a bit width. `i` is a loop variable. Wire subscripts contain an
-integer literal, loop name, or JSON prefix expression. `inverse: true`
-reverses the expanded body and adjoints each leaf. These concrete spellings
-are checkpoint conventions, not amendments to the normative contract.
-Scratch lists enumerate declaration names; expanded allocation occurrences
-receive distinct bit identities. No node sharing or removability is inferred.
-All gates inherit ambient effective controls; allocation/release do not.
+The document is RFC 8785 canonical UTF-8 without a trailing LF; recipes are
+ordered by bytewise kind. Every recipe has kind, ordered parameters, body,
+scratch, removable:[], and its motivating ISA source. Typed formals,
+constructors, lexical capture, call ordinal spaces and fresh allocation
+identities are defined by §11.1 K19–K24. An image actual binds exact data
+bytes; empty means absent/default-zero even for non-byte-aligned regions.
+Template application binds explicit frame/wire actuals while preserving free
+captures. Arguments vectors are tied to one closure hash and capture their
+actuals' environment; value formals preserve exact §12.3 integer, ptr, f64
+and token encodings. They do not yet encode source region roles/shapes.
 
-`conformance/tools/ref_catalog.py` generates canonical UTF-8 (no final LF),
-with a small integer-subset JCS canonicalizer, and validates the printed
-qxor witness's four-line envelope hash before writing. Run with `python3 -I`.
-`conformance/src/ref_catalog.rs` independently expands catalog constructors,
-resolves integer-only invokes (no invented wire binding), unrolls loops,
-adjoints inverse bodies, numbers leaves, and compiles a bit permutation
-machine. Unsupported constructors, gate operands and dirty release fail
-explicitly. Tests enumerate the full legal domain, both inherited control
-values, and visit original ordinals backwards to restore the entire state.
-The checker does not read or import interpreter source. The 0.8 harness
-runs the existing binary as an independent regression gate only.
+The generators under conformance/tools/ contain no interpreter imports.
+Run ref_catalog.py with python3 -I (the required headless project TMPDIR
+environment applies). Python's independent integer-subset JCS canonicalizer
+checks the printed qxor witness and hashes the four-line envelope. Rust's
+independent canonicalizer and SHA-256 must agree with it. Source/scratch
+names, bound images and constructor order are hash-significant.
 
-| §4 instruction/row | Recipe or blocking disposition |
+## Current coverage, in §11.1 family/row order
+
+| ISA row | Recipe / exact remaining disposition |
 |---|---|
-| 4.1 const | Classical event; binding schema blocked (cbk) |
-| 4.1 add sub mul and or xor shl lshr ashr | Classical events; binding schema blocked (cbk) |
-| 4.1 udiv urem sdiv srem | Classical events; binding schema blocked (cbk) |
-| 4.1 icmp eq ne ult ule slt sle | Classical events; binding schema blocked (cbk) |
-| 4.1 select; zext sext trunc; ptrtoint inttoptr | Classical events; binding schema blocked (cbk) |
-| 4.1 load store alloc free | Classical events; binding schema blocked (cbk) |
-| 4.1 br call ret uncall trap fault | Classical events; binding schema blocked (cbk) |
-| 4.1 qreg.new free slice concat width id from_id | Classical events; binding schema blocked (cbk) |
-| 4.1 measure / measure.iN; budget.mint; effect; hostcall | Classical events; binding schema blocked (cbk) |
-| 4.2 lift.const | Assignment composition blocked (cbk) |
-| 4.2 lift.binop (all nine operations) | Value helpers below; assignment composition blocked (cbk) |
-| 4.2 lift.div (all four operations) | Value helpers below; flag/assignment composition blocked (cbk) |
-| 4.2 lift.icmp (all six predicates) | Value helpers below; assignment composition blocked (cbk) |
-| 4.2 lift.select; lift.cast (all three casts) | Value helpers below; assignment composition blocked (cbk) |
-| 4.2 lift.mov lift.parmov lift.label lift.addr | Assignment composition blocked (cbk) |
-| 4.2 lift.boundscheck lift.load lift.store lift.alloc lift.free | Value/dispatch helpers below; row composition blocked (cbk) |
-| 4.2 lift.faultif | Row composition blocked (cbk) |
-| 4.2 lift.call lift.ret | C1–C5/R1–R5 binding blocked (cbk) |
-| 4.2 lift.retval | Row composition blocked (cbk) |
-| 4.2 lift.oracle_call lift.oracle_uncall lift.perm_call | Callee/body binding blocked (cbk) |
-| 4.2 qjump qbranch qjumpr fault | Successor/row binding blocked (cbk) |
-| 4.3 qalloc qborrow qfree qreturn | Generic class/borrow binding blocked (cbk) |
-| 4.4 x cx ccx swap | gate.x gate.cx gate.ccx gate.swap |
-| 4.4 mcx; h s sdg t tdg cz rx ry rz | Variadic/angle/quantum witness gap (8sc); not certified as basis permutations |
-| 4.5 qcopy quncopy qxor qexch | qcopy quncopy qxor qexch |
-| 4.5 qinplace | Oracle binding blocked (cbk); retain printed operation order for repair |
-| 4.6 qregion | Image/body binding blocked (cbk) |
-| 4.6 qload qunload qstore qexchm | Dispatch helpers below; region binding blocked (cbk) |
-| 4.6 qpred qunpred qif qloop qloop-while | Body/control binding blocked (cbk) |
-| 4.7 oracle_call action_call adj ctl | Body/symbol/control binding blocked (cbk) |
-| 4.8 opcode summary | Same dispositions as the individual rows above |
-| 4.9 classical faults (all causes) | Classical event/history binding blocked (cbk) |
-| 3.6 forward/inverse step | Heterogeneous row/body binding blocked (cbk) |
-| 3.7 activation C1–C5/R1–R5 | Location/callee/stack binding blocked (cbk) |
-| 5.2 allocate/forward/commit/reverse/release | Oracle/row/body binding blocked (cbk) |
+| §4.5 qxor/qcopy/quncopy/qexch | qxor/qcopy/quncopy/qexch; positional bind.qxor/bind.qexch adapters. Generic allocation result lifetimes for copy/uncopy remain 3xe. |
+| §4.4 x/cx/ccx/swap | gate.x/cx/ccx/swap; typed bind.gate.x/cx/ccx/swap |
+| §4.4 h/s/sdg/t/tdg/cz | gate.h/s/sdg/t/tdg/cz; exact full-basis matrix witnesses |
+| §4.4 rx/ry/rz/mcx(k) | gate.rx/ry/rz/mcx; exact angle bits, numerical matrix evidence for rotations, full-domain variadic mcx |
+| Ripple add/sub/comparisons | value.add/sub/icmp.eq/ne/ult/ule/slt/sle and bind.value.* adapters |
+| Other arithmetic/casts/select | value.and/or/xor/mul/select/zext/sext/trunc/udiv/urem/sdiv/srem; width-uniform bind.value.shl/lshr/ashr plus historical w1..w4 helpers |
+| Linear inrange/free/alloc/call flags | scan.inrange/free.flag; value.alloc.flag; value.call.flag plus historical fixed-capacity helpers |
+| Address dispatch | dispatch.copy/store/exchange, historical .a1 helpers; qstore/qexchm |
+| §4.1 const; arithmetic/Boolean/shifts/div/rem; icmp; select/casts/pointer conversions | cc.<opcode>, bound classical instruction/execution-point leaf events |
+| §4.1 load/store/alloc/free; br/call/ret/uncall/trap/fault | cc.<opcode>, bound classical events |
+| §4.1 qreg.new/free/slice/concat/width/id/from_id; measure/measure.iN; budget.mint/effect/hostcall | cc.<opcode>, 48 classical bindings total |
+| §4.2 lift.const/binop/icmp/select/cast/mov/parmov/label/addr | lift.const; lift.add/sub/mul/and/or/xor/shl/lshr/ashr; lift.icmp.<pred>; lift.select/zext/sext/trunc/mov/parmov/label/addr |
+| §4.2 lift.div | lift.udiv/urem/sdiv/srem; old-state flag before success-only assignment and effective fault writes |
+| §4.2 lift.boundscheck | lift.boundscheck with widened pointer/length endpoints |
+| §4.2 lift.load/store | **Blocked 1oa:** typed ordered mapped-region layout records and byte/wire bindings absent |
+| §4.2 lift.alloc/free | lift.alloc/free with exact slot/exchange order, pinned-free correction and no-wrap checks |
+| §4.2 lift.faultif/fault/retval | lift.faultif, fault, lift.retval; cause 0 maps to 4, F≥4 |
+| §4.2 lift.call/ret; §3.7 C1–C5/R1–R5 | **Blocked evi:** ordered heterogeneous location descriptors (id,width,wire,parameter,capture/slot/stack mapping) absent; general value.call.flag is a verified predicate only |
+| §4.2 lift.oracle_call/oracle_uncall/perm_call | **Blocked 1a4:** source region shape/role descriptor binding; K24 repairs wire/value/token vector forwarding only |
+| §4.2 qjump/qbranch/qjumpr | qjump/qbranch/qjumpr and successor.literal/flagged/dynamic |
+| §3.6 forward/inverse step | step: indexed row/successor templates, explicit current frame, dispatch including HALT, commit pc, clean dispatch; inverse visits retained leaves backwards |
+| §4.3 qalloc/qborrow/qfree/qreturn | **Blocked 3xe:** exact class, output/declaration wire binders and invocation lifetime results absent |
+| §4.5 qinplace | **Blocked 82x:** printed t/f release order conflicts with ratified scratch LIFO; also needs 1a4 complete interfaces |
+| §4.6 qregion | qregion: complete function-local scope, unconditional image preparation/restoration, explicit cells template argument, clean release |
+| §4.6 qload/qunload | dispatch.copy verified; allocation-producing row lifetime binding **blocked 3xe** |
+| §4.6 qstore/qexchm | qstore/qexchm, generic address scan |
+| §4.6 qpred/qunpred/qif/qloop/qloop-while | qpred.scope (matched lexical pair), qif, qloop, qloop.while |
+| §4.7 adj/ctl | adj/ctl body composition; generic symbol call source regions still **1a4** |
+| §4.7 oracle_call/action_call | K24 closure-bound argument forwarding mechanism checked; source region shape/role binding **1a4** |
+| §4.8 opcode summary; §4.9 faults | Same rows above; classical faults retained in bound §4.1 event/history semantics |
+| §5.2 allocate/forward/commit/reverse/release | **Blocked 3xe:** heterogeneous state allocation/class/lifetime metadata; step-template frame binding itself is now K22 |
 
-Completed first-family witnesses: widths 1–4 for copy/XOR/exchange, 1,480
-legal tuples; fixed native permutation gates, 36 tuples (counts include
-both ambient control values). `qcopy` has a clean allocated destination;
-`quncopy`'s legal domain is the matching copied destination, not arbitrary
-dirty inputs. `qxor`/exchange enumerate arbitrary source and target entries.
+The exact blockers remain capabilities to implement. Passing a prebuilt
+caller dispatcher/activation/construction as an opaque body does not put
+its algorithm in the catalog and is not a completed row. Beads use the
+b-isa-spec- prefix: cbk/8sc closed before this resumption, afi/lph repaired
+by K21/K22, 1a4/3xe/1oa/82x carried, evi filed for residual activation
+metadata. The catalog parent 8r4 stays open.
 
-Ripple value helpers: `value.add`, `value.sub`, `value.icmp.eq/ne/ult/ule/slt/sle`.
-They XOR the arithmetic result into arbitrary `t`, preserving separate `a,b`
-bundles and cleaning all fresh Boolean-node scratch. These are value helpers,
-not a claim to have encoded the lifted assignment/frame/successor rows.
-Full domains at widths 1–4: 26,880 tuples including both controls.
+## Evidence and limits
 
-Other arithmetic: `value.and/xor/or/mul/select/zext/sext/trunc/udiv/urem/sdiv/srem`
-and `value.shl/lshr/ashr.w1/w2/w3/w4`. The shifts are explicit width
-specializations; wider shifts remain unfinished. Division uses restoring
-long division at N+1 remainder bits and conditional signed magnitudes,
-XORs code 5/6 into arbitrary four-bit `f`, and leaves `t` unchanged on
-fault. Full domains include signed MIN/-1 and every divisor-zero tuple.
-Widths 1–4: 664,560 arithmetic and 21,760 cast/select tuples.
-Rust std-only SHA-256 and Python hashlib independently agree on the
-checkpoint envelope; both canonicalizers verify the printed qxor witness.
-A checkpoint digest does not identify the complete library.
+Rust integer/permutation and reduced ordered BDD checkers independently
+compare full-domain Boolean functions to plain arithmetic/range/dispatch
+semantics, check every scratch boundary, preserve required inputs and
+restore the complete state by reverse execution. BDD domain restrictions
+(e.g. atop≤capacity, pc≤HALT) and exact tuple exponents are in progress;
+these are exhaustive symbolic domains, not random samples. No table-only
+helper is called a complete activation/oracle witness. Classical event
+witnesses check exact binding bytes, not classical execution or a unitary.
 
-Linear scans: `value.inrange.e1`, `value.free.flag.e1` (N), and
-`value.inrange/free.flag.e2.w1/w2` (fixed widths); `value.alloc.flag` (N,A),
-`value.call.flag.rf4.w1/w2/w3/w4`. Table columns use flattened bundles
-`base`, `size`, `live`, `pinned`, with `atop` of width 1 (one entry) or 2
-(two entries). Only legal atop values 0..entry-count are enumerated.
-Pointer/range endpoints use N+1 bits so overflowing N-bit sums are not
-wrapped. Allocator witnesses use A=1 (two capacity slots), every Ac-bit
-entry; call witnesses fix R_f=4 and extend prospective sums before comparison.
-All configurations enumerate arbitrary predicate targets and both controls.
-Counts: inrange 1,318,144; free flag 24,704; alloc flag 149,760; call flag
-1,123,328. Wider table configurations and general call records remain open;
-these helpers do not implement allocator writes or activation operations.
+Structured loops use bounds 0,1,2,3,17 at widths 1–4, including nested
+finite actual bodies to expansion fixpoint. New step checks cover 1,218,560
+tuples across widths 1–4 and row counts 0/1/2/3/17, including heterogeneous
+assignment, fault and direct rows plus idle frames. Repeated frame slices
+at bounds 0/1/2/3/17 add 3,400 tuples. New qregion scopes cover cell widths
+1–4, cell counts 1/8, 272 image configurations (all 256 one-byte images,
+default non-byte-aligned zero, and specified multibyte patterns), 1,088
+full-domain tuples and 1,088 exact coherent matrix columns. The sparse
+exact checker keeps every allocation coordinate and checks clean boundaries;
+it agrees with the dense checker on entangled Clifford+T columns.
 
-Address dispatch: `dispatch.copy.a1`, `dispatch.store.a1`,
-`dispatch.exchange.a1`, parameter W. `a` is one bit, `cells` has 2W bits
-in address/bit order, and `v` has W bits. Equality scratch is recomputed
-and cleared for each address in numeric order. Controlled exchange uses
-CX v cell; CCX equality cell v; CX v cell, with no private Fredkin leaf.
-Widths W=1–4: 56,160 full-domain tuples. Generic mapped-region, multi-byte
-load/store, and stack/location selectors remain blocked with the row bindings.
-The linear scan checkpoint now uncomputes entry scratch immediately after
-each ordered OR fold; no cross-entry arithmetic computation is shared.
+Exact amplitudes use checked dyadic rationals in Q(√2,i), including global
+phase. Native H/S/SDG/T/TDG/CZ: 356 columns with spectators and controls;
+MCX k=0/1/2/3/4/17: 524,412 basis tuples; typed X/CX/CCX/SWAP: 36 tuples.
+Rotations use eight finite binary64 angle encodings (both zeros, subnormal,
+±1, π encoding, positive/negative maxima), all three rotations and widths
+1–4: 1,440 numerical columns. Required round trip: f64::from_bits(bits).
+to_bits()==bits, inverse bits XOR 2^63; no decimal rendering or recipe
+angle arithmetic. Matrix entries, norms and U†U have absolute residual
+≤8·f64::EPSILON using independent Pauli/spectral formulas. This is numerical
+evidence at those angles, not an ε=0 transcendental proof for every angle.
+The generic call predicate adds 43,200 tuples across 192 configurations
+(D,S independently1–4, R4/5/16, two depth/stack limits), plus 131,072 at
+the exact §16.3 D5/S10/R16/limits17/272 counter configuration.
 
-The row/oracle/structure family is recorded by staged case
-`E-ref-09-structure-blocked`. The expander tests integer invoke composition,
-loop expansion, inverse order, cycle rejection, and rejection of invented
-wire/body actuals and private conditionals. These are schema boundary tests,
-not semantic certification of the absent structured recipes.
-
-Final checkpoint: 54 recipes and 3,386,812 family tuples. Rust SHA-256 and
-Python -I hashlib agree on the **checkpoint-only** four-line envelope hash:
+Current **checkpoint-only** envelope SHA-256 (Rust and Python -I):
+`84e8940646f1cf2416790b71a9eed525589f0c62e2c397f2a7d08e0b33233230`.
+The historical 54-recipe checkpoint was
 `3a99ce3028e1ecc421b3991e3b5b7423ee33323badc5ca3ce1e61088a5e5055d`.
-No completed-library hash/count was inserted into draft §11.1. Its unchanged
-diff remains checked against the accepted text. All missing instructions,
-activation/step/oracle sequences and native quantum leaves remain in scope.
-
-Final headless/offline gate: fmt --check and clippy --all-targets -D warnings
-green; cargo test **40 pass / 0 fail**. Full 0.8 harness **445 pass / 0 fail /
-60 unavailable (505 cases), exit 2**. Six new family cases add unavailable
-only, naming b-isa-spec-8r4. No push.
-
-## Resumption: bound classical events
-
-K19/K20 closed cbk/8sc as language gaps (commit 5a8ec58). The old
-checkpoint dispositions above describe the prior state; subsequent entries
-record the current implementation. `cc.<opcode>` now covers all 48 §4.1
-opcode/predicate spellings in the README, including qreg view/identity,
-measure widths, budget.mint and fault. Every event binds canonical instruction
-bytes and its execution point. The expander rejects opcode mismatches.
-The 16,320 configurations at widths 1–4 check exact event-byte preservation;
-these are binding witnesses, not a second classical interpreter.
-The catalog currently has 102 recipes; its digest is a checkpoint only.
-
-### Lifted assignments and faults
-
-`lift.add/sub/mul/and/or/xor/shl/lshr/ashr`, `lift.icmp.<pred>`,
-`lift.zext/sext/trunc`, `lift.select/mov/parmov`, `lift.const/label/addr`,
-`lift.udiv/urem/sdiv/srem`, `lift.faultif`, `lift.retval`, and `fault` now
-encode assignment/effect order. `t` is the clean displacement slot and
-`w` the old destination. `parmov` concatenates heterogeneous bundles in
-slot order and captures every bit before any exchange. Literal C is the
-canonical unsigned bit-vector value or resolved label/layout base.
-New `bind.value.*` adapters implement positional wire binding; shifts scan
-all j<N with a quantum constant counter, so coverage is width-uniform.
-
-The row tests check 1,318,048 tuples at widths 1–4 (details in progress),
-including arbitrary displacement destinations, signed overflow, zero divisors,
-all four-bit code entries, both faulted states, controls and full reversal.
-Generic nested interfaces, output allocations/classes and nonzero region
-images remain blocked on 1a4/3xe/afi respectively; costs are not exclusions.
-
-### Generic scans and memory wire operations
-
-Row commit: 0bc8426. Generic `dispatch.copy/store/exchange`, `qstore`,
-`qexchm`, `scan.inrange`, `scan.free.flag`, `lift.boundscheck`, `lift.free`
-replace fixed-capacity-only coverage. 162 total recipes. Scan parameters:
-P=pointer/base/size width, L=length width, E=max(P,L)+1, C=table capacity,
-T=atop counter width; 0<=atop<=C. Separate pointer and length widths are
-retained, and every prospective endpoint has the required extra bit.
-Unused n/size formals for free can bind existing source bundles; they do
-not affect operations or the free predicate. Dispatch uses selector width
-A, cell count C=2^A, cell width W, address-order packed cells.
-
-The independent reduced ordered BDD checker executes every Boolean input
-simultaneously, comparing canonical Boolean functions to separately built
-unsigned arithmetic/range/multiplexer semantics. Zero difference under the
-legal atop domain is an exact full-domain proof, not random sampling.
-Every lifetime boundary and complete reverse restoration is checked.
-The BDD engine's own four-bit add/order/equality truth tables are exhaustive.
-
-Dispatch: 80 configurations (five recipes, A and W independently 1–4),
-**47,224,025,124,923,801,776,800 tuples** total; each configuration has
-2^(A+2^A*W+W+1) tuples, including ambient control.
-Scans: 32 configurations per recipe (P and L independently 1–4; C=1/2,
-T=1/2). Each helper covers **6,239,116,800 tuples**; each row covers
-**99,825,868,800 tuples**. Four recipes total **212,129,971,200 tuples**.
-The exact domain per helper is (C+1)*2^(P+L+2CP+2C+2); the rows replace
-an arbitrary predicate target by clean flag plus arbitrary faulted/code,
-giving exponent +4. Largest dispatch configuration is 2^73 basis tuples.
-
-### Structured bodies
-
-Generic memory commit aa9448f; 54 Rust tests and harness 445/0/63.
-Six structured recipes: qif, qloop, qloop.while, qpred.scope, ctl, adj.
-Predicate scopes group matching qpred/qunpred pairs as §3.5 lexical scopes.
-Bounds 0,1,2,3,17 at widths 1–4, full input domains, including every
-17-bit while condition vector and ambient control: 7,865,220 tuples per
-loop recipe. qif and nested fixpoint compositions each add 120 tuples.
-Exact Q(√2,i) witnesses: 270 coherent scope/qif/adjoint matrix columns,
-plus 600 Hadamard-loop columns (qloop bounds through 17; while bounds 0–3).
-The large while bound has an exact permutation witness over its entire
-basis; non-permutation leaf matrices and coherent scoped composition are
-checked independently, not called basis permutations.
-168 total recipes. Step/construction are blocked on b-isa-spec-lph:
-whole-body capture-free splices cannot select heterogeneous row templates
-or rebind the current frame. Generic call/activation interfaces remain
-b-isa-spec-1a4; allocation/class outputs b-isa-spec-3xe; images afi.
-
-### Ratified corrections, control rows, allocator and aliases
-
-Current count before the native family: 178 recipes. Added qjump/qbranch/
-qjumpr and successor.literal/flagged/dynamic, plus lift.alloc and positional
-copy/exchange/select adapters. Branch/successor witnesses: 22,120 tuples;
-qjumpr: 138,880 tuples over every nonempty function interval at widths 1–4.
-Wide effective-cause witnesses: 14,592 tuples at F=4,5,8. Cause C=0 maps
-to 4, including under faultif; core fault tests now cover all C=0..15
-(3,072 tuples). These supplement, not replace, the available 0.8 harness.
-
-All four allocator assignment values precede all four exchanges; inverse
-restores atop before addressing table[atop]. Eight exact BDD configurations:
-N=1–4, H=N+2, P=max(N+2,5), capacities 2/4, T=2/3, Base=16,
-Limit=2^N, F=4; **1,512,125,731,994,490,556,645,376 tuples**. Domain per configuration:
-(C+1)*2^(N+H+C*(2P+2)+P+F+2), legal atop 0..C. Packed entries are
-base[P], size[P], live, pinned. E=max(H,N)+1; K=min(P,H), J=min(P,N).
-These are derived width parameters; successful allocation sizes fit P.
-Selectors may be wider than log2(C): only the C physical entries are
-scanned, and bounds are checked before mutation.
-
-Pinned free entries are excluded from both the validity predicate and the
-mutation match (0.9 E17.13). Division computes frame.flag before any value
-slot write (§3.6), then success-only assignment and fault writes. F≥4 is
-an explicit parameter: the complete F=8 division circuit equals the F=4
-circuit and touches no high code bit, proving exact tensor identity on all
-high inputs and an additional **19,169,280** tuples. Both regressions were
-observed red before their fixes. Strict cast widths exclude M=N (the old
-value-helper checkpoint also tested identity-width mathematical extensions).
-Updated core assignment/fault witness count: 1,318,032 tuples; repeated
-location/destination aliases add 540, positional copy/exchange 1,360.
-Input captures are distinct, so aliasing location reads cannot create an
-invalid coincident-control CCX. All declared library scratch is balanced;
-every release is now checked against reverse allocation order. Diagonal
-and both swap targets obey §3.3 effective-control disjointness.
-
-Additional blockers: b-isa-spec-1oa (typed mapped-region layout descriptors
-for arbitrary lift.load/store); b-isa-spec-82x (qinplace's printed t/f
-release order conflicts with §11.1 reverse allocation order). Neither is
-silently replaced by a partial specialization. Complete-library hash/count
-remain withheld while these and afi/1a4/3xe/lph are open.
+Neither is a complete-library binding. In particular the first remaining
+blocked row, lift.load, still cannot express its ordered mapped layout
+under §11.1's typed formal grammar/K22 template-only list rule (1oa).

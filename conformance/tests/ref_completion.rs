@@ -140,3 +140,39 @@ fn unused_template_shapes_and_types_are_rejected() {
             .is_err());
     }
 }
+
+#[test]
+fn template_capture_is_not_rebound_by_legacy_integer_formals_or_cross_type_names() {
+    let d = doc(
+        r#"[{"kind":"use","parameters":[{"name":"T","type":"templates","length":1},{"name":"b","type":"wire","width":1},"n"],"body":[{"apply":"T","index":0,"args":[0]}]}]"#,
+    );
+    let args = json::parse(r#"[[{"parameters":["k"],"body":[{"gate":"x","wires":["b"]}]}],"a",1]"#)
+        .unwrap();
+    let leaves = Expander::new(&d, Registry::new())
+        .unwrap()
+        .expand("use", args.as_arr().unwrap(), &[("a", 1), ("b", 1)])
+        .unwrap();
+    assert_eq!(leaves[0].wires, [("b".into(), 0)]);
+    let d = doc(
+        r#"[{"kind":"use","parameters":["a",{"name":"T","type":"templates","length":1},{"name":"b","type":"wire","width":1}],"body":[{"apply":"T","index":0,"args":["b"]}]}]"#,
+    );
+    // Capture integer a=1, then shadow it with a wire formal named a.
+    // The template must not continue resolving a as an integer.
+    let args=json::parse(r#"[1,[{"parameters":[{"name":"a","type":"wire","width":1}],"body":[{"for":"i","from":0,"to":"a","body":[]}]}],"b"]"#).unwrap();
+    // The actual captures at the external caller, so construct the integer
+    // capture using an outer recipe's literal template actual.
+    let mut parsed = json::parse(&d).unwrap();
+    if let Json::Obj(m) = &mut parsed {
+        if let Some(Json::Arr(rs)) = m.get_mut("recipes") {
+            rs.push(json::parse(r#"{"kind":"wrapper","parameters":["a",{"name":"b","type":"wire","width":1}],"body":[{"invoke":"use","args":["a",[{"parameters":[{"name":"a","type":"wire","width":1}],"body":[{"for":"i","from":0,"to":"a","body":[]}]}],"b"]}],"scratch":[],"removable":[],"source":"K22 lexical shadow witness"}"#).unwrap());
+        }
+    }
+    assert!(Expander::new(&parsed.to_string(), Registry::new())
+        .unwrap()
+        .expand(
+            "wrapper",
+            &[args.as_arr().unwrap()[0].clone(), Json::Str("b".into())],
+            &[("b", 1)]
+        )
+        .is_err());
+}

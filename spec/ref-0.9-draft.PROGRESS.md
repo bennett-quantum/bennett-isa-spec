@@ -1,5 +1,12 @@
 # ref 0.9 catalog checkpoint (b-isa-spec-8r4)
 
+Current resumed state (2026-10-31): **195 recipes**, still incomplete and
+not publishable. Latest family evidence and blockers are in the final
+section below; the 54-recipe and intermediate sections are historical.
+Part 1: bbb1b62 (K21–K24). First remaining blocked row: §4.2 lift.load,
+b-isa-spec-1oa (typed ordered mapped-region descriptors). Current
+checkpoint-only hash: 84e8940646f1cf2416790b71a9eed525589f0c62e2c397f2a7d08e0b33233230.
+
 Status: incomplete, not publishable; no normative catalog hash/count edit.
 Contract blockers filed before implementation: b-isa-spec-cbk and
 b-isa-spec-8sc. Their descriptions quote the exact §11.1 sentences and
@@ -195,3 +202,77 @@ Part 1 commit: the commit containing this entry (recorded explicitly in the
 next family entry). Headless offline fmt/clippy/test and harness are green;
 full gate logs are project-local .tmp/ref-gate-{0,1,2,3}.log. Recipe bytes
 are unchanged in this Part 1 commit; complete-library marker is untouched.
+
+## Resumed row/oracle/structure family (after Part 1 bbb1b62)
+
+**195 recipes**: added `step` and complete-scope `qregion` to the actual
+193-recipe starting catalog. Catalog algorithms are in ref_step.py; body
+and successor templates bind explicit current frames/cells. No caller
+supplies an opaque complete dispatcher in place of the step algorithm.
+
+| Completed row / evidence | Widths, bounds, configurations | Full-domain witnesses | Commit |
+|---|---|---:|---|
+| §3.6 step / inverse step | W=1–4, N=0/1/2/3/17, P=bit_length(N)≥1; frame old_pc[P], displacement[W], flag; 20 shapes / 112 legal pc configurations | 1,218,560 tuples | family commit containing this entry |
+| Repeated explicit step-frame binding | W=1–4; bounds 0/1/2/3/17; 20 configurations; complete finite expansion with distinct scratch identities | 3,400 tuples | same |
+| §4.6 complete qregion function scope | W=1–4; C=1/8; 272 image configurations (all 256 one-byte images, four default small-width regions, 12 multibyte patterns) | 1,088 basis tuples + 1,088 exact matrix columns | same |
+| Sparse exact amplitude backend | Every allocated coordinate retained; clean alloc/release checks; entangled H/CX/T/SDG/H/CZ/SWAP circuit adjoint | 4 dense/sparse agreeing columns | same |
+| Native checkpoint resumed from fcea698 | W=1–4; H/S/SDG/T/TDG/CZ; eight finite bit-pattern angles × rx/ry/rz; k=0/1/2/3/4/17 | 356 exact + 1,440 numerical columns; 524,412 MCX tuples + 36 typed permutation tuples | fcea698; verified in this family |
+| General no-wrap call predicate checkpoint | D,S independently1–4, R4/5/16, two depth/stack limits; 192 configurations; §16.3 D5/S10/R16/17/272 | 43,200 + 131,072 tuples | fcea698; accounting corrected bbb1b62 |
+
+Step tests were observed red at unknown recipe before serialization, then
+green against independent BDD old-state arithmetic. They include assignment
+slot preservation, conditional fault effects/successor, direct rows and
+HALT idle frames, scratch cleanup and complete inverse restoration. This
+is component certification, not a completed activation or oracle claim.
+
+Qregion was observed red at unknown recipe before serialization. Semantic
+and coherent tests include false effective controls: images still execute
+unconditionally, while body gates are predicated. Empty/default-zero images
+also work for non-byte-aligned cell widths, as §4.6 requires. Sparse exact
+columns avoid the dense checker's 20-coordinate workspace cap; the output
+interface cap remains explicit. They do not discard unused allocation bits.
+
+A capture bug was observed red during the template audit: legacy integer
+formals imported apply-site wires over captured free names. Template apply
+now imports only explicit formals and shadows captured bindings across all
+types; a wire formal cannot accidentally retain a captured integer of the
+same name. The regression is in ref_completion.rs. K22's normative lexical
+rule already required this behavior. K21's default-zero case was clarified
+in §11.1 and the raw diff regenerated. Qxor witness bytes remain unchanged.
+
+Resolved afi/K21 and lph/K22; cbk/8sc were already closed at entry. Remaining
+activation metadata is split into new **b-isa-spec-evi**: typed ordered
+location records (id, width, source wire, parameter/capture/slot/stack
+mapping), with declaration/id-order iteration and inverse address rules.
+K22 templates can bind frames but cannot inspect heterogeneous record fields.
+`value.call.flag` is not claimed to implement C1–C5/R1–R5.
+
+Carry **1a4**, **3xe**, **1oa**, **82x**, with exact required changes in their
+bd notes. First blocked row in table order is **§4.2 lift.load** (then store):
+§11.1's typed-formal list plus K22's template objects (`parameters`,`body`
+only) has no ordered descriptor binding associating a mapped region's base,
+extent and cells. Required change is typed ordered layout-region records
+with deterministic address-order byte mapping, or canonical specialization
+(1oa). Further blocked rows are activation (evi), complete source region
+interfaces (1a4), allocation-producing lifetimes/classes and §5.2 state
+allocation (3xe), and qinplace's conflicting release sequence (82x).
+All remain in scope; complete-library count/hash marker is untouched.
+
+Checkpoint-only envelope SHA-256 from Python -I and independently Rust:
+`84e8940646f1cf2416790b71a9eed525589f0c62e2c397f2a7d08e0b33233230`.
+The historical 54-recipe checkpoint remains
+`3a99ce3028e1ecc421b3991e3b5b7423ee33323badc5ca3ce1e61088a5e5055d`.
+Neither is a complete ref@0.9 binding. Updated coverage is the single
+current table in ref-0.9-draft.README.md, replacing stale blocked cbk/8sc
+claims while preserving this file's historical checkpoints.
+
+Final family gate: **88 Rust tests pass / 0 fail**; fmt --check and clippy
+--offline --all-targets -D warnings green. Full harness **445 pass / 0 fail /
+68 unavailable (513 cases), exit 2**, versus entry **445/0/65 (510)**.
+Exactly three new pending-0.9 cases account for the unavailable increase:
+E-ref-09-step-templates, E-ref-09-region-images, E-ref-09-native-parametric.
+Rust/Python independent canonical bytes and envelope hashes agree; the
+hash test now checks the generator's entire default catalog instead of the
+old hard-coded ten-family checkpoint. Accepted 0.8 SHA-256 remains
+90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e.
+No reference-interpreter changes, push, or publication in this work.

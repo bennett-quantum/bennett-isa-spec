@@ -2350,9 +2350,10 @@ copies of B. Consumers expand finite actual bodies to a constructor fixpoint.
 
 **Image binding (K21).** An `image` actual is a bound image formal or
 an even-length string of lowercase hexadecimal byte pairs in data-image
-byte order, including the empty string. Exactly
-`{ "image": name, "wires": actual }` requires exactly eight wires per
-byte; bit 8j+i of the flattened wire list is bit i of byte j (i=0..7).
+byte order. The empty string denotes the absent/default-zero image,
+including on a wire list whose width is not byte-aligned. Exactly
+`{ "image": name, "wires": actual }` emits no leaf for the empty image;
+a nonempty image requires exactly eight wires per byte; bit 8j+i of the flattened wire list is bit i of byte j (i=0..7).
 It emits one X leaf for each one bit in increasing bit order, with an
 empty effective-control set regardless of inherited controls. This
 constructor denotes only the unconditional data-image preparation or
