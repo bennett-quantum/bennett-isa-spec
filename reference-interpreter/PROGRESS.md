@@ -2,95 +2,78 @@
 
 Resume here. The whole accepted ISA 0.8 remains in scope; staged deliverables
 are not complete. Sole implementation sub-agent; owned interpreter and external
-round-14 response only. Never push. Every cargo invocation uses the headless
+round-15 response only. Never push. Every cargo invocation uses the headless
 prefix and TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/.tmp.
 
-## Round-14 fixes (2026-10-31)
+## Round-15 fixes (2026-10-31)
 
-Baseline **375 passed / 0 failed / 5 ignored**, summed over all binaries.
-Combined witness RED **0 passed / 4 failed**: parse admitted both malformed
-certificate types, CLI check returned exit 0/status ok. Witnesses and all
-round 4–13 positives/negatives retained; the R13 type family is replaced.
+Baseline **379 passed / 0 failed / 5 ignored**, summed over all binaries,
+20.67 s runner sum. Combined R15 RED **2 passed / 3 failed**: direct grammar
+admits frame lengths [0,1,2,3], expected [2]; library/CLI reject legal "0.0"
+with §11: §5.2. The two full-admission frame regressions already pass because
+of the old downstream guard. Combined GREEN **5 passed / 0 failed** (0.06 s).
+All round 4–15 positives/negatives and previous family tests are retained.
 
 | Blocker | RED tests | Status | Commit |
 |---|---|---|---|
-| R14-B01 | metadata::r14_y_endpoints_require_decimal_strings; cli_xam::r14_cli_rejects_numeric_y_endpoints | GREEN | 7f834d0 |
-| R14-B02 | metadata::r14_table_rows_and_components_are_typed_at_admission; cli_xam::r14_cli_rejects_malformed_table_rows_and_cells | GREEN | 7f834d0 |
+| R15-B01 | metadata_schema::tests::r15_translation_frame_is_first_and_last_point_tuple; retained-admission controls metadata::r15_translation_frame_cardinality_is_checked_at_admission, cli_xam::r15_cli_rejects_empty_translation_frame | GREEN | 9283db7 |
+| R15-B02 | metadata::r15_oracle_schedule_epsilon_uses_exact_decimal_value; cli_xam::r15_cli_oracle_schedule_epsilon_is_exact_by_value | GREEN | 9283db7 |
 
-Design: src/metadata_schema.rs::TABLE is the sole recursive grammar, with
-clauses on all productions. It covers every accepted JSON metadata section
-and the textual data NAME/HEX projection. Admission preflight, signatures,
-certificate details and validate_claim consume it; previous hand-written
-field/type schemas are removed. Metadata helper checks also delegate to it.
-Only contextual/range checks remain in object.rs, metadata.rs, certificate.rs
-and validation.rs, with their § citations. Expected tuples use arbitrary-size
-canonical integers; Y endpoints use signed finite decimal strings.
-Service strings, layout extrema, integer/decimal alternatives, expression
-ASTs and optional fields are retained. Numerical/channel verification stays
+Design: src/metadata_schema.rs::TABLE is the sole recursive structural grammar.
+New translation_frame = Tuple(point, point) expresses §12.1 first/last
+cardinality; V/W remain Array(point). The duplicate cardinality-only check
+in certificate.rs::validate_claim is removed. Contextual claim-index checks
+remain. metadata.rs::Object::validate_schedule_details checks numeric oracle
+epsilon zero after decimal validation: all mantissa digits must be zero,
+regardless of scale/exponent, with no binary64 conversion for the decision.
+README's metadata Design paragraph reflects this structural/semantic split.
+No spec reading/waiver is added; numerical/channel verification remains
 explicitly Unverified at the existing staged boundary.
 
-Six exact reviewer witnesses are copied under tests/support/r14-witnesses/,
-not the valid fixture inventory. tests/support/r14_pins.py independently
-assembles literal LF envelopes and verifies file/interface/closure/object
-pins; no interpreter or rehash defines expectations. Inc8 is 8ce5e64f…5be93,
-object 8093da48…ec5d9; action is 2fcd5b3d…ab8be, object ddc5d672…666f0.
-The singleton X action still verifies as Evidence { elements: 1 }. A component
-above u128 remains admissible; table truth/cardinality remain verifier work.
-CLI negatives exit 1 with empty stdout and §9.1/§12 diagnostics.
+Two exact reviewer witnesses in tests/support/r15-witnesses/ match their
+read-only originals byte-for-byte. r15_pins.py independently assembles the
+literal 261-byte LF envelope and hashes it, without interpreter/rehash.
+Interface=closure 8ce5e64f…5be93, object 8093da48…ec5d9 remain unchanged.
+The epsilon witness SHA is 1431a1db…2df; the empty-frame file is bf88ce59…b27d.
+Library/CLI positives 0, "0", "0.0", "0.000" parse/check/hash with those pins.
+Nonzero "0.1", "0.000001", exact decimal-string 10^-400 and numeric 1e-300
+reject §5.2. String "1e-300" is outside the existing decimal-string grammar
+and rejects §9.1. CLI negatives exit 1 with empty stdout and cited diagnostics.
+Only two-point frames parse/check; empty/one/three-point frames reject §12.1.
 
-The derived family is metadata_schema::tests::r14_generated_metadata_schema_type_family
-(src/metadata_schema/tests.rs), derived from **162 productions**. It exercises
-**9,754 generated positives, 1,632 unique typed paths, 26,354 grammar negatives**;
-**1,992** of those run through BOTH admission validators (and certificate
-negatives also call validate_certificate_details directly). Another **26 pinned
-objects, 2,393 parse path visits, 17,173 full-parse negatives** exercise real
-admission before identities. Total negative cases: **43,527** (dual-validator
-assertions are a subset, not added again). Empty/nonempty containers, optional
-absence, every union/enum alternative, canonical large integers and decimal
-edges are represented. Wrong-kind expectations derive from Shape independently
-of observed validator results. The old R13 family/union is removed, not retained
-as a second schema. The width family remains **507: 159 constructed, 286 layout
-rejections, 62 resource diagnostics**. The reviewer's nonblocking S1 request
-for stronger independent width-outcome assertions is left as future work;
-no width behavior or existing assertion is changed this round.
+The retained metadata_schema::tests::r14_generated_metadata_schema_type_family
+now exercises **163 productions, 9,806 generated positives, 1,653 unique typed
+paths, 26,545 grammar negatives**; **1,992** negatives also run through BOTH
+admission validators (a subset, not added again). **26 pinned objects, 2,393
+parse path visits and 17,173 full-parse negatives** remain. Total negatives
+without recounting dual assertions: **43,718**. Table-derived baselines now
+have two frame points. The independent literal cardinality test checks the
+clause separately; generated counts establish enforcement of TABLE.
+The width family remains **507: 159 constructed, 286 layout rejections,
+62 resource diagnostics**. Its independent outcome-classification follow-up
+remains nonblocking future work, as the reviewer permits.
 
-Observed normal gates: 379/0/5 after replacement and 379/0/5 after final
-schema/positive-family changes. Initial full run failed only because malformed
-reviewer objects were placed in the valid fixture inventory; moved them to
-support without weakening the fixture audit. The first pin script assumed
-r14-table-bool was action-based; corrected it to read its inc8 symbol. All
-supplied pins match unchanged. Clippy's redundant unit-expression finding
-was corrected. Final post-style suite: **379 passed / 0 failed / 5 ignored**,
-9 unit + 370 integration, 0 doctests, 22.84 s summed runner time. Baseline was
-18.32 s. Fmt and strict all-target Clippy pass (0 warnings). The final family
-and width gate passed 5 tests (two generated families plus three retained width
-regressions); 5.21 s schema + 0.07 s widths.
+Observed first full suite: **384 passed / 0 failed / 5 ignored**, 20.60 s.
+Final full suite: **384 passed / 0 failed / 5 ignored**, 19.65 s runner sum; 10 unit + 374 integration, 0 doctests.
+Final family/width gate: **6 passed / 0 failed**, 5.19 s schema + 0.07 s widths.
+Fmt and strict all-target Clippy pass (0 warnings). Independent pin script and
+copy checks pass. No production/test edits after final suite or sweep start.
 
-All **5 ignored sweeps passed / 0 failed**, **100.56 s** summed runner time.
+All **5 ignored sweeps passed / 0 failed**, **97.21 s** summed runner time.
 
 | Sweep | Full domain | Observed result / runner time |
 |---|---|---|
 | u8 division/remainder | 65,536 operand pairs × 4 = 262,144 executions | 1/0; 0.52 s |
-| 17-wire borrow | 131,072 entries | 1/0; 2.71 s |
-| checked borrow certificate | 262,144 elements, subject and expected program | 1/0; 14.81 s |
-| §6 differential | 200,000 programs: 70,931 accepted (all clean), 129,069 rejected | 1/0; 80.11 s |
-| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 1/0; 2.41 s |
+| 17-wire borrow | 131,072 entries | 1/0; 2.74 s |
+| checked borrow certificate | 262,144 elements, subject and expected program | 1/0; 14.99 s |
+| §6 differential | 200,000 programs: 70,931 accepted (all clean), 129,069 rejected | 1/0; 76.54 s |
+| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 1/0; 2.42 s |
 
-No production/test edits after the final normal suite or sweep start.
-All three generated corpora reproduce byte-identically; all six copied
-reviewer files match the originals. Owned diff --check is clean.
-
-Supplemental exact RED replay builds e3ae1af sources with headless rustc under
-reference-interpreter/.tmp (no checkout/current-source changes): 0/2 library
-tests on exact Y-number/row-bool; all ten exact negative check/hash calls
-wrongly exit 0. The same ten calls on the current binary exit 1, empty stdout,
-with §9.1/§12; the singleton positive pin is unchanged.
-Logs: .tmp/r14-exact-{red-replay,cli-green}.log.
-
-Logs: repo .tmp/r14-{before,red,green,schema-full,family,full,final,final2,
-clippy,clippy-final,families-final,sweeps}.log. No spec/conformance edits or execution, dependency,
+Logs: interpreter .tmp/r15-{before,red,green,full,final,family,clippy,sweeps}.log.
+Owned diffs pass --check. No spec/conformance edits or execution, dependency,
 Beads mutation/export, push or Dolt sync. Concurrent changes are untouched.
-Historical round evidence is in council/response-round-N.md and git history.
+Historical round evidence is in council/response-round-N.md, external council
+responses and git history.
 
 ## Resume here: outstanding work, in priority order
 
