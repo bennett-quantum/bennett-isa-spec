@@ -435,3 +435,31 @@ minus-I action; the rounded-angle probe must retain both support keys.
 qinplace identity requires a fault-free token; B=0 is a §4.5 rejection.
 Literal envelopes and independent hashlib pins precede interpreter checks.
 The complete round-11 sidecar audit is in tests/support/r11-comment-audit.md.
+
+**Design (metadata and derived widths, round 13).** `metadata_types.rs` checks
+all accepted metadata sections, nested records, tagged payloads and optional
+fields at admission, before identities, binding checks or execution. Integer
+number/string encodings, decimal alternatives and null/index fields retain
+exactly their schema alternatives. Semantic validators then resolve names,
+check ranges and verify bindings. Service versions are strings; arbitrary host
+service versions remain legal. A present `layout.block_image` is a data NAME
+resolving to a complete-sector image, including for action-only objects.
+`DerivedWidths::from_program` checks H+2, A_tab+1 and S_cells+1; a legal layout
+whose counters exceed host representation returns a cited host-limit error.
+Admission and sequential B=0 semantics remain independent of that host limit.
+The depth addition and bit-vector limb/storage sizing also use checked
+arithmetic. No ISA exponent cap is introduced.
+
+| Schema / rule | Load-time validator | Positive and negative controls |
+|---|---|---|
+| §9.1 optional `layout.block_image`, §7.3 sectors | `metadata_types::layout`, `Object::validate_layout`; checked lookup in `ClassicalMachine::construct` | `parser::r13_block_image_schema_is_checked_without_a_layout_consumer`, `r13_classical_missing_block_image_never_panics`; absent/disk action identities in the R13 pin corpus |
+| §9.1 optional `imports.pinned_closure_hash`, §9.3 bindings | `metadata_types::imports`, `Object::validate_symbols` | `linking::link_resolves_calls_and_pins_and_deduplicates`, `link_rejects_unresolved_signature_pin_definition_and_layout_conflicts`; R13 type family |
+| §9.1 coverage classification payloads, §13 | `metadata_types::coverage`, `Object::validate_coverage_details` | `metadata::coverage_points_and_classification_payloads_are_checked`; all three classification branches in the R13 type family |
+| §9.1 devices, layout and every accepted schedule/certificate optional field | `Object::validate_metadata_types`, followed by the section's semantic validator | `metadata::r13_generated_metadata_schema_type_family`: literal pinned controls and one-field type substitutions |
+| §§3.7, 7.2 derived counters and storage | `DerivedWidths::from_program`, `BitVector::zero` | `r1_widths::r13_generated_derived_width_extremes_family`; recursive S_cells=9 reversal in `step_machine` |
+
+These admission checks do not claim the staged target, launch, schedule
+execution or interval-verification deliverables. Borrow obligations remain
+separate: `validation.rs::validate_action_sequence` checks static cleanup and
+causal histories, `borrow.rs::decide_frames` checks full-frame factorisation,
+and `quantum.rs::audit_borrow_boundary` checks runtime return obligations.

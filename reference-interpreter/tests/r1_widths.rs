@@ -297,3 +297,174 @@ fn r13_derived_counter_width_overflow_reports_host_limit() {
         );
     }
 }
+
+#[test]
+fn r13_generated_derived_width_extremes_family() {
+    let mut cases = 0;
+    let mut admitted = 0;
+    let mut rejected = 0;
+    let mut host_limits = 0;
+    let values = [
+        0u128,
+        1,
+        63,
+        64,
+        127,
+        128,
+        u64::MAX as u128 - 64,
+        u64::MAX as u128 - 63,
+        u64::MAX as u128 - 2,
+        u64::MAX as u128 - 1,
+        u64::MAX as u128,
+        1u128 << 64,
+    ];
+    for (text, root) in [
+        (
+            support::r13_text("S_cells")
+                .replace(r#""S_cells":"18446744073709551615""#, r#""S_cells":0"#),
+            "inc8",
+        ),
+        (
+            support::r13_text("S_cells")
+                .replace(r#""S_cells":"18446744073709551615""#, r#""S_cells":0"#)
+                .replace("ptr_width=32", "ptr_width=128")
+                .replace(r#""ptr_width":32"#, r#""ptr_width":128"#)
+                .replace(r#""H":6"#, r#""H":128"#),
+            "inc8",
+        ),
+        (include_str!("fixtures/heap.bisa").into(), "heap"),
+        (include_str!("fixtures/sum_db.bisa").into(), "sum_db"),
+        (
+            include_str!("fixtures/tiny_memory.bisa").into(),
+            "tiny_load",
+        ),
+    ] {
+        let o = Object::parse(&text).unwrap();
+        let root = if o.functions.contains_key(root) {
+            root
+        } else {
+            o.function_order[0].as_str()
+        };
+        let layout = o.section("layout").unwrap();
+        // All scalars, including nested global base/size and interface base.
+        fn paths(
+            v: &bennett_isa_ref::json::Json,
+            path: &mut Vec<String>,
+            out: &mut Vec<Vec<String>>,
+        ) {
+            if let bennett_isa_ref::json::Json::Object(m) = v {
+                for (k, v) in m {
+                    path.push(k.clone());
+                    paths(v, path, out);
+                    path.pop();
+                }
+            } else if matches!(v, bennett_isa_ref::json::Json::Number(_)) {
+                out.push(path.clone());
+            }
+        }
+        fn put(v: &mut bennett_isa_ref::json::Json, path: &[String], n: u128) {
+            if path.is_empty() {
+                *v = if n <= 9_007_199_254_740_991 {
+                    bennett_isa_ref::json::Json::Number(n.to_string())
+                } else {
+                    bennett_isa_ref::json::Json::String(n.to_string())
+                };
+            } else if let bennett_isa_ref::json::Json::Object(m) = v {
+                put(m.get_mut(&path[0]).unwrap(), &path[1..], n);
+            }
+        }
+        let mut all = Vec::new();
+        paths(layout, &mut Vec::new(), &mut all);
+        for path in all {
+            for n in values {
+                cases += 1;
+                let mut l = layout.clone();
+                put(&mut l, &path, n);
+                let mutated = text.replace(&layout.canonical(), &l.canonical());
+                let result = std::panic::catch_unwind(|| -> bennett_isa_ref::Result<bool> {
+                    let object = match Object::parse(&mutated) {
+                        Ok(o) => o,
+                        Err(e) => {
+                            assert!(e.to_string().contains('§'), "{e}");
+                            return Ok(false);
+                        }
+                    };
+                    let f = &object.functions[root];
+                    let mut input = OracleVectorInput::default();
+                    for p in &f.params[0] {
+                        input
+                            .ins
+                            .push(BitVector::zero(p.ty.bits(object.ptr_width)?)?);
+                    }
+                    for p in &f.params[3] {
+                        if let bennett_isa_ref::Type::Region(a, w) = p.ty {
+                            input.regions.insert(
+                                p.name.clone(),
+                                vec![0; (1usize << a) * (w as usize).div_ceil(8)],
+                            );
+                        }
+                    }
+                    let b = Budget::steps(0);
+                    // A legal layout always preserves the sequential B=0 result.
+                    let r = object.run_oracle_vectors(root, &input, b)?;
+                    assert_eq!(
+                        (r.payload.to_u128()?, r.code.to_u128()?, r.steps),
+                        (0, 1, 0)
+                    );
+                    let d = bennett_isa_ref::DerivedWidths::derive(&object, root, b)?;
+                    assert_eq!(d.hc as u128, l.get("H")?.uint()? + 2);
+                    assert_eq!(d.ac as u128, l.get("A_tab")?.uint()? + 1);
+                    assert_eq!(d.sc as u128, l.get("S_cells")?.uint()? + 1);
+                    assert_eq!(d.w_cell, d.p.max(d.sc).max(d.did).max(d.w_max));
+                    let m = OracleVectorMachine::new(&object, root, &input, b)?;
+                    assert!(m.frames_clean());
+                    Ok(true)
+                });
+                match result.unwrap_or_else(|_| panic!("panic for {root} {path:?}={n}")) {
+                    Ok(true) => admitted += 1,
+                    Ok(false) => rejected += 1,
+                    Err(e) => {
+                        assert!(e.to_string().contains('§'), "{root} {path:?}={n}: {e}");
+                        host_limits += 1;
+                    }
+                }
+            }
+        }
+    }
+    // Dc's logarithm and d+2 boundary are independent of the layout exponents.
+    let text = support::r13_text("S_cells")
+        .replace(r#""S_cells":"18446744073709551615""#, r#""S_cells":128"#);
+    let o = Object::parse(&text).unwrap();
+    let input = OracleVectorInput {
+        ins: vec![BitVector::from_u128(8, 8).unwrap()],
+        ..Default::default()
+    };
+    for depth in values
+        .into_iter()
+        .chain([u128::MAX - 2, u128::MAX - 1, u128::MAX])
+    {
+        cases += 1;
+        let b = Budget {
+            depth,
+            ..Budget::steps(0)
+        };
+        let result = std::panic::catch_unwind(|| -> bennett_isa_ref::Result<()> {
+            let d = bennett_isa_ref::DerivedWidths::derive(&o, "inc8", b)?;
+            let expected = (128 - (depth + 1).leading_zeros() as usize).max(1);
+            assert_eq!(d.dc, expected);
+            OracleVectorMachine::new(&o, "inc8", &input, b)?;
+            Ok(())
+        })
+        .expect("depth arithmetic must not panic");
+        match result {
+            Ok(()) => admitted += 1,
+            Err(e) => {
+                assert!(e.to_string().contains('§'), "{e}");
+                host_limits += 1;
+            }
+        }
+    }
+    eprintln!("R13 widths: {cases} cases; {admitted} constructed, {rejected} layout rejections, {host_limits} resource diagnostics");
+    assert_eq!(cases, 507);
+    assert_eq!(cases, admitted + rejected + host_limits);
+}

@@ -52,3 +52,79 @@ record('block-absent', action(layout), aenv, object_pin='ddc5d6729a98484acc2d5e8
 record('block-disk', action(dict(layout, block_image='disk'), True), aenv)
 (ROOT / 'support/r13_cases.json').write_text(json.dumps(cases, indent=2) + '\n')
 print(f'{len(cases)} records; all supplied interface and object pins match')
+
+# Schema exemplars are literal, independently pinned objects. They exercise
+# every section and optional production, including each tagged payload branch.
+from copy import deepcopy
+samples = []
+def sample(label, obj):
+    samples.append(dict(name=label, object=obj))
+def section(base, key, value):
+    return base + '\nsection ' + key + '\n' + j(value) + '\n'
+for fixture in ['inc8', 'sum_db', 'heap', 'actions', 'classical', 'registers', 'control_flow']:
+    sample(fixture, (ROOT / ('fixtures/' + fixture + '.bisa')).read_text())
+sample('block', cases[-1]['object'])
+sample('devices', section(inc, 'devices', dict(models={d: dict(version='0.8') for d in ['console','clock','entropy','block']}, services={'org.bennett.test': dict(version='vendor.1')})))
+# Every signature form is exercised through the independent imports schema too.
+imports = {}
+for s in samples[:7]:
+    syms = json.loads(s['object'].split('section symbols\n')[1].splitlines()[0])
+    for symbol in syms.values():
+        kind = symbol['kind']
+        imports['import_' + kind] = dict(signature=symbol['signature'], pinned_closure_hash='4'*64)
+sample('imports', inc.replace('\nsection functions', '\nsection imports\n' + j(imports) + '\n\nsection functions'))
+h = sha(env)
+point = [h, 'entry', 0]
+path = [dict(symbol=h, point='entry:0', iteration=[])]
+bindings = dict(budget=[3,0,0,0], closure_hash=h, epsilon=0, expansion=dict(hash='1'*64,name='ref',version='0.8'), inherited_controls=0,params_hash='2'*64,region='inc8',scheduler=dict(name='test',version='1'),target_hash='3'*64,variant='forward')
+for kind, payload in [('cleanup', dict(realisation='reverse')), ('gate', dict(realisation='native',epsilon_share=0)), ('alloc', dict(**{'class':'clean'})), ('start', dict(time=0))]:
+    for wildcard in [False, True]:
+        e = dict(path=deepcopy(path), step='*' if wildcard else 1, phase='*' if wildcard else 'fwd', generated='*' if wildcard else 0, kind=kind, **{kind:payload})
+        if wildcard:
+            e['path'][0]['iteration'] = '*'
+        sample('schedule-' + kind + str(wildcard), section(inc, 'schedule', dict(bindings=bindings, entries=[e])))
+for kind, extra in [('lowered', {}), ('trapped', dict(fault_code=1)), ('shimmed', dict(shim_hash='4'*64))]:
+    sample('coverage-' + kind, section(inc, 'coverage', dict(entries=[dict(classification=kind, count=1, point=point,reason='direct',source='dialect.add', **extra)])))
+domain = dict(bundles=[dict(name='x',width=8,lo=0,hi=255)], borrowed=[dict(name='b',width=1,lo=0,hi=1)], regions=[])
+subject = dict(closure_hash=h,variant='forward',inherited_controls=0,schedule_hash='4'*64)
+claims = [
+    dict(kind='exhaustive', domain=domain, expected=dict(table=[]),label='proof'),
+    dict(kind='exhaustive', domain=domain, expected=dict(program=h)),
+    dict(kind='exhaustive', domain=domain, expected='oracle',subject=subject),
+    dict(kind='sampled', domain=domain, sampler=dict(algorithm='xoshiro256**',seed=['1','0','0','0'],count=10),label='evidence'),
+    dict(kind='structural',rule='adjoint_table',subclaims=[0],witness={}),
+    dict(kind='structural',rule='inverse_pair_library',subclaims=[],witness=dict(library_closure_hash=h,claim_index=0)),
+    dict(kind='structural',rule='translation_lemma',subclaims=[],witness=dict(V=[point], W=[point], X=['x'], B=['b'], frame=[point,point])),
+    dict(kind='numerical',subject=subject,metric='operator_norm',precision_bits=128,bound='0.001'),
+    dict(kind='channel',subject=subject,metric='diamond',precision_bits=128,bound=0,dual=[dict(Y=[['-1','0','0','1']],mu=0)]),
+]
+frame = dict(interface=[dict(role='in',width=8,**{'class':'any'},name='x'), dict(role='tgt',width=8,**{'class':'any'}),dict(role='fault',width=4,**{'class':'any'})],scratch={'any':dict(clean=0,dirty={'var':'c'})},retained_history=dict(op='+',args=[0,dict(table='frame_table',index='k')]),borrow={'any':0},scheme_ancillae={'any':0},live_ranges=[dict(frame='f',start=0,end=1)])
+# Frame table index k is intentionally not bound; the valid c expression is used.
+frame['retained_history']['args'][1] = dict(var='c')
+region = dict(kind='oracle',signature=sig,bounds=[],frame=frame,resources={'gates':0},gates_used={'h':dict(count=0,scheme='native',epsilon='0')},claims=claims,verification=dict(oracle=0,borrow_frames=[0],inverse_pairs=[dict(g=h,ginv=h,claim=0)],unitary=[0],channel=[8],fault_rate=dict(domain=domain,faults_by_code={'1':0},undefined_excluded=0,layout_dependent_excluded=0)),cleanup={'forward:0':[dict(path=path,realisation='reverse')]},error={'forward:0':dict(local=dict(operator_norm=0,diamond='0'),inclusive=dict(operator_norm=0,diamond=0))},definedness_assumptions=['defined'])
+cert = dict(versions={v:'0.8' for v in ['isa','object','launch','sched','cert','coverage','target']},bindings=dict(object_hash=sha(inc),interface_hash=h,closure_hash=h,reference_program_hash=h,dialect_mapping_version='test.1',target_hash='3'*64,schedule_hash='4'*64),producer=dict(name='tests',version='1',materialisation=dict(llvm_version='none',pipeline='none',normaliser_version='1')),regions={h:region},composition=dict(multiplicities={h+':forward:0':'18446744073709551615'},epsilon_total=dict(diamond=0),method='sum_over_multiplicities'))
+sample('certificate', section(inc, 'certificate', cert))
+# Explicit null-or-index branch, decimal-string/number branches, expression
+# constants/table AST, plus a region domain with both cells representations.
+c2 = deepcopy(cert)
+c2['regions'][h]['verification']['oracle'] = None
+c2['regions'][h]['frame']['retained_history'] = dict(table='frame_table',index='eps_decade')
+# eps is not in the frame environment: table AST is covered in expression tests,
+# so use the accepted constant alternative at this position instead.
+c2['regions'][h]['frame']['retained_history'] = 0
+sample('certificate-null', section(inc, 'certificate', c2))
+base = (ROOT/'fixtures/sum_db.bisa').read_text()
+syms = json.loads(base.split('section symbols\n')[1].splitlines()[0])
+root = next(s for s in syms.values() if s['name']=='sum_db')
+rh = root['interface_hash']
+c3 = deepcopy(cert)
+c3['bindings'].update(object_hash=sha(base),interface_hash=rh,closure_hash=rh,reference_program_hash=rh)
+r = deepcopy(region)
+r.update(signature=root['signature'],claims=[],cleanup={},kind='oracle')
+r['verification'] = dict(oracle=None,borrow_frames=[],inverse_pairs=[],unitary=[],channel=[],fault_rate=dict(domain=dict(bundles=[],borrowed=[],regions=[dict(name='db',cells=[dict(index=0,lo=0,hi=255)])]),faults_by_code={},undefined_excluded=0,layout_dependent_excluded=0))
+c3['regions'] = {rh:r}
+sample('certificate-regions', section(base, 'certificate', c3))
+r['verification']['fault_rate']['domain']['regions'][0]['cells']='all'
+sample('certificate-all-cells', section(base, 'certificate', c3))
+(ROOT/'support/r13_schema_cases.json').write_text(json.dumps(samples,indent=2)+'\n')
+print(f'{len(samples)} schema exemplars')

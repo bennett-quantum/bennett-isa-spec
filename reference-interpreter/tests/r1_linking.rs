@@ -119,8 +119,8 @@ fn b17_incompatible_certificates_are_link_errors() {
     assert!(e.contains("§9.3"), "{e}");
 }
 #[test]
-fn interface_region_names_cannot_alias_symbols() {
-    // fable suggestion (§9.2): `lift.addr @db` must stay unreplaced in the envelope.
+fn interface_region_names_cannot_alias_layout_globals() {
+    // SPEC-QUESTIONS 32: only actual global/interface address ambiguity rejects.
     let text = include_str!("fixtures/sum_db.bisa")
         .replace("(db:region[4,8] in)", "(zero:region[4,8] in)")
         .replace("base = lift.addr @db", "base = lift.addr @zero")

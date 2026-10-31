@@ -3,7 +3,7 @@
 Resume from this file. Scope is the entire accepted ISA 0.8 (BRIEF.md); the
 current CLI brief is `docs/briefs/2026-10-29-isa-ref-cli-xam.md`. Write only
 under `reference-interpreter/`; commit own paths
-(`git commit -- <explicit owned paths>` ),
+(`git commit -- <explicit owned paths>`),
 never push. Run headless with `TMPDIR=$PWD/reference-interpreter/.tmp`.
 
 ## Round-12 fixes (2026-10-31)
@@ -98,9 +98,9 @@ Baseline: **365 passed / 0 failed / 5 ignored**, summed over all binaries.
 
 | Blocker | RED tests | Status | Commit |
 |---|---|---|---|
-| SOL-R13-B01 | metadata::r13_service_versions_require_strings; cli_xam::r13_cli_rejects_nonstrings_in_service_versions | GREEN | implementation commit below |
-| SOL-R13-B02 | r1_widths::r13_derived_counter_width_overflow_reports_host_limit; cli_xam::r13_cli_counter_width_limit_is_a_diagnostic | GREEN | implementation commit below |
-| R13-B01 | parser::r13_block_image_schema_is_checked_without_a_layout_consumer / r13_classical_missing_block_image_never_panics; cli_xam::r13_cli_rejects_invalid_block_image | GREEN | implementation commit below |
+| SOL-R13-B01 | metadata::r13_service_versions_require_strings; cli_xam::r13_cli_rejects_nonstrings_in_service_versions | GREEN | 3242123 |
+| SOL-R13-B02 | r1_widths::r13_derived_counter_width_overflow_reports_host_limit; cli_xam::r13_cli_counter_width_limit_is_a_diagnostic | GREEN | 3242123 |
+| R13-B01 | parser::r13_block_image_schema_is_checked_without_a_layout_consumer / r13_classical_missing_block_image_never_panics; cli_xam::r13_cli_rejects_invalid_block_image | GREEN | 3242123 |
 
 Witness RED: **0 passed / 7 failed**. Service/block schema witnesses wrongly
 admitted; derive panicked and reverse exited 101. All seven targeted tests now
@@ -117,7 +117,44 @@ checks; block_image is a data NAME resolved at load for every function kind.
 Derived Hc/Ac/Sc widths use checked addition and cited host-limit errors,
 without an ISA exponent cap. Existing BitVector storage arithmetic is checked.
 Logs: .tmp/r13-{before,witness-red-all,witness-green,witness-full}.log.
-Family generation and final sweeps follow in the next green step.
+### Generated-family green step
+
+Full normal gate: **374 passed / 0 failed / 5 ignored** (8 unit + 366
+integration; 0 doctests), after the witness step's **372/0/5**. Baseline
+365/0/5 took 67.14 s runner sum; witness full 48.63 s; family full 20.56 s
+(test optimization 1, retaining assertions, overflow checks and all domains).
+Fmt --check and strict all-target Clippy pass, 0 warnings.
+
+metadata::r13_generated_metadata_schema_type_family: **25 positive pinned
+objects, 2,268 field visits, 12,849 negative mutations**. All seven metadata
+sections, all signature forms/import pins, nested globals/interface mappings,
+block_image, four devices, arbitrary service strings, every schedule payload,
+coverage classification and certificate claim/optional-field production are
+represented. All negatives fail Object::parse with §9.1, before caller-side
+hashing/execution. A new metadata_types preflight checks types before internal
+identity/binding consumers too. Cross-field and reference validators remain.
+The initial family RED reported 1,282 failures: mostly correct rejections
+without §9.1 or with an earlier consumer diagnostic. Six were generator
+misclassifications (legal scratch number expressions and channel Y arrays);
+corrected the independent union table rather than narrowing admission.
+
+r1_widths::r13_generated_derived_width_extremes_family: **507 cases**, with
+**159 constructed, 286 cited layout rejections, 62 cited resource diagnostics**;
+no unwinding. All layout scalar paths (including nested bases/sizes), Hc/Ac/Sc,
+P/Did/W_max/W_cell and call/ret/allocation slots are exercised across inc8,
+heap, recursive sum_db, tiny_memory and a 128-bit-address layout. Twelve
+values include limb boundaries and u64-max neighbours through 2^64; fifteen
+depth limits also reach the u128 d+2 boundary. Legal B=0 cases retain (0,1,0).
+Tests use independent width formulae and existing complete-tuple controls.
+
+All three S1 suggestions applied: the typed-field matrix, the narrow
+interface_region_names_cannot_alias_layout_globals name/comment (fixture and
+assertion unchanged), and README's optional-field validator/test index.
+README also links static cleanup, full-frame factorisation and runtime-return
+validators. No accepted-spec question or new scope restriction was needed.
+All round 4–13 positives/negatives and RNG distributions remain unchanged.
+Logs: .tmp/r13-{family-red,family-green,family-full,families-final,clippy}.log.
+The five ignored sweeps are running; final results will be appended here.
 No beads mutation, spec/conformance edit/execution, dependency or push.
 
 ## Earlier rounds (2–11) and the codex-job history

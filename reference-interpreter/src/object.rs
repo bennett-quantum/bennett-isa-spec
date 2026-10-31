@@ -812,7 +812,7 @@ impl Object {
                     if v.canonical() != lines[start] {
                         return err(
                             "§16.1",
-                            format!("section {section} is not RFC 8785 canonical"),
+                            format!("§9.1: section {section} is not RFC 8785 canonical"),
                         );
                     }
                     obj.metadata.insert(section.into(), v);
@@ -934,6 +934,7 @@ impl Object {
             .object()
     }
     fn validate(&self) -> Result<()> {
+        self.validate_metadata_types()?;
         self.validate_symbols()?;
         // Schemas and the region call graph first: later passes read callee
         // bodies and must never index malformed operands (suite F).
