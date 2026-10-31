@@ -77,7 +77,7 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 - Explicit user or orchestrator instructions override this Beads block.
 - Do not commit or push without clear authority from the active profile or the current user request.
 - If a required sync or push is blocked, stop and report the exact command and error.
-<!-- END BEADS INTEGRATION -->
+
 12. DECLARED DEPENDENCIES IN THE 0.9 DRAFT (maintainer, 2026-10-31). Every new or changed normative
    sentence in `spec/Bennett-ISA-Spec-0.9-draft.md` ends with a dependency marker
    `[deps: <id>, <id>, ...]` naming the statements or clauses it relies on, with IDs from
@@ -85,3 +85,5 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
    `ISA-3.3-P2.S1`; clause IDs such as `ISA-5.6-P3` or a section `ISA-5.6` when the whole section is
    meant). Accepted 0.8 bytes never change for this. The clause-graph tool prefers declared edges
    over inferred ones; this is how the spec becomes a DAG of Lamport-style statements incrementally.
+
+<!-- END BEADS INTEGRATION -->
