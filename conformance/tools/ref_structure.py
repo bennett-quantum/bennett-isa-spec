@@ -18,7 +18,7 @@ def _all(api):
     out.append(recipe('qloop.while',[F('N'),F('cond','wire','N'),F('B','body')],body,'§4.6 qloop while: flags c1..cn clean; initialize from cond[0], iterate under ci, advance by CCX, uncompute reverse and free. N=0 emits no flag gates.',['flags']))
     out.append(recipe('qpred.scope',[F('p','wire',1),F('B','body')],[under('p',[splice])],'§3.5/§4.6: matching qpred/qunpred pair is one lexical effective-control scope.'))
     out.append(recipe('ctl',[F('p','wire',1),F('B','body')],[under('p',[splice])],'§4.7: ctl adds the control to semantic gates of the bound call body; allocation is unconditional.'))
-    out.append(recipe('adj',[F('B','body')],[inv([splice])],'§4.7/§5.3: adjoint reverses the bound unitary body and adjoints every leaf.'))
+    out.append(recipe('adj',[F('B','body')],[splice],'§4.7/§5.3: B is the source-adjointed body formed by the instruction replacements before recipe instantiation; splice it with its own instruction ordinal spaces.'))
     for g,ports in [('x',['a']),('cx',['a','b']),('ccx',['a','b','t']),('swap',['a','b'])]:
         out.append(recipe('bind.gate.'+g,[F(n,'wire',1) for n in ports]+[F('E','environment')],[gate(g,*ports)],'§4.4 native '+g+' with explicit positional wire/environment binding.'))
     for g in ['h','s','sdg','t','tdg','cz','rx','ry','rz','mcx']:

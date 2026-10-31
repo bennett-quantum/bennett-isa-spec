@@ -184,7 +184,9 @@ fn coherent_scopes_qif_and_adjoint_full_matrix_columns() {
             }
         }
         let forward=json::parse(r#"[{"gate":"h","wires":["r[0]"]},{"gate":"t","wires":["r[0]"]},{"gate":"s","wires":["r[0]"]}]"#).unwrap();
-        let args = json::Json::Arr(vec![forward.clone()]);
+        // The source adjoint table produces SDG; TDG; H before binding adj.
+        let source_adj = json::parse(r#"[{"gate":"sdg","wires":["r[0]"]},{"gate":"tdg","wires":["r[0]"]},{"gate":"h","wires":["r[0]"]}]"#).unwrap();
+        let args = json::Json::Arr(vec![source_adj]);
         let mut leaves = e
             .expand("qloop", &[json::Json::Num(1.0), forward], &bundles)
             .unwrap();

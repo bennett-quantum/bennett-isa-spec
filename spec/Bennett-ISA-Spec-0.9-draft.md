@@ -139,7 +139,7 @@ north star §3.1 requires).
 | K25 | §11.1 | **REF-DESCRIPTORS**. Ordered typed records for byte layouts and heterogeneous activation locations | b-isa-spec-1oa; b-isa-spec-evi | S | new |
 | K26 | §11.1 | **REF-REGIONS**. Shape, role, origin and cell bindings preserved in closure arguments | b-isa-spec-1a4 | S | new |
 | K27 | §11.1 | **REF-LIFETIMES**. Exact class actuals and shared allocation declarations across invocations | b-isa-spec-3xe | S | new |
-| K28 | §11.1 | **REF-INSTRUCTION-RELEASE**. Recipe scratch follows reverse allocation order; instruction-defined release sequences remain exact, with the qinplace ordinal witness. [deps: ISA-4.5-P5, ISA-11.1-P21] | b-isa-spec-82x; maintainer ruling 2026-10-31 | S | new |
+| K28 | §11.1 | **REF-INSTRUCTION-RELEASE**. Recipe scratch follows reverse allocation order; instruction-defined release sequences remain exact, with the qinplace ordinal witness. [deps: ISA-4.5-P5, ISA-11.1-P29.S5] | b-isa-spec-82x; maintainer ruling 2026-10-31 | S | new |
 | K29 | §5.3 | **QIF-ADJOINT**. Complete-expansion inverse for cross-arm lifetimes; §5.1 matches lifetimes region-wide, not arm-wise; witness: `qif p { d = qalloc any 1 } { qfree d }` recreates d before freeing it in the inverse. | INV-1 gap 2; b-isa-spec-bdv; SQ 28 | S | +bytes |
 | K30 | §4.6 | **LOOP-BINDINGS**. Visit-local linear binding carry-over; witness: a body frees c then reallocates c, and the next visit uses the new c. | INV-1 gap 3; r9_mixed_loop_threads_reallocated_bindings | E | – |
 | K31 | §5.3 | **MATCHED-PAIRS**. Callees, classical/token values, operand versions and effective control sets identify adjoints; witness: opaque oracle pairs under stacks [p,q] and [q,p,p] match. | INV-1 gap 4; r10_equivalent_control_sets_preserve_opaque_inverse | E | – |
@@ -173,6 +173,7 @@ north star §3.1 requires).
 | K59 | §17 item 9 | **RATIONAL-DEFAULT-SHARE**. Exact reduced-rational resolved shares preserve §8.1 evaluation without rounding or modifying schedule bytes; witness: epsilon 0.1 with N=3 resolves to (1,30); N=0 assigns zero without division. | INV-5 gap 15 | S | – |
 | K60 | §11 | **SCHEDULE-DECIMALS**. Schedule decimal values are exact rationals, independent of spelling; witness: 0, "0", "0.0" and "0.000" all denote exact zero. | INV-5 gap 16 | E | – |
 | K61 | §11 | **UNCOVERED-NESTED-DEFAULTS**. Uncovered operations take defaults directly; no synthetic entry or multi-level selector is required; witness: root step 1 keeps scheme X while an uncovered root-step-2/nested-step-1 gate takes its default. | INV-5 gap 17 | E | – |
+| K62 | §5.3, §11.1 | **SCHEDULED-ACTION-ADJOINT**. Source instruction replacements precede recipe instantiation; witness: adj(qinplace G H) allocates t[1] at 0 and f[4] at 1, calls H then G and releases t then f. [deps: ISA-5.3-P4, ISA-4.5-P5, ISA-11-P2, ISA-11.1-P29] | SOL09-R1-B01 | S | library |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -1169,6 +1170,10 @@ renumbered):
   qloop n {A} ↦ qloop n {adj A}
   qloop n while cond {A} ↦ flags computed forward as §4.6; adj A for i = n..1 under c_i; flags uncomputed
 ```
+
+Scheduled action adjoints use the source replacements above before
+reference-recipe instantiation, with the ordinal contract and `adj`
+adapter specified in §11.1 (K62). [deps: ISA-5.3-P4, ISA-11-P2, ISA-11.1-P29]
 
 **Control.** `ctl w @a` is controlled-U: workspace, regions and flags
 allocated unconditionally; every gate of the body and its cleanup runs
@@ -2912,16 +2917,39 @@ may infer extra permission from a zero-valued basis input. Motivation
 remove only operations the library marks removable"; §17 item 7:
 "clean scratch released in reverse order".
 
-The reverse-allocation release rule governs recipe scratch; an instruction whose own semantics fix a release sequence (qinplace per §4.5: `qfree t; qfree f`) keeps that sequence, and its recipe MUST reproduce it exactly. [deps: ISA-4.5-P5, ISA-11.1-P21]
+The reverse-allocation release rule governs recipe scratch; an instruction whose own semantics fix a release sequence (qinplace per §4.5: `qfree t; qfree f`) keeps that sequence, and its recipe MUST reproduce it exactly. [deps: ISA-4.5-P5, ISA-11.1-P29.S5]
 
-**Instruction-release witness (K28).** For n=1, F=4 and identity oracles,
-qinplace emits allocation t (row ordinal 0), allocation f (1), G's CX
-(callee ordinal 0), exchange x/t (row 2), Ginv's CX (its own callee
-ordinal 0), release t (row 3), release f (4). [deps: ISA-4.5-P5, ISA-5.4, ISA-11.1-P21] The certified pair leaves
-t/f clean for both x values and both effective controls; allocations and
-releases are unconditional. [deps: ISA-4.5-P5, ISA-3.5, ISA-4.3] Recipe-internal scratch within either call
-still releases in reverse allocation order. [deps: ISA-11.1-P21] Inverse traversal retains
-these ordinals, reverses their order and adjoints the leaves (§5.3). [deps: ISA-5.3, ISA-11.1-P21]
+**Instruction-release witness (K28).** This is a synthetic constructor-binding
+witness whose two callee fixtures each contain one CX at callee ordinal 0;
+it illustrates caller ordinals and release order, rather than the complete
+`ref` expansion or cost of an ISA oracle. [deps: ISA-4.5-P5, ISA-11.1-P9, ISA-11.1-P22, ISA-11.1-P29.S1, ISA-11.1-P29.S2]
+For n=1, F=4 the private instruction trace is alloc t[1] (0), alloc f[4]
+(1), call G, swap x/t (2), call H, release t (3), release f (4), with
+each call's complete expansion in its own ordinal space. [deps: ISA-4.5-P5, ISA-5.4, ISA-11.1-P29.S1, ISA-11.1-P29.S2]
+The certified pair leaves t/f clean for both x values and both effective
+controls; allocations and releases are unconditional. [deps: ISA-4.5-P5, ISA-3.5, ISA-4.3]
+Recipe-internal scratch within either call still releases in reverse
+allocation order. [deps: ISA-11.1-P29.S5]
+Raw inverse traversal retains forward ordinals, reverses their order and
+adjoints the leaves; it describes reversal of an already expanded machine
+row, rather than formation of a scheduled action adjoint. [deps: ISA-5.3, ISA-11.1-P29.S3]
+
+**Scheduled action adjoint (K62).** Before recipe instantiation, form an
+action adjoint using the §5.3 instruction replacements in reverse source
+order, and bind the `adj` recipe's body B to that source-adjointed body;
+`adj` splices B without applying a leaf inverse. [deps: ISA-5.3-P4, ISA-11-P2, ISA-11.1-P5, ISA-11.1-P29]
+Each replacement instruction has its own forward ordinal space, so
+`adj(qinplace G H)` instantiates `qinplace H G` with allocations t then f,
+exchange, and releases t then f in caller ordinals 0,1,2,3,4 for n=1,
+F=4; its calls are H then G, each with a separate callee space. [deps: ISA-5.3-P4, ISA-4.5-P5, ISA-11.1-P29.S1, ISA-11.1-P29.S2]
+The `qif` replacement still reverses its complete §4.6 expansion,
+including unconditional lifetimes. [deps: ISA-5.3-P4, ISA-4.6-P7]
+Schedulers, executors and estimators use this same action-adjoint trace;
+raw `inverse` constructors retain forward ordinals when reversing an
+already expanded row, including inverse oracle steps. [deps: ISA-11-P2, ISA-11.1-P29.S3, ISA-5.2-P3, ISA-5.3-P4]
+For an alloc entry at this instruction with `generated: 0` and class
+`special`, with other allocations resolving to class `default`, the
+private allocations are t[1]:special and f[4]:default. [deps: ISA-11-P5, ISA-11-P6, ISA-4.5-P5]
 
 **Decomposition set.** The §17 item 7 defaults are made explicit below. Bit
 loops below increase from the least-significant bit. To make Boolean
@@ -2952,7 +2980,7 @@ The permutation algorithms define exact permutation circuits, preserving
 every input required by the row and cleaning scratch; circuit correctness must still be checked
 against full-domain T3 witnesses and §5.7, not inferred from costs or
 names. Complete draft catalog: **219 recipes**; envelope SHA-256
-`fcb2f1e6d61aced0bf9689eab5f6d82c4ae42e9fea8d1b21ae9c7ffccda6f5ce`. [deps: ISA-11.1-P2, ISA-11.1-P3, ISA-11.1-P28, ISA-11.1-P29]
+`5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`. [deps: ISA-11.1-P2, ISA-11.1-P3, ISA-11.1-P28, ISA-11.1-P29]
 Publication follows acceptance. [deps: ISA-11.1-P1, ISA-11.1-P2] In particular this is
 not permission to publish a partial library that omits division, stack,
 coherent control, memory or any instruction.
@@ -3921,7 +3949,7 @@ the item is revised. Items 1–5 are asserted non-semantic.
    in the object's header, with the full-library envelope hash published
    for that version in §11.1. [deps: ISA-9.1, ISA-11.1-P3, ISA-11.1-P4]
    For a 0.9 object this is exactly
-   `{"name":"ref","version":"0.9","hash":"fcb2f1e6d61aced0bf9689eab5f6d82c4ae42e9fea8d1b21ae9c7ffccda6f5ce"}`,
+   `{"name":"ref","version":"0.9","hash":"5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197"}`,
    equally for omission and an explicit binding. [deps: ISA-11.1-P3, ISA-11.1-P4, ISA-11.1]
    §11.1 fixes its schema, ordinals, scratch identities, empty removable
    sets and deterministic decomposition algorithms. [deps: ISA-11.1]

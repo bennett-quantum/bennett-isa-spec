@@ -1,3 +1,24 @@
+## 2026-10-31 Council round 1 → 2 — item 1 (K62)
+
+SOL09-R1-B01 addressed: canonical action adjoints apply the §5.3 source
+instruction replacements before recipe instantiation. The adj adapter now
+splices that body; raw inverse constructors retain forward ordinals when
+reversing expanded machine rows. K28 t-then-f releases remain exact.
+Rejected: making the instruction table merely extensional and imposing
+leaf-inverse order on action adjoints, which would change K28's scheduled
+allocation identity/order. qif retains its complete-expansion inverse.
+No capability, legal binding, cleanup realisation or oracle is excluded.
+
+The new private trace test failed on the old adapter (first allocation
+width 4 rather than 1); the changed adapter passes the n=1/F=4 trace and
+nondefault ordinal-0 class witness. SOL S3 / COD S04 are covered by the
+same concept: K28 now labels the one-CX callees as synthetic fixtures.
+Count remains 219; recipe body and source bytes change the full-library
+hash from fcb2f1e6d61aced0bf9689eab5f6d82c4ae42e9fea8d1b21ae9c7ffccda6f5ce
+to 5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197.
+The qxor witness hash is unchanged. The H/T/S matrix test now binds the
+source-table-produced SDG/TDG/H body; no engine inverse rule changes.
+
 ## 2026-10-31 INV-5 second editorial pass — dispositions and validation
 
 Sole draft-text editor; only draft/diff/progress/beads are owned. Read

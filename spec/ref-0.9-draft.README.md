@@ -56,7 +56,7 @@ names, bound images and constructor order are hash-significant.
 | §4.6 qload/qunload | qload.in/mut and qunload.in/mut: K26 source region + K27 result declaration |
 | §4.6 qstore/qexchm | qstore/qexchm, generic address scan |
 | §4.6 qpred/qunpred/qif/qloop/qloop-while | qpred.scope (matched lexical pair), qif, qloop, qloop.while |
-| §4.7 adj/ctl | adj/ctl body composition; complete symbol interfaces use K24/K26 |
+| §4.7 adj/ctl | adj splices the §5.3 source-adjointed body; ctl adds controls; complete symbol interfaces use K24/K26 |
 | §4.7 oracle_call/action_call | oracle_call/action_call: complete K24/K26 interface forwarding |
 | §4.8 opcode summary; §4.9 faults | Same rows above; classical faults retained in bound §4.1 event/history semantics |
 | §5.2 allocate/forward/commit/reverse/release | oracle.construct: K25 state/frame descriptors, catalog step loop, commit, prefix reversal and reverse-order state release |
@@ -269,3 +269,10 @@ The corrected n=1/F=4 K28 witness and draft_contracts pass separately too.
 All 31 disposition rows are bound; all 218 earlier recipe objects are
 unchanged. Parent 8r4 and final child 82x are closed; beads exported by path.
 Status: **complete under draft 0.9; publication gated on accepted 0.9**.
+
+Council round 1 → 2: the adj adapter consumes the source-adjointed body,
+formed by §5.3 replacements before recipe instantiation. Raw inverse
+constructors still reverse expanded machine rows. The scheduled private
+qinplace adjoint retains t-then-f allocation/release and fresh instruction
+ordinals. The K28 one-CX callees are synthetic constructor fixtures, not
+full ref oracle.construct expansions.
