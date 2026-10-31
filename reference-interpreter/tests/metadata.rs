@@ -803,3 +803,326 @@ fn r17_loop_iteration_union_and_empty_domains() {
         assert_eq!(Object::parse(&text).is_ok(), valid, "loop {bound}");
     }
 }
+
+#[test]
+fn r18_literal_nested_budget_ties_reject() {
+    for source in [
+        include_str!("support/r18-nested-budget-2.bisa"),
+        include_str!("support/r18-nested-budget-3.bisa"),
+    ] {
+        let e = Object::parse(source).expect_err("nested step 3 must not use root B=2");
+        assert!(
+            e.to_string()
+                .contains("§11: multiple maximal matching schedule entries"),
+            "{e}"
+        );
+    }
+}
+
+#[test]
+fn r18_single_and_shadowed_nested_entries_preserve_identity_and_resolve_all_orders() {
+    use support::{
+        r17::{document, schedule},
+        r18::*,
+    };
+    let mut s = schedule(TWO);
+    let literal = s.get("entries").unwrap().array().unwrap()[0].clone();
+    let mut op = literal.clone();
+    set(&mut op, "generated", json("0")); // review probe's concrete operation
+    set(&mut s, "entries", Json::Array(vec![literal.clone()]));
+    let o = Object::parse(&document(TWO, &s)).unwrap();
+    o.check_hashes().unwrap();
+    assert_eq!(o.identity().unwrap().object_hash, OH);
+    assert_eq!(
+        o.identity().unwrap().closure_hashes["ignore"].as_deref(),
+        Some(IH)
+    );
+    assert_eq!(o.resolve_schedule(&op, "gate").unwrap(), Some(&literal));
+    // Literal duplicates are fully specific except generated="*"; one more
+    // generated ordinal cannot cover that entire domain. Broaden iterations
+    // for A/B; the literal C then genuinely covers their tie on ALL ordinals.
+    let mut broad = literal.clone();
+    let mut path = broad.get("path").unwrap().array().unwrap().to_vec();
+    for p in &mut path {
+        set(p, "iteration", json(r#""*""#));
+    }
+    set(&mut broad, "path", Json::Array(path));
+    let entries = [broad.clone(), broad, literal.clone()];
+    for order in ORDERS {
+        set(
+            &mut s,
+            "entries",
+            Json::Array(order.map(|i| entries[i].clone()).to_vec()),
+        );
+        let o = Object::parse(&document(TWO, &s)).unwrap();
+        o.check_hashes().unwrap();
+        assert_eq!(o.identity().unwrap().object_hash, OH);
+        for g in [0, 1, u128::MAX] {
+            set(&mut op, "generated", Json::Number(g.to_string()));
+            assert_eq!(o.resolve_schedule(&op, "gate").unwrap(), Some(&literal));
+        }
+    }
+}
+
+#[test]
+fn r18_lproc_action_root_and_prefix_domain_controls() {
+    use support::r18::*;
+    for (edges, action) in [
+        (vec!['L'], false),
+        (vec!['O', 'L'], false),
+        (vec!['O'], true),
+    ] {
+        let o = chain(&edges, action);
+        let hashes = o.identity().unwrap().interface_hashes;
+        let path: Vec<_> = (0..=edges.len())
+            .map(|i| {
+                point(
+                    &hashes[&format!("n{i}")],
+                    if i == edges.len() { 2 } else { 0 },
+                )
+            })
+            .collect();
+        let mut s = support::r18::schedule(&o, 2, &[3]);
+        let e = gate(&path, json("3"));
+        set(&mut s, "entries", Json::Array(vec![e.clone(), e]));
+        let parsed = Object::parse(&document(&o, &s));
+        if edges == ['L'] {
+            // lift.call shares root B=2: root step 3 really is empty.
+            parsed.unwrap();
+        } else {
+            let e = parsed.unwrap_err();
+            assert!(e.to_string().contains("§11: multiple maximal"), "{e}");
+        }
+    }
+    // A prefix is not confined to the root's domain when it matches nested
+    // operations. Covers for root steps 1,2 leave nested step 3 uncovered.
+    let o = chain(&['O'], false);
+    let mut s = support::r18::schedule(&o, 2, &[3]);
+    let a = gate(&[], json(r#""*""#));
+    let entries = vec![a.clone(), a, gate(&[], json("1")), gate(&[], json("2"))];
+    set(&mut s, "entries", Json::Array(entries));
+    assert!(Object::parse(&document(&o, &s))
+        .unwrap_err()
+        .to_string()
+        .contains("§11: multiple maximal"));
+    // Root B=0 has no nested invocation; no token preimage is inferred.
+    let mut bindings = s.get("bindings").unwrap().clone();
+    set(&mut bindings, "budget", json("[0,0,256,16]"));
+    set(&mut s, "bindings", bindings);
+    Object::parse(&document(&o, &s)).unwrap();
+}
+
+#[test]
+fn r18_nested_specificity_family_matches_brute_force() {
+    use std::collections::BTreeMap;
+    use support::r18::*;
+    // Derive operations from explicit O/L shapes and concrete budgets BEFORE
+    // admission. Every oracle dispatch expands each static row at t=1..B,
+    // including gated-off rows; L shares that dispatch, O starts its own.
+    // Tokens are not recoverable from params_hash. Enumerate their assignments
+    // 0..4 and take the union: selectors name steps 1..3, and 4 is the residual.
+    // This exhausts this family's symbolic step partitions, not all executions.
+    fn enumerate(edges: &[char], action: bool, hashes: &[String], budgets: &[u64]) -> Vec<Json> {
+        let mut out = Vec::new();
+        let mut prefix = Vec::new();
+        let mut owner = if action { None } else { Some(0) };
+        let mut next_token = 1;
+        for (depth, symbol) in hashes.iter().enumerate() {
+            let bound = owner.map_or(4, |i| budgets[i]);
+            if bound == 0 {
+                break;
+            }
+            let points = if depth == 0 && action {
+                1
+            } else if depth == edges.len() {
+                3
+            } else {
+                2
+            };
+            for ordinal in 0..points {
+                let mut path = prefix.clone();
+                path.push(point(symbol, ordinal));
+                for t in 1..=bound {
+                    for phase in ["fwd", "rev"] {
+                        for generated in 0..=2 {
+                            let mut op = gate(&path, Json::Number(t.to_string()));
+                            set(&mut op, "phase", Json::String(phase.into()));
+                            set(&mut op, "generated", Json::Number(generated.to_string()));
+                            out.push(op);
+                        }
+                    }
+                }
+            }
+            if let Some(&edge) = edges.get(depth) {
+                prefix.push(point(symbol, 0));
+                if edge == 'O' {
+                    owner = Some(next_token);
+                    next_token += 1;
+                }
+            }
+        }
+        out
+    }
+    let mut seed = 0x1819_cafe_u64;
+    let mut draw = |n: u64| {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed % n
+    };
+    let (mut cases, mut admitted, mut assignments, mut operations) = (0, 0, 0, 0);
+    for depth in 1..=3 {
+        for oracles in 0..=depth {
+            let edges: Vec<_> = (0..depth)
+                .map(|i| if i < oracles { 'O' } else { 'L' })
+                .collect();
+            for action in [false, true] {
+                if action && oracles == 0 {
+                    continue;
+                }
+                let o = chain(&edges, action);
+                let id = o.identity().unwrap();
+                let hashes: Vec<_> = (0..=depth)
+                    .map(|i| id.interface_hashes[&format!("n{i}")].clone())
+                    .collect();
+                for root in [0, 1, 2, 4] {
+                    let mut union = BTreeMap::new();
+                    for encoded in 0..5usize.pow(oracles as u32) {
+                        let mut n = encoded;
+                        let mut budgets = vec![root];
+                        for _ in 0..oracles {
+                            budgets.push((n % 5) as u64);
+                            n /= 5;
+                        }
+                        assignments += 1;
+                        for op in enumerate(&edges, action, &hashes, &budgets) {
+                            operations += 1;
+                            union.insert(op.canonical(), op);
+                        }
+                    }
+                    let concrete: Vec<_> = union.into_values().collect();
+                    // Even with B=0 there are no root oracle operations. Build
+                    // selectors independently so empty domains are exercised.
+                    let leaf: Vec<_> = (0..=depth)
+                        .map(|i| point(&hashes[i], if i == depth { 2 } else { 0 }))
+                        .collect();
+                    for case in 0..80 {
+                        let mut entries = Vec::new();
+                        for _ in 0..(2 + draw(3)) {
+                            let mut path = leaf[..draw((depth + 2) as u64) as usize].to_vec();
+                            for p in &mut path {
+                                if draw(2) == 0 {
+                                    set(p, "iteration", json(r#""*""#));
+                                }
+                            }
+                            let mut e = gate(
+                                &path,
+                                if draw(3) == 0 {
+                                    json(r#""*""#)
+                                } else {
+                                    Json::Number((1 + draw(3)).to_string())
+                                },
+                            );
+                            set(
+                                &mut e,
+                                "phase",
+                                json([r#""*""#, r#""fwd""#, r#""rev""#][draw(3) as usize]),
+                            );
+                            set(
+                                &mut e,
+                                "generated",
+                                if draw(3) == 0 {
+                                    json(r#""*""#)
+                                } else {
+                                    Json::Number(draw(2).to_string())
+                                },
+                            );
+                            entries.push(e);
+                        }
+                        // Deterministic exact ties, shadowed ties, and UNION
+                        // coverage supplement (without replacing) the RNG.
+                        if case % 8 == 0 {
+                            let a = gate(&leaf, json("3"));
+                            entries = vec![a.clone(), a];
+                        } else if case % 8 == 1 {
+                            let a = gate(&[], json(r#""*""#));
+                            entries =
+                                vec![a.clone(), a, gate(&[], json("1")), gate(&[], json("2"))];
+                        } else if case % 8 == 2 {
+                            let mut a = gate(&leaf, json(r#""*""#));
+                            set(
+                                &mut a,
+                                "path",
+                                Json::Array(
+                                    leaf.iter()
+                                        .map(|p| {
+                                            let mut p = p.clone();
+                                            set(&mut p, "iteration", json(r#""*""#));
+                                            p
+                                        })
+                                        .collect(),
+                                ),
+                            );
+                            entries = vec![a.clone(), a, gate(&leaf, json(r#""*""#))];
+                        }
+                        let expected: Vec<_> =
+                            concrete.iter().map(|op| winners(&entries, op)).collect();
+                        let ambiguous = expected.iter().any(|w| w.len() > 1);
+                        let tokens: Vec<_> = (0..oracles).map(|_| draw(5)).collect();
+                        let mut s = support::r18::schedule(&o, root, &tokens);
+                        for reverse in [false, true] {
+                            let mut ordered = entries.clone();
+                            if reverse {
+                                ordered.reverse();
+                            }
+                            set(&mut s, "entries", Json::Array(ordered));
+                            let parsed = Object::parse(&document(&o, &s));
+                            assert_eq!(parsed.is_err(), ambiguous, "edges={edges:?}, action={action}, root={root}, case={case}, reverse={reverse}: {}", s.canonical());
+                            if let Ok(parsed) = parsed {
+                                if !reverse {
+                                    admitted += 1;
+                                }
+                                for (op, w) in concrete.iter().zip(&expected) {
+                                    assert_eq!(
+                                        parsed.resolve_schedule(op, "gate").unwrap(),
+                                        w.first().map(|i| &entries[*i])
+                                    );
+                                }
+                            } else {
+                                assert!(parsed
+                                    .unwrap_err()
+                                    .to_string()
+                                    .contains("§11: multiple maximal"));
+                            }
+                        }
+                        cases += 1;
+                    }
+                }
+            }
+        }
+    }
+    assert_eq!(cases, 4800);
+    eprintln!("R18 nested family: {cases} schedules + {cases} reversed orders, {admitted} admitted / {} rejected; {assignments} concrete budget assignments, {operations} concrete operations before partition deduplication; admission and all admitted resolver results: oracle agreement 100%",cases-admitted);
+}
+
+#[test]
+fn r18_recursive_lproc_keeps_root_budget_without_depth_cap() {
+    use support::r18::{document, gate, point, set};
+    let o = Object::parse(include_str!("fixtures/sum_db.bisa")).unwrap();
+    let id = o.identity().unwrap();
+    let mut s = schedule();
+    let mut b = s.get("bindings").unwrap().clone();
+    set(&mut b, "region", Json::String("sum_db".into()));
+    set(
+        &mut b,
+        "closure_hash",
+        Json::String(id.closure_hashes["sum_db"].clone().unwrap()),
+    );
+    set(&mut b, "budget", json("[2,4080,16,64]"));
+    set(&mut s, "bindings", b);
+    let a = gate(&[point(&id.interface_hashes["sum_db"], 2)], json("3"));
+    set(&mut s, "entries", Json::Array(vec![a.clone(), a]));
+    // Exploring extensions must terminate at a call-graph fixpoint; recursive
+    // lift.call does not create a token-governed machine or a fresh step range.
+    Object::parse(&document(&o, &s)).unwrap();
+}

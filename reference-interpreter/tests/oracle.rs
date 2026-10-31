@@ -299,3 +299,14 @@ fn council_r4_sum_db_literal_step_and_stack_cutoffs() {
         assert_eq!((r.payload, r.code, r.steps), expected);
     }
 }
+
+#[test]
+fn r18_outer_two_steps_and_nested_three_steps_are_independent() {
+    // Literal §4.2/§5.2 derivation: inc8 has const/add/retval = 3 rows;
+    // ignore has call/retval = 2 rows. Neither budget is changed by admission.
+    let o = Object::parse(include_str!("fixtures/nested.bisa")).unwrap();
+    let mut input = OracleInput::bits(&[8]);
+    input.args.push(Argument::Token(Budget::steps(3)));
+    let r = o.run_oracle("ignore", &input, Budget::steps(2)).unwrap();
+    assert_eq!((r.payload, r.code, r.steps), (9, 0, 2));
+}

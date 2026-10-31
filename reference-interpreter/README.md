@@ -478,22 +478,36 @@ admission. `r17_section17_defaults_are_optional_and_applied` independently
 enumerates all 14 §17 items, distinguishing metadata defaults from decisions
 without a metadata field and staged target/interval consumers.
 
-**Design (schedule matching).** Specificity is the §11 lexicographic tuple;
-only ties at the actual maximum invalidate a schedule. Admission intersects
-equal-specificity selectors with the object's legal invocation/loop domains
-and oracle step budget, then subtracts the union of all strictly higher
-matching domains of the same kind. A nonempty remainder witnesses ambiguity.
-Domains are boxes with selector boundaries; loop/step counts are never
-expanded or capped. The shortest chains in a prefix suffice: each instruction
-(including a call) has its own generated operations, so a longer path cannot
-cover those operations; covering their whole domain with prefixes covers
-extensions too. Empty paths are split over real root instructions. Generated
-ordinal ranges remain symbolic for the bound expansion library.
-`Object::resolve_schedule` counts maxima after inspecting every match and
-reports a genuine tie instead of selecting document order. The independent
-1,200-schedule specificity family checks all 54 concrete selector partitions
-per case and reversed document orders; union/partial coverage and zero/large
-loop domains have separate controls.
+**Design (schedule matching, round 18).** Specificity is the §11 lexicographic
+tuple; only ties at the actual maximum invalidate a schedule. Admission
+intersects equal-specificity selectors with invocation/loop domains, then
+subtracts the union of all strictly higher matching domains of the same kind.
+A nonempty remainder witnesses ambiguity. Step domains follow their owning
+invocation: the root oracle uses bindings.budget[0]; `lift.call` and lifted
+action gates stay in that machine. `lift.oracle_call`/`lift.oracle_uncall` and
+normalized `oracle_call` open token-governed invocations. Admission has only
+params_hash, not the token values, so nested steps stay symbolic over the
+ABI's positive u64 range; the root B never proves a nested step empty. A
+resolved token would supply that invocation's own bound. Action roots do not
+turn their schedule budget into an oracle step bound.
+Domains are boxes split at selector boundaries; loop/step counts are never
+expanded or capped. Every instruction (including calls) has its own generated
+operations. Shortest chains suffice once their entire symbolic step domain is
+covered; finite root domains additionally require checking call extensions
+that can enter a new oracle. Suffix call-graph states are memoized after all
+selector paths end, so recursive lprocs terminate without a depth cap. Empty
+paths split over real root instructions; zero-trip loops and root B=0 stay
+empty. Generated ordinal ranges remain symbolic for the expansion library.
+`Object::resolve_schedule` counts final maxima independently of document order.
+The retained R17 family checks 1,200 schedules and reversed orders against 54
+concrete selector partitions each. The R18 family adds 4,800 schedules and
+reversed orders over depth 1–3 oracle/lproc chains and action roots, with
+1,532 concrete budget assignments. Its independent oracle enumerates concrete
+nested operation partitions across those assignments, accounting for unknown
+token preimages; admission and all admitted resolver results agree 100%.
+These are finite selector families, not a claim to complete schedule execution.
+Union/partial coverage, recursive lprocs, and zero/large loop bounds have
+separate controls.
 
 `DerivedWidths::from_program` checks H+2, A_tab+1 and S_cells+1; a legal layout
 whose counters exceed host representation returns a cited host-limit error.

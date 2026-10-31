@@ -2228,3 +2228,109 @@ fn r17_cli_malformed_gate_share_rejects() {
         }
     }
 }
+
+#[test]
+fn r18_cli_literal_nested_budget_check_hash_reject() {
+    for (budget, source, pin) in [
+        (
+            2,
+            include_str!("support/r18-nested-budget-2.bisa"),
+            "07c617a312f2b1f333689d95b474ccf9b7dea4a570c43ced87a92c089b66d9e7",
+        ),
+        (
+            3,
+            include_str!("support/r18-nested-budget-3.bisa"),
+            "0584dc9a6dbe02b138e516caca59168a4dbbf577185e9d96504f58d5a5fcf4ae",
+        ),
+    ] {
+        assert_eq!(bennett_isa_ref::sha256_hex(source.as_bytes()), pin);
+        let path = tmp_file(&format!("r18-nested-{budget}.bisa"), source);
+        for command in ["check", "hash"] {
+            fails(
+                &[command, &path],
+                "§11: multiple maximal matching schedule entries",
+            );
+        }
+    }
+}
+
+#[test]
+fn r18_cli_single_covering_and_context_controls() {
+    use support::{
+        r17::{document, schedule},
+        r18::*,
+    };
+    for (budget, source) in [(2, TWO), (3, THREE)] {
+        let mut s = schedule(source);
+        let literal = s.get("entries").unwrap().array().unwrap()[0].clone();
+        let mut broad = literal.clone();
+        let path = broad
+            .get("path")
+            .unwrap()
+            .array()
+            .unwrap()
+            .iter()
+            .map(|p| {
+                let mut p = p.clone();
+                set(&mut p, "iteration", support::json(r#""*""#));
+                p
+            })
+            .collect();
+        set(&mut broad, "path", Json::Array(path));
+        let entries = [broad.clone(), broad, literal.clone()];
+        let mut variants = vec![vec![literal]];
+        variants.extend(ORDERS.map(|order| order.map(|i| entries[i].clone()).to_vec()));
+        for (i, entries) in variants.into_iter().enumerate() {
+            set(&mut s, "entries", Json::Array(entries));
+            let path = tmp_file(
+                &format!("r18-positive-{budget}-{i}.bisa"),
+                &document(source, &s),
+            );
+            for command in ["check", "hash"] {
+                let result = ok(&[command, &path]);
+                assert_eq!(text(&result, "object_hash"), OH);
+                if command == "hash" {
+                    let ignore = field(&result, "symbols").get("ignore").unwrap();
+                    assert_eq!(text(ignore, "interface_hash"), IH);
+                    assert_eq!(text(ignore, "closure_hash"), IH);
+                }
+            }
+        }
+    }
+    for (i, (edges, action)) in [
+        (vec!['L'], false),
+        (vec!['O', 'L'], false),
+        (vec!['O'], true),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let o = chain(&edges, action);
+        let hashes = o.identity().unwrap().interface_hashes;
+        let points: Vec<_> = (0..=edges.len())
+            .map(|i| {
+                point(
+                    &hashes[&format!("n{i}")],
+                    if i == edges.len() { 2 } else { 0 },
+                )
+            })
+            .collect();
+        let e = gate(&points, support::json("3"));
+        let mut s = support::r18::schedule(&o, 2, &[3]);
+        set(&mut s, "entries", Json::Array(vec![e.clone(), e]));
+        let path = tmp_file(
+            &format!("r18-context-{i}.bisa"),
+            &support::r18::document(&o, &s),
+        );
+        for command in ["check", "hash"] {
+            if i == 0 {
+                ok(&[command, &path]);
+            } else {
+                fails(
+                    &[command, &path],
+                    "§11: multiple maximal matching schedule entries",
+                );
+            }
+        }
+    }
+}

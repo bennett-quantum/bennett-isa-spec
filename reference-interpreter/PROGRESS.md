@@ -2,96 +2,84 @@
 
 Resume here. The whole accepted ISA 0.8 remains in scope; staged deliverables
 are not complete. Sole implementation sub-agent; owned interpreter and external
-round-17 response only. Never push. Every cargo invocation uses the headless
+round-18 response only. Never push. Every cargo invocation uses the headless
 prefix and TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/.tmp.
 
-## Round-17 fixes (2026-10-31)
+## Round-18 fixes (2026-10-31)
 
-Baseline **390 passed / 0 failed / 5 ignored**, summed over all 33 binaries
-(including 0-test main/doctests), 22.35 s runner sum. Initial witness RED:
-**2 passed / 4 failed**, missing epsilon_share and pairwise nonmaximal-tie
-rejection. Audit RED for sampler.count: **0 passed / 1 failed**, missing count.
-All round 4–17 positive and negative tests are retained.
+Baseline **403 passed / 0 failed / 5 ignored**, summed over all 33 binaries
+(including 0-test main/doctests), **22.51 s** runner sum. Literal witness RED:
+**1 passed / 2 failed** (library admission and CLI check/hash wrongly accept;
+independent outer-two/nested-three execution already passes). All round 4–18
+positive and negative tests are retained, including every R17 permutation,
+union/partial-coverage and zero/large-loop test and byte pin.
 
 | Blocker | RED tests | Status | Commit |
 |---|---|---|---|
-| R17-B01 | metadata_schema::tests::r17_gate_payload_omission_is_literal_clause_control; metadata::r17_default_share_and_shadowed_witness_preserve_identity; cli_xam::r17_cli_default_share_and_shadowed_tie_check_hash_pins; audit r17_sampler_count_default_is_optional | GREEN | e72df8c |
-| R17-B02 | metadata::r17_shadowed_tie_all_orders_and_genuine_maximum_ties | GREEN | e72df8c |
+| R18-B01 | metadata::r18_literal_nested_budget_ties_reject; cli_xam::r18_cli_literal_nested_budget_check_hash_reject | GREEN | pending owned-path commit |
 
-Design: TABLE gate_payload uses epsilon_share?:decimal (§17.9). The
-schedule_epsilon_share consumer returns an exact equal-share recipe once the
-expanded approximate-operation count is known, or preserves an explicit
-assignment; exact operations remain exact. No canonical bytes are rewritten.
-The class audit also found sampler.count wrongly required (§17.13); TABLE
-now makes it optional and claim replay defaults to 65,536, with actual replay
-and malformed-present controls. Item 7 was previously wrong and repaired in
-R16; it remains covered. The independent table-driven
-r17_section17_defaults_are_optional_and_applied enumerates all 14 items,
-checking omitted-field admission plus consumer observations where implemented.
-Nonsemantic decisions/C layout and staged target/interval choices are
-explicitly identified, never counted as implemented consumers. §§8.1, 9.1,
-11 and 12 audit: no additional incorrectly required default field found;
-block_image and pinned_closure_hash remain optional, with empty-block-map
-and unpinned-link consumers already present. Precision/seed/algorithm and
-present kind payloads still have no omission default and remain required.
+Design: `metadata.rs::validate_schedule_details` passes a root bound only for
+an oracle root. `metadata/schedule_domains.rs::InvocationSteps` tracks root,
+nested-token and action domains through each chain. `chain_domain` keeps
+lift.call/lift.perm_call in the same machine; lifted oracle call/uncall and
+normalized oracle_call open a new invocation. params_hash supplies no token
+preimage: nested domains remain symbolic over positive u64 steps, never
+intersected with the root B. Known root B=0 and zero-trip ancestor loops remain
+empty. No execution budget, reference body or canonical schedule is changed.
+Only equal maxima with an uncovered selector-domain remainder reject; UNION
+subtraction and document-order-independent resolution are unchanged.
 
-Schedule ambiguity uses intersection/subtraction of selector boxes within
-legal invocation/iteration domains and the oracle's 1..B step range. Only a
-nonempty equal-maximum remainder after subtracting the UNION of all higher
-entries rejects. The resolver counts final maxima independent of order.
-Shortest real chains suffice, including each call instruction's own generated
-operations; empty prefixes split over all root instructions. No loop bound
-or generated-ordinal sampling cap is imposed. All six witness orders admit
-and resolve C; A/B and duplicate C reject, A/C admits. Union/partial coverage,
-step-domain and loop bounds 0, 2, 3 and 2^40 are covered. The independent
-specificity family observes **1,200 schedules + 1,200 reversed orders**,
-**1,168 admitted / 32 rejected**, 54 concrete operation patterns each,
-**100% oracle agreement**; every admitted resolver result is compared too.
+The old shortest-chain coverage argument needed refinement too: a finite root
+step domain can be fully covered while a nested invocation's larger one is
+not. `has_uncovered_tie` visits call extensions until it reaches the symbolic
+nested domain. Beyond the longest selector path it memoizes suffix call-graph
+states, so recursive lprocs terminate without a depth/loop/step expansion cap.
+Once a whole symbolic domain is covered, its extensions cannot broaden it.
+The same-machine recursive sum_db control and the root-prefix union control
+exercise both cases.
 
-Both read-only reviewer witnesses were copied byte-for-byte. r17_pins.py
-independently reconstructs them from the R13 corpus and literal 261-byte
-inc8 envelope (no interpreter/rehash). File SHA-256 8af833c2…2a5 and
-9fc08dca…1aff; schedule hashes d9025ef2…4845d and e13ea989…287f;
-object 8093da48…ec5d9, interface=closure 8ce5e64f…5be93 remain unchanged.
-Raw schedule bytes, source text and budget [3,0,0,0] are preserved.
-Null/object/negative/invalid decimal-string shares and missing realisation
-reject in both library and CLI (check/hash exit 1, empty stdout, cited
-§9.1/§11). Present malformed counts also reject; absent sampled count
-actually replays 65,536 elements; explicit 0 and 3 remain 0 and 3.
+Literal reviewer files and probe copied verbatim into tests/support/.
+Both B=2 and B=3 files reject with §11 multiple maximal matching schedule
+entries; CLI check/hash exit 1 with empty stdout. Single-entry positives keep
+object 8e6e852c…f815 and ignore interface=closure 9687f21a…89012.
+A/B with wildcard iterations and literal fully specific C admit and resolve C
+in all six orders, at generated 0, 1 and u128::MAX; CLI also checks all orders
+and identity pins at both root budgets. The literal duplicate's only remaining
+wildcard is generated, so a single concrete generated ordinal would NOT cover
+it; the covering control deliberately broadens A/B's iterations instead.
+Lproc-only root step 3 at B=2 stays empty; nested-oracle/lproc and action-root
+variants reject. Outer B=2 with token B=3 still executes payload=9/code=0/steps=2.
+Independent r18_pins.py checks file hashes, original nested fixture bytes,
+canonical schedule bytes and the exact token preimage hash. R17 pins still pass.
 
-Derived schema family: **163 productions, 9,897 positives, 1,653 unique typed
-paths, 26,746 grammar negatives**; **1,992** negatives also pass through BOTH
-admission validators (subset). **26 pinned objects, 2,393 parse visits,
-17,173 full-parse negatives**; total negatives **43,919**. The derived family
-proves enforcement of TABLE; the independent §17 table catches wrongly
-required defaults. Width family and all previous controls are retained.
+`r18_nested_specificity_family_matches_brute_force` adds **4,800 schedules +
+4,800 reversed orders**, **3,873 admitted / 927 rejected**, **100% oracle
+agreement** for admission and every admitted resolver result. Fifteen shapes
+cover call depth 1–3, oracle prefixes/lproc suffixes (all mixes valid under
+§4.2), action roots, root B in {0,1,2,4} and independently varied per-token
+budgets 0..4: **1,532 assignments**, **121,182 concrete operation partitions**
+before deduplication. The oracle derives owning machines from O/L edges,
+enumerates static dispatch-row operations at each legal concrete step and
+both phases, then computes the literal specificity maximum without production
+matching/domain helpers. Steps 1..3 are named selector values and 4 is the
+residual; generated 0,1 and residual 2 exhaust this family's distinctions.
+Admission cannot invert params_hash, so expectations use the union over token
+assignments; a token-specific infeasibility is never credited as a proof of
+emptiness. This finite family does not claim full schedule/target execution.
+The original R17 family/distribution and all other prior assertions are intact.
 
-First full suite: **403 passed / 0 failed / 5 ignored**, 37.84 s runner sum.
-Final full suite: **403 passed / 0 failed / 5 ignored**, 34.62 s runner sum,
-**14 unit + 389 integration**, 0 doctests. Fmt/fmt --check and strict
-all-target Clippy pass, 0 warnings. An initial Clippy finding concerned only
-hex digit grouping in the unchanged RNG seed; final Clippy and full suite
-reran after the spelling fix. Production and all sweep inputs/assertions
-were unchanged after sweep start.
-
-All **5 ignored sweeps passed / 0 failed**, **135.70 s** runner sum across
-all 33 binaries.
-
-| Sweep | Full domain | Observed result / runner time |
-|---|---|---|
-| u8 division/remainder | 65,536 operand pairs × 4 = 262,144 executions | 1/0; 1.24 s |
-| 17-wire borrow | 131,072 entries | 1/0; 5.51 s |
-| checked borrow certificate | 262,144 elements, subject and expected program | 1/0; 28.56 s |
-| §6 differential | 200,000 programs: 70,931 accepted (all clean), 129,069 rejected | 1/0; 96.16 s |
-| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 1/0; 4.23 s |
-
-Logs: .tmp/r17-{before,red,red-count,regressions-final,loop,schema-family,
-full,final,clippy,clippy-final,sweeps}.log. Independent reconstruction and
-both cmp checks pass. Owned diffs pass --check. No foreign tests, non-owned
-path edits, dependencies, Beads mutation/export, push or Dolt sync. Concurrent
-spec and conformance work is untouched. Historical round evidence is in
-council/response-round-N.md, external council responses and git history.
-Implementation commit e72df8c; this block records the final evidence.
+First full suite: **411 passed / 0 failed / 5 ignored**, **29.82 s** runner sum.
+Final full suite after the Clippy-only iterator spelling fix: **411 passed /
+0 failed / 5 ignored**, **28.65 s**, **14 unit + 397 integration**, 0 doctests,
+summed over all 33 binaries. Focused R18 tests: **8 passed / 0 failed**,
+including the 4,800-case family. Fmt/fmt --check and strict all-target Clippy
+pass with 0 warnings. Initial build-only corrections were a Rust-2021 let-chain
+spelling and a test helper name shadow; initial Clippy requested enumerate()
+in the new independent oracle loop. No production behavior or sweep input was
+changed for those corrections. All five ignored sweeps are running; production
+and test inputs/assertions are frozen from sweep start. Logs: interpreter .tmp/r18-{before,red,green,controls,family,
+full,clippy,sweeps}.log. Only owned paths; no foreign tests, dependency changes,
+push or Dolt sync. Full-ISA bead b-isa-spec-zq2 remains active for staged work.
 
 ## Resume here: outstanding work, in priority order
 

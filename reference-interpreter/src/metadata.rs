@@ -304,7 +304,13 @@ impl Object {
                     if a.get("kind")? == other.get("kind")?
                         && specificity(a)? == specificity(other)?
                         && overlaps(a, other)?
-                        && self.has_uncovered_tie(a, other, entries, region, values[0])?
+                        && self.has_uncovered_tie(
+                            a,
+                            other,
+                            entries,
+                            region,
+                            (f.kind == "oracle").then_some(values[0]),
+                        )?
                     {
                         return err("§11", "multiple maximal matching schedule entries");
                     }
