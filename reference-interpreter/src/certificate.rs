@@ -318,11 +318,6 @@ impl Object {
                 for claim in c.get("subclaims")?.array()? {
                     index(claim, position)?;
                 }
-                if c.get("rule")?.string()? == "translation_lemma"
-                    && c.get("witness")?.get("frame")?.array()?.len() != 2
-                {
-                    return err("§12.1", "frame needs first and last points");
-                }
             }
             "numerical" | "channel" => {
                 subject(c.get("subject")?)?;

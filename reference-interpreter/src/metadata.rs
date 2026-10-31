@@ -179,10 +179,14 @@ impl Object {
                     stack: values[2],
                     depth: values[3],
                 })?;
-                // Exact permutation regions have no approximation budget.
-                if b.get("epsilon")?.canonical() != "0"
-                    && b.get("epsilon")? != &Json::String("0".into())
-                {
+                // §§4.4/5.2: exact permutations have no approximation budget.
+                // Schema validation above guarantees a nonnegative decimal.
+                // Its value is zero iff every mantissa digit is zero, whatever
+                // its scale/exponent; never round a tiny nonzero via binary64.
+                let zero = matches!(b.get("epsilon")?, Json::Number(s) | Json::String(s)
+                    if s.split(['e', 'E']).next().is_some_and(|mantissa|
+                        mantissa.bytes().filter(u8::is_ascii_digit).all(|d| d == b'0')));
+                if !zero {
                     return err("§5.2", "oracle schedules must be exact");
                 }
             }

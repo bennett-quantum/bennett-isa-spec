@@ -2127,3 +2127,43 @@ fn r14_cli_rejects_malformed_table_rows_and_cells() {
         "ddc5d6729a98484acc2d5e8feb585c155799293bd36f31fd96cbc510f77666f0"
     );
 }
+
+#[test]
+fn r15_cli_rejects_empty_translation_frame() {
+    let path = tmp_file("r15-frame-empty.bisa", support::r15::FRAME);
+    for command in ["check", "hash"] {
+        fails(&[command, &path], "§12.1");
+    }
+}
+
+#[test]
+fn r15_cli_oracle_schedule_epsilon_is_exact_by_value() {
+    use support::r15::*;
+    for (i, epsilon) in zeros().into_iter().enumerate() {
+        let path = tmp_file(&format!("r15-epsilon-zero-{i}.bisa"), &schedule(epsilon));
+        for command in ["check", "hash"] {
+            let result = ok(&[command, &path]);
+            assert_eq!(text(&result, "object_hash"), OH);
+            if command == "check" {
+                assert_eq!(text(&result, "status"), "ok");
+            } else {
+                let inc8 = field(&result, "symbols").get("inc8").unwrap();
+                assert_eq!(text(inc8, "interface_hash"), IH);
+                assert_eq!(text(inc8, "closure_hash"), IH);
+            }
+        }
+    }
+    for (i, epsilon) in nonzeros().into_iter().enumerate() {
+        let path = tmp_file(&format!("r15-epsilon-nonzero-{i}.bisa"), &schedule(epsilon));
+        for command in ["check", "hash"] {
+            fails(&[command, &path], "§5.2");
+        }
+    }
+    let path = tmp_file(
+        "r15-epsilon-string-exponent.bisa",
+        &schedule(support::json(r#""1e-300""#)),
+    );
+    for command in ["check", "hash"] {
+        fails(&[command, &path], "§9.1");
+    }
+}

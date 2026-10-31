@@ -353,3 +353,50 @@ fn r14_table_rows_and_components_are_typed_at_admission() {
         assert!(e.to_string().contains("§12"), "{e}");
     }
 }
+
+#[test]
+fn r15_translation_frame_cardinality_is_checked_at_admission() {
+    use support::r15::*;
+    // The exact reviewer negative remains rejected after moving the rule
+    // into the grammar. A two-point control preserves every identity pin.
+    for len in 0..=3 {
+        let point = format!(r#"["{IH}","entry",0]"#);
+        let frame = format!("[{}]", vec![point; len].join(","));
+        let text = FRAME.replace(r#""frame":[]"#, &format!(r#""frame":{frame}"#));
+        assert!(FRAME.contains(r#""frame":[]"#));
+        if len == 2 {
+            let o = Object::parse(&text).unwrap();
+            o.check_hashes().unwrap();
+            assert_eq!(o.identity().unwrap().object_hash, OH);
+        } else {
+            let e = Object::parse(&text).unwrap_err();
+            assert!(e.to_string().contains("§12.1"), "{e}");
+        }
+    }
+}
+
+#[test]
+fn r15_oracle_schedule_epsilon_uses_exact_decimal_value() {
+    use support::r15::*;
+    assert_eq!(schedule(json(r#""0.0""#)), EPSILON);
+    assert_eq!(
+        bennett_isa_ref::sha256_hex(EPSILON.as_bytes()),
+        "1431a1dbbe4991d170e3848995026610ebbffce08e7279ee05a68880f06c82df"
+    );
+    for epsilon in zeros() {
+        let o = Object::parse(&schedule(epsilon.clone()))
+            .unwrap_or_else(|e| panic!("zero {}: {e}", epsilon.canonical()));
+        o.check_hashes().unwrap();
+        let id = o.identity().unwrap();
+        assert_eq!(id.object_hash, OH);
+        assert_eq!(id.interface_hashes["inc8"], IH);
+        assert_eq!(id.closure_hashes["inc8"].as_deref(), Some(IH));
+    }
+    for epsilon in nonzeros() {
+        let e = Object::parse(&schedule(epsilon)).unwrap_err();
+        assert!(e.to_string().contains("§5.2"), "{e}");
+    }
+    // The string exponent form is outside §9.1's decimal-string grammar.
+    let e = Object::parse(&schedule(json(r#""1e-300""#))).unwrap_err();
+    assert!(e.to_string().contains("§9.1"), "{e}");
+}

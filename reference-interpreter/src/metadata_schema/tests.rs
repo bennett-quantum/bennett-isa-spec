@@ -5,6 +5,29 @@ use std::collections::{BTreeMap, BTreeSet};
 fn j(s: &str) -> Json {
     Json::parse(s).unwrap()
 }
+#[test]
+fn r15_translation_frame_is_first_and_last_point_tuple() {
+    // Literal §12.1 cardinality oracle, independent of TABLE/samples/baseline.
+    let point =
+        j(r#"["0000000000000000000000000000000000000000000000000000000000000000","entry",0]"#);
+    let mut accepted = Vec::new();
+    for len in 0..=3 {
+        let mut witness = j(r#"{"B":[],"V":[],"W":[],"X":[],"frame":[]}"#);
+        let Json::Object(fields) = &mut witness else {
+            unreachable!()
+        };
+        fields.insert("frame".into(), Json::Array(vec![point.clone(); len]));
+        if validate("translation_witness", &witness).is_ok() {
+            accepted.push(len);
+        }
+    }
+    assert_eq!(accepted, [2], "§12.1: frame is [first point, last point]");
+    // V and W remain variable-length point arrays, including empty arrays.
+    for len in 0..=3 {
+        let points = Json::Array(vec![point.clone(); len]);
+        validate("points", &points).unwrap();
+    }
+}
 fn samples(name: &str) -> Vec<Json> {
     match entry(name).shape {
         String => vec![j(r#""""#), j(r#""vendor.2026""#)],
@@ -328,6 +351,6 @@ fn r14_generated_metadata_schema_type_family() {
             }
         }
     }
-    eprintln!("R14 schema: {} entries; {positives} generated positives; {} unique typed paths; {negatives} grammar negatives, {admissions} through BOTH admission validators; {} pinned objects, {parse_paths} parse path visits, {parse_negatives} full-parse negatives",TABLE.len(),paths.len(),corpus.array().unwrap().len());
+    eprintln!("R15 schema: {} entries; {positives} generated positives; {} unique typed paths; {negatives} grammar negatives, {admissions} through BOTH admission validators; {} pinned objects, {parse_paths} parse path visits, {parse_negatives} full-parse negatives",TABLE.len(),paths.len(),corpus.array().unwrap().len());
     assert_eq!(visited.len(), TABLE.len());
 }

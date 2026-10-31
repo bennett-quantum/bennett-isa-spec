@@ -436,16 +436,18 @@ qinplace identity requires a fault-free token; B=0 is a §4.5 rejection.
 Literal envelopes and independent hashlib pins precede interpreter checks.
 The complete round-11 sidecar audit is in tests/support/r11-comment-audit.md.
 
-**Design (metadata, round 14).** `src/metadata_schema.rs::TABLE` is the
+**Design (metadata, round 15).** `src/metadata_schema.rs::TABLE` is the
 single declarative recursive grammar for all seven JSON metadata sections,
 signatures and the textual data NAME/HEX projection. Every production cites
 its clause (§9.1, §9.2, §9.4, §8.1, §11, §12.1–12.3 or §13). Both the
 pre-identity admission pass and certificate/claim admission use this table;
 there are no parallel hand-written field/type schemas. Y endpoints are
 signed finite decimal strings; exhaustive tables contain arrays of canonical
-§9.1 integers of arbitrary size. Semantic checks remain in `object.rs`
-(layout ranges, image resolution), `metadata.rs` (schedule paths, payload
-agreement and overlap; coverage points), `certificate.rs` (domain bindings,
+§9.1 integers of arbitrary size. The translation frame is a two-point tuple
+in the grammar; V and W remain point arrays. Semantic checks remain in
+`object.rs` (layout ranges, image resolution), `metadata.rs` (schedule paths,
+payload agreement and overlap, exact decimal-value zero for oracle epsilon;
+coverage points), `certificate.rs` (domain bindings,
 indices, expression environments/arity, live-range overlap and certificate
 bindings), and `validation.rs` (device model compatibility). These checks
 cite their determining clauses. Target/launch/schedule execution and interval
@@ -454,6 +456,11 @@ sector block images retain their forms. The grammar-derived family in
 `src/metadata_schema/tests.rs` replaces the R13 path/type union: it populates
 nested arrays/maps, tests every production and alternative, walks all supplied
 paths, and rejects malformed types before hashing or claim execution.
+Round 15 observes 163 productions, 9,806 generated positives, 1,653 unique
+typed paths and 26,545 grammar negatives (1,992 also through both admission
+validators); 26 pinned objects add 2,393 parse visits and 17,173 parse negatives.
+This tests enforcement of the table; independent clause-derived controls
+check frame cardinality and numeric zero through full admission.
 
 `DerivedWidths::from_program` checks H+2, A_tab+1 and S_cells+1; a legal layout
 whose counters exceed host representation returns a cited host-limit error.
