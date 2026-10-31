@@ -9,8 +9,20 @@ Surgical edits only; K1–K75 and accepted 0.8 semantics/bytes retained.
 | Suggestion / proof step | Disposition | K | Clauses / existing coverage | Semantic premises | Bead status |
 |---|---|---|---|---|---|
 | 1 / §16.3 placeholders | a: fill all 25 symbol values, including repeated symbols and the printed SCC envelope; independent precheck reconstructs every envelope | existing §9.2 | §16.3; §0 example inventory | §9.2, §16.1–§16.2 | 4a4 IN_PROGRESS |
-
 | 2 / §5.5 matched cleanup | a: clarify that ins writes invalidate the pair, while mem-cell writes only remove the clearing guarantee | existing E17.5 | §5.5 first paragraph | §4.2, §5.5 later paragraph | 4a4 IN_PROGRESS |
+| 3 / INV-3 1.4.2–1.4.3, gaps 5–6 | a: add muse's permissive sufficient dependency-set test; failure is inconclusive | existing K41 | §6.1 outstanding dependence | §6.1 transfer, §14.2; INV-3 1.4 | 4a4 IN_PROGRESS |
+
+Item 3 proof/S0 check: read INV-3 in bennett-conformance read-only. Its
+1.4.2 counterexample transfers d0 through d1 to interface t. Cleaning d1
+and applying H to d0 cannot erase that path to t, so this sufficient test
+fails there and cannot admit the refuted cleanup. Diagonal phases and
+region cells are explicit sinks; transitive paths include implicit target
+reads and effective controls, as the existing transfer/operation rules
+require. Exact K41 M = I_G ⊗ V (every input, external entanglement and
+exact global phase) remains the semantic definition. A failed syntactic
+test is inconclusive, so semantic cancellations and other valid proofs
+remain available. This is MAY text, not an additional acceptance gate.
+Draft witness precheck PASS after exact diff regeneration.
 
 Item 2 S0 check: this retains the existing permitted intervening store,
 the identical uncall permutation, the producer clearing obligation and

@@ -1408,6 +1408,11 @@ inverse cancels it in M. [deps: ISA-4.4, ISA-6.3, ISA-14.2]
 Dependency-set propagation through reads supplies such transitive paths,
 but absence of a direct provenance edge to g alone does not establish
 the required factorisation. [deps: ISA-6.1-P1, ISA-14.2]
+A producer MAY establish non-dependence by the dependency-set test: if no
+live value, interface wire, region cell or uncancelled diagonal phase has
+a transitive read path from g in the intervening sequence, then M
+factorises as I_G ⊗ V; failure of this test does not by itself prove
+dependence.
 
 ### 6.2 Window and obligations
 
