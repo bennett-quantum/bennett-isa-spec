@@ -75,6 +75,31 @@ fn r23_store_child() {
             Ok(p) => assert_eq!(p.unwrap().instruction.op, "store.i8"),
         }
         assert_eq!(m.outcome().steps, frames + 1);
+        if small {
+            // Independent §7.1 sorted digest, including resident-byte omission
+            // for SOL's zero rewrite and unchanged observer bytes elsewhere.
+            let mut expected = String::from("heap_base=1;heap_used=8;table_capacity=Some(2);alloc base=1 size=8 live=true pinned=false;");
+            for address in 1..=8 {
+                let byte = if address == 1 {
+                    if seat == "sol" {
+                        0
+                    } else {
+                        2
+                    }
+                } else if seat == "sol" {
+                    0xa5
+                } else {
+                    1
+                };
+                if byte != 0 {
+                    expected.push_str(&format!("byte {address}={byte};"));
+                }
+            }
+            assert_eq!(
+                m.memory_digest().unwrap(),
+                bennett_isa_ref::sha256_hex(expected.as_bytes())
+            );
+        }
         assert_eq!(
             m.memory_bytes(1, 1).unwrap(),
             [if seat == "sol" { 0 } else { 2 }]
