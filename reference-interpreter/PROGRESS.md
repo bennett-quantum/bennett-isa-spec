@@ -15,8 +15,8 @@ All round 4–17 positive and negative tests are retained.
 
 | Blocker | RED tests | Status | Commit |
 |---|---|---|---|
-| R17-B01 | metadata_schema::tests::r17_gate_payload_omission_is_literal_clause_control; metadata::r17_default_share_and_shadowed_witness_preserve_identity; cli_xam::r17_cli_default_share_and_shadowed_tie_check_hash_pins; audit r17_sampler_count_default_is_optional | GREEN | implementation commit below |
-| R17-B02 | metadata::r17_shadowed_tie_all_orders_and_genuine_maximum_ties | GREEN | implementation commit below |
+| R17-B01 | metadata_schema::tests::r17_gate_payload_omission_is_literal_clause_control; metadata::r17_default_share_and_shadowed_witness_preserve_identity; cli_xam::r17_cli_default_share_and_shadowed_tie_check_hash_pins; audit r17_sampler_count_default_is_optional | GREEN | e72df8c |
+| R17-B02 | metadata::r17_shadowed_tie_all_orders_and_genuine_maximum_ties | GREEN | e72df8c |
 
 Design: TABLE gate_payload uses epsilon_share?:decimal (§17.9). The
 schedule_epsilon_share consumer returns an exact equal-share recipe once the
@@ -67,14 +67,31 @@ proves enforcement of TABLE; the independent §17 table catches wrongly
 required defaults. Width family and all previous controls are retained.
 
 First full suite: **403 passed / 0 failed / 5 ignored**, 37.84 s runner sum.
-Final full suite and sweeps are running. Fmt and strict all-target Clippy
-pass, 0 warnings, after grouping the unchanged RNG seed's hex digits to
-satisfy Clippy. This is a test-spelling-only edit; final suite is rerunning.
+Final full suite: **403 passed / 0 failed / 5 ignored**, 34.62 s runner sum,
+**14 unit + 389 integration**, 0 doctests. Fmt/fmt --check and strict
+all-target Clippy pass, 0 warnings. An initial Clippy finding concerned only
+hex digit grouping in the unchanged RNG seed; final Clippy and full suite
+reran after the spelling fix. Production and all sweep inputs/assertions
+were unchanged after sweep start.
+
+All **5 ignored sweeps passed / 0 failed**, **135.70 s** runner sum across
+all 33 binaries.
+
+| Sweep | Full domain | Observed result / runner time |
+|---|---|---|
+| u8 division/remainder | 65,536 operand pairs × 4 = 262,144 executions | 1/0; 1.24 s |
+| 17-wire borrow | 131,072 entries | 1/0; 5.51 s |
+| checked borrow certificate | 262,144 elements, subject and expected program | 1/0; 28.56 s |
+| §6 differential | 200,000 programs: 70,931 accepted (all clean), 129,069 rejected | 1/0; 96.16 s |
+| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 1/0; 4.23 s |
+
 Logs: .tmp/r17-{before,red,red-count,regressions-final,loop,schema-family,
-full,final,clippy,clippy-final,sweeps}.log. Final results will replace this
-paragraph before handoff. No foreign tests or owned-external-path edits,
-dependencies, Beads mutation/export, push or Dolt sync. Concurrent spec and
-conformance work is untouched.
+full,final,clippy,clippy-final,sweeps}.log. Independent reconstruction and
+both cmp checks pass. Owned diffs pass --check. No foreign tests, non-owned
+path edits, dependencies, Beads mutation/export, push or Dolt sync. Concurrent
+spec and conformance work is untouched. Historical round evidence is in
+council/response-round-N.md, external council responses and git history.
+Implementation commit e72df8c; this block records the final evidence.
 
 ## Resume here: outstanding work, in priority order
 
