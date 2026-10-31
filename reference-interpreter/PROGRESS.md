@@ -17,7 +17,7 @@ under that symbolic-range commit. Both directions are repaired below.
 
 | Blocker | RED tests | Status | Commit |
 |---|---|---|---|
-| R18-B01 | metadata::r18_literal_nested_budget_ties_defer_until_run (original admission-negative witness, revised by addendum); cli_xam::r18_cli_literal_nested_budget_check_hash_defer_and_run_reject | GREEN | pending bound-matching commit |
+| R18-B01 | metadata::r18_literal_nested_budget_ties_defer_until_run (original admission-negative witness, revised by addendum); cli_xam::r18_cli_literal_nested_budget_check_hash_defer_and_run_reject | GREEN | 42d4049 |
 
 Design: `metadata.rs::validate_schedule_details` supplies a bound only for an
 oracle root. `metadata/schedule_domains.rs::InvocationSteps` tracks root,
@@ -80,8 +80,21 @@ Final full suite after the addendum: **412 passed / 0 failed / 5 ignored**,
 33 binaries. Focused final R18: **9 passed / 0 failed**, family 10.47 s.
 Fmt/fmt --check and strict all-target Clippy pass with 0 warnings. The earlier
 411-test full runs/sweeps preceded the addendum and are not final evidence.
-All five ignored sweeps are being rerun against the final bound-matching code;
-production, test inputs and assertions are frozen from their start.
+All **5 ignored sweeps passed / 0 failed**, **96.71 s** runner sum across all
+33 binaries, rerun on final bound-matching code. Production, test inputs and
+assertions were unchanged from their start.
+
+| Sweep | Full domain | Result / runner time |
+|---|---|---|
+| u8 division/remainder | 65,536 operand pairs × 4 = 262,144 executions | 1/0; 0.51 s |
+| 17-wire borrow | 131,072 entries | 1/0; 2.86 s |
+| checked borrow certificate | 262,144 elements, subject and expected program | 1/0; 14.80 s |
+| §6 differential | 200,000 programs: 70,931 accepted (all clean), 129,069 rejected | 1/0; 76.14 s |
+| recursive prefix reversal | 256 inputs × every prefix through completion/first fault | 1/0; 2.40 s |
+
+Implementation commit 42d404924e68d4a40524f6c35accdcc7c60cfc73; this block
+records final evidence. No user decision is needed for this repair; the 0.9
+spec decision remains tracked by b-isa-spec-6hs.
 
 Logs: interpreter .tmp/r18-{before,red,addendum-red,addendum-green,bound-full,
 bound-clippy,bound-final,bound-sweeps}.log. Only owned interpreter paths and
