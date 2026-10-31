@@ -13,8 +13,8 @@
 +**Date:** 2026-10-31. **Status:** draft 0.9, **reopened by editorial pass III, pending a one-seat re-review**.
 +Snapshot `59eee9ad0d96` was accepted by the sol and codex seats (council run
 +`isa-09-2026-10-31`: codex round 2, sol round 3, both core accept, 0 blocking; muse seat held).
-+K64 and K65 are drafted pending maintainer ratification; publication is gated on that ratification
-+and the muse vote. It
++K64 and K65 were ratified by the maintainer on 2026-10-31; publication is gated on the muse vote
++(required for 0.9 as a new contract; maintainer ruling 2026-10-31). It
 +revises draft 0.8, which was **accepted by the council in round 8**
 +(2026-10-28; reports and the editor's responses under
 +`docs/council/isa-2026-10-28/round-{1..8}/` in the `bennett` meta
@@ -193,8 +193,8 @@
 +| K61 | §11 | **UNCOVERED-NESTED-DEFAULTS**. Uncovered operations take defaults directly; no synthetic entry or multi-level selector is required; witness: root step 1 keeps scheme X while an uncovered root-step-2/nested-step-1 gate takes its default. | INV-5 gap 17 | E | – |
 +| K62 | §5.3, §11.1 | **SCHEDULED-ACTION-ADJOINT**. Source instruction replacements precede recipe instantiation; witness: adj(qinplace G H) allocates t[1] at 0 and f[4] at 1, calls H then G and releases t then f. [deps: ISA-5.3-P4, ISA-4.5-P5, ISA-11-P2, ISA-11.1-P29] | SOL09-R1-B01 | S | library |
 +| K63 | §9.2, §11, §11.1, §12.1 | **INVOCATION-EDGE-IDENTITY**. Serialize fixed-binding instance and forward semantic-call occurrence independently of leaf ordinals; witness: qinplace G G has call_index 0/1; lproc keys [0]/[1] have distinct contexts. [deps: ISA-3.7-P5, ISA-3.7-P6, ISA-9.2-P1.S3, ISA-11.1-P9, ISA-12.1-P11] | COD-R1-B01; SOL S2 | S | – |
-+| K64 | §11 | **NON-ROW-ADDRESSES**. Reserved support points and their source/step/callee partition define every non-row ordinal; witness: B=0 has construction/commit/release and B=1 starts step support at allocation at, ordinal 0. [deps: ISA-3.6, ISA-5.2-P3, ISA-11.1-P22, ISA-11.1-P29] | INV-5 gap 3; 8ka; maintainer ratification pending | S | – |
-+| K65 | §11 | **WHOLE-CLEANUP-CARRIER**. One non-emitting ordinal-0 carrier selects the whole explicit cleanup before expansion, even if empty; witness: reverse/recompute for quncopy share one carrier. [deps: ISA-6.2-P1, ISA-6.4-P1, ISA-11-P6] | INV-5 gap 8; 23g; maintainer ratification pending | S | – |
++| K64 | §11 | **NON-ROW-ADDRESSES**. Reserved support points and their source/step/callee partition define every non-row ordinal; witness: B=0 has construction/commit/release and B=1 starts step support at allocation at, ordinal 0. [deps: ISA-3.6, ISA-5.2-P3, ISA-11.1-P22, ISA-11.1-P29] | INV-5 gap 3; 8ka; ratified by the maintainer 2026-10-31 | S | – |
++| K65 | §11 | **WHOLE-CLEANUP-CARRIER**. One non-emitting ordinal-0 carrier selects the whole explicit cleanup before expansion, even if empty; witness: reverse/recompute for quncopy share one carrier. [deps: ISA-6.2-P1, ISA-6.4-P1, ISA-11-P6] | INV-5 gap 8; 23g; ratified by the maintainer 2026-10-31 | S | – |
 +| K66 | §9.2, §11, §11.1, §12.1 | **DEPENDENCY-ACCURACY**. Retarget release, matching, staging, construction and replay declarations to their semantic premises; witness: K28 cites ordinal/scratch P29 rather than activation P21. [deps: ISA-11.1-P29, ISA-11-P5, ISA-11-P6, ISA-11-P7, ISA-9.2-P4, ISA-12.1-P7] | SOL S1; COD S01/S02 (targeted) | E | – |
 +| K67 | §12.1 | **LEGAL-REPLAY-WITNESS**. F=4 and W=8 with legal unused mapping give a 25-bit domain; witness: four singleton draws cover 1/33554432 with unchanged XOR outcomes. [deps: ISA-5.4, ISA-7.1, ISA-7.2, ISA-12.1-P8, ISA-12.2] | COD S03 | E | – |
 +| K68 | §5.3 | **ACTION-DOMAIN**. Include both region roles in the unitary and D; witness: an unchanged two-cell one-bit `in` region still contributes four configurations. [deps: ISA-5.1-P1, ISA-5.2-P4, ISA-3.3-P19, ISA-5.6-P1, ISA-14.2] | INV-6 gap 1; afu | E | – |
