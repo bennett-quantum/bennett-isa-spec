@@ -27,6 +27,10 @@ struct Context {
     bodies: BTreeMap<String, (Vec<Json>, Box<Context>)>,
     symbols: BTreeMap<String, String>,
     events: BTreeMap<String, Json>,
+    images: BTreeMap<String, Vec<u8>>,
+    templates: BTreeMap<String, (Vec<Json>, Box<Context>)>,
+    arguments: BTreeMap<String, (String, Vec<Json>, Box<Context>)>,
+    values: BTreeMap<String, (Json, Json)>,
     controls: Vec<Wire>,
     legacy: bool,
     scratch_names: BTreeSet<String>,
@@ -70,6 +74,84 @@ fn angle(j: &Json, c: &Context) -> Result<u64, String> {
     }
     Ok(bits)
 }
+fn value(j: &Json, ty: &Json, c: &Context) -> Result<Json, String> {
+    let j = if let Some((v, bound_type)) = j.as_str().and_then(|n| c.values.get(n)) {
+        if bound_type != ty {
+            return Err("forwarded value type mismatch".into());
+        }
+        v
+    } else {
+        j
+    };
+    fn decimal(j: &Json) -> Result<&str, String> {
+        let t = s(j)?;
+        if t.is_empty()
+            || !t.bytes().all(|b| b.is_ascii_digit())
+            || (t.len() > 1 && t.starts_with('0'))
+        {
+            return Err("noncanonical unsigned decimal".into());
+        }
+        Ok(t)
+    }
+    fn fits(t: &str, width: usize) -> bool {
+        let mut digits = t.bytes().map(|b| b - b'0').collect::<Vec<_>>();
+        let mut bits = 0;
+        while digits.iter().any(|d| *d != 0) {
+            let mut carry = 0;
+            for d in &mut digits {
+                let v = carry * 10 + *d;
+                *d = v / 2;
+                carry = v % 2;
+            }
+            bits += 1;
+            if bits > width {
+                return false;
+            }
+        }
+        true
+    }
+    if let Some(t) = ty.as_str() {
+        match t {
+            "token" => {
+                let parts = a(j)?;
+                if parts.len() != 4 {
+                    return Err("token needs four components".into());
+                }
+                for p in parts {
+                    decimal(p)?;
+                }
+            }
+            "f64" => {
+                let text = s(j)?;
+                if text.len() != 18
+                    || !text.starts_with("0x")
+                    || !text[2..]
+                        .bytes()
+                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+                {
+                    return Err("value needs binary64 hex".into());
+                }
+            }
+            t if t.starts_with('i') => {
+                let width = t[1..]
+                    .parse::<usize>()
+                    .map_err(|_| "invalid integer value type")?;
+                if width == 0 || t[1..].starts_with('0') || !fits(decimal(j)?, width) {
+                    return Err("integer value width".into());
+                }
+            }
+            _ => return Err("unknown ISA value type".into()),
+        }
+    } else {
+        keys(ty, &["ptr"])?;
+        let width =
+            usize::try_from(scalar(f(ty, "ptr")?, &Env::new())?).map_err(|_| "pointer width")?;
+        if width == 0 || !fits(decimal(j)?, width) {
+            return Err("pointer value width".into());
+        }
+    }
+    Ok(j.clone())
+}
 fn wires(j: &Json, c: &Context) -> Result<Vec<Wire>, String> {
     match j {
         Json::Arr(v) => {
@@ -106,9 +188,44 @@ fn wires(j: &Json, c: &Context) -> Result<Vec<Wire>, String> {
         _ => Err("invalid wire actual".into()),
     }
 }
+fn validate_formals(ps: &[Json]) -> Result<(), String> {
+    let mut names = BTreeSet::new();
+    for p in ps {
+        let name = if let Json::Str(n) = p {
+            n.as_str()
+        } else {
+            let ty = s(f(p, "type")?)?;
+            keys(
+                p,
+                match ty {
+                    "wire" => &["name", "type", "width"],
+                    "templates" => &["name", "type", "length"],
+                    "arguments" => &["name", "type", "symbol"],
+                    "value" => &["name", "type", "isa_type"],
+                    "integer" | "angle" | "body" | "symbol" | "environment" | "event" | "image" => {
+                        &["name", "type"]
+                    }
+                    _ => return Err("unknown formal type".into()),
+                },
+            )?;
+            s(f(p, "name")?)?
+        };
+        if !names.insert(name) {
+            return Err("duplicate formal".into());
+        }
+    }
+    Ok(())
+}
 fn validate_body(body: &[Json]) -> Result<(), String> {
     for c in body {
-        if c.get("gate").is_some() {
+        if c.get("image").is_some() {
+            keys(c, &["image", "wires"])?;
+            s(f(c, "image")?)?;
+        } else if c.get("apply").is_some() {
+            keys(c, &["apply", "index", "args"])?;
+            s(f(c, "apply")?)?;
+            a(f(c, "args")?)?;
+        } else if c.get("gate").is_some() {
             keys(
                 c,
                 if c.get("params").is_some() {
@@ -142,7 +259,11 @@ fn validate_body(body: &[Json]) -> Result<(), String> {
             };
             keys(c, &[key, "args"])?;
             s(f(c, key)?)?;
-            a(f(c, "args")?)?;
+            if key == "call" && f(c, "args")?.as_str().is_some() {
+                s(f(c, "args")?)?;
+            } else {
+                a(f(c, "args")?)?;
+            }
         } else if c.get("for").is_some() {
             keys(c, &["for", "from", "to", "body"])?;
             s(f(c, "for")?)?;
@@ -180,6 +301,10 @@ impl Expander {
         crate::ref_catalog::Catalog::parse(bytes)?;
         let d = json::parse(bytes)?;
         keys(&d, &["isa", "name", "version", "recipes"])?;
+        for r in registry.values() {
+            validate_formals(a(f(r, "parameters")?)?)?;
+            validate_body(a(f(r, "body")?)?)?;
+        }
         for (k, v) in [("isa", "0.9"), ("name", "ref"), ("version", "0.9")] {
             if s(f(&d, k)?)? != v {
                 return Err(format!("wrong {k}"));
@@ -189,33 +314,7 @@ impl Expander {
         let mut previous = None;
         for r in a(f(&d, "recipes")?)? {
             validate_body(a(f(r, "body")?)?)?;
-            let mut formal_names = BTreeSet::new();
-            for p in a(f(r, "parameters")?)? {
-                if let Json::Str(name) = p {
-                    if !formal_names.insert(name.as_str()) {
-                        return Err("duplicate formal".into());
-                    }
-                    continue;
-                }
-                let ty = s(f(p, "type")?)?;
-                keys(
-                    p,
-                    if ty == "wire" {
-                        &["name", "type", "width"]
-                    } else {
-                        &["name", "type"]
-                    },
-                )?;
-                if !matches!(
-                    ty,
-                    "integer" | "wire" | "angle" | "body" | "symbol" | "environment" | "event"
-                ) {
-                    return Err("unknown formal type".into());
-                }
-                if !formal_names.insert(s(f(p, "name")?)?) {
-                    return Err("duplicate formal".into());
-                }
-            }
+            validate_formals(a(f(r, "parameters")?)?)?;
             let name = s(f(r, "kind")?)?.to_string();
             if previous.as_ref().is_some_and(|p| p >= &name) {
                 return Err("recipe order/duplicate".into());
@@ -332,27 +431,86 @@ impl Expander {
                 c.scratch_names.insert(s(name)?.into());
             }
         }
-        let mut names = BTreeSet::new();
+        validate_formals(ps)?;
         for (p, v) in ps.iter().zip(args) {
-            if !matches!(p, Json::Str(_)) {
-                keys(
-                    p,
-                    if s(f(p, "type")?)? == "wire" {
-                        &["name", "type", "width"]
-                    } else {
-                        &["name", "type"]
-                    },
-                )?;
-            }
             let (name, ty) = if let Json::Str(n) = p {
                 (n.as_str(), "integer")
             } else {
                 (s(f(p, "name")?)?, s(f(p, "type")?)?)
             };
-            if !names.insert(name) {
-                return Err("duplicate formal".into());
-            }
             match ty {
+                "value" => {
+                    let ty = f(p, "isa_type")?;
+                    c.values
+                        .insert(name.into(), (value(v, ty, caller)?, ty.clone()));
+                }
+                "arguments" => {
+                    let symbol = c
+                        .symbols
+                        .get(s(f(p, "symbol")?)?)
+                        .ok_or("arguments require earlier symbol")?;
+                    let saved = if let Json::Str(n) = v {
+                        caller
+                            .arguments
+                            .get(n)
+                            .cloned()
+                            .ok_or("unbound arguments")?
+                    } else {
+                        (symbol.clone(), a(v)?.to_vec(), Box::new(caller.clone()))
+                    };
+                    if &saved.0 != symbol {
+                        return Err("arguments closure mismatch".into());
+                    }
+                    let r = self.registry.get(symbol).ok_or("unbound closure")?;
+                    self.bind(r, &saved.1, &saved.2)?;
+                    c.arguments.insert(name.into(), saved);
+                }
+                "image" => {
+                    let text = s(v)?;
+                    let bytes = if let Some(bytes) = caller.images.get(text) {
+                        bytes.clone()
+                    } else {
+                        if text.len() % 2 != 0
+                            || !text
+                                .bytes()
+                                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+                        {
+                            return Err("image needs lowercase byte hex".into());
+                        }
+                        (0..text.len())
+                            .step_by(2)
+                            .map(|i| {
+                                u8::from_str_radix(&text[i..i + 2], 16)
+                                    .map_err(|_| "bad image".to_string())
+                            })
+                            .collect::<Result<Vec<_>, _>>()?
+                    };
+                    c.images.insert(name.into(), bytes);
+                }
+                "templates" => {
+                    let captured = if let Json::Str(n) = v {
+                        caller
+                            .templates
+                            .get(n)
+                            .cloned()
+                            .ok_or("unbound templates")?
+                    } else {
+                        let ts = a(v)?;
+                        for t in ts {
+                            keys(t, &["parameters", "body"])?;
+                            validate_formals(a(f(t, "parameters")?)?)?;
+                            validate_body(a(f(t, "body")?)?)?;
+                        }
+                        (ts.to_vec(), Box::new(caller.clone()))
+                    };
+                    if usize::try_from(scalar(f(p, "length")?, &c.ints)?)
+                        .map_err(|_| "negative template length")?
+                        != captured.0.len()
+                    {
+                        return Err("template length mismatch".into());
+                    }
+                    c.templates.insert(name.into(), captured);
+                }
                 "integer" => {
                     c.ints.insert(name.into(), scalar(v, &caller.ints)?);
                 }
@@ -511,7 +669,57 @@ impl Expander {
                 event: None,
                 scratch: false,
             };
-            if let Some(g) = j.get("gate") {
+            if let Some(n) = j.get("image") {
+                keys(j, &["image", "wires"])?;
+                let bytes = c.images.get(s(n)?).ok_or("unbound image")?;
+                let ws = wires(f(j, "wires")?, c)?;
+                if ws.len() != bytes.len() * 8 {
+                    return Err("image width mismatch".into());
+                }
+                let mut indices = (0..ws.len()).collect::<Vec<_>>();
+                if rev {
+                    indices.reverse();
+                }
+                for bit in indices {
+                    if bytes[bit / 8] >> (bit % 8) & 1 != 0 {
+                        let mut x = leaf.clone();
+                        x.gate = "x".into();
+                        x.wires = vec![ws[bit].clone()];
+                        x.controls.clear();
+                        self.emit(x, false, out)?;
+                    }
+                }
+            } else if let Some(n) = j.get("apply") {
+                keys(j, &["apply", "index", "args"])?;
+                let (ts, captured) = c.templates.get(s(n)?).cloned().ok_or("unbound templates")?;
+                let index = usize::try_from(scalar(f(j, "index")?, &c.ints)?)
+                    .map_err(|_| "negative template index")?;
+                let t = ts.get(index).ok_or("template index out of bounds")?;
+                // Actuals resolve at the apply site, free names at capture.
+                let bound = self.bind(t, a(f(j, "args")?)?, c)?;
+                let mut local = *captured;
+                local.ints.extend(bound.ints);
+                local.wires.extend(bound.wires);
+                local.angles.extend(bound.angles);
+                local.bodies.extend(bound.bodies);
+                local.symbols.extend(bound.symbols);
+                local.events.extend(bound.events);
+                local.images.extend(bound.images);
+                local.templates.extend(bound.templates);
+                local.arguments.extend(bound.arguments);
+                local.values.extend(bound.values);
+                local.controls.extend(bound.controls);
+                local.controls.sort();
+                local.controls.dedup();
+                self.body(
+                    a(f(t, "body")?)?,
+                    &mut local,
+                    path,
+                    rev,
+                    &mut Vec::new(),
+                    out,
+                )?;
+            } else if let Some(g) = j.get("gate") {
                 keys(
                     j,
                     if j.get("params").is_some() {
@@ -662,7 +870,19 @@ impl Expander {
                 let hash = c.symbols.get(s(n)?).ok_or("unbound symbol")?.clone();
                 let mut child = path.to_vec();
                 child.push(self.serial);
-                self.invoke(&hash, a(f(j, "args")?)?, c, &child, rev, chain, out)?;
+                if let Some(n) = f(j, "args")?.as_str() {
+                    let (bound_hash, args, mut captured) =
+                        c.arguments.get(n).cloned().ok_or("unbound arguments")?;
+                    if bound_hash != hash {
+                        return Err("arguments closure mismatch".into());
+                    }
+                    captured.controls.extend(c.controls.clone());
+                    captured.controls.sort();
+                    captured.controls.dedup();
+                    self.invoke(&hash, &args, &captured, &child, rev, chain, out)?;
+                } else {
+                    self.invoke(&hash, a(f(j, "args")?)?, c, &child, rev, chain, out)?;
+                }
             } else if let Some(n) = j.get("splice") {
                 keys(j, &["splice"])?;
                 let (b, mut captured) = c.bodies.get(s(n)?).cloned().ok_or("unbound body")?;

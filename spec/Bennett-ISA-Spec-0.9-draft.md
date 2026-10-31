@@ -132,6 +132,10 @@ north star §3.1 requires).
 | K18 | §0, §3.7, §4.2, §4.9, §5.4, §7.3, §8.1 | **Confirmations (ratified A4/A5)**: Q14 explicit forwarding; EPS-DECADE, BLOCK-IMAGE, ISA-7 and Q1–Q13 confirmed as applied | b-isa-spec-7u6; b-isa-spec-f31; b-isa-spec-0d0; b-isa-spec-221; b-isa-spec-2c9 | E | – |
 | K19 | §11.1 | **REF-BINDING**. Typed integer/wire/body/symbol/environment bindings, lexical substitution, invocation-local ordinals and validation witnesses | b-isa-spec-cbk | S | new |
 | K20 | §11.1 | **REF-QUANTUM**. Binary64 angle bits, variadic wires and full-basis matrix witnesses | b-isa-spec-8sc | S | new |
+| K21 | §11.1 | **REF-IMAGE**. Bound image bytes emit unconditional LSB-ordered X leaves with an exact adjoint | b-isa-spec-afi | S | new |
+| K22 | §11.1 | **REF-TEMPLATES**. Indexed typed body templates bind explicit frame actuals while retaining lexical captures | b-isa-spec-lph | S | new |
+| K23 | §11.1 | **REF-LITERAL-BITS**. Exact nonnegative integer bit extraction fixes literal X emission | b-isa-spec-8r4 | S | new |
+| K24 | §11.1 | **REF-ARGUMENTS**. Closure-bound positional argument vectors and exact ISA classical/token values | b-isa-spec-1a4 (region-role binding carried) | S | new |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -2251,8 +2255,11 @@ inverse (`inverse`, `body`). Constructor objects have exactly those
 keys. Fully instantiated `operations` contain only emitted leaves, each
 also carrying its computed `ordinal`; unexpanded `body` constructors
 carry no ordinal. Scalars are integer literals, parameter names, or prefix arrays
-`[op, operands…]` for `+ - * div mod`; div is floor division with a
-positive divisor. Wires are declaration names with integer-expression
+`[op, operands…]` for `+ - * div mod bit`; div is floor division with a
+positive divisor. `bit(x,i)` requires nonnegative integers x and i and
+returns floor(x/2^i) mod 2, with no fixed machine-word truncation (K23).
+For x=13, bit(x,0..4) is 1,0,1,1,0; literal construction emits X only
+for the one bits, in increasing bit order. Wires are declaration names with integer-expression
 subscripts. Loops enumerate [from,to) in increasing order; expansion is
 depth first, array order, and recipe dependencies are acyclic. An
 inverse reverses its fully expanded body and adjoints each leaf by
@@ -2262,8 +2269,11 @@ this draft does not claim that prose alone is an interchangeable file.
 
 **Typed binding (K19).** A formal is `{ "name": name, "type": type }`,
 with exactly these keys, except `wire`, which additionally requires
-`width` (an integer expression). Types are `integer`, `wire`, `angle`,
-`body`, `symbol`, `environment`, and `event`. A bare name abbreviates an
+`width`, and `templates`, which additionally requires `length` (integer
+expressions using earlier integer formals); `arguments` requires `symbol`,
+and `value` requires `isa_type`, as specified in K24. Types are `integer`,
+`wire`, `angle`, `body`, `symbol`, `environment`, `event`, `image`,
+`templates`, `arguments`, and `value`. A bare name abbreviates an
 `integer` formal, retaining the printed witness bytes. Names are unique
 within a parameter list. Width expressions use only earlier integer
 formals. A wire formal of width n is the ordered list w[n], with
@@ -2337,6 +2347,82 @@ Acyclicity concerns declared
 recipe/symbol dependencies, not repetition of a higher-order recipe name
 inside finite captured actual syntax: qloop(3, qloop(2, B)) expands to six
 copies of B. Consumers expand finite actual bodies to a constructor fixpoint.
+
+**Image binding (K21).** An `image` actual is a bound image formal or
+an even-length string of lowercase hexadecimal byte pairs in data-image
+byte order, including the empty string. Exactly
+`{ "image": name, "wires": actual }` requires exactly eight wires per
+byte; bit 8j+i of the flattened wire list is bit i of byte j (i=0..7).
+It emits one X leaf for each one bit in increasing bit order, with an
+empty effective-control set regardless of inherited controls. This
+constructor denotes only the unconditional data-image preparation or
+restoration required by §3.5/§4.6; ordinary X gates remain semantic.
+The bytes are serialized in the actual, not resolved from an unbound
+external image name. Image leaves have ordinary row ordinals and the
+same allocation wire identities as semantic leaves. Inverse traverses
+these X leaves in reverse order, still unconditional. Reject malformed
+hex, unbound image or a byte/wire width mismatch. Witness: `"8102"` on
+16 wires emits X at indices 0,7,9; inverse emits 9,7,0, even under a
+false inherited predicate. This fixes the image binding bytes without
+altering §9.2's source data-symbol identity.
+
+**Indexed typed body templates (K22).** A `templates` actual is an ordered
+array of exactly `length` objects, each with exactly `parameters` and
+`body`, or the name of a bound templates formal. Each object's parameters
+use the same typed formal grammar as recipes; its body uses the same
+closed constructors. The array is captured in the caller's lexical
+environment. Exactly `{ "apply": name, "index": scalar, "args": [...] }`
+selects its zero-based element and binds positional actuals evaluated at
+the apply site, with the same type/width/arity validation as invoke.
+Formal bindings shadow captured names only inside that application;
+all free references still resolve in the captured environment. Effective
+controls are the union of captured controls, apply-site controls and
+explicit environment actuals. Fresh allocations include the application
+occurrence in their identity. Applications compose within the containing
+row's ordinal space; they do not introduce a semantic symbol call.
+Reject negative/out-of-range indices, length mismatch, unknown/duplicate
+formals or invalid constructor syntax even in unused templates. Inverse
+reverses the applications and adjoints each selected body using its
+restored positional bindings. This permits row templates with a typed
+frame formal, applied to frame_t, and a step template applied to each
+successive frame without rebinding a captured free name.
+Witness: two templates `(f:wire[2])` containing CX outer f[0] and CX outer
+f[1], applied in index order to a, emit CX outer a[0], CX outer a[1];
+the inverse emits them in reverse order. Applying to a one-wire actual
+rejects. Applying the same template to distinct frame slices cannot
+change its captured outer binding.
+
+**Closure-bound argument vectors (K24).** An `arguments` formal's
+`symbol` names an earlier symbol formal. Its actual is an array of actuals
+in that linked symbol's own formal order, or a bound arguments name for
+the identical closure hash. The vector captures the actuals' lexical
+environment; validate every argument against that symbol's interface at
+binding, even when no call executes. `call` additionally accepts the
+bound arguments name as its `args` value; it forwards the whole vector
+without reinterpreting names in the forwarding recipe's scope. Reject a
+vector bound to another closure, even if the two interfaces have equal
+widths. Each call still has its own invocation path and callee ordinals.
+
+A `value` formal's `isa_type` is `iN` (N a canonical positive decimal),
+`f64`, `token`, or exactly `{ "ptr": N }` with N the linked object's
+positive `ptr_width`. Values use exactly §12.3 invocation encodings:
+canonical unsigned decimal strings within the iN/ptr range, binary64
+bit-pattern hex (including signed zero and NaN payloads for classical
+f64), or four canonical nonnegative decimal strings for a token tuple.
+A value may also be the name of a bound value of exactly the same
+`isa_type`; widening or converting it implicitly is forbidden. Token
+values carry tuples, never process-local ids. This adds no arithmetic
+on classical f64 or tokens inside a recipe.
+
+Witness: a linked interface `(wire[1], wire[3], i128, f64, token)` accepts
+`[a,b,"18446744073709551617","0x7ff8000000000001",["2","0","0","0"]]`.
+A forwarding recipe `(S:symbol,A:arguments(S))` with two calls using A
+preserves all bindings and emits two distinct invocation paths starting
+at ordinal zero. Swapping a and b rejects; 2^128 for i128, a three-part
+token, or an arguments vector for a different closure rejects. This
+binding rule does not replace §3.3's source interface region shape/role
+validation or the §9.2 linker obligation that the registry interface and
+body match the supplied closure hash.
 
 **Angles and quantum witnesses (K20).** An `angle` actual is a bound angle
 formal or a finite binary64 value. Reusing §12.3's bit-pattern encoding:

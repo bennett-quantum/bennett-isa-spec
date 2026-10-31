@@ -77,7 +77,8 @@ fn general_call_records_and_exact_example_counter_widths() {
             }
         }
     }
-    assert_eq!(count, 41760);
+    // 16 width pairs × 3 record sizes × 2 depth limits × 2 stack limits.
+    assert_eq!(count, 43200);
     assert_eq!(check(&mut e, 5, 10, 16, 17, 272), 131072);
-    println!("generic call flags: {count} tuples across 168 configurations; §16.3 R=16, D=5, S=10, limits17/272: 131072 tuples");
+    println!("generic call flags: {count} tuples across 192 configurations; §16.3 R=16, D=5, S=10, limits17/272: 131072 tuples");
 }

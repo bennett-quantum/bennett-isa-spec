@@ -158,11 +158,11 @@ fn binary64_angles_round_trip_and_numerical_adjoint_matrices() {
             assert_eq!(adj[0].angles, [bits ^ (1 << 63)]);
             let matrix = rotation(g, bits).unwrap();
             let inverse = rotation(g, bits ^ (1 << 63)).unwrap();
-            for col in 0..2 {
-                for row in 0..2 {
+            for (col, _) in matrix[0].iter().enumerate() {
+                for (row, inverse_row) in inverse.iter().enumerate() {
                     let mut value = (0.0, 0.0);
                     for k in 0..2 {
-                        let (ar, ai) = inverse[row][k];
+                        let (ar, ai) = inverse_row[k];
                         let (br, bi) = matrix[k][col];
                         value.0 += ar * br - ai * bi;
                         value.1 += ar * bi + ai * br;

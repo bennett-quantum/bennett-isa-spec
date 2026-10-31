@@ -167,3 +167,31 @@ for arbitrary lift.load/store); b-isa-spec-82x (qinplace's printed t/f
 release order conflicts with §11.1 reverse allocation order). Neither is
 silently replaced by a partial specialization. Complete-library hash/count
 remain withheld while these and afi/1a4/3xe/lph are open.
+
+## 2026-10-31 completion resumption — Part 1
+
+Actual starting catalog is **193 recipes** (the earlier pause commit
+fcea698 includes native/call-flag work beyond the 178-recipe prose).
+Baseline harness: **445 pass / 0 fail / 65 unavailable** (510 cases).
+Baseline cargo test aborted after **27 pass / 1 fail** at ref_call_flag's
+incorrect tuple total; the 192 semantic configurations had already passed.
+No semantic checks, widths or domains were removed. The corrected count is
+43,200 plus 131,072 for the exact §16.3 call-counter example. Existing
+native matrix loops also needed an iterator-only clippy correction.
+
+Added §0/§11.1 K21 image bytes/unconditional image X; K22 indexed typed
+body templates; K23 exact literal bit extraction; K24 closure-bound
+argument vectors and arbitrary-width ISA classical/token encodings.
+Four language/binding tests, including invalid unused templates, are green.
+K19/K20 and cbk/8sc were already committed/closed at entry; witnesses stay
+green and qxor bytes/hash are unchanged. afi is resolved by K21. lph's
+explicit frame application is implemented; step catalog witnesses follow.
+1a4 is partially repaired: exact wire/value/token argument forwarding is
+implemented, source region shape/role descriptors still absent. Carry 1a4,
+3xe (classes/output-lifetimes), 1oa (mapped layout records), 82x (qinplace
+release-order conflict with ratified A1). No capability is declared inert.
+
+Part 1 commit: the commit containing this entry (recorded explicitly in the
+next family entry). Headless offline fmt/clippy/test and harness are green;
+full gate logs are project-local .tmp/ref-gate-{0,1,2,3}.log. Recipe bytes
+are unchanged in this Part 1 commit; complete-library marker is untouched.

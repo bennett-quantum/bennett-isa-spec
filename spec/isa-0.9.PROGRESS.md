@@ -844,3 +844,38 @@ recorded in ref progress and bd. No partial-library hash is inserted at
 the complete-catalog marker. The arbitrary-image and qinplace-order fixes
 would exceed the explicitly scoped constructor additions, so are raised
 for a separate contract decision rather than guessed.
+
+
+REF completion resumed 2026-10-31: K21 binds unconditional image bytes
+(afi); K22 adds indexed typed body templates with explicit frame actuals
+(lph); K23 documents the integer bit extractor already used by literal
+recipes. Both new language tests were observed red on unknown constructors
+before implementation. Rejected: controlling image X, opaque image names,
+rebinding body captures by spelling, treating template application as a
+callee ordinal space, and leaving bit extraction implementation-private.
+The qxor witness bytes and hash remain unchanged.
+
+The call-flag regression was reproduced: all 192 semantic configurations
+passed, then the tuple-count assertion failed (43,200 actual vs 41,760
+printed). Its loop/domain and semantic assertions are retained; accounting
+is corrected to 192 configurations / 43,200 tuples, plus the exact §16.3
+5/10-bit counter case (131,072 tuples). This is not a relaxation of the
+call predicate. Baseline harness is 445/0/65, not the older 445/0/60.
+
+Carried contract gaps: 1a4 (arbitrary heterogeneous interface argument-list
+forwarding, including token/classical types), 3xe (class and output/lifetime
+wire binders), 1oa (ordered mapped-region descriptors), and 82x (ratified
+reverse-allocation order versus the printed qinplace sequence). Their exact
+blocking sentences remain in §11.1 and the beads; no partial library is
+published. In particular changing qinplace's release order or adding a
+ratified-A1 exception needs a contract decision, not an expander default.
+
+K24 adds captured closure-bound argument vectors and exact classical/token
+values, including >64-bit integers and NaN payloads. Its forwarding test
+failed on the missing args-name constructor before implementation. Rejected:
+reinterpreting captured actual names in the forwarder's scope, word-sized
+classical integers, token ids, implicit value widening, and sharing caller
+ordinals with symbol calls. 1a4 is carried until source region shape/role
+metadata is encoded (the vector mechanism itself is now implemented); it
+shares that remaining descriptor gap with 1oa. No flattened wire shape is
+misrepresented as a complete region interface.
