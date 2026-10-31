@@ -76,4 +76,43 @@ for a, b in [("a","a.c"),("a.b","a.b.c"),("a.b.c","a.b.c.c")]:
                       interface_regions={a:{"c.db":{"base":16}},b:{"db":{"base":base}}},
                       null_size=1,ptr_width=32)
         case(f"deep-{a}-{base}",[oracle(a,8,"c.db"),oracle(b,8,"db")],layout)
+
+# Exact council two-function probes. These pin the binary64 and discrete cases
+# independently of the larger control_flow fixture and every interpreter hash.
+phase = "action @phase (t:wire mut) () () () ()\n^entry():\nrz 6.283185307179586 t\n"
+discrete = "s t\ns t\nx t\ns t\ns t\nx t\n"
+probe = "action @probe (t:wire mut, p:wire mut) () () () ()\n^entry():\nh p\nctl p action_call @phase (t) () () ()\nh p\n"
+for tag, body, hp, ho, op in [
+    ("rounded-probe",phase,"eb4b8c89a878e6fb8c514214417d0827f809fe0fd6b155e2f395ec19f5f31271","0655c9e45f09d1748fbf0241e6d38244e7f353153a3f365f0a5f712b37a6e24d","04baeadb96dbafb2dc94832982272b6cfeb60174de6c8bb407bd28a3e4c37294"),
+    ("exact-probe",phase.replace("rz 6.283185307179586 t\n",discrete),"300340284f4927db0fc9ccf6b6285917606928b2926e62e015034eb0174e2713","0dcda336816f668d43eb75a083d0ee26574ccf854078a639de0a08a64f79009d","0b71a29321bd566442de1d6e61774603031c3616a0b1cb4875b7719016837457")]:
+    case(tag,[("phase",action,body,[]),("probe",dict(action,mut=[1,1]),probe,["phase"])],
+         expected=({"phase":hp,"probe":ho},op))
+
 (ROOT/"support/r11_cases.json").write_text(j(cases)+"\n")
+
+# Idempotently add minus_i while retaining the literal rounded phase. Only
+# controlled_phase depends on minus_i. All other stored pins stay unchanged.
+fixture = ROOT/"fixtures/control_flow.bisa"
+text = fixture.read_text()
+symbols = json.loads(text.splitlines()[3])
+functions = text.split("section functions\n")[1].split("\nsection data\n")[0]
+minus = "action @minus_i (t:wire mut) () () () ()\n^entry():\n"+discrete
+if "action @minus_i " not in functions:
+    functions = functions.replace("action @controlled_phase ",minus+"action @controlled_phase ")
+functions = functions.replace("ctl p action_call @phase (t) () () ()","ctl p action_call @minus_i (t) () () ()")
+minus_env = "isa=0.8\nptr_width=32\n"+j(action)+"\n"+minus
+minus_hash = sha(minus_env)
+control_sig = dict(action, **{"in":[1]})
+control_body = "action @controlled_phase (t:wire mut) (p:wire in) () () ()\n^entry():\nctl p action_call @minus_i (t) () () ()\n"
+control_env = "isa=0.8\nptr_width=32\n"+j(control_sig)+"\n"+control_body.replace("@minus_i ","@"+minus_hash+" ")+minus_hash+"\n"
+for symbol in symbols.values():
+    if symbol["name"]=="controlled_phase":
+        symbol["interface_hash"] = sha(control_env)
+if not any(s["name"]=="minus_i" for s in symbols.values()):
+    symbols[str(len(symbols))] = dict(name="minus_i",kind="action",signature=action,interface_hash=minus_hash)
+text = text.split("\nsection symbols\n")[0]+"\nsection symbols\n"+j(symbols)+"\n\nsection functions\n"+functions+"\nsection data\n"+text.split("\nsection data\n")[1]
+fixture.write_text(text)
+pins = dict(envelopes=dict(minus_i=minus_env,controlled_phase=control_env),
+            hashes=dict(minus_i=minus_hash,controlled_phase=sha(control_env)),object_hash=sha(text))
+(ROOT/"support/r11_control_flow_pins.json").write_text(j(pins)+"\n")
+print("control_flow",pins["hashes"],pins["object_hash"])

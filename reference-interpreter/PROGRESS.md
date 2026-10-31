@@ -16,8 +16,8 @@ including malformed objects, without interpreter calls or pin corrections.
 | Blocker | RED tests | Status | Commit |
 |---|---|---|---|
 | SOL-R11-B01 ≡ R11-B01 | parser::r11_action_regs_do_not_produce_wires / r11_action_regs_cannot_invent_angles; CLI wire/angle counterparts | GREEN, 6 targeted pass; full suite 344/0/5 | d3e3c21 |
-| SOL-R11-B02 ≡ R11-B02 | identity::r11_oracle_layout_ownership_uses_exact_names / r11_dotted_oracle_layout_ownership; CLI counterpart | GREEN; full suite 348/0/5 | this step |
-| SOL-R11-B03 ≡ R11-B03 | qinplace and rounded-angle fixture claims | pending | — |
+| SOL-R11-B02 ≡ R11-B02 | identity::r11_oracle_layout_ownership_uses_exact_names / r11_dotted_oracle_layout_ownership; CLI counterpart | GREEN; full suite 348/0/5 | fc6ab68 |
+| SOL-R11-B03 ≡ R11-B03 | r1_fixtures::r11_qinplace_comment_matches_budget_contract; quantum_control::qif_and_nested_control_preserve_interference | GREEN; full suite 353/0/5 | this step |
 
 B01 RED: parser 0 passed / 3 failed, CLI 1 passed / 1 failed;
 separate exact angle CLI 0 passed / 1 failed. Initial test-source quoting
@@ -43,8 +43,31 @@ remain. Six dotted-name positives plus three own-base sensitivity controls
 include colliding rendered paths. Both member pin sets match without correction.
 Initial test build used the wrong OracleInput field; fixed before semantic RED.
 Logs: .tmp/r11-b02-{red,green,full}.log.
-Remaining work: B03 fixture audit/fixes,
-README Design, final gates and five sweeps, external response and commits.
+B03 RED: 8 passed / 2 failed (3/1 quantum_control, 5/1 fixture target).
+The strict basis assertion rejected the old rounded-angle circuit and the
+qinplace sidecar equality failed; retained rounded probe already passed.
+First GREEN: 74/0 (63 CLI, 4 quantum_control, 7 fixtures); added exact minus-I
+both-basis/direction coverage and corrected the same misleading inline TAU
+comment in quantum.rs afterward. Final full suite: 353 passed / 0 failed / 5 ignored (15.36 s runner sum).
+
+All 16 fixture sidecars and generated comments were audited against literal
+rows and ISA rules. Details: tests/support/r11-comment-audit.md. Only the two
+reported sidecars needed semantic corrections; control_flow's data-symbol
+wording was clarified. The r9 generator branches on sol-qinplace, preserving
+valid direct-oracle B=0 cancellation. All four r9 .bisa byte hashes remain.
+The original @phase retains its literal bytes/hash. @minus_i uses S S X S S X;
+controlled_phase now calls it. Independent literal envelope derivation repins
+only this dependency plus the new symbol. Both codex standalone rounded/exact
+probe H/object triples reproduce exactly; no member pin correction.
+Design: exact structured owner selection precedes dotted rendering, and
+fixture evidence distinguishes exact support from diagnostic rounding and
+checks token preconditions. README now records all three round-11 rules.
+No runtime quantum or qinplace semantics changed for B03.
+Normal/fmt/strict all-target Clippy gates pass; 0 warnings (Clippy 1.12 s).
+Owned diff --check is clean. New control_flow object hash:
+e7e0acadaebf638a1adb34adb61efc2c79b43f0ec90b786582d2fdb6db7634d8.
+Remaining: five ignored sweeps, external response and final evidence commits.
+ISA 0.8 gap/amendment: none. Existing staging and SPEC-QUESTIONS unchanged.
 
 ## Round-10 fixes (2026-10-30)
 

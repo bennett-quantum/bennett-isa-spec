@@ -404,3 +404,23 @@ suffixes use canonical INT spelling at load. State JSON selects support exactly
 and approximates rotation phases using bounded finite factors, even when their
 combined symbolic angle exceeds binary64. Numerical/channel certificate claims
 still report the staged rigorous interval checker as deliverable 11.
+
+
+## Design: kind, ownership and fixture evidence
+
+Register files are kind-specific at load: oracle/lproc locations are reg[N],
+CC/R use dynamic SSA, and action/perm_action workspace comes from Q producers.
+An empty regs line remains legal and carries loop bounds. A named rotation
+angle must be an f64 classical argument fixed at region entry (§3.1).
+
+Oracle identity selects interface_regions by exact structured JSON owner key
+before flattening layout leaves (§9.2); dots remain legal in owner and region
+names. Every non-interface leaf remains in the oracle envelope.
+
+Fixture hand derivations must distinguish exact semantic support, rounded
+diagnostic amplitudes and token preconditions. A finite binary64 angle is
+never symbolic pi. Probability-one interference uses an exact discrete
+minus-I action; the rounded-angle probe must retain both support keys.
+qinplace identity requires a fault-free token; B=0 is a §4.5 rejection.
+Literal envelopes and independent hashlib pins precede interpreter checks.
+The complete round-11 sidecar audit is in tests/support/r11-comment-audit.md.

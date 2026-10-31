@@ -58,13 +58,16 @@ fn every_gate_and_controlled_global_phase() {
             close(a, b);
         }
     }
-    // Controlled Rz(2*pi) is -I on its enabled subspace; global phase matters.
+    // TAU is a rounded binary64 angle. The enabled phase is near -1, but
+    // interference retains a strictly nonzero residual branch (§3.1/§4.4).
     let mut q = QuantumState::new();
     let w = q.allocate(2).unwrap();
     q.gate("h", &[w[0]], None, &[]).unwrap();
     q.gate("rz", &[w[1]], Some(std::f64::consts::TAU), &[w[0]])
         .unwrap();
     q.gate("h", &[w[0]], None, &[]).unwrap();
+    assert_eq!(q.exact_support().len(), 2);
+    assert!(q.read_basis(&[w[0]]).is_err());
     close(q.amplitudes().unwrap()[1], Complex::new(1.0, 0.0));
 }
 #[test]

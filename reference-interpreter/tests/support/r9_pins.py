@@ -38,5 +38,10 @@ for name, oracle, body, expected_h, expected_object in CASES:
     text = HEADER + j(symbols) + "\n\nsection functions\n" + (oracle or "") + function
     assert sha(text) == expected_object, (name, sha(text))
     (ROOT / ("r9-" + name + ".bisa")).write_text(text)
-    (ROOT / ("r9-" + name + ".comments")).write_text("Hand: H; O; O†; H = I (oracle B=0 fault XORs also cancel); CX(0,b)=I_bR.\n" if oracle else "Hand: each visit returns b under clean c, frees c and allocates a fresh zero; H²=I_t.\n")
+    comment = ("Hand: for B >= 1, @o is the one-step identity permutation, both qinplace rows are I, H^2=I, and CX(0,b)=I_bR. B=0 rejects under §4.5 because the oracle faults; it is not an identity run.\n"
+               if name == "sol-qinplace" else
+               "Hand: H; O; O†; H = I (oracle B=0 fault XORs also cancel); CX(0,b)=I_bR.\n"
+               if oracle else
+               "Hand: each visit returns b under clean c, frees c and allocates a fresh zero; H²=I_t.\n")
+    (ROOT / ("r9-" + name + ".comments")).write_text(comment)
     print(name, "H=" + h, "object=" + sha(text), "envelope-bytes=" + str(len(envelope.encode())))

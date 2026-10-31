@@ -4,6 +4,51 @@ mod support;
 use bennett_isa_ref::Object;
 use std::path::PathBuf;
 
+#[test]
+fn r11_qinplace_comment_matches_budget_contract() {
+    let expected = "Hand: for B >= 1, @o is the one-step identity permutation, both qinplace rows are I, H^2=I, and CX(0,b)=I_bR. B=0 rejects under §4.5 because the oracle faults; it is not an identity run.\n";
+    assert_eq!(include_str!("fixtures/r9-sol-qinplace.comments"), expected);
+    let o = Object::parse(support::r9_fixture("sol-qinplace")).unwrap();
+    o.check_hashes().unwrap();
+    support::r9_identity(
+        &o,
+        &[bennett_isa_ref::Argument::Token(
+            bennett_isa_ref::Budget::steps(1),
+        )],
+    );
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/r9-sol-qinplace.bisa");
+    for t in ["0", "1"] {
+        for budget in ["token:0,0,0,0", "token:1,0,0,0"] {
+            let out = std::process::Command::new(env!("CARGO_BIN_EXE_bennett-isa-ref"))
+                .args([
+                    "run-action",
+                    path.to_str().unwrap(),
+                    "a",
+                    "--mut",
+                    t,
+                    "--arg",
+                    budget,
+                ])
+                .output()
+                .unwrap();
+            if budget == "token:0,0,0,0" {
+                assert_eq!(out.status.code(), Some(1));
+                assert!(out.stdout.is_empty());
+                assert!(String::from_utf8_lossy(&out.stderr).contains("§4.5"));
+            } else {
+                assert!(out.status.success(), "{out:?}");
+                let v = support::json(std::str::from_utf8(&out.stdout).unwrap());
+                assert_eq!(
+                    v.get("state").unwrap().canonical(),
+                    format!(r#"{{"{t}":[1,0]}}"#)
+                );
+                assert_eq!(v.get("wires").unwrap().uint().unwrap(), 1);
+            }
+        }
+    }
+}
+
 fn fixtures() -> Vec<PathBuf> {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
     let mut out: Vec<_> = std::fs::read_dir(dir)
@@ -371,7 +416,7 @@ fn fixture_identities_are_pinned_as_literals() {
         (
             "control_flow",
             "controlled_phase",
-            "ab91d03274c13ebfeb0832746e0567b6fe2e3178d34300ffb353cfc1cb2fbc06",
+            "9d9c349c97df952f56700426fc92bc1c1f7937d144f868f2f2287d7ec243f3cb",
         ),
         (
             "control_flow",
@@ -382,6 +427,11 @@ fn fixture_identities_are_pinned_as_literals() {
             "control_flow",
             "image",
             "fd66ff5ee2580e4f999e4e85e74e2e24de2b54ffa1c70c4a6b90dc63e56a8e90",
+        ),
+        (
+            "control_flow",
+            "minus_i",
+            "caec1fe67f4d082c9e4c9286aa43c12ffb3ba5baa75db05769bb451b8fbae443",
         ),
         (
             "control_flow",
@@ -649,5 +699,35 @@ fn r10_independent_effective_control_and_grammar_pins() {
             bennett_isa_ref::sha256_hex(support::r10_text(tag).as_bytes()),
             c.get("object_hash").unwrap().string().unwrap()
         );
+    }
+}
+
+#[test]
+fn r11_control_flow_pins_match_literal_envelopes() {
+    let pins = support::json(include_str!("support/r11_control_flow_pins.json"));
+    let o = Object::parse(include_str!("fixtures/control_flow.bisa")).unwrap();
+    let id = o.identity().unwrap();
+    assert_eq!(
+        id.object_hash,
+        pins.get("object_hash").unwrap().string().unwrap()
+    );
+    for (name, env) in pins.get("envelopes").unwrap().object().unwrap() {
+        let env = env.string().unwrap();
+        assert_eq!(id.envelopes[name], env);
+        let h = bennett_isa_ref::sha256_hex(env.as_bytes());
+        assert_eq!(
+            h,
+            pins.get("hashes")
+                .unwrap()
+                .get(name)
+                .unwrap()
+                .string()
+                .unwrap()
+        );
+        assert_eq!(id.interface_hashes[name], h);
+        assert_eq!(id.closure_hashes[name].as_deref(), Some(h.as_str()));
+    }
+    for tag in ["rounded-probe", "exact-probe"] {
+        support::r11_pin(tag);
     }
 }

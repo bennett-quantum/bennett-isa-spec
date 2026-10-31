@@ -89,7 +89,55 @@ fn qif_and_nested_control_preserve_interference() {
     o.execute_action("controlled_phase", &mut q, &b, false, &[])
         .unwrap();
     q.gate("h", &p, None, &[]).unwrap();
-    assert!((q.amplitudes().unwrap()[2].re - 1.0).abs() < 1e-12);
+    assert_eq!(q.read_basis(&p).unwrap(), 1);
+    assert_eq!(q.exact_support(), vec![(vec![false, true], (1.0, 0.0))]);
+}
+
+#[test]
+fn r11_rounded_angle_retains_nonzero_interference_branch() {
+    // θ is the binary64 literal, not symbolic 2π. The exact amplitudes are
+    // (1+exp(-iθ/2))/2 and (1-exp(-iθ/2))/2, so both branches are nonzero.
+    let o = fixture();
+    let mut q = QuantumState::new();
+    let w = q.allocate(2).unwrap();
+    let mut b = QuantumBindings::default();
+    b.bundles.insert("t".into(), vec![w[0]]);
+    q.gate("h", &[w[1]], None, &[]).unwrap();
+    o.execute_action("phase", &mut q, &b, false, &[w[1]])
+        .unwrap();
+    q.gate("h", &[w[1]], None, &[]).unwrap();
+    let support = q.exact_support();
+    assert_eq!(
+        support
+            .iter()
+            .map(|(bits, _)| bits.clone())
+            .collect::<Vec<_>>(),
+        vec![vec![false, false], vec![false, true]]
+    );
+    assert!(q.read_basis(&[w[1]]).is_err());
+    assert_eq!(support[0].1, (0.0, -6.12323823339278e-17));
+    assert_eq!(support[1].1, (1.0, 6.12323823339278e-17));
+}
+
+#[test]
+fn r11_exact_minus_i_on_both_basis_states() {
+    let o = fixture();
+    // S S X S S X gives -|0> and -|1>; its adjoint does too.
+    for value in [false, true] {
+        for adjoint in [false, true] {
+            let mut q = QuantumState::new();
+            let w = q.allocate(1).unwrap();
+            if value {
+                q.gate("x", &w, None, &[]).unwrap();
+            }
+            let mut b = QuantumBindings::default();
+            b.bundles.insert("t".into(), w);
+            o.execute_action("minus_i", &mut q, &b, adjoint, &[])
+                .unwrap();
+            assert_eq!(q.exact_support(), vec![(vec![value], (-1.0, 0.0))]);
+            assert_eq!(q.wire_count(), 1);
+        }
+    }
 }
 
 #[test]

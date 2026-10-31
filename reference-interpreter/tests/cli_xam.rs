@@ -1922,3 +1922,23 @@ fn r11_cli_exact_oracle_layout_owners() {
         }
     }
 }
+
+#[test]
+fn r11_cli_rounded_and_exact_phase_probes() {
+    for tag in ["rounded-probe", "exact-probe"] {
+        support::r11_pin(tag);
+        let path = tmp_file(&format!("r11-{tag}.bisa"), &support::r11_text(tag));
+        assert_eq!(text(&ok(&["check", &path]), "status"), "ok");
+        let v = ok(&["run-action", &path, "probe", "--mut", "0,0"]);
+        if tag == "rounded-probe" {
+            assert_eq!(
+                field(&v, "state").canonical(),
+                r#"{"00":[0,-6.12323823339278e-17],"01":[1,6.12323823339278e-17]}"#
+            );
+            assert_eq!(field(&v, "mut").canonical(), "[0,null]");
+        } else {
+            assert_eq!(field(&v, "state").canonical(), r#"{"01":[1,0]}"#);
+            assert_eq!(field(&v, "mut").canonical(), "[0,1]");
+        }
+    }
+}
