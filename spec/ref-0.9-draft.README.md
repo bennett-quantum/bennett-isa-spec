@@ -1,6 +1,6 @@
 # ref 0.9 constructor catalog — incomplete, not publishable
 
-Current checkpoint: **217 recipes**. The complete-library hash/count marker
+Current checkpoint: **218 recipes**. The complete-library hash/count marker
 in draft §11.1 remains untouched. No ref/ publication or schedule binding is
 claimed. Historical checkpoints and family witness counts are retained in
 [the progress file](ref-0.9-draft.PROGRESS.md). No interpreter source was read
@@ -10,7 +10,7 @@ The document is RFC 8785 canonical UTF-8 without a trailing LF; recipes are
 ordered by bytewise kind. Every recipe has kind, ordered parameters, body,
 scratch, removable:[], and its motivating ISA source. Typed formals,
 constructors, lexical capture, call ordinal spaces and fresh allocation
-identities are defined by §11.1 K19–K24. An image actual binds exact data
+identities are defined by §11.1 K19–K27. An image actual binds exact data
 bytes; empty means absent/default-zero even for non-byte-aligned regions.
 Template application binds explicit frame/wire actuals while preserving free
 captures. Arguments vectors are tied to one closure hash and capture their
@@ -58,14 +58,18 @@ names, bound images and constructor order are hash-significant.
 | §4.7 adj/ctl | adj/ctl body composition; complete symbol interfaces use K24/K26 |
 | §4.7 oracle_call/action_call | oracle_call/action_call: complete K24/K26 interface forwarding |
 | §4.8 opcode summary; §4.9 faults | Same rows above; classical faults retained in bound §4.1 event/history semantics |
-| §5.2 allocate/forward/commit/reverse/release | **Blocked 3xe:** heterogeneous state allocation/class/lifetime metadata; step-template frame binding itself is now K22 |
+| §5.2 allocate/forward/commit/reverse/release | oracle.construct: K25 state/frame descriptors, catalog step loop, commit, prefix reversal and reverse-order state release |
 
-The exact blockers remain capabilities to implement. Passing a prebuilt
-caller dispatcher/activation/construction as an opaque body does not put
-its algorithm in the catalog and is not a completed row. Beads use the
-b-isa-spec- prefix: cbk/8sc closed before this resumption, afi/lph repaired
-by K21/K22, 1a4/3xe/1oa/82x carried, evi filed for residual activation
-metadata. The catalog parent 8r4 stays open.
+The sole remaining contract blocker is qinplace (82x). Accepted §4.5
+prints `qfree t; qfree f` after allocating t then f; ratified §11.1/A1
+requires library scratch released in reverse allocation order. Resolving
+that conflict needs a generated-order/ratification decision, not a new
+binding type. No recipe or complete-library marker is supplied for it.
+Closed: 1oa/evi (K25), 1a4 (K26), 3xe (K27), 4nx (existing K23).
+The catalog parent 8r4 remains open. All other current rows have recipes;
+the family witnesses certify their stated configurations, not every
+possible source object or an ISA 0.9 executor. Linked source/layout and
+closure-hash validation remains a prerequisite to typed descriptor input.
 
 ## Evidence and limits
 
@@ -104,13 +108,13 @@ The generic call predicate adds 43,200 tuples across 192 configurations
 the exact §16.3 D5/S10/R16/limits17/272 counter configuration.
 
 Current **checkpoint-only** envelope SHA-256 (Rust and Python -I):
-`74bf368112db2f4ab86ff4403981bb9585678d12be2fb63f9993355a770b05a5`.
+`64a05ef20201faad429ca2568ee27848fae0b833f95c006a7d594df0313da4ca`.
 The historical 54-recipe checkpoint was
 `3a99ce3028e1ecc421b3991e3b5b7423ee33323badc5ca3ce1e61088a5e5055d`.
-Neither is a complete-library binding. K25 closes the lift.load language gap; remaining catalog families follow, with qinplace still blocked on 82x.
+Neither is a complete-library binding. The sole omitted row is qinplace, blocked on 82x.
 
-Final local gate: **88 Rust pass / 0 fail**, fmt/clippy green; harness
-**445 pass / 0 fail / 68 unavailable**, versus entry 445/0/65. New commits:
+Previous-pass gate (historical): **88 Rust pass / 0 fail**, fmt/clippy green; harness
+**445 pass / 0 fail / 68 unavailable**, versus that pass's entry 445/0/65. Previous-pass commits:
 bbb1b62 (Part 1), 0656e14 (step/qregion family and resumed native evidence);
 see progress for the exported-beads bookkeeping commit. No push.
 
@@ -129,7 +133,7 @@ accesses 1/2/3/4/16 bytes, with 0/1/2/3 mapped byte regions as width permits;
 plus P=5, 16-byte accesses with 0/17 mapped regions. All memory, mapped
 cells, values, fault/code and table inputs are arbitrary, flag/slot clean;
 one table entry, legal base+size<=2^P, atop=0/1, ambient control included.
-Exact tuples per configuration: (M*(M+3)/2-1)*2^(P+9+8*B+16*M), M=2^P.
+Exact tuples per non-alias configuration: (M*(M+3)/2-1)*2^(P+9+8*B+16*M), M=2^P.
 Total tuples: 167143296548916895889517112694306429377925266509132267598234820116853215623227220551812585180993364921141732939506160915932057223539145589421667637993405146421832216413988502350229780370880234778525696. Scratch and complete reversal checked.
 
 Four additional P=N=8, H=2 byte configurations bind value/destination
@@ -176,3 +180,32 @@ is now separate, with fault writes after all exchanges (§3.6). The
 88 full-domain memory shapes and ordinal test are rerun after correction,
 and independent Rust/Python checkpoint hashes are recomputed. This
 corrects generated order without changing the byte-memory permutation.
+
+## Completion II construction family / final checkpoint
+
+`oracle.construct` allocates and initializes the K25 state list, invokes
+its catalog step algorithm for each source-bound frame, commits, reverses
+frames and releases state in reverse allocation order. It takes source
+row/successor templates; no caller supplies an opaque dispatcher.
+Its 60 full-domain shapes use W1–4 and B0/1/2/3/17: assignment followed
+by success, assignment followed by fault7, and a nonhalting update cycle.
+**2,246,400 tuples** include arbitrary two-input/target/fault values and
+both ambient controls, retained assignment history, complete reversal,
+and unconditional local image initialization/restoration (81). Every
+private state descriptor is marked scratch on acquire, with classification
+retained through record scope and release aliases.
+
+All corpus cases remain pending 0.9. Final gate and commit mapping are
+recorded in the progress file; the final suite passes 108 Rust tests
+and harness 445/0/73. Full-domain witnesses at one construction program
+family do not claim exhaustive source-program enumeration. Large memory
+examples, source/link validation and recursive programs are covered by
+separate component witnesses, not inferred from these construction tuples.
+
+Final verified gate: **108 Rust tests pass / 0 fail**, including
+ref_call_flag.rs; fmt --check and clippy --offline --all-targets -D warnings
+green. Harness **445 pass / 0 fail / 73 unavailable**, compared with
+entry **445/0/68**; exactly five new pending-0.9 cases account for +5.
+Rust/Python canonical bytes and checkpoint envelope agree. Accepted 0.8
+SHA-256 remains 90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e;
+qxor witness hash remains 299510fd67cc626fdcbcc10adcd40730f9af294ba596d86fb25fd31be08a5c7f.

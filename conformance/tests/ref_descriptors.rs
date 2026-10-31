@@ -204,3 +204,21 @@ fn declaration_handles_cannot_bypass_declared_library_scratch_lifo() {
         "declared library scratch must stay LIFO"
     );
 }
+
+#[test]
+fn acquired_record_handles_retain_recipe_scratch_classification() {
+    let d = doc(
+        "[]",
+        r#"[{"declare":"a","width":1,"class":{"class":"any"},"state":"clean","body":[{"declare":"b","width":1,"class":{"class":"any"},"state":"clean","body":[{"invoke":"use","args":[[{"storage":"a"},{"storage":"b"}]]}]}]}]"#,
+    );
+    let mut d = json::parse(&d).unwrap();
+    if let Json::Obj(m) = &mut d {
+        if let Some(Json::Arr(rs)) = m.get_mut("recipes") {
+            rs.push(json::parse(r#"{"kind":"use","parameters":[{"name":"D","type":"records","fields":[{"name":"storage","type":"allocation"}],"order":[]}],"body":[{"visit":"D","body":[{"acquire":"storage"}]},{"visit":"D","body":[{"relinquish":"storage"}]}],"scratch":["storage"],"removable":[],"source":"K25/K27 private state descriptors"}"#).unwrap());
+        }
+    }
+    assert!(
+        expand(&d.to_string(), "[]", &[]).is_err(),
+        "private record allocations cannot release in forward order"
+    );
+}

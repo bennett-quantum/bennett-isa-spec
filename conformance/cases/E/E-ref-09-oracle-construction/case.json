@@ -1,0 +1,30 @@
+{
+  "id": "E-ref-09-oracle-construction",
+  "suite": "E",
+  "spec": "\u00a75.2; \u00a73.6; \u00a711.1 K25/K27",
+  "derivation": "Source row templates implement add then retval/fault or nonhalting cycle; catalog owns all allocation/step/commit/reversal logic. Independent BDD arithmetic over every input/target/fault/control tuple; every lifetime is clean and reversed, image initialization unconditional.",
+  "scenario": {
+    "widths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "bounds": [
+      0,
+      1,
+      2,
+      3,
+      17
+    ],
+    "checker": "ref_construction.rs"
+  },
+  "expected_outcome": {
+    "shapes": 60,
+    "tuples": 2246400
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "unavailable pending 0.9: b-isa-spec-8r4; accepted K25/K27 and complete library required"
+  }
+}

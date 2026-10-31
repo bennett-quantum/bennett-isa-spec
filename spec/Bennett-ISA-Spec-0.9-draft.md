@@ -2486,6 +2486,36 @@ against the linked source declarations/layout before expansion:
   mappings. These lists add no locations for token/classical/region
   arguments; those remain K24/K26 fixed bindings.
 
+* A construction state list has `width`, `initial` integers, `I:image`,
+  `storage:allocation`, with empty `order` (array order). Each storage
+  identity is distinct, clean and exactly `width` bits; its class is
+  `any` for the implicit §5.2 state. In allocation order the list is:
+  pc, pc-prime, faulted, code, result_val; then heap_used, atop, sp, fp,
+  depth, ordinary mem, stack when layout state exists; locations in global
+  id order; local regions in declaration order; alloctab when layout state
+  exists; frames 0..B-1. Omit only the layout state excluded by §7.2's
+  memoryless-object rule. Counter widths/values are the reference widths
+  and initial values of §3.7; all other non-image initial values are zero
+  except alloctab pre-entries. A table cell packs base[ptr_width],
+  size[ptr_width], live, pinned, in that LSB-first order; pre-entries are
+  in §3.7's layout order and unused entries are zero. Image-bearing mem
+  and local regions have initial=0. Ordinary mem's I is exactly 2^H
+  bytes, initially zero, with each global's image overlaid at its layout
+  base; bytes hidden by mapped interface regions remain zero. A local
+  region's I is its exact bound data image, or empty for absent/default
+  zero. Every other record has I empty and initial
+  the nonnegative integer encoding of its initial bit vector, strictly
+  below 2^width. Mapped interface regions are borrowed inputs, never
+  acquired by this state list. A separate frame list has `index` integer
+  and `frame:allocation`, ordered by index; it contains exactly B entries
+  indexed 0..B-1, referring to the identical frame handles in the state
+  list, each with §3.6's fixed frame width and field order. Reject any
+  mismatch of source state, image, width, class, order or identity. The
+  construction acquires/initializes this list, invokes the catalog `step`
+  once per frame, commits, then reverses frames and initialization before
+  releasing the list in reverse order; source row/successor templates
+  supply rows, never a replacement dispatcher or construction body.
+
 Witness: byte records `(base=0,extent=1,cells=a[8])` and
 `(base=1,extent=2,cells=b[16])` bind addresses 0,1,2 to a[0..8),
 b[0..8),b[8..16), respectively. Visiting X on each first bit emits
@@ -2494,6 +2524,11 @@ id 0/slot 0 followed by a one-bit location id 1/slot 1 exchanges only
 the low 2 and low 1 bits of stack cells old_sp+3 and old_sp+4;
 return/inverse address them at restored_fp+3 and restored_fp+4.
 Exchanging the two record positions rejects for id order.
+A construction witness with rows `loc = lift.add x y; lift.retval loc`
+commits fault 1 for B=0/1 and `(x+y) mod 2^W` into the arbitrary target
+for B>=2, preserving inputs and cleaning every state/frame allocation.
+A local image 81 emits unconditional X at cell bits 0,7 and restores them
+before release, including under a false external predicate.
 
 **Source region bindings (K26).** A `region` formal has exactly `name`,
 `type`, `address`, `cell`, `role`; address/cell are integer expressions

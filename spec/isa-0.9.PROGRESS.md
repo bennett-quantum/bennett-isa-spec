@@ -936,3 +936,14 @@ than silently treating qinplace's private scratch as caller results.
 K26 origin suffix is now the exact source NAME token; occurrence identity
 is the origin binding plus the already retained cell wire identities,
 which disambiguate repeated invocations without an unspecified string form.
+
+K25 construction uses the same record vocabulary: width/initial/image and
+shared storage handle; a separate indexed frame list aliases exactly the
+state list's B frame handles. Source formation fixes the printed §5.2
+group order and the reference §3.7 widths/initial values, with byte images
+remaining K21. Rejected: an opaque caller construction body, image-only
+initialization of non-byte state, bytewise name sorting across declaration
+order, and flattening all heterogeneous frames into caller-private circuits.
+The catalog invokes its own step algorithm; only source row/successor
+templates are supplied. Record acquire retains the recipe scratch mark
+through K25 scope binding, so private state cannot bypass K27 LIFO.

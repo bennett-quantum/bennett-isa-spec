@@ -1024,6 +1024,7 @@ impl Expander {
                     {
                         local.clear_name(n);
                     }
+                    local.scratch_names = c.scratch_names.clone();
                     local.merge(&record);
                     self.body(a(f(j, "body")?)?, &mut local, path, rev, chain, out)?;
                 }

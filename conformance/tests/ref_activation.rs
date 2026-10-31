@@ -28,7 +28,7 @@ fn heterogeneous_recursive_activation_full_symbolic_domains() {
     let mut totals = [0u128; 2];
     let mut configs = 0;
     for w in 1usize..=4 {
-        for dest in [0usize, 1, 3] {
+        for dest in [0usize, 1, 2] {
             for op in ["call", "ret"] {
                 if op == "ret" && dest != 0 {
                     continue;
@@ -52,25 +52,43 @@ fn heterogeneous_recursive_activation_full_symbolic_domains() {
                     ("succ", 3),
                 ];
                 bundles.extend(names.iter().copied().zip(widths));
-                let location = |count: usize| {
-                    (0..count)
-                        .map(|id| {
-                            format!(
-                                r#"{{"id":{id},"width":{},"slot":{id},"location":"{}"}}"#,
-                                widths[id], names[id]
-                            )
-                        })
-                        .collect::<Vec<_>>()
-                        .join(",")
-                };
-                let locations = format!("[{}]", location(3));
-                let globals = format!("[{}]", location(4));
+                // Oracle location id0 precedes the selected lproc's
+                // parameter/result/local ids1..3 in §3.7 source order.
+                let locations = (0..3)
+                    .map(|slot| {
+                        format!(
+                            r#"{{"id":{},"width":{},"slot":{slot},"location":"{}"}}"#,
+                            slot + 1,
+                            widths[slot],
+                            names[slot]
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(",");
+                let locations = format!("[{locations}]");
+                let global_indices = [3usize, 0, 1, 2];
+                let globals = global_indices
+                    .iter()
+                    .enumerate()
+                    .map(|(id, j)| {
+                        format!(
+                            r#"{{"id":{id},"width":{},"slot":{},"location":"{}"}}"#,
+                            widths[*j],
+                            if *j == 3 { 0 } else { *j },
+                            names[*j]
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(",");
+                let globals = format!("[{globals}]");
+                let argument = if dest == 0 { "other" } else { "l0" };
+                let return_index = if dest == 0 { 1 } else { 3 };
                 let common = format!(
-                    r#"2,4,5,6,8,4,3,2,4,2,8,3,{dest},"depth","sp","fp","stack","dfp","dsp","ddepth","flag","faulted","code""#
+                    r#"2,4,5,6,8,4,3,2,4,2,8,{return_index},{dest},"depth","sp","fp","stack","dfp","dsp","ddepth","flag","faulted","code""#
                 );
                 let actuals = if op == "call" {
                     format!(
-                        r#"[{common},{locations},[{{"position":0,"width":{w},"source":"l0","parameter":"l0","capture":"cap"}}]]"#
+                        r#"[{common},{locations},[{{"position":0,"width":{w},"source":"{argument}","parameter":"l0","capture":"cap"}}]]"#
                     )
                 } else {
                     format!(
@@ -166,7 +184,7 @@ fn heterogeneous_recursive_activation_full_symbolic_domains() {
                             }
                         }
                         for (off, bits) in [
-                            (0, Bdd::constant(3, 3)),
+                            (0, Bdd::constant(return_index, 3)),
                             (1, fp.clone()),
                             (2, Bdd::constant(dest, 2)),
                         ] {
@@ -198,18 +216,18 @@ fn heterogeneous_recursive_activation_full_symbolic_domains() {
                             .map(|i| old[m.inputs["stack"][4 * (base + 2) + i]])
                             .collect::<Vec<_>>();
                         let mut valid_id = 0;
-                        for id in 0..4 {
+                        for (id, j) in global_indices.iter().enumerate() {
                             let select = b.equal(&selector, &Bdd::constant(id, 2));
-                            if widths[id] == w {
+                            if widths[*j] == w {
                                 valid_id = b.or(valid_id, select);
                             }
                             let selected = b.and(at, select);
-                            for bit in 0..widths[id] {
+                            for bit in 0..widths[*j] {
                                 swap_if(
                                     &mut b,
                                     &mut want,
                                     m.inputs["delivery"][bit],
-                                    m.inputs[names[id]][bit],
+                                    m.inputs[names[*j]][bit],
                                     selected,
                                 );
                             }
@@ -230,7 +248,7 @@ fn heterogeneous_recursive_activation_full_symbolic_domains() {
                 }
                 if op == "call" {
                     for bit in 0..w {
-                        let d = b.and(success, old[m.inputs["l0"][bit]]);
+                        let d = b.and(success, old[m.inputs[argument][bit]]);
                         want[m.inputs["cap"][bit]] = d;
                         let id = m.inputs["l0"][bit];
                         want[id] = b.xor(want[id], d);

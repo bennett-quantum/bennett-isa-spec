@@ -1,13 +1,13 @@
 # ref 0.9 catalog checkpoint (b-isa-spec-8r4)
 
-Current completion-II state: **217 recipes**, incomplete and not publishable.
+Current completion-II state: **218 recipes**, incomplete and not publishable.
 Contract pass: 90590a7 (K25–K27); byte memory: fedc9c6. K23 also closes 4nx.
 Language gaps 1oa/evi/1a4/3xe are closed with typed-binding witnesses.
 The remaining contract blocker is §4.5 qinplace / 82x: printed t/f release
 order conflicts with the ratified reverse-allocation scratch rule.
-Other remaining rows are catalog implementation work under the new bindings.
+All other README rows now have serialized recipes under the new bindings.
 Current checkpoint-only envelope:
-74bf368112db2f4ab86ff4403981bb9585678d12be2fb63f9993355a770b05a5.
+64a05ef20201faad429ca2568ee27848fae0b833f95c006a7d594df0313da4ca.
 The 195-recipe / 84e89406…3230 sections below are historical.
 
 Status: incomplete, not publishable; no normative catalog hash/count edit.
@@ -367,3 +367,49 @@ is now separate, with fault writes after all exchanges (§3.6). The
 88 full-domain memory shapes and ordinal test are rerun after correction,
 and independent Rust/Python checkpoint hashes are recomputed. This
 corrects generated order without changing the byte-memory permutation.
+
+## Completion II — §5.2 construction
+
+Call/activation commit 7ff93a5 (also memory fault-write ordinal correction
+and scratch-handle hardening). Added oracle.construct: 218 recipes total.
+Observed red at unknown oracle.construct before serialization; 60 BDD
+shapes at W1–4, bounds0/1/2/3/17 then pass / 2,246,400 tuples. Programs
+exercise assignment history before retval, before first fault7, and in a
+nonhalting cycle. Arbitrary inputs, targets, fault entries and controls;
+image81 initialization/restoration remains unconditional. Prefix reversal
+cleans every private state/frame allocation and preserves committed XORs.
+A fixture initially reversed lift.add's slot/destination actuals; the
+independent arithmetic witness caught the zero payload and the binding
+was corrected. No assertion/domain was removed.
+
+K25 state list formation now specifies source order, reference widths,
+initial table packing and byte images; Frames aliases exact State frame
+handles. A further red/green witness ensures acquiring record fields keeps
+the recipe's private scratch classification. It cannot bypass LIFO.
+Checkpoint-only envelope (Rust/Python must agree in final gate):
+64a05ef20201faad429ca2568ee27848fae0b833f95c006a7d594df0313da4ca.
+Sole blocked row: §4.5 qinplace (82x). Exact conflict: §4.5 prints
+`qfree t; qfree f`; §11.1 says `All library scratch is clean, allocated
+unconditionally and released in reverse allocation order after
+uncomputation`. t/f are allocated in that order and instruction-private
+scratch. Changing either required order needs explicit ratification.
+Complete-library hash/count marker remains untouched.
+
+Final construction-family gate: **108 Rust pass / 0 fail**; fmt --check,
+clippy --offline --all-targets -D warnings green; full harness **445/0/73
+(518 cases), exit 2**, from entry **445/0/68 (513)**. Five new cases are
+layout-memory, allocation-results, call-interfaces, activation and
+oracle-construction, all pending 0.9 / 8r4. ref_call_flag remains green.
+Rust/Python canonical bytes and checkpoint envelope agree at 218 recipes.
+Accepted 0.8 fingerprint remains 90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e;
+printed qxor witness bytes/hash unchanged. A section-isolation comparison
+against the Part 1 parent confirms draft edits only in §0 K rows / §11.1.
+
+The activation fixture's final source mapping puts oracle id0 before lproc
+ids1..3, binds nonrecursive arguments from the oracle location and recursive
+arguments from the lproc parameter, with matching return indices1/3.
+Targeted activation proof passes after that fixture-only normalization;
+call/ret domain counts and all semantic assertions are unchanged.
+Construction State uses the same private scratch classification through
+record binding; a red/green regression prevents forward-order releases.
+No interpreter source read/copied, no writes outside owned paths, no push.
