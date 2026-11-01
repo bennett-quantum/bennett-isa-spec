@@ -13,6 +13,8 @@ repository).
 **Round 7: accepted** (2026-11-01, codex seat, 0 blocking). K76 and K77
 were accepted by the codex seat in fix rounds 6–7; the three-seat
 acceptance of the core stands.
+Pass VIII / K78 (resolved primitive identity in §5.6) awaits the
+codex-seat council fix round; the accepted core and prior amendments stand.
 §0 lists every change from 0.8.
 Implementation is expected to expose frictions; revisions go back
 through the council. Founding text of
@@ -197,6 +199,7 @@ north star §3.1 requires).
 | K75 | §12.2 | **UNCHECKED-HOST-LIMIT**. Report host exhaustion separately from labels and rejection without a domain cap; witness: region[63,1] at count 1 remains legal even when one element cannot be stored. [deps: ISA-3.3-P2.S2, ISA-3.3-P19, ISA-12.1-P2, ISA-12.2-P1, ISA-5.6-P2, ISA-14.3-P3, ISA-12.3] | INV-6 gap 12; afu | S | – |
 | K76 | §5.6 | **FRAME-ENTRY-DOMAIN**. Normative constant and causal-adjoint analysis fixes D_F; interface/borrowed components stay independent and full; checker establishes reachable-entry support before restricted T3 factorisation. Witness: CX(0,b) passes, polynomial-only prefix zero does not. | consumer 73y; pass V; SQ 20 | E | – |
 | K77 | §4.7, §11.1, §16.2 | **ORACLE-INVOCATION-CONTEXT**. Explicit typed source-call token context is captured outside the declared argument vector, forwarded through adapters and retained under inverse traversal; each linked oracle construction uses its own tuple. Witness: the same inc8 closure and arguments at B=2 and B=3 in one expansion. | consumer 5xm; pass VII | S | – |
+| K78 | §5.6 | **ENTRY-PRIMITIVE-IDENTITY**. Causal entry analysis uses resolved primitive identity: X-family spellings share the resolved target and effective control set; qxor/qexch contribute per-bit cx/swap events. All-operand causal matching remains; source hashes and occurrence identities are unchanged. Witness: cx a c; mcx (a) c restores c=0, while polynomial-only or reader-interleaved prefixes do not. | consumer 9eq; pass VIII | E | – |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -1406,6 +1409,18 @@ The transfer rules are:
    This is a decidable finite rule set; Boolean polynomial simplification
    and quantum identities beyond these exact adjoint pops supply no
    entry facts.
+
+For rule 2, consumers MUST use resolved primitive-operation identity.
+Resolve `x`, `cx`, `ccx` and `mcx` to one X-family flip kind, identified
+by its resolved target wire and effective control set (all own and
+contextual literals, including polarity). Thus `cx a c` and `mcx (a) c`
+have the same identity. Resolve `qxor` and `qexch` to the per-bit `cx`
+and `swap` operations specified in §4.5 before recording or matching
+events; each event has the identity of the directly written primitive.
+This resolution is confined to this entry analysis: source opcodes,
+hashes and §11 occurrence identities are unchanged. It permits neither
+target-scheme gate decompositions nor Boolean-equivalent circuit
+replacement and leaves the all-operand top-event condition intact.
 
 At a frame entry, retain only the known constants of its allocated local
 wires; every other local component independently takes both values, and

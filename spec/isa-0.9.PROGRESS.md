@@ -1,3 +1,57 @@
+## 2026-11-01 Editorial pass VIII — resolved primitive causal identity (9eq)
+
+Reading **B** adopted. Bead 9eq stays in_progress for the orchestrator's
+codex-seat council fix round. This is a real ambiguity, rather than a
+not-a-defect closure: §4.4 defines the X-family as one exact controlled-X
+operation and K76 resolves controls/operands before transfer, but rule 2's
+“exact §5.3 adjoint” together with the opcode-by-opcode adjoint table can
+also support Reading A. The new text makes the boundary explicit.
+
+| Item | Disposition | Clauses / evidence |
+|---|---|---|
+| B: resolved X-family operation identity | adopted; own/contextual controls form the resolved literal set, independent of source spelling | §4.4, §5.3, §5.6 rule 2; borrow.rs gate lowering to Node::Flip, EffectiveControls, EntryAnalysis::apply |
+| A: preserve source opcode in causal identity | declined; introduces a distinction absent from the reference's primitive node and the specified X-family operation | before-text frame_identity regression; cx/mcx both directions; ccx/mcx with reversed control order; contextual-X/cx |
+| qxor/qexch boundary | adopted; record/match their §4.5 per-bit cx/swap events, including disjoint interleavings | borrow.rs compile qcopy/quncopy/qxor and qexch branches; frame_identity bundle regression |
+| stronger entry facts | declined; no target-scheme lowering or Boolean-equivalent circuit replacement; keep all-operand top-event matching | different-control, intervening-reader and mixed-spelling polynomial-prefix negatives reject §5.6; existing frame_domain negatives retained |
+| inventory | one explicit normalization MUST added: K78 only; K1–K77 unchanged | §0 inventory; exact-label 0.8-to-0.9 diff |
+| reference alignment | already aligned; no src change, fixture edit or weakening | three regression tests green against unchanged reference before text edit; CLI hash/check on all six positive circuits, 64 basis configurations each including both borrowed values |
+
+Before-text evidence: `.tmp/pass-viii-before-text.log`. The initial fixture
+drafting needed canonical NAME-only/comma-separated mcx lists, rehashed
+CLI objects and an explicit idle borrowed bundle; those were harness fixes,
+not a reference/spec mismatch. The final tests establish forward identity
+independently of admission. No red-to-green interpreter fix is claimed.
+
+Exact new normative text, §5.6 after the finite transfer rules:
+
+> For rule 2, consumers MUST use resolved primitive-operation identity.
+> Resolve `x`, `cx`, `ccx` and `mcx` to one X-family flip kind, identified
+> by its resolved target wire and effective control set (all own and
+> contextual literals, including polarity). Thus `cx a c` and `mcx (a) c`
+> have the same identity. Resolve `qxor` and `qexch` to the per-bit `cx`
+> and `swap` operations specified in §4.5 before recording or matching
+> events; each event has the identity of the directly written primitive.
+> This resolution is confined to this entry analysis: source opcodes,
+> hashes and §11 occurrence identities are unchanged. It permits neither
+> target-scheme gate decompositions nor Boolean-equivalent circuit
+> replacement and leaves the all-operand top-event condition intact.
+
+Required pass-VIII headless gates, all exit 0: reference **473 passed,
+0 failed, 5 unchanged ignored**; conformance **113 passed, 0 failed,
+0 ignored**; `python3 -I conformance/tests/draft_witnesses.py` PASS;
+`python3 -I conformance/tools/ref_catalog.py --check` PASS. Logs:
+`.tmp/pass-viii-{reference,conformance,witness,catalog}.log`. Cargo used
+`--offline`; all four gates unset DISPLAY, WAYLAND_DISPLAY,
+DBUS_SESSION_BUS_ADDRESS and BROWSER and set project-local TMPDIR.
+Both new Rust test files pass rustfmt; owned-source whitespace checks pass.
+K1–K77 are byte-identical to 989948e; K78 is the only new row and the
+only new MUST. The exact-label diff is regenerated. Accepted 0.8 and
+catalog bytes remain unchanged; 219 recipes and envelope
+`5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`.
+No reference src edit, fixture weakening, sibling write, push or remote
+sync. Orchestrator owns the council fix round, session worklog and
+statement-layer regeneration in bennett-conformance.
+
 ## 2026-11-01 Editorial pass VII — oracle invocation-token binding (5xm)
 
 Reading **B** adopted. **Round 7: accepted** (codex seat, 0 blocking);

@@ -1,86 +1,82 @@
-# Current state — 2026-11-01 09:45:07 UTC
+# Current state — 2026-11-01 10:43:51 UTC
 
-ISA 0.9 passes VI and VII are implemented in order, with separate commits,
-PROGRESS blocks, Beads notes/exports and complete headless gates. Both
-b-isa-spec-73y and b-isa-spec-5xm stay in_progress for the orchestrator's
-one-reviewer council round 7. No council round was run by this implementer.
-The orchestrator also owns the session worklog and final 0.9 statement-layer
-regeneration / repaired INV-3 citation resolution in bennett-conformance.
-No sibling repository was written in this session.
+Round-7 housekeeping and pass VIII are implemented in order with separate
+commits and complete headless gates. No push, remote/Dolt sync or sibling
+repository write. The orchestrator owns the session worklog, council fix
+round and final statement-layer regeneration / INV-3 citation refresh in
+bennett-conformance. This implementer did not run a council round.
 
-Pass VI / round 6 (codex seat, astra): R6-CODEX-1 adopted exactly in
-§5.6 rule 1, counting own and contextual controls; disabled operations
-preserve values and record no causal event. The full CCX witness was
-accepted by the unchanged reference before the text edit and is now a
-suite F/frame_domain regression lock: c=0 at entry admits the single
-CX(c,b) frame; replacing both CCXs by X gives c=1 with valid cleanup and
-rejects §5.6. Polynomial-prefix, interface-correlation and certificate
-negatives still pass. All three S1s adopted: exact finite-transfer domain
-versus coarser invariants (§5.6 rule 3), frame versus region claim domain
-and illustration (§12.2), statement-layer regeneration assigned to the
-orchestrator. K1–K76 unchanged; no new row in this pass.
+Round 7 accepted passes VI/VII (codex seat, 0 blocking). Beads
+b-isa-spec-73y and b-isa-spec-5xm are closed with that acceptance;
+PROGRESS and the 0.9 status/history header record K76/K77 acceptance in
+fix rounds 6–7 while preserving three-seat acceptance of the core.
+Housekeeping commit: 989948e. An intervening bead-only commit, 7dd1ffd,
+captured the exported closures while the housekeeping gates ran; it was
+preserved. Unrelated consumer issues in the shared Beads export were
+preserved. No source changes from another implementer were incorporated.
 
-Pass VII / 5xm: Reading B, matching the source header and reference's
-separate budget argument. §11.1 defines explicit source-binding channel
-oracle_invocation: exactly token:value(token), canonical four-string tuple
-(B, heap_limit, stack_limit, depth_limit). It is outside A and catalog
-JSON. The linked source-body builder receives per-invocation context and
-derives token-dependent construction parameters from the tuple and linked
-source/layout. Captured A/body/templates preserve it, qinplace captures
-both calls, nested calls resolve their own tk. Source-adjoint replacements
-precede fresh instantiation (K62); inverse traversal preserves instantiated
-forward identities and tuples (K63). §4.7/§16.2 signpost the channel;
-K77 is the only new row. No synthetic source formal or args entry.
-The two-token inc8 worked example uses the same closure/[x,t,f] at B=2
-and B=3: two versus three frames, fault versus x+1, final (x+1,1) from
-zero target/fault. The regression covers all 256 x with nonzero target/
-fault seeds and complete inverse restoration, already green before the
-text edit. Existing K63 qualifies the bead's shorthand: separate source
-points each have call_index=0; two calls in one row expansion use 0/1.
-The generic constructor expander is not a complete ISA source-body builder;
-no new 0.9 executor/source-expander conformance is claimed.
+Round-7 S1: §15 H states the existing K77 argument/body/template capture,
+forwarding, nesting, inverse and rejection vector. The finite inc8 adapter
+witness in reference-interpreter/tests/k77_adapter.rs uses the actual
+catalog expander for invoke/call, body splicing and template application.
+Its out-of-band source binding captures B=2/B=3 under unrelated B=99
+context and restores outer bindings after nested builds. Across all 256 x,
+the independent literal frame machine checks exactly 2/3 frames,
+zero-seed (t,f)=(x+1 mod 256,1), retained forward indices under inverse
+traversal and full state restoration. Absent, malformed, noncanonical and
+source-inconsistent records reject. This is a finite adapter witness,
+not a general ISA-to-catalog source builder or complete 0.9 executor.
+The reference uses a local conformance-crate dev dependency for this test;
+no published catalog bytes changed. Statement-layer S1 stays with the
+orchestrator; no bennett-conformance write was made.
 
-Commits in this session:
-- 44ffea0 — pass VI spec/diff and frame-domain regression.
-- 74af3fe — pass VI dispositions, gates and Beads export.
-- 1d86f00 — pass VII context contract, K77, diff and two-token regression.
-- 4f7e18f — distinguish source-adjoint from inverse context traversal.
-- Final record commit — pass VII PROGRESS/Beads export and this handoff.
-Exact normative text, dispositions, rationale and evidence are in the top
-two blocks of spec/isa-0.9.PROGRESS.md. Earlier pass V brief remains at
-docs/briefs/2026-11-01-isa-09-pass-v-73y.md.
+Pass VIII / b-isa-spec-9eq: Reading B adopted. The existing text was
+ambiguous: §4.4 and pre-transfer resolution support primitive identity,
+while “exact §5.3 adjoint” can suggest source opcode identity. The
+accepted reference already lowers X-family gates to Node::Flip and
+qxor/qexch to per-bit flips/swaps before EntryAnalysis causal matching.
+§5.6 now explicitly requires resolved primitive operation identity,
+including all own/contextual control literals and polarity. It retains
+all-operand top-event matching and excludes target-scheme decomposition
+and Boolean-equivalent circuit replacement as entry facts. Source opcodes,
+hashes and occurrence identities are unchanged. K78 is the only new row
+and MUST; K1–K77 are byte-identical to 989948e. The status header marks
+K78 pending the codex-seat council fix round; 9eq remains in_progress.
+Exact normative text/dispositions: top block of spec/isa-0.9.PROGRESS.md.
 
-Required full gates, all exit 0:
-- Pass VI reference: 467 passed, 0 failed, 5 unchanged opt-in ignores.
-- Pass VI conformance: 113 passed, 0 failed, 0 ignored.
-- Pass VII reference: 468 passed, 0 failed, 5 unchanged opt-in ignores.
-- Pass VII conformance: 113 passed, 0 failed, 0 ignored.
-- Both passes: python3 -I conformance/tests/draft_witnesses.py PASS;
-  python3 -I conformance/tools/ref_catalog.py --check PASS (219 recipes).
-  Final witness rerun after the source-adjoint wording clarification.
-- Rustfmt checks pass for the two touched test files; owned source/progress
-  whitespace checks pass. K1–K76 byte-identical to starting 6a7cea3;
-  K77 only new row. Exact-label diff regenerated after each spec amendment.
-All gate commands unset DISPLAY, WAYLAND_DISPLAY, DBUS_SESSION_BUS_ADDRESS
-and BROWSER and set TMPDIR to this repo's .tmp. Cargo uses --offline with
-the required reference-interpreter/Cargo.toml and conformance/Cargo.toml.
-Logs: .tmp/pass-vi-{reference,conformance,witness,catalog}.log and
-.tmp/pass-vii-{reference,conformance,witness,catalog}.log.
-Before-text regression evidence: .tmp/pass-vi-before-text.log and
-.tmp/pass-vii-before-text.log.
+reference-interpreter/tests/frame_identity.rs adds three regression tests,
+green against unchanged reference src before the text edit. Six positive
+circuits pass CLI hash/check and forward identity on all 64 interface/
+borrowed basis configurations: cx/mcx both ways, ccx/mcx control order,
+contextual-X/cx, qxor/per-bit cx and qexch/per-bit swap. Different controls,
+intervening readers and mixed-spelling polynomial-only prefixes reject
+§5.6. No fixture edit, test removal or reference implementation fix.
+Before-text evidence: .tmp/pass-viii-before-text.log.
 
-Accepted 0.8 spec/Bennett-ISA-Spec.md was never edited; SHA-256:
+All required gates exit 0, with DISPLAY, WAYLAND_DISPLAY,
+DBUS_SESSION_BUS_ADDRESS and BROWSER unset and TMPDIR set to this repo's
+.tmp. Cargo used --offline and the specified manifest paths.
+- Housekeeping reference: 470 passed, 0 failed, 5 unchanged opt-in ignores.
+- Pass VIII reference: 473 passed, 0 failed, 5 unchanged opt-in ignores.
+- Both conformance runs: 113 passed, 0 failed, 0 ignored.
+- Both runs: draft_witnesses.py PASS; ref_catalog.py --check PASS,
+  219 recipes and unchanged envelope. Rustfmt and source whitespace pass.
+Logs: .tmp/round7-{reference,conformance,witness,catalog}.log and
+.tmp/pass-viii-{reference,conformance,witness,catalog}.log.
+
+Accepted 0.8 is unchanged; SHA-256:
 90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e.
-Reference object admission remains 0.8 under the existing binding erratum;
-no version-gate change. Published spec/ref-0.9.json is byte-identical to
-starting 6a7cea3; byte SHA-256:
+Published catalog bytes are unchanged; SHA-256:
 52dbc3f8f0c91d587fd933a43080385fd5284abcfec0ce84788229fcb15c53d8.
-Its 219-recipe envelope remains:
+Catalog envelope:
 5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197.
-Final 0.9 spec SHA-256: 9cfba0edcf76ebcd1e0eca8fc14f8028e2e1b0bc098af8d4a8514e8e2f0cb833.
-Final exact-label diff SHA-256: 290cdeb18ae65318037c90874c31e300563415059440c3e5436135a66a3de5ce.
+Final 0.9 spec SHA-256:
+3a665d6834b94e90646e65626a222f70d7788bf2ff885b449815e2fda9096126.
+Final exact-label diff SHA-256:
+3a71d9229859cfa158211ddc2ed364837706fbdadd7cfa2e11ef7654ed564b03.
+The reference's 0.8 admission/version gate is unchanged.
 
-No push, remote/Dolt sync, VM/conformance sibling writes, fixture changes
-or test removals. Preserve the pre-existing untracked .tmp/ (also contains
-this session's logs). After the final record commit, owned tracked paths
-are clean; only that pre-existing untracked directory remains.
+The final pass-VIII commit includes the spec, exact-label diff, regression,
+PROGRESS, exported Beads and this handoff. Preserve the pre-existing
+untracked .tmp/; it also contains this session's logs and drafting files.
+After the final commit, only that directory should remain in git status.
