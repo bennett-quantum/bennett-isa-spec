@@ -5,6 +5,49 @@ are not complete. Sole implementation sub-agent; owned interpreter and external
 round-23 response only. Never push. Cargo gates use the headless prefix and
 TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/.tmp.
 
+## 2026-11-01 — n8j: persistent dynamic-instance checkpoints
+
+The growing dynamic-instance environment now uses a shared immutable AVL root
+and shared linked value-stack tails (standard library only). A checkpoint of
+this environment is O(1); definitions/removals copy O(log live keys) tree nodes
+and no retained values. Stack equality and destruction are iterative, including
+40,000-value loop histories. Snapshot/delta ordering remains by (activation,
+name). The existing transaction boundary, byte-delta frames, history/segment
+checkpoints and restoration by assignment are retained; no undo replay or
+allocation is needed to restore an error prefix. Other control/device/quantum
+metadata retain their existing costs; this is not an arbitrary-OOM guarantee.
+
+Red-first clone-count regression: the old code copies 499,500 / 1,999,000
+ClassicalValues for 1,000 / 2,000 straight-line definitions. The new code copies
+0 / 0. The unchanged-boundary control denies a HostResource observer after the
+2,001st definition twice, checks complete snapshot and frame-count equality,
+then retries and reverses to entry. It passes before and after the fix. Two
+additional tests compare persistent updates/checkpoints with a BTreeMap/Vec
+model and exercise long-stack equality/destruction; all prior R23 stage tests
+remain. No fixture was weakened. Red evidence: `.tmp/n8j-red.log`.
+
+Release build: `cargo build --release --offline` (interpreter manifest).
+The supplied rung-2 launch object, ht_demo_basic, budget
+10,000,000/1,048,576/65,536/256, `timeout 900`:
+- n=0: **2.00 s wall**, COMPLETED/CLOSED, no fault, i64 result **0**,
+  **258,272 steps**, peak RSS 244,128 KiB.
+- n=1000: **4.88 s wall**, COMPLETED/CLOSED, no fault, i64 result
+  **54380828142828**, **436,715 steps**, peak RSS 417,296 KiB.
+- n=0 fuel exhaustion at 20k/40k: **0.14/0.17 s wall**, versus the reported
+  pre-fix **3.48/27.6 s** (the old full n=0 run exceeded 600 s).
+These are individual /usr/bin/time runs, not stable benchmarking claims.
+Raw results/times: `.tmp/n8j-{20k,40k,rung0,rung1000}.{json,err,time}`.
+
+Reference gate: **477 passed, 0 failed, 5 unchanged ignored** (473 baseline
+plus four new tests). Conformance **113 passed, 0 failed, 0 ignored**;
+`draft_witnesses.py` and `ref_catalog.py --check` PASS (219 recipes, unchanged
+envelope 5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197).
+All four gates used the prescribed headless environment, project-local TMPDIR
+and offline Cargo; accepted 0.8 and catalog bytes are unchanged. Strict Clippy on library/binaries and owned-source rustfmt
+pass. Optional all-target strict Clippy remains blocked by the pre-existing
+`needless_range_loop` at `tests/k77_adapter.rs:203`; that unrelated test is
+unchanged. Logs: `.tmp/n8j-{reference,conformance,witness,catalog,clippy-lib}.log`.
+
 ## Round-23 fixes (2026-10-31)
 
 Baseline **451 passed / 0 failed / 5 ignored**, **123.70 s** runner sum over

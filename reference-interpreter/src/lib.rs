@@ -10,6 +10,7 @@ mod controls;
 mod exact;
 mod handle_validation;
 mod identity;
+mod instances;
 pub mod json;
 mod linking;
 mod machine;

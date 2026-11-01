@@ -10,7 +10,8 @@ use crate::{
 };
 use std::collections::{BTreeMap, VecDeque};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(not(test), derive(Clone))]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ClassicalValue {
     Int(u16, u128),
     Ptr(u128),
@@ -78,7 +79,7 @@ struct Devices {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClassicalSnapshot {
-    instances: BTreeMap<Key, Vec<ClassicalValue>>,
+    instances: crate::instances::Instances,
     memory: Memory,
     devices: Devices,
     control: Vec<Activation>,
@@ -401,11 +402,10 @@ impl<'a> ClassicalMachine<'a> {
                 }
             }
         }
-        let instances = f.params[0]
-            .iter()
-            .zip(args)
-            .map(|(p, v)| ((0, p.name.clone()), vec![v.clone()]))
-            .collect();
+        let mut instances = crate::instances::Instances::default();
+        for (p, v) in f.params[0].iter().zip(args) {
+            instances.push((0, p.name.clone()), v.clone());
+        }
         let mut devices = Devices::default();
         if let Some(l) = object.section("layout") {
             if let Some(image) = l.object()?.get("block_image") {
@@ -1037,11 +1037,7 @@ impl<'a> ClassicalMachine<'a> {
     }
     fn define_at(&mut self, id: u64, name: &str, value: ClassicalValue, undo: &mut Undo) {
         let key = (id, name.into());
-        self.state
-            .instances
-            .entry(key.clone())
-            .or_default()
-            .push(value);
+        self.state.instances.push(key.clone(), value);
         undo.definitions.push(key);
     }
     fn save_bytes(&self, p: u128, len: usize, undo: &mut Undo) -> Result<()> {
@@ -1071,16 +1067,8 @@ impl<'a> ClassicalMachine<'a> {
                 .restore_next_wire_id(record.wire_next)?;
         }
         for key in undo.definitions.into_iter().rev() {
-            let stack = self
-                .state
-                .instances
-                .get_mut(&key)
-                .ok_or_else(|| Error::new("§7.4: missing retained dynamic instance".into()))?;
-            stack
-                .pop()
-                .ok_or_else(|| Error::new("§7.4: empty retained dynamic instance".into()))?;
-            if stack.is_empty() {
-                self.state.instances.remove(&key);
+            if !self.state.instances.pop(&key) {
+                return err("§7.4", "missing retained dynamic instance");
             }
         }
         for &(p, b) in undo.bytes.iter().rev() {
@@ -1256,7 +1244,8 @@ impl<'a> ClassicalMachine<'a> {
         Ok(None)
     }
     // All execution and observer work is private until this boundary returns.
-    // The checkpoint owns the pre-write sparse/console/tape buffers. Restoring
+    // The checkpoint shares the instance root and pre-write sparse/console/tape
+    // buffers. Restoring
     // it is assignment/drop only, never byte replay, COW or another allocation.
     fn transaction<T>(
         &mut self,
@@ -1814,4 +1803,94 @@ fn ordered_union<T: Ord>(
         (Some(_), None) => a.next(),
         (None, _) => b.next(),
     })
+}
+
+#[cfg(test)]
+thread_local! {
+    static VALUE_CLONES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+#[cfg(test)]
+impl Clone for ClassicalValue {
+    fn clone(&self) -> Self {
+        VALUE_CLONES.with(|n| n.set(n.get() + 1));
+        match self {
+            Self::Int(w, v) => Self::Int(*w, *v),
+            Self::Ptr(v) => Self::Ptr(*v),
+            Self::F64(v) => Self::F64(*v),
+            Self::Token(v) => Self::Token(*v),
+            Self::Qreg(v) => Self::Qreg(*v),
+        }
+    }
+}
+#[cfg(test)]
+mod checkpoint_tests {
+    use super::*;
+    fn program(steps: usize) -> Object {
+        // Straight-line definitions grow both the key set and retained history.
+        let body = format!(
+            "fn cc @f () () () () ()\n^entry():\n{}ret\n",
+            (0..steps)
+                .map(|i| format!("x{i} = const.i8 1\n"))
+                .collect::<String>()
+        );
+        crate::r23_transaction::rehash(&crate::r23_transaction::object(
+            &[(
+                "f",
+                r#"{"abi":"0.8","kind":"cc","params":[],"results":[],"tier":"cc"}"#,
+                &body,
+            )],
+            "{}",
+            "",
+        ))
+    }
+    #[test]
+    fn checkpoint_clone_work_scales_linearly() {
+        let mut counts = Vec::new();
+        for steps in [1000, 2000] {
+            let o = program(steps);
+            let mut m = ClassicalMachine::new(&o, "f", &[], &[]).unwrap();
+            VALUE_CLONES.with(|n| n.set(0));
+            for _ in 0..steps {
+                m.step_once().unwrap().unwrap();
+            }
+            let clones = VALUE_CLONES.with(|n| n.get());
+            eprintln!("{steps} definitions: {clones} value clones");
+            counts.push(clones);
+        }
+        assert!(
+            counts[1] <= 3 * counts[0] + 100,
+            "superlinear checkpoint work: {counts:?}"
+        );
+        assert!(
+            counts[1] <= 16 * 2000,
+            "checkpoint copied retained values: {counts:?}"
+        );
+    }
+    #[test]
+    fn checkpoint_observer_resource_error_restores_long_instance_history() {
+        let o = program(2001);
+        let mut m = ClassicalMachine::new(&o, "f", &[], &[]).unwrap();
+        for _ in 0..2000 {
+            m.step_once().unwrap();
+        }
+        let before = m.snapshot();
+        let frames = m.outcome().steps;
+        for _ in 0..2 {
+            let error = m
+                .step_once_observed(|_, pre, post| {
+                    assert_eq!(pre, &before);
+                    assert_ne!(pre, post);
+                    Err::<(), _>(Error::host_resource(
+                        "test: denied observer after definition".into(),
+                    ))
+                })
+                .unwrap_err();
+            assert_eq!(error.kind(), crate::ErrorKind::HostResource);
+            assert_eq!(m.snapshot(), before);
+            assert_eq!(m.outcome().steps, frames);
+        }
+        m.step_once().unwrap().unwrap();
+        assert_eq!(m.outcome().steps, frames + 1);
+        m.reverse().unwrap();
+    }
 }
