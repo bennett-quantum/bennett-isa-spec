@@ -11,13 +11,83 @@ use std::{
 };
 /// Source context remains outside the closed catalog and positional arguments.
 #[derive(Clone, Debug)]
-pub struct SourceSymbol { pub name:String, pub hash:String, pub oracle_invocation:Option<Json>, pub adjoint:bool }
+pub struct SourceSymbol {
+    pub name: String,
+    pub hash: String,
+    pub oracle_invocation: Option<Json>,
+    pub adjoint: bool,
+}
 #[derive(Clone, Debug)]
-struct SourceCapture { oracle_invocation:Option<Json>, adjoint:bool }
+struct SourceCapture {
+    oracle_invocation: Option<Json>,
+    adjoint: bool,
+}
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SourcePoint {
+    pub symbol: String,
+    pub point: String,
+    pub iteration: Vec<usize>,
+    pub instance: Vec<usize>,
+}
+impl SourcePoint {
+    pub fn pseudo(symbol: &str, point: &str) -> Self {
+        Self {
+            symbol: symbol.into(),
+            point: point.into(),
+            iteration: Vec::new(),
+            instance: Vec::new(),
+        }
+    }
+}
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SourceEdge {
+    pub point: SourcePoint,
+    pub call_index: usize,
+}
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SourceStep {
+    pub invocation: Vec<usize>,
+    pub symbol: String,
+    pub step: usize,
+    pub reverse: bool,
+}
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SourceLocation {
+    pub path: Vec<SourceEdge>,
+    pub terminal: SourcePoint,
+    pub steps: Vec<SourceStep>,
+}
 #[derive(Clone, Debug)]
-pub struct SourceBody { pub body:Json, pub symbols:Vec<SourceSymbol> }
+pub struct SourceBody {
+    pub body: Json,
+    pub symbols: Vec<SourceSymbol>,
+    pub symbol: String,
+    pub oracle: bool,
+    pub points: BTreeMap<String, SourcePoint>,
+    pub rows: Vec<SourcePoint>,
+}
+#[derive(Clone, Debug)]
+struct SourceOwner {
+    symbol: String,
+    oracle: bool,
+    points: BTreeMap<String, SourcePoint>,
+    rows: Vec<SourcePoint>,
+    raw_reverse: bool,
+}
+#[derive(Clone, Debug)]
+struct StepPlan {
+    leaves: Vec<Leaf>,
+    arguments: BTreeMap<String, Vec<Wire>>,
+}
 pub trait SourceFactory: std::fmt::Debug + Send + Sync {
-    fn construct(&self, hash:&str, values:&BTreeMap<String,Json>, regions:&BTreeMap<String,Json>, oracle_invocation:Option<&Json>, adjoint:bool)->Result<SourceBody,String>;
+    fn construct(
+        &self,
+        hash: &str,
+        values: &BTreeMap<String, Json>,
+        regions: &BTreeMap<String, Json>,
+        oracle_invocation: Option<&Json>,
+        adjoint: bool,
+    ) -> Result<SourceBody, String>;
 }
 #[derive(Clone)]
 struct Handle {
@@ -39,10 +109,17 @@ pub struct Leaf {
     pub allocation: Option<(String, usize, String, String)>,
     pub event: Option<Json>,
     pub scratch: bool,
+    pub source: Option<std::sync::Arc<SourceLocation>>,
 }
 #[derive(Clone, Default)]
 struct Context {
     ints: Env,
+    source_owner: Option<std::sync::Arc<SourceOwner>>,
+    source_point: Option<SourcePoint>,
+    source_edges: Vec<SourceEdge>,
+    source_steps: Vec<SourceStep>,
+    source_location: Option<std::sync::Arc<SourceLocation>>,
+
     records: BTreeMap<String, Vec<Context>>,
     record_schemas: BTreeMap<String, Json>,
     regions: BTreeMap<String, Json>,
@@ -56,8 +133,8 @@ struct Context {
     images: BTreeMap<String, Vec<u8>>,
     templates: BTreeMap<String, (Vec<Json>, Box<Context>)>,
     arguments: BTreeMap<String, (String, Vec<Json>, Box<Context>, Option<SourceCapture>)>,
-    sources:BTreeMap<String,SourceCapture>,
-    invocation_source:Option<SourceCapture>,
+    sources: BTreeMap<String, SourceCapture>,
+    invocation_source: Option<SourceCapture>,
     values: BTreeMap<String, (Json, Json)>,
     controls: Vec<Wire>,
     legacy: bool,
@@ -66,6 +143,18 @@ struct Context {
     allocations: BTreeMap<String, (String, usize, String, String)>,
 }
 impl Context {
+    fn location(&mut self) -> Option<std::sync::Arc<SourceLocation>> {
+        if self.source_location.is_none() {
+            self.source_location = self.source_point.as_ref().map(|point| {
+                std::sync::Arc::new(SourceLocation {
+                    path: self.source_edges.clone(),
+                    terminal: point.clone(),
+                    steps: self.source_steps.clone(),
+                })
+            });
+        }
+        self.source_location.clone()
+    }
     fn has_name(&self, n: &str) -> bool {
         self.ints.contains_key(n)
             || self.wires.contains_key(n)
@@ -453,7 +542,12 @@ fn validate_body(body: &[Json]) -> Result<(), String> {
 #[derive(Clone, Debug)]
 pub struct Expander {
     recipes: BTreeMap<String, Json>,
-    source_factory:Option<std::sync::Arc<dyn SourceFactory>>,
+    source_factory: Option<std::sync::Arc<dyn SourceFactory>>,
+    source_ordinals: BTreeMap<std::sync::Arc<SourceLocation>, usize>,
+    source_calls: BTreeMap<std::sync::Arc<SourceLocation>, usize>,
+    source_serial: usize,
+    source_step_plans: BTreeMap<(Vec<usize>, usize), StepPlan>,
+
     registry: Registry,
     serial: usize,
     ordinals: BTreeMap<Vec<usize>, usize>,
@@ -537,7 +631,11 @@ impl Expander {
         }
         Ok(Self {
             recipes,
-            source_factory:None,
+            source_factory: None,
+            source_ordinals: BTreeMap::new(),
+            source_calls: BTreeMap::new(),
+            source_serial: 0,
+            source_step_plans: BTreeMap::new(),
             registry,
             serial: 0,
             ordinals: BTreeMap::new(),
@@ -552,24 +650,41 @@ impl Expander {
         }
         Ok(Self {
             recipes: self.recipes.clone(),
-            source_factory:self.source_factory.clone(),
+            source_factory: self.source_factory.clone(),
+            source_ordinals: BTreeMap::new(),
+            source_calls: BTreeMap::new(),
+            source_serial: 0,
+            source_step_plans: BTreeMap::new(),
             registry,
             serial: 0,
             ordinals: BTreeMap::new(),
         })
     }
-    pub fn with_source_factory(mut self, factory:std::sync::Arc<dyn SourceFactory>)->Self {self.source_factory=Some(factory);self}
+    pub fn with_source_factory(mut self, factory: std::sync::Arc<dyn SourceFactory>) -> Self {
+        self.source_factory = Some(factory);
+        self
+    }
     pub fn expand(
         &mut self,
         kind: &str,
         args: &[Json],
         bundles: &[(&str, usize)],
     ) -> Result<Vec<Leaf>, String> {
-        self.expand_bound(kind,args,bundles,&[])
+        self.expand_bound(kind, args, bundles, &[])
     }
-    pub fn expand_bound(&mut self,kind:&str,args:&[Json],bundles:&[(&str,usize)],symbols:&[SourceSymbol])->Result<Vec<Leaf>,String> {
+    pub fn expand_bound(
+        &mut self,
+        kind: &str,
+        args: &[Json],
+        bundles: &[(&str, usize)],
+        symbols: &[SourceSymbol],
+    ) -> Result<Vec<Leaf>, String> {
         self.serial = 0;
         self.ordinals.clear();
+        self.source_ordinals.clear();
+        self.source_calls.clear();
+        self.source_serial = 0;
+        self.source_step_plans.clear();
         let mut caller = Context::default();
         for (n, w) in bundles {
             if caller
@@ -581,9 +696,19 @@ impl Expander {
             }
         }
         for symbol in symbols {
-            if !self.registry.contains_key(&symbol.hash) || caller.has_name(&symbol.name) {return Err("invalid source symbol binding".into());}
-            caller.symbols.insert(symbol.name.clone(),symbol.hash.clone());
-            caller.sources.insert(symbol.name.clone(),SourceCapture{oracle_invocation:symbol.oracle_invocation.clone(),adjoint:symbol.adjoint});
+            if !self.registry.contains_key(&symbol.hash) || caller.has_name(&symbol.name) {
+                return Err("invalid source symbol binding".into());
+            }
+            caller
+                .symbols
+                .insert(symbol.name.clone(), symbol.hash.clone());
+            caller.sources.insert(
+                symbol.name.clone(),
+                SourceCapture {
+                    oracle_invocation: symbol.oracle_invocation.clone(),
+                    adjoint: symbol.adjoint,
+                },
+            );
         }
         let mut out = Vec::new();
         self.invoke(kind, args, &caller, &[], false, &mut Vec::new(), &mut out)?;
@@ -629,6 +754,11 @@ impl Expander {
         let mut c = Context {
             ints: seed.clone(),
             controls: caller.controls.clone(),
+            source_owner: caller.source_owner.clone(),
+            source_point: caller.source_point.clone(),
+            source_edges: caller.source_edges.clone(),
+            source_steps: caller.source_steps.clone(),
+            source_location: caller.source_location.clone(),
             legacy: ps.iter().all(|p| matches!(p, Json::Str(_))),
             ..Context::default()
         };
@@ -834,7 +964,12 @@ impl Expander {
                             .cloned()
                             .ok_or("unbound arguments")?
                     } else {
-                        (symbol.clone(), a(v)?.to_vec(), Box::new(caller.clone()), c.sources.get(s(f(p,"symbol")?)?).cloned())
+                        (
+                            symbol.clone(),
+                            a(v)?.to_vec(),
+                            Box::new(caller.clone()),
+                            c.sources.get(s(f(p, "symbol")?)?).cloned(),
+                        )
                     };
                     if &saved.0 != symbol {
                         return Err("arguments closure mismatch".into());
@@ -936,7 +1071,9 @@ impl Expander {
                         return Err("unbound closure hash".into());
                     }
                     c.symbols.insert(name.into(), h.into());
-                    if let Some(context)=caller.sources.get(n) {c.sources.insert(name.into(),context.clone());}
+                    if let Some(context) = caller.sources.get(n) {
+                        c.sources.insert(name.into(), context.clone());
+                    }
                 }
                 "event" => {
                     let event = if let Json::Str(n) = v {
@@ -980,19 +1117,147 @@ impl Expander {
             .cloned()
             .ok_or_else(|| format!("unknown recipe {kind}"))?;
         let mut c = self.bind(&r, args, caller)?;
+        if self.source_factory.is_some() && kind == "step" {
+            let step = c
+                .source_steps
+                .last()
+                .filter(|step| step.invocation == path)
+                .cloned()
+                .ok_or("source step has no bound frame index")?;
+            let key = (path.to_vec(), step.step);
+            if rev {
+                let plan = self
+                    .source_step_plans
+                    .get(&key)
+                    .cloned()
+                    .ok_or("inverse source step has no instantiated forward tree")?;
+                if plan.arguments != c.wires {
+                    return Err("inverse source step changed its bound state".into());
+                }
+                let mut locations = BTreeMap::new();
+                for mut leaf in plan.leaves.into_iter().rev() {
+                    adjoint_leaf(&mut leaf)?;
+                    if let Some(location) = &leaf.source {
+                        let replacement = locations
+                            .entry(location.clone())
+                            .or_insert_with(|| {
+                                let mut location = (**location).clone();
+                                for frame in &mut location.steps {
+                                    if frame.invocation == path {
+                                        frame.reverse = step.reverse;
+                                    }
+                                }
+                                std::sync::Arc::new(location)
+                            })
+                            .clone();
+                        leaf.source = Some(replacement);
+                    }
+                    out.push(leaf);
+                }
+                return Ok(());
+            }
+            let mut leaves = Vec::new();
+            chain.push(kind.into());
+            self.body(a(f(&r, "body")?)?, &mut c, path, false, chain, &mut leaves)?;
+            chain.pop();
+            if self
+                .source_step_plans
+                .insert(
+                    key,
+                    StepPlan {
+                        leaves: leaves.clone(),
+                        arguments: c.wires.clone(),
+                    },
+                )
+                .is_some()
+            {
+                return Err("source step instantiated twice".into());
+            }
+            out.extend(leaves);
+            return Ok(());
+        }
+        if self.source_factory.is_some() && kind == "oracle.construct" {
+            let owner = c
+                .source_owner
+                .clone()
+                .filter(|o| o.oracle)
+                .ok_or("construction has no source oracle owner")?;
+            let body = a(f(&r, "body")?)?;
+            let order: Vec<_> = if rev {
+                (0..body.len()).rev().collect()
+            } else {
+                (0..body.len()).collect()
+            };
+            chain.push(kind.into());
+            for index in order {
+                let point = if index == 0 {
+                    "$construct"
+                } else if index == 1 || index + 2 == body.len() {
+                    "$step"
+                } else if index + 1 == body.len() {
+                    "$release"
+                } else {
+                    "$commit"
+                };
+                c.source_point = Some(SourcePoint::pseudo(&owner.symbol, point));
+                c.source_location = None;
+                self.body(&body[index..index + 1], &mut c, path, rev, chain, out)?;
+            }
+            chain.pop();
+            return Ok(());
+        }
         chain.push(kind.into());
         if self.registry.contains_key(kind) {
-            if let Some(factory)=self.source_factory.clone() {
-                let values=c.values.iter().map(|(k,(v,_))|(k.clone(),v.clone())).collect();
-                let built=factory.construct(kind,&values,&c.regions,caller.invocation_source.as_ref().and_then(|s|s.oracle_invocation.as_ref()),caller.invocation_source.as_ref().is_some_and(|s|s.adjoint))?;
+            if let Some(factory) = self.source_factory.clone() {
+                let values = c
+                    .values
+                    .iter()
+                    .map(|(k, (v, _))| (k.clone(), v.clone()))
+                    .collect();
+                let built = factory.construct(
+                    kind,
+                    &values,
+                    &c.regions,
+                    caller
+                        .invocation_source
+                        .as_ref()
+                        .and_then(|s| s.oracle_invocation.as_ref()),
+                    caller.invocation_source.as_ref().is_some_and(|s| s.adjoint),
+                )?;
                 validate_body(a(&built.body)?)?;
-                for symbol in built.symbols {
-                    if !self.registry.contains_key(&symbol.hash) || c.has_name(&symbol.name) {return Err("invalid constructed source symbol".into());}
-                    c.symbols.insert(symbol.name.clone(),symbol.hash);
-                    c.sources.insert(symbol.name,SourceCapture{oracle_invocation:symbol.oracle_invocation,adjoint:symbol.adjoint});
+                if built.symbol != kind {
+                    return Err("constructed body is bound to a different closure".into());
                 }
-                self.body(a(&built.body)?,&mut c,path,rev,chain,out)?;
-                chain.pop();return Ok(());
+                c.source_owner = Some(std::sync::Arc::new(SourceOwner {
+                    symbol: built.symbol.clone(),
+                    oracle: built.oracle,
+                    points: built.points,
+                    rows: built.rows,
+                    raw_reverse: rev,
+                }));
+                c.source_point = if built.oracle {
+                    Some(SourcePoint::pseudo(kind, "$construct"))
+                } else {
+                    None
+                };
+                c.source_location = None;
+
+                for symbol in built.symbols {
+                    if !self.registry.contains_key(&symbol.hash) || c.has_name(&symbol.name) {
+                        return Err("invalid constructed source symbol".into());
+                    }
+                    c.symbols.insert(symbol.name.clone(), symbol.hash);
+                    c.sources.insert(
+                        symbol.name,
+                        SourceCapture {
+                            oracle_invocation: symbol.oracle_invocation,
+                            adjoint: symbol.adjoint,
+                        },
+                    );
+                }
+                self.body(a(&built.body)?, &mut c, path, rev, chain, out)?;
+                chain.pop();
+                return Ok(());
             }
         }
         self.body(a(f(&r, "body")?)?, &mut c, path, rev, chain, out)?;
@@ -1016,7 +1281,11 @@ impl Expander {
                 *b ^= 1 << 63;
             }
         }
-        let n = self.ordinals.entry(l.invocation.clone()).or_default();
+        let n = if let Some(source) = &l.source {
+            self.source_ordinals.entry(source.clone()).or_default()
+        } else {
+            self.ordinals.entry(l.invocation.clone()).or_default()
+        };
         l.ordinal = *n;
         *n += 1;
         out.push(l);
@@ -1061,6 +1330,7 @@ impl Expander {
                 allocation: None,
                 event: None,
                 scratch: false,
+                source: c.location(),
             };
             if let Some(n) = j.get("visit") {
                 let mut records = c.records.get(s(n)?).cloned().ok_or("unbound records")?;
@@ -1082,6 +1352,25 @@ impl Expander {
                     }
                     local.scratch_names = c.scratch_names.clone();
                     local.merge(&record);
+                    if self.source_factory.is_some() && s(n)? == "Frames" {
+                        let owner = local
+                            .source_owner
+                            .as_ref()
+                            .ok_or("frame visit has no source owner")?;
+                        let index = record
+                            .ints
+                            .get("index")
+                            .and_then(|n| n.to_i64())
+                            .and_then(|n| usize::try_from(n).ok())
+                            .ok_or("invalid source frame index")?;
+                        local.source_steps.push(SourceStep {
+                            invocation: path.to_vec(),
+                            symbol: owner.symbol.clone(),
+                            step: index + 1,
+                            reverse: rev ^ owner.raw_reverse,
+                        });
+                        local.source_location = None;
+                    }
                     self.body(a(f(j, "body")?)?, &mut local, path, rev, chain, out)?;
                 }
             } else if let Some(n) = j.get("declare") {
@@ -1182,6 +1471,23 @@ impl Expander {
                     local.clear_name(name);
                 }
                 local.merge(&bound);
+                local.source_steps = bound.source_steps.clone();
+                local.source_edges = bound.source_edges.clone();
+                local.source_location = None;
+                if self.source_factory.is_some() && matches!(s(n)?, "Rows" | "Next") {
+                    let owner = local
+                        .source_owner
+                        .as_ref()
+                        .filter(|o| o.oracle)
+                        .ok_or("row template has no source oracle owner")?;
+                    local.source_point = Some(
+                        owner
+                            .rows
+                            .get(index)
+                            .cloned()
+                            .ok_or("source row index has no program point")?,
+                    );
+                }
                 local.controls.extend(bound.controls);
                 local.controls.sort();
                 local.controls.dedup();
@@ -1315,6 +1621,18 @@ impl Expander {
                 if to < from {
                     return Err("reversed range".into());
                 }
+                let old_point = c.source_point.clone();
+                let old_location = c.source_location.clone();
+                if self.source_factory.is_some() && n.starts_with("$source-point/") {
+                    c.source_point = Some(
+                        c.source_owner
+                            .as_ref()
+                            .and_then(|o| o.points.get(n))
+                            .cloned()
+                            .ok_or("unbound source program point")?,
+                    );
+                    c.source_location = None;
+                }
                 let old = c.ints.get(n).cloned();
                 let it: Box<dyn Iterator<Item = i64>> = if rev {
                     Box::new((from..to).rev())
@@ -1330,6 +1648,8 @@ impl Expander {
                 } else {
                     c.ints.remove(n);
                 }
+                c.source_point = old_point;
+                c.source_location = old_location;
             } else if j.get("inverse").is_some() {
                 keys(j, &["inverse", "body"])?;
                 if f(j, "inverse")?.as_bool() != Some(true) {
@@ -1342,23 +1662,55 @@ impl Expander {
             } else if let Some(n) = j.get("call") {
                 keys(j, &["call", "args"])?;
                 let hash = c.symbols.get(s(n)?).ok_or("unbound symbol")?.clone();
-                let mut child = path.to_vec();
-                child.push(self.serial);
-                if let Some(n) = f(j, "args")?.as_str() {
+                let (args, mut captured) = if let Some(name) = f(j, "args")?.as_str() {
                     let (bound_hash, args, mut captured, source) =
-                        c.arguments.get(n).cloned().ok_or("unbound arguments")?;
+                        c.arguments.get(name).cloned().ok_or("unbound arguments")?;
                     if bound_hash != hash {
                         return Err("arguments closure mismatch".into());
                     }
-                    captured.invocation_source=source;
-                    captured.controls.extend(c.controls.clone());
-                    captured.controls.sort();
-                    captured.controls.dedup();
-                    self.invoke(&hash, &args, &captured, &child, rev, chain, out)?;
+                    captured.invocation_source = source;
+                    (args, *captured)
                 } else {
-                    let mut captured=c.clone();captured.invocation_source=c.sources.get(s(n)?).cloned();
-                    self.invoke(&hash, a(f(j, "args")?)?, &captured, &child, rev, chain, out)?;
+                    let mut captured = c.clone();
+                    captured.invocation_source = c.sources.get(s(n)?).cloned();
+                    (a(f(j, "args")?)?.to_vec(), captured)
+                };
+                captured.controls.extend(c.controls.clone());
+                captured.controls.sort();
+                captured.controls.dedup();
+                captured.source_steps = c.source_steps.clone();
+                captured.source_location = None;
+                let mut child = path.to_vec();
+                if self.source_factory.is_some() {
+                    if let Some(location) = captured.location() {
+                        let count = self.source_calls.entry(location.clone()).or_default();
+                        let index = *count;
+                        *count += 1;
+                        captured.source_edges.push(SourceEdge {
+                            point: location.terminal.clone(),
+                            call_index: index,
+                        });
+                        captured.source_location = None;
+                    }
+                    child.push(self.source_serial);
+                    self.source_serial += 1;
+                } else {
+                    child.push(self.serial);
                 }
+                let mut semantic_chain = chain
+                    .iter()
+                    .filter(|name| self.registry.contains_key(*name))
+                    .cloned()
+                    .collect();
+                self.invoke(
+                    &hash,
+                    &args,
+                    &captured,
+                    &child,
+                    rev,
+                    &mut semantic_chain,
+                    out,
+                )?;
             } else if let Some(n) = j.get("splice") {
                 keys(j, &["splice"])?;
                 let (b, mut captured) = c.bodies.get(s(n)?).cloned().ok_or("unbound body")?;
@@ -1463,4 +1815,22 @@ pub fn permutation(leaves: &[Leaf]) -> Result<Vec<crate::ref_catalog::Leaf>, Str
         }
     }
     Ok(out)
+}
+
+fn adjoint_leaf(leaf: &mut Leaf) -> Result<(), String> {
+    leaf.gate = match leaf.gate.as_str() {
+        "s" => "sdg",
+        "sdg" => "s",
+        "t" => "tdg",
+        "tdg" => "t",
+        "alloc" => "release",
+        "release" => "alloc",
+        "classical" => return Err("classical inverse requires retained history".into()),
+        g => g,
+    }
+    .into();
+    for angle in &mut leaf.angles {
+        *angle ^= 1 << 63;
+    }
+    Ok(())
 }

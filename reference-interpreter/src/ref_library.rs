@@ -72,18 +72,61 @@ impl RefLibrary {
 impl Object {
     /// Expand a checked structured source invocation with captured classical
     /// actuals. Source adjoints are formed before constructor instantiation.
-    pub fn expand_action_source(&self,name:&str,args:&[Value],bundles:&[(&str,usize)],adjoint:bool)->Result<Vec<Leaf>> {
-        self.ensure_linked()?;self.check_hashes()?;
-        let f=self.functions.get(name).filter(|f|matches!(f.kind.as_str(),"action"|"perm_action")).ok_or_else(||crate::Error::new("§11.1: source action is not defined".into()))?;
-        let library=self.bound_ref_library()?;let identity=self.identity()?;
-        let hash=identity.closure_hashes[&f.name].clone().ok_or_else(||crate::Error::new("§11.1: source action closure is unlinked".into()))?;
-        let registry=self.functions.values().filter(|f|matches!(f.kind.as_str(),"oracle"|"action"|"perm_action")).map(|f| {
-            let h=identity.closure_hashes[&f.name].clone().ok_or_else(||crate::Error::new("§11.1: source closure is unlinked".into()))?;
-            Ok((h,Value::Obj(std::collections::BTreeMap::from([("parameters".into(),Value::Arr(source_parameters(self,f)?)),("body".into(),Value::Arr(Vec::new()))]))))
-        }).collect::<Result<Registry>>()?;
-        let factory=std::sync::Arc::new(crate::source_constructor::LinkedSource::new(self.clone())?);
-        let mut e=library.expander.with_registry(registry).map_err(infeasible)?.with_source_factory(factory);
-        e.expand_bound("action_call",&[Value::Str("$root".into()),Value::Arr(args.to_vec())],bundles,&[bennett_isa_conformance::ref_language::SourceSymbol{name:"$root".into(),hash,oracle_invocation:None,adjoint}]).map_err(infeasible)
+    pub fn expand_action_source(
+        &self,
+        name: &str,
+        args: &[Value],
+        bundles: &[(&str, usize)],
+        adjoint: bool,
+    ) -> Result<Vec<Leaf>> {
+        self.ensure_linked()?;
+        self.check_hashes()?;
+        let f = self
+            .functions
+            .get(name)
+            .filter(|f| matches!(f.kind.as_str(), "action" | "perm_action"))
+            .ok_or_else(|| crate::Error::new("§11.1: source action is not defined".into()))?;
+        let library = self.bound_ref_library()?;
+        let identity = self.identity()?;
+        let hash = identity.closure_hashes[&f.name]
+            .clone()
+            .ok_or_else(|| crate::Error::new("§11.1: source action closure is unlinked".into()))?;
+        let registry = self
+            .functions
+            .values()
+            .filter(|f| matches!(f.kind.as_str(), "oracle" | "action" | "perm_action"))
+            .map(|f| {
+                let h = identity.closure_hashes[&f.name]
+                    .clone()
+                    .ok_or_else(|| crate::Error::new("§11.1: source closure is unlinked".into()))?;
+                Ok((
+                    h,
+                    Value::Obj(std::collections::BTreeMap::from([
+                        ("parameters".into(), Value::Arr(source_parameters(self, f)?)),
+                        ("body".into(), Value::Arr(Vec::new())),
+                    ])),
+                ))
+            })
+            .collect::<Result<Registry>>()?;
+        let factory =
+            std::sync::Arc::new(crate::source_constructor::LinkedSource::new(self.clone())?);
+        let mut e = library
+            .expander
+            .with_registry(registry)
+            .map_err(infeasible)?
+            .with_source_factory(factory);
+        e.expand_bound(
+            "action_call",
+            &[Value::Str("$root".into()), Value::Arr(args.to_vec())],
+            bundles,
+            &[bennett_isa_conformance::ref_language::SourceSymbol {
+                name: "$root".into(),
+                hash,
+                oracle_invocation: None,
+                adjoint,
+            }],
+        )
+        .map_err(infeasible)
     }
     /// Resolve a concrete ref library without modifying canonical metadata.
     /// No 0.9 library is substituted for an accepted 0.8 binding.
@@ -239,7 +282,8 @@ impl<'a> OracleInvocation<'a> {
                 &[bennett_isa_conformance::ref_language::SourceSymbol {
                     name: "$root".into(),
                     hash: self.closure_hash.clone(),
-                    oracle_invocation: Some(self.context.clone()), adjoint:false,
+                    oracle_invocation: Some(self.context.clone()),
+                    adjoint: false,
                 }],
             )
             .map_err(infeasible)

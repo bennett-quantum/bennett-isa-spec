@@ -368,8 +368,20 @@ pub(crate) fn oracle(
             ]));
         }
     }
-    let fixed=root.params.iter().flatten().zip(call.arguments()).filter(|(p,_)|matches!(p.ty,crate::Type::Token|crate::Type::Int(_)|crate::Type::Ptr|crate::Type::F64)).map(|(p,v)|(p.name.clone(),v.clone())).collect::<BTreeMap<_,_>>();
-    let closure_hashes=object.identity()?.closure_hashes;
+    let fixed = root
+        .params
+        .iter()
+        .flatten()
+        .zip(call.arguments())
+        .filter(|(p, _)| {
+            matches!(
+                p.ty,
+                crate::Type::Token | crate::Type::Int(_) | crate::Type::Ptr | crate::Type::F64
+            )
+        })
+        .map(|(p, v)| (p.name.clone(), v.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let closure_hashes = object.identity()?.closure_hashes;
     let mut symbols = Vec::new();
     let mut rows = Vec::new();
     let mut successors = Vec::new();
@@ -486,18 +498,52 @@ pub(crate) fn oracle(
         } else {
             match op {
                 "lift.oracle_call" | "lift.oracle_uncall" | "lift.perm_call" => {
-                let oracle=op!="lift.perm_call";let callee=&object.functions[a[0].trim_start_matches('@')];
-                let alias=format!("$source-call/{k}");
-                let context=if oracle {Some(obj([("token",fixed.get(&a[1]).cloned().ok_or_else(||Error::new(format!("§11.1: unresolved fixed source token {}",a[1])))?)]))}else{None};
-                symbols.push(bennett_isa_conformance::ref_language::SourceSymbol{name:alias.clone(),hash:closure_hashes[&callee.name].clone().ok_or_else(||Error::new("§11.1: unlinked nested source call".into()))?,oracle_invocation:context,adjoint:false});
-                let mut arguments=Vec::new();
-                if oracle {for n in crate::object::list(&a[2])? {arguments.push(text(read(&n)?));}arguments.extend([text(read(&a[3])?),text(read(&a[4])?)]);}
-                else {for group in [1usize,2] {for n in crate::object::list(&a[group])? {arguments.push(text(read(&n)?));}}}
-                let mem=if oracle {5}else{3};for n in crate::object::list(&a[mem])? {arguments.push(text(n));}
-                for n in crate::object::list(&a[mem+1])? {arguments.push(fixed.get(&n).cloned().ok_or_else(||Error::new(format!("§11.1: unresolved fixed source argument {n}")))?);}
-                row.push(invoke(op,[text(alias),array(arguments)]));
-            },
-            "lift.call" => {
+                    let oracle = op != "lift.perm_call";
+                    let callee = &object.functions[a[0].trim_start_matches('@')];
+                    let alias = format!("$source-call/{k}");
+                    let context = if oracle {
+                        Some(obj([(
+                            "token",
+                            fixed.get(&a[1]).cloned().ok_or_else(|| {
+                                Error::new(format!("§11.1: unresolved fixed source token {}", a[1]))
+                            })?,
+                        )]))
+                    } else {
+                        None
+                    };
+                    symbols.push(bennett_isa_conformance::ref_language::SourceSymbol {
+                        name: alias.clone(),
+                        hash: closure_hashes[&callee.name].clone().ok_or_else(|| {
+                            Error::new("§11.1: unlinked nested source call".into())
+                        })?,
+                        oracle_invocation: context,
+                        adjoint: false,
+                    });
+                    let mut arguments = Vec::new();
+                    if oracle {
+                        for n in crate::object::list(&a[2])? {
+                            arguments.push(text(read(&n)?));
+                        }
+                        arguments.extend([text(read(&a[3])?), text(read(&a[4])?)]);
+                    } else {
+                        for group in [1usize, 2] {
+                            for n in crate::object::list(&a[group])? {
+                                arguments.push(text(read(&n)?));
+                            }
+                        }
+                    }
+                    let mem = if oracle { 5 } else { 3 };
+                    for n in crate::object::list(&a[mem])? {
+                        arguments.push(text(n));
+                    }
+                    for n in crate::object::list(&a[mem + 1])? {
+                        arguments.push(fixed.get(&n).cloned().ok_or_else(|| {
+                            Error::new(format!("§11.1: unresolved fixed source argument {n}"))
+                        })?);
+                    }
+                    row.push(invoke(op, [text(alias), array(arguments)]));
+                }
+                "lift.call" => {
                     let callee = &object.functions[a[0].trim_start_matches('@')];
                     let actuals = crate::object::list(&a[1])?;
                     let count = actuals.len();
@@ -767,9 +813,7 @@ pub(crate) fn oracle(
                     fallible = true;
                 }
                 "lift.free" | "lift.boundscheck" => {
-                    let n = if op == "lift.free" {
-                        ptr
-                    } else if crate::object::integer(&a[1]) {
+                    let n = if op == "lift.free" || crate::object::integer(&a[1]) {
                         ptr
                     } else {
                         width(&a[1])?
@@ -957,9 +1001,29 @@ pub(crate) fn oracle(
         teardown.insert(0, obj([("relinquish", text(&name))]));
         teardown.insert(0, inverse(operations));
     }
-    let mut body = setup;
-    body.push(construct);
-    body.extend(teardown);
+    let source_symbol = call.closure_hash().to_string();
+    let mut points = BTreeMap::new();
+    points.insert(
+        "$source-point/prepare".into(),
+        bennett_isa_conformance::ref_language::SourcePoint::pseudo(&source_symbol, "$construct"),
+    );
+    points.insert(
+        "$source-point/release".into(),
+        bennett_isa_conformance::ref_language::SourcePoint::pseudo(&source_symbol, "$release"),
+    );
+    let tag = |name: &str, body: Vec<Value>| {
+        obj([
+            ("for", text(name)),
+            ("from", Value::Num(0.0)),
+            ("to", Value::Num(1.0)),
+            ("body", array(body)),
+        ])
+    };
+    let mut body = vec![
+        tag("$source-point/prepare", setup),
+        construct,
+        tag("$source-point/release", teardown),
+    ];
     for (name, width) in declarations.into_iter().rev() {
         body = vec![obj([
             ("declare", text(name)),
@@ -971,6 +1035,33 @@ pub(crate) fn oracle(
     }
     Ok(bennett_isa_conformance::ref_language::SourceBody {
         body: array(body),
+        symbol: source_symbol,
+        oracle: true,
+        points,
+        rows: program
+            .rows
+            .iter()
+            .map(|(f, i)| {
+                let (block, index) = f
+                    .blocks
+                    .iter()
+                    .find_map(|b| {
+                        b.instructions
+                            .iter()
+                            .position(|v| v.line == i.line)
+                            .map(|n| (&b.name, n))
+                    })
+                    .ok_or_else(|| Error::new("§11.1: row has no source point".into()))?;
+                Ok(bennett_isa_conformance::ref_language::SourcePoint {
+                    symbol: closure_hashes[&f.name]
+                        .clone()
+                        .ok_or_else(|| Error::new("§11.1: row symbol is unlinked".into()))?,
+                    point: format!("{block}:{index}"),
+                    iteration: Vec::new(),
+                    instance: Vec::new(),
+                })
+            })
+            .collect::<Result<Vec<_>>>()?,
         symbols,
     })
 }
@@ -996,7 +1087,9 @@ impl bennett_isa_conformance::ref_language::SourceFactory for LinkedSource {
         &self,
         hash: &str,
         values: &BTreeMap<String, Value>,
-        regions:&BTreeMap<String,Value>, context: Option<&Value>, adjoint:bool,
+        regions: &BTreeMap<String, Value>,
+        context: Option<&Value>,
+        adjoint: bool,
     ) -> std::result::Result<bennett_isa_conformance::ref_language::SourceBody, String> {
         let build = || -> Result<_> {
             let name = self
@@ -1004,7 +1097,9 @@ impl bennett_isa_conformance::ref_language::SourceFactory for LinkedSource {
                 .get(hash)
                 .ok_or_else(|| Error::new("§11.1: closure is not in linked source".into()))?;
             let f = &self.object.functions[name];
-            if f.kind != "oracle" {return action::construct(&self.object,f,values,regions,adjoint);}
+            if f.kind != "oracle" {
+                return action::construct(&self.object, f, values, regions, adjoint);
+            }
             let context =
                 context.ok_or_else(|| Error::new("§11.1 K77: missing oracle_invocation".into()))?;
             let tuple = context
