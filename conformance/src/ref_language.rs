@@ -9,6 +9,16 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     rc::Rc,
 };
+/// Source context remains outside the closed catalog and positional arguments.
+#[derive(Clone, Debug)]
+pub struct SourceSymbol { pub name:String, pub hash:String, pub oracle_invocation:Option<Json>, pub adjoint:bool }
+#[derive(Clone, Debug)]
+struct SourceCapture { oracle_invocation:Option<Json>, adjoint:bool }
+#[derive(Clone, Debug)]
+pub struct SourceBody { pub body:Json, pub symbols:Vec<SourceSymbol> }
+pub trait SourceFactory: std::fmt::Debug + Send + Sync {
+    fn construct(&self, hash:&str, values:&BTreeMap<String,Json>, regions:&BTreeMap<String,Json>, oracle_invocation:Option<&Json>, adjoint:bool)->Result<SourceBody,String>;
+}
 #[derive(Clone)]
 struct Handle {
     declared_scratch: bool,
@@ -45,7 +55,9 @@ struct Context {
     events: BTreeMap<String, Json>,
     images: BTreeMap<String, Vec<u8>>,
     templates: BTreeMap<String, (Vec<Json>, Box<Context>)>,
-    arguments: BTreeMap<String, (String, Vec<Json>, Box<Context>)>,
+    arguments: BTreeMap<String, (String, Vec<Json>, Box<Context>, Option<SourceCapture>)>,
+    sources:BTreeMap<String,SourceCapture>,
+    invocation_source:Option<SourceCapture>,
     values: BTreeMap<String, (Json, Json)>,
     controls: Vec<Wire>,
     legacy: bool,
@@ -76,6 +88,7 @@ impl Context {
         self.angles.remove(n);
         self.bodies.remove(n);
         self.symbols.remove(n);
+        self.sources.remove(n);
         self.events.remove(n);
         self.images.remove(n);
         self.templates.remove(n);
@@ -102,6 +115,7 @@ impl Context {
         self.angles.extend(b.angles.clone());
         self.bodies.extend(b.bodies.clone());
         self.symbols.extend(b.symbols.clone());
+        self.sources.extend(b.sources.clone());
         self.events.extend(b.events.clone());
         self.images.extend(b.images.clone());
         self.templates.extend(b.templates.clone());
@@ -439,6 +453,7 @@ fn validate_body(body: &[Json]) -> Result<(), String> {
 #[derive(Clone, Debug)]
 pub struct Expander {
     recipes: BTreeMap<String, Json>,
+    source_factory:Option<std::sync::Arc<dyn SourceFactory>>,
     registry: Registry,
     serial: usize,
     ordinals: BTreeMap<Vec<usize>, usize>,
@@ -522,6 +537,7 @@ impl Expander {
         }
         Ok(Self {
             recipes,
+            source_factory:None,
             registry,
             serial: 0,
             ordinals: BTreeMap::new(),
@@ -536,17 +552,22 @@ impl Expander {
         }
         Ok(Self {
             recipes: self.recipes.clone(),
+            source_factory:self.source_factory.clone(),
             registry,
             serial: 0,
             ordinals: BTreeMap::new(),
         })
     }
+    pub fn with_source_factory(mut self, factory:std::sync::Arc<dyn SourceFactory>)->Self {self.source_factory=Some(factory);self}
     pub fn expand(
         &mut self,
         kind: &str,
         args: &[Json],
         bundles: &[(&str, usize)],
     ) -> Result<Vec<Leaf>, String> {
+        self.expand_bound(kind,args,bundles,&[])
+    }
+    pub fn expand_bound(&mut self,kind:&str,args:&[Json],bundles:&[(&str,usize)],symbols:&[SourceSymbol])->Result<Vec<Leaf>,String> {
         self.serial = 0;
         self.ordinals.clear();
         let mut caller = Context::default();
@@ -558,6 +579,11 @@ impl Expander {
             {
                 return Err("duplicate bundle".into());
             }
+        }
+        for symbol in symbols {
+            if !self.registry.contains_key(&symbol.hash) || caller.has_name(&symbol.name) {return Err("invalid source symbol binding".into());}
+            caller.symbols.insert(symbol.name.clone(),symbol.hash.clone());
+            caller.sources.insert(symbol.name.clone(),SourceCapture{oracle_invocation:symbol.oracle_invocation.clone(),adjoint:symbol.adjoint});
         }
         let mut out = Vec::new();
         self.invoke(kind, args, &caller, &[], false, &mut Vec::new(), &mut out)?;
@@ -808,7 +834,7 @@ impl Expander {
                             .cloned()
                             .ok_or("unbound arguments")?
                     } else {
-                        (symbol.clone(), a(v)?.to_vec(), Box::new(caller.clone()))
+                        (symbol.clone(), a(v)?.to_vec(), Box::new(caller.clone()), c.sources.get(s(f(p,"symbol")?)?).cloned())
                     };
                     if &saved.0 != symbol {
                         return Err("arguments closure mismatch".into());
@@ -910,6 +936,7 @@ impl Expander {
                         return Err("unbound closure hash".into());
                     }
                     c.symbols.insert(name.into(), h.into());
+                    if let Some(context)=caller.sources.get(n) {c.sources.insert(name.into(),context.clone());}
                 }
                 "event" => {
                     let event = if let Json::Str(n) = v {
@@ -954,6 +981,20 @@ impl Expander {
             .ok_or_else(|| format!("unknown recipe {kind}"))?;
         let mut c = self.bind(&r, args, caller)?;
         chain.push(kind.into());
+        if self.registry.contains_key(kind) {
+            if let Some(factory)=self.source_factory.clone() {
+                let values=c.values.iter().map(|(k,(v,_))|(k.clone(),v.clone())).collect();
+                let built=factory.construct(kind,&values,&c.regions,caller.invocation_source.as_ref().and_then(|s|s.oracle_invocation.as_ref()),caller.invocation_source.as_ref().is_some_and(|s|s.adjoint))?;
+                validate_body(a(&built.body)?)?;
+                for symbol in built.symbols {
+                    if !self.registry.contains_key(&symbol.hash) || c.has_name(&symbol.name) {return Err("invalid constructed source symbol".into());}
+                    c.symbols.insert(symbol.name.clone(),symbol.hash);
+                    c.sources.insert(symbol.name,SourceCapture{oracle_invocation:symbol.oracle_invocation,adjoint:symbol.adjoint});
+                }
+                self.body(a(&built.body)?,&mut c,path,rev,chain,out)?;
+                chain.pop();return Ok(());
+            }
+        }
         self.body(a(f(&r, "body")?)?, &mut c, path, rev, chain, out)?;
         chain.pop();
         Ok(())
@@ -1304,17 +1345,19 @@ impl Expander {
                 let mut child = path.to_vec();
                 child.push(self.serial);
                 if let Some(n) = f(j, "args")?.as_str() {
-                    let (bound_hash, args, mut captured) =
+                    let (bound_hash, args, mut captured, source) =
                         c.arguments.get(n).cloned().ok_or("unbound arguments")?;
                     if bound_hash != hash {
                         return Err("arguments closure mismatch".into());
                     }
+                    captured.invocation_source=source;
                     captured.controls.extend(c.controls.clone());
                     captured.controls.sort();
                     captured.controls.dedup();
                     self.invoke(&hash, &args, &captured, &child, rev, chain, out)?;
                 } else {
-                    self.invoke(&hash, a(f(j, "args")?)?, c, &child, rev, chain, out)?;
+                    let mut captured=c.clone();captured.invocation_source=c.sources.get(s(n)?).cloned();
+                    self.invoke(&hash, a(f(j, "args")?)?, &captured, &child, rev, chain, out)?;
                 }
             } else if let Some(n) = j.get("splice") {
                 keys(j, &["splice"])?;

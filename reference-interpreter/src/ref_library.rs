@@ -184,7 +184,50 @@ impl<'a> OracleInvocation<'a> {
         library: &RefLibrary,
         bundles: &[(&str, usize)],
     ) -> Result<Vec<Leaf>> {
-        self.expand(library, bundles, crate::source_constructor::oracle)
+        let registry = self
+            .object
+            .functions
+            .values()
+            .filter(|f| matches!(f.kind.as_str(), "oracle" | "action" | "perm_action"))
+            .map(|f| {
+                let hash = self.object.identity()?.closure_hashes[&f.name]
+                    .clone()
+                    .ok_or_else(|| crate::Error::new("§11.1: unresolved source closure".into()))?;
+                Ok((
+                    hash,
+                    Value::Obj(std::collections::BTreeMap::from([
+                        (
+                            "parameters".into(),
+                            Value::Arr(source_parameters(self.object, f)?),
+                        ),
+                        ("body".into(), Value::Arr(Vec::new())),
+                    ])),
+                ))
+            })
+            .collect::<Result<Registry>>()?;
+        let factory = std::sync::Arc::new(crate::source_constructor::LinkedSource::new(
+            self.object.clone(),
+        )?);
+        let mut expander = library
+            .expander
+            .with_registry(registry)
+            .map_err(infeasible)?
+            .with_source_factory(factory);
+        expander
+            .expand_bound(
+                "oracle_call",
+                &[
+                    Value::Str("$root".into()),
+                    Value::Arr(self.arguments.clone()),
+                ],
+                bundles,
+                &[bennett_isa_conformance::ref_language::SourceSymbol {
+                    name: "$root".into(),
+                    hash: self.closure_hash.clone(),
+                    oracle_invocation: Some(self.context.clone()), adjoint:false,
+                }],
+            )
+            .map_err(infeasible)
     }
     pub fn object(&self) -> &'a Object {
         self.object
@@ -217,52 +260,7 @@ impl<'a> OracleInvocation<'a> {
         bundles: &[(&str, usize)],
         builder: impl FnOnce(&Self) -> Result<Value>,
     ) -> Result<Vec<Leaf>> {
-        let mut parameters = Vec::new();
-        for p in self.function.params.iter().flatten() {
-            let mut formal =
-                std::collections::BTreeMap::from([("name".into(), Value::Str(p.name.clone()))]);
-            match &p.ty {
-                crate::Type::Wire(w) | crate::Type::Reg(w) => {
-                    formal.insert("type".into(), Value::Str("wire".into()));
-                    // Conformance scalar expressions use the exact JCS subset.
-                    if *w >= 1u64 << 53 {
-                        return Err(crate::resource_error(
-                            "§11.1",
-                            "constructor width exceeds exact scalar range",
-                        ));
-                    }
-                    formal.insert("width".into(), Value::Num(*w as f64));
-                }
-                crate::Type::Region(a, w) => {
-                    if *a >= 1u64 << 53 || *w >= 1u64 << 53 {
-                        return Err(crate::resource_error(
-                            "§11.1",
-                            "constructor region exceeds exact scalar range",
-                        ));
-                    }
-                    formal.insert("type".into(), Value::Str("region".into()));
-                    formal.insert("address".into(), Value::Num(*a as f64));
-                    formal.insert("cell".into(), Value::Num(*w as f64));
-                    formal.insert(
-                        "role".into(),
-                        Value::Str(p.role.clone().unwrap_or_else(|| "in".into())),
-                    );
-                }
-                ty => {
-                    formal.insert("type".into(), Value::Str("value".into()));
-                    let ty = if *ty == crate::Type::Ptr {
-                        Value::Obj(std::collections::BTreeMap::from([(
-                            "ptr".into(),
-                            Value::Num(self.object.ptr_width as f64),
-                        )]))
-                    } else {
-                        Value::Str(ty.text())
-                    };
-                    formal.insert("isa_type".into(), ty);
-                }
-            }
-            parameters.push(Value::Obj(formal));
-        }
+        let parameters = source_parameters(self.object, self.function)?;
         let entry = |body| {
             Value::Obj(std::collections::BTreeMap::from([
                 ("parameters".into(), Value::Arr(parameters.clone())),
@@ -296,4 +294,54 @@ impl<'a> OracleInvocation<'a> {
             registry,
         )
     }
+}
+
+pub(crate) fn source_parameters(object: &Object, function: &crate::Function) -> Result<Vec<Value>> {
+    let mut parameters = Vec::new();
+    for p in function.params.iter().flatten() {
+        let mut formal =
+            std::collections::BTreeMap::from([("name".into(), Value::Str(p.name.clone()))]);
+        match &p.ty {
+            crate::Type::Wire(w) | crate::Type::Reg(w) => {
+                formal.insert("type".into(), Value::Str("wire".into()));
+                // Conformance scalar expressions use the exact JCS subset.
+                if *w >= 1u64 << 53 {
+                    return Err(crate::resource_error(
+                        "§11.1",
+                        "constructor width exceeds exact scalar range",
+                    ));
+                }
+                formal.insert("width".into(), Value::Num(*w as f64));
+            }
+            crate::Type::Region(a, w) => {
+                if *a >= 1u64 << 53 || *w >= 1u64 << 53 {
+                    return Err(crate::resource_error(
+                        "§11.1",
+                        "constructor region exceeds exact scalar range",
+                    ));
+                }
+                formal.insert("type".into(), Value::Str("region".into()));
+                formal.insert("address".into(), Value::Num(*a as f64));
+                formal.insert("cell".into(), Value::Num(*w as f64));
+                formal.insert(
+                    "role".into(),
+                    Value::Str(p.role.clone().unwrap_or_else(|| "in".into())),
+                );
+            }
+            ty => {
+                formal.insert("type".into(), Value::Str("value".into()));
+                let ty = if *ty == crate::Type::Ptr {
+                    Value::Obj(std::collections::BTreeMap::from([(
+                        "ptr".into(),
+                        Value::Num(object.ptr_width as f64),
+                    )]))
+                } else {
+                    Value::Str(ty.text())
+                };
+                formal.insert("isa_type".into(), ty);
+            }
+        }
+        parameters.push(Value::Obj(formal));
+    }
+    Ok(parameters)
 }
