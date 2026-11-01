@@ -1,3 +1,58 @@
+## 2026-11-01 Round 8 acceptance and S1 portable-vector publication
+
+**round 8: accepted** (codex seat, 0 blocking): passes VIII/IX/X,
+K78/K79/K80; K1–K80 accepted in total. Closed 9eq, 7js and 5cd with the
+round-8 disposition and exported `.beads/issues.jsonl`. The 0.9 history
+header and each pass block now record acceptance; prior implementation
+notes remain historical evidence. Housekeeping commit: 997d700.
+
+Published `conformance/fixtures/accepted-k78-k80-09/{k78,k79,k80}.json`
+and its README: 21 vectors, 272 complete basis tuples. Source admission,
+phase-sensitive full output, inverse restoration, clean scratch and expanded
+coordinates are recorded. The K80 primitive reverse has entry:3/4/5,
+generated 0 each; recompute has entry:5 generated 0–7. The semantic-call
+variant has fresh call_index 0/1/2/3 with separate callee ordinal 0 and
+caller ordinals 0/1/2/3. A one-iteration source-qloop original at entry:2/3
+has iteration [0]; its outside-loop release carrier at entry:6 owns the
+whole replacement with iteration [], never importing [0].
+
+Three new `portable_k78_vectors_exact_bytes`,
+`portable_k79_vectors_exact_bytes`, `portable_k80_vectors_exact_bytes`
+tests in the existing frame_identity, memory_address and cleanup_ownership
+regressions rederive exact canonical JSON plus LF. Shared byte-lock/update
+helper: `reference-interpreter/tests/support/round8.rs`. The red lock failed
+on absent fixture bytes, then explicit generation and the normal full-suite
+byte comparisons passed. An initial qloop harness header incorrectly put a
+bound in a parameter group; corrected to the signature/regs bounds record.
+No interpreter source fix or production 0.9 admission is claimed.
+
+K78/K79 source admission means parsing/validation of the 0.8 compatibility
+envelope before hash checking; their placeholder hashes are documented.
+K80 source is rehashed. Actual source/QuantumState execution and unchanged
+catalog expansion supply finite semantics; source points, per-point spaces,
+iterations and serialized call_index remain explicitly adapter-assigned.
+Constructor replay is not rewritten-source admission or an independent
+production source-builder coordinate check. The existing coherent tests
+remain in place. The orchestrator retains session-worklog ownership.
+
+Adopted both requested S1 edits: §15 links the fixtures and states their
+coordinate provenance; §3.3 uses the exact lifted-width clarification.
+No new K row; K1–K80 remain byte-identical to 99efbe4. The 0.8-to-0.9 diff
+is independently byte-exact with labels `a/spec/Bennett-ISA-Spec.md` and
+`b/spec/Bennett-ISA-Spec-0.9.md`. Implementation commit: cd6f840.
+
+Required gates all exit 0, headless with project-local TMPDIR:
+- reference-interpreter Cargo offline: **491 passed, 0 failed, 5 ignored**
+  (488 baseline plus three fixture byte-lock tests).
+- conformance Cargo offline: **113 passed, 0 failed, 0 ignored**.
+- `python3 -I conformance/tests/draft_witnesses.py`: PASS.
+- `python3 -I conformance/tools/ref_catalog.py --check`: PASS, 219 recipes;
+  unchanged envelope `5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`.
+Logs: `.tmp/round8-{reference,conformance,witness,catalog}.log`;
+red/generation evidence: `.tmp/round8-{red,generate}.log`. Owned Rust rustfmt,
+whitespace, tuple-range and semantic-call/caller-space audits pass. Accepted
+0.8 and catalog bytes are unchanged. No push or sibling repository write.
+
 ## 2026-11-01 Editorial pass X — multirow cleanup leaf ownership (5cd)
 
 **round 8: accepted** (2026-11-01, codex seat, 0 blocking); 5cd closed.
