@@ -17,6 +17,8 @@ Pass VIII / K78 (resolved primitive identity in §5.6) awaits the
 codex-seat council fix round; the accepted core and prior amendments stand.
 Pass IX / K79 (exact-width coherent addresses and the A=0 empty actual,
 §4.6) awaits that council fix round; its binop/icmp wording is a clarification.
+Pass X / K80 (multirow cleanup leaf ownership, §11) awaits the same
+round-8 one-reviewer council round, covering passes VIII–X together.
 §0 lists every change from 0.8.
 Implementation is expected to expose frictions; revisions go back
 through the council. Founding text of
@@ -203,6 +205,7 @@ north star §3.1 requires).
 | K77 | §4.7, §11.1, §16.2 | **ORACLE-INVOCATION-CONTEXT**. Explicit typed source-call token context is captured outside the declared argument vector, forwarded through adapters and retained under inverse traversal; each linked oracle construction uses its own tuple. Witness: the same inc8 closure and arguments at B=2 and B=3 in one expansion. | consumer 5xm; pass VII | S | – |
 | K78 | §5.6 | **ENTRY-PRIMITIVE-IDENTITY**. Causal entry analysis uses resolved primitive identity: X-family spellings share the resolved target and effective control set; qxor/qexch contribute per-bit cx/swap events. All-operand causal matching remains; source hashes and occurrence identities are unchanged. Witness: cx a c; mcx (a) c restores c=0, while polynomial-only or reader-interleaved prefixes do not. | consumer 9eq; pass VIII | E | – |
 | K79 | §4.6, §16.2 | **COHERENT-EMPTY-ADDRESS**. Coherent memory rows bind exactly A address wires; A=0 has the address-only source actual `()`, bound to the catalog's empty wire list. Ordinary wire values remain nonempty. Witness: qload/qunload/qstore/qexchm on region[0,1] select cell 0; nonempty A=0 and empty A>0 addresses reject. | consumer 7js; pass IX | S | – |
+| K80 | §11 | **CLEANUP-LEAF-OWNERSHIP**. Reverse retains written cleanup points; recompute owns one fresh caller leaf/call space at the carrier, with separate callee spaces and fresh replay identities. Witness: a six-row two-CX computation/cleanup has reverse leaves at entry:3/4/5 and recompute leaves at entry:5 ordinals 0–7. | consumer 5cd; pass X | S | – |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -2695,6 +2698,70 @@ For `d = qcopy s; quncopy s d`, selecting recompute at the quncopy point
 chooses fresh-copy/XOR/uncompute for the whole cleanup, while reverse
 chooses inverse-copy/release at the same carrier; an empty inverse
 sequence still has its ordinal-0 carrier at its release point. [deps: ISA-4.5, ISA-6.2-P1, ISA-6.4-P1, ISA-11-P6]
+
+
+**Cleanup leaf ownership (K80).** For `reverse`, emitted leaves retain the
+written cleanup's source points and per-point ordinal and semantic-call
+occurrence spaces, including the terminating release. For `recompute`,
+consumers MUST assign the entire replacement's caller-level leaves and
+call edges to the carrier's point and coordinates. The original
+computation is unchanged; replaced inverse rows emit nothing. Materialise
+fresh computation, XOR, fresh uncomputation and releases in §6.4 order;
+number caller leaves contiguously from zero, excluding callee subtrees,
+and number semantic-call occurrences independently from zero (§11.1/K63).
+Fresh uncomputation has separate occurrences from fresh computation;
+neither reuses the original computation's edges or scratch identities.
+Callees retain their own source points, nested chains and ordinal/call
+spaces under these fresh edges. Internal replay does not import the
+original rows' source-qloop coordinates. Raw inverse traversal of the
+chosen expansion retains all forward addresses and identities; source-
+adjoint formation remains K62. The carrier's ordinal 0 belongs only to
+cleanup-kind matching; it does not consume emitted-leaf ordinal 0.
+K64's oracle support partition is unchanged.
+
+**Multirow cleanup witness (K80).** In one action invocation, with no
+source qloop, write six separate source instructions:
+
+```
+^entry():
+d = qalloc any 1
+cx x d
+cx z d
+cx z d
+cx x d
+qfree d
+```
+
+The carrier is `entry:5`, cleanup ordinal 0 in either realisation.
+The original allocation and computation stay at `entry:0/1/2`, each at
+leaf ordinal 0. Reverse emits `cx z d`, `cx x d`, release d at
+`entry:3/4/5`, each at leaf ordinal 0. Recompute replaces those three
+rows by this caller trace, all at `entry:5`:
+
+| Leaf ordinal | Operation |
+|---|---|
+| 0 | allocate fresh u[1] clean, class any |
+| 1 | cx x u |
+| 2 | cx z u |
+| 3 | cx u d (the XOR) |
+| 4 | cx z u |
+| 5 | cx x u |
+| 6 | release u |
+| 7 | release d |
+
+Thus a gate selector at `entry:1/generated:0` selects only the original
+CX; `entry:5/generated:0` has an allocation and no gate, while
+`entry:5/generated:1` selects the fresh computation's first CX.
+The carrier has no charge: cleanup gate counts are two for reverse,
+five for recompute, before target decomposition. If the two computing
+CXs are instead two calls to a linked one-CX perm_action, reverse keeps
+the written inverse calls at `entry:3/4`, each with call_index 0.
+Recompute has fresh call_index 0/1 for computation and 2/3 for
+uncomputation at `entry:5`, in emitted call order; each one-CX callee
+starts at its own source point and ordinal 0. The XOR remains caller
+leaf ordinal 1, with allocation u at 0 and releases u/d at 2/3.
+Reversing that already expanded trace visits call_index 3/2/1/0 and
+caller ordinals 3/2/1/0 without renumbering.
 
 ### 11.1 Reference-library contract (K11)
 
