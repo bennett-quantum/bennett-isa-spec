@@ -1,3 +1,140 @@
+## 2026-11-01 Editorial pass VII — oracle invocation-token binding (5xm)
+
+Reading **B** adopted. Bead 5xm remains in_progress for the orchestrator's
+round 7, together with 73y. Implementation commits: 1d86f00 and
+4f7e18f (source-adjoint versus inverse identity clarification).
+
+| Item | Adopted/declined | Clauses / evidence | Commits |
+|---|---|---|---|
+| B: explicit invocation context outside A | adopted: typed `oracle_invocation.token`, captured per source call; source-derived body builder takes the tuple explicitly | §4.7, §11.1, §16.2; action.rs 659–699, 844 onward; claims.rs 394–415 and claim_budget | 1d86f00 |
+| A: synthetic invocation-token formal | declined: no such slot in the source header/signature, and reference receives the budget separately from args | §16.2 five groups; K24; action.rs oracle_quantum signature | 1d86f00 |
+| capture / forwarding / inverse traversal | adopted: context travels with A/body/templates, including qinplace adapters; nested calls resolve their own tk; retain forward identities under inverse | §11.1 K77 | 1d86f00, 4f7e18f |
+| two-token inc8 witness | adopted: identical source closure and `[x,t,f]`, different captured B=2/B=3 tuples; two versus three frames | §11.1 worked example; oracle.rs 256-input regression | 1d86f00 |
+| normative inventory and artifacts | one new MUST, K77 only; K1–K76 byte-identical; exact-label diff regenerated; catalog bytes unchanged | §0.2; spec/isa-0.8-to-0.9.diff | 1d86f00 |
+
+Why B: the source grammar supplies invocation `tk` separately from the
+oracle's five declared groups. `action.rs` resolves that operand in the
+caller, collects declared args separately, and passes `budget` separately
+to `oracle_quantum`/the oracle executor. `claims.rs` likewise obtains the
+root budget from schedule binding, not a fictitious source parameter.
+The constructor catalog's `oracle_call` and `lift.oracle_call` only forward
+S and A. `ref_language.rs` captures the lexical environment for A and
+body/template actuals; its generic fixture registry contains supplied
+constructor bodies, not an ISA source-to-constructor builder. It does not
+establish a source invocation budget by itself. The amendment specifies
+that missing source-builder input explicitly, without claiming a complete
+0.9 source expander in the conformance crate or changing a recipe.
+
+The channel has exactly one field `token`, K24 value(token), canonical
+four-string tuple in §5.4 order. It is explicit out-of-catalog source
+binding metadata, not a JSON-constructor extension, added formal, default,
+or closure-hash component. The builder is invocation-specific even when
+the registry is keyed by one closure hash. Existing source/link checking,
+control propagation, budget validity and admission/concrete-check staging
+remain in force. No capability, width or legal source program is removed.
+
+The new regression passes against the unchanged reference before the
+text edit (`.tmp/pass-vii-before-text.log`), covering all 256 input x,
+nonzero target/fault seeds 0x55/0xa, the combined XOR result and inverse
+restoration including allocator state. This validates the source semantics
+of the worked example; it does not claim a generic catalog source builder.
+The bead's call_index shorthand is qualified by existing K63: two calls
+within one source-row expansion have indices 0/1; calls at separate source
+points each start at 0 and remain distinguished by the point. No change to
+K63, call numbering or invocation-path semantics is made.
+
+Required headless gates, all exit 0: reference **468 passed, 0 failed,
+5 unchanged ignored**; conformance **113 passed, 0 failed, 0 ignored**;
+`python3 -I conformance/tests/draft_witnesses.py` PASS (rerun on final
+source-adjoint wording); `python3 -I conformance/tools/ref_catalog.py
+--check` PASS. Both Cargo commands used `--offline` and the requested
+manifest paths. All gates unset DISPLAY, WAYLAND_DISPLAY,
+DBUS_SESSION_BUS_ADDRESS and BROWSER, with project-local TMPDIR.
+Logs: `.tmp/pass-vii-{reference,conformance,witness,catalog}.log`.
+Both touched Rust tests pass rustfmt --check; owned source/progress
+whitespace checks pass. Pass VI's completed gate precedes pass VII edits.
+
+Catalog byte SHA-256 remains
+`52dbc3f8f0c91d587fd933a43080385fd5284abcfec0ce84788229fcb15c53d8`;
+envelope remains
+`5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`
+(219 recipes). Accepted 0.8 SHA-256 remains
+`90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e`.
+No catalog edit, sibling write, push or remote sync. Orchestrator owns
+session worklog, final 0.9 statement-layer regeneration/INV-3 citation
+resolution and the pending one-reviewer council round 7.
+
+Exact new normative text and worked example (line wrapping as published):
+
+§4.7:
+
+> The invocation operand `tk` is separate from the callee's declared
+> `args`; its explicit catalog context channel is `oracle_invocation`
+> (§11.1, K77), including for the lifted calls of §4.2.
+
+§11.1:
+
+**Oracle invocation context (K77).** An oracle's catalog argument vector
+contains exactly its declared parameters, flattened in header-group order
+`in`, `tgt`, `fault`, `mem`, `args` (§16.2); empty groups add no entries.
+The invocation token is not an additional formal or vector entry.
+Before concrete expansion, consumers MUST supply and validate the
+explicit source-binding channel `oracle_invocation`, preserve it through
+the captures below, and reject missing, ill-typed or source-inconsistent
+context. The channel is a record with exactly one field, `token`, of
+K24's `value` type with `isa_type:"token"`: four canonical nonnegative
+decimal strings in §5.4 order `(B, heap_limit, stack_limit, depth_limit)`,
+resolved from that source call's `tk` and
+validated for the linked callee under §5.4. A root oracle instead binds
+the explicit launch/schedule request budget. Unresolved source parameters
+retain §11's admission/concrete-check staging.
+
+This channel is explicit input to the linked source-body builder, outside
+the catalog JSON and positional actuals, not an implicit name, default,
+new constructor key or token arithmetic inside a recipe. The registry
+binds the closure's source/interface; its builder instantiates the
+source-derived constructor body separately for each invocation, using
+this tuple and the linked source/layout to derive B, frames and every
+token-dependent limit or width supplied to `oracle.construct`.
+A registry keyed by closure hash alone cannot fix one invocation budget.
+The context is associated with the full §11 invocation identity, not
+with the closure hash or positional vector values alone.
+
+Source binding captures the channel with the corresponding `arguments`
+actual and with any body/template adapter containing that call. Forwarding
+an arguments name through `invoke` or `call`, or splicing/applying a
+captured body/template, preserves that captured channel; unrelated
+caller/apply-site context cannot replace it. The qinplace adapters capture
+the source `tk` for both calls. Each nested source oracle call resolves
+its own `tk` in its own fixed bindings, then restores the outer context.
+Source-adjoint adapters retain their captured tuples and perform §5.3
+replacements before recipe instantiation (K62). Inverse traversal retains
+each instantiated forward call's channel and forward occurrence identity
+while reversing/adjointing its operations (§11). None of these captures
+adds a leaf, ordinal, source parameter or closure-hash component.
+
+**Two-token witness.** Use §16.3 example 1's `inc8` closure and two source
+calls `oracle_call @inc8 tk2 (x) t f () ()` and
+`oracle_call @inc8 tk3 (x) t f () ()` in one action expansion, with
+`tk2=(2,0,0,0)` and `tk3=(3,0,0,0)`. Both positional vectors are `[x,t,f]`;
+their captured contexts are respectively `{"token":["2","0","0","0"]}`
+and `{"token":["3","0","0","0"]}`. The linked closure hash is identical.
+The first construction has two frames and XORs `(0,FAULT_BUDGET_STEPS)`
+into `(t,f)`; the second has three frames and XORs `(x+1 mod 256,0)`.
+Starting from `(t,f)=(0,0)`, the final pair is `(x+1 mod 256,1)`.
+Their §11 edges are distinct: separate source points each have
+`call_index=0`; two calls within a single source-row forwarding expansion
+instead have forward `call_index=0,1`. Inverse traversal retains those
+identities and tuples and restores the complete input. Neither binding
+adds a token to `inc8`'s empty signature `args` list or changes its hash.
+
+§16.2:
+
+> The oracle header and signature declare no invocation-token slot. Its
+> catalog interface follows the five printed groups exactly; the separate
+> `tk` operand binds the typed `oracle_invocation` channel of §11.1, not a
+> reserved header name or an extra `args` element.
+
 ## 2026-11-01 Editorial pass VI — council round 6 response (73y)
 
 Source: `../bennett/docs/council/isa-09-2026-10-31/round-6/report.md`
