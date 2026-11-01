@@ -108,6 +108,11 @@ pub struct SnapshotDelta {
     pub memory: Vec<(u128, u8, u8)>,
 }
 impl ClassicalSnapshot {
+    /// The active §7.3 tape at this checkpoint. An observer can compare the
+    /// newly appended entry before a step is published; `uncall` can shrink it.
+    pub fn effect_tape(&self) -> &[TapeEntry] {
+        &self.devices.tape
+    }
     /// SHA-256 (hex) of the complete §7.1 memory: allocation table, heap
     /// bump and every nonzero byte, in sorted order.
     pub fn memory_digest(&self) -> Result<String> {

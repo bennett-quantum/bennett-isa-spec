@@ -22,6 +22,28 @@ conformance gate is running; final results will be recorded in this pass block.
 Logs: `.tmp/pass-xi-221-{reference,conformance,witness,catalog}.log`.
 221 closed with its clause citations; b-isa-spec-fuk remains open. Beads exported.
 
+### b-isa-spec-04d — (b) reference saved-tape consumer interface
+
+ISA 0.8 §7.3 defines device effects/tape entries and §7.4 defines retained
+history/reversal; dialect 0.2.10 @023f5a7 §19.2 requires deterministic replay
+from tape and entropy. The missing CLI is an implementation item under that
+text. No normative addition, new MUST, K81 or inventory/diff regeneration.
+K1–K80 and both spec versions/catalog bytes remain unchanged.
+
+The reference now exposes `--tape-out file` / `--replay-tape file` for
+run-cc, CC/R reverse and run-program. README specifies strict JSON Tape[],
+ordered pre-commit dev/op/args/bytes validation and exact exhaustion, entropy
+and checked reply inputs, error behavior, byte-identical output/reset, and
+the saved execution journal versus active tape distinction around uncall.
+Eight new CLI regressions and one transactional rollback/retry regression;
+red/green and harness corrections are detailed in reference PROGRESS.md.
+This closes only reference integration. The valid ISA-0.8 typed-fault
+prerequisite remains open as b-isa-spec-fuk, and full musl rung-3 acceptance
+still requires the consumer pipeline and explicit verified pin updates.
+No sibling changes or production musl verdict is claimed.
+
+Full gates in progress: `.tmp/pass-xi-04d-{reference,conformance,witness,catalog}.log`.
+
 ## 2026-11-01 Round 8 acceptance and S1 portable-vector publication
 
 **round 8: accepted** (codex seat, 0 blocking): passes VIII/IX/X,

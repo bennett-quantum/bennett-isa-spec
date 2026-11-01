@@ -219,6 +219,54 @@ explicit staged diagnostics, never silently ignored: `--target file`
 §11). The rest of deliverable 8 (the full §10 C API as a library, estimates,
 coverage) remains staged as PROGRESS records.
 
+### Saved effect tapes and deterministic replay
+
+`run-cc`, `reverse` on a CC/R entry, and `run-program` accept:
+
+- `--tape-out file`: after a successful command, write the forward effect
+  journal as a canonical JSON `Tape[]` (schema below), followed by LF. Every
+  successfully executed `effect` contributes its dev/op/args/transferred bytes
+  in execution order. A faulting effect contributes no entry (§7.3 atomicity).
+  For `reverse --steps N`, save only that forward prefix. Whole-run reversal
+  does not erase the saved journal. A normal JSON `FAILED` run can be saved;
+  command diagnostics do not publish a tape.
+- `--replay-tape file`: read a saved `Tape[]` and consume its entries in order.
+  The deterministic device model forms each candidate effect from the entry
+  state and supplied entropy; its dev, op, integer args and transferred bytes
+  must match the next saved entry **before the step commits**. A mismatch or
+  missing entry rolls back that step (including memory, devices and history),
+  and leaves the replay cursor unchanged. Extra entries at the end of the
+  forward run/prefix also fail. Divergence exits 1 with a §7.3/§10
+  `replay mismatch` diagnostic, no stdout JSON and no tape-output write.
+  Malformed schema/hex/integer encodings and I/O errors are diagnostics too.
+  Both options may be used together; each may occur only once.
+
+Use the same object, entry, arguments, global images, entropy, measurement
+inputs (if any), budgets/fuel, prefix length and checked `--replies` file.
+Replay consumes the supplied tape during execution; it is not an unchecked
+second run or a post-run comparison. Identical inputs and a valid saved tape
+produce byte-identical stdout, including results, console bytes, trace, active
+tape and reset report, with no added replay-only JSON fields. Entropy is still
+supplied by `--entropy`; host request/reply payloads remain in `--replies`,
+not in the device journal. This interface does not replace source R step
+instrumentation or change the ISA 0.8 admission target.
+
+The output JSON's `tape` remains the **active** §7.3 tape. Segment `uncall`
+removes its cancelled entries from that active tape (§7.4); `--tape-out`
+retains them in the execution journal so replay can validate them before their
+cancellation. With no segment cancellation, the saved array equals the forward
+output's `tape` and consumers may save that field directly. Otherwise use
+`--tape-out`. A reversal command still reports the forward active `tape` and
+post-reversal `effect_tape_length`, as before.
+
+For the published five-effect device control (not the musl rung-3 corpus):
+
+```sh
+reference-interpreter/target/debug/bennett-isa-ref run-cc reference-interpreter/tests/fixtures/classical.bisa effects --entropy 0b1621 --tape-out .tmp/effects.json
+reference-interpreter/target/debug/bennett-isa-ref run-cc reference-interpreter/tests/fixtures/classical.bisa effects --entropy 0b1621 --replay-tape .tmp/effects.json
+reference-interpreter/target/debug/bennett-isa-ref reverse reference-interpreter/tests/fixtures/classical.bisa effects --entropy 0b1621 --replay-tape .tmp/effects.json
+```
+
 Exact output schemas follow. This structural notation describes JSON:
 `T[]` is an array, `Record<string,T>` an object with arbitrary string keys,
 `&` combines object fields, and `|` is a union. Every listed field is
@@ -302,6 +350,8 @@ reference-interpreter/target/debug/bennett-isa-ref run-program reference-interpr
   the `effect_tape` with transferred bytes, `memory_digest`, caller-seeded
   globals (`with_quantum_registers_and_globals`), and snapshot comparison
   (`ClassicalSnapshot::delta`, `first_difference`, `memory_equals`); the
+  `ClassicalSnapshot::effect_tape` exposes the checkpoint's active tape for
+  transactional replay observers; the
   step machine snapshot likewise (`BasisVectorConfiguration::locations`,
   `counter_values`, `first_difference`).
 - `QuantumState` is the §14.2 simulator: a basis fast path and a sparse

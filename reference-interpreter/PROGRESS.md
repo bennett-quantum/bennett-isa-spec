@@ -14,6 +14,34 @@ Host fuel is not the dialect §17.6 counter. This pass leaves interpreter
 admission at 0.8 and does not clear the consumer's BD-B-ISA7 blocker. Open b-isa-spec-fuk retains the actual migration prerequisite. No code
 or normative spec change for this bead; existing regressions retained.
 
+b-isa-spec-04d is classification (b), an implementation interface under
+ISA 0.8 §7.3/§7.4 and dialect 0.2.10 @023f5a7 §19.2, not a new spec rule.
+`--tape-out file` and `--replay-tape file` on run-cc, CC/R reverse and
+run-program save/consume strict Tape[] journals. Every dev/op/args/bytes
+entry is checked in the existing step transaction before publication; bad
+entries/exhaustion roll back the step without advancing the cursor, and unused
+entries fail at end of forward execution (or requested prefix). Entropy and
+HOST_REQUEST replies retain their existing inputs. Saved journals include
+subsequently uncalled effects; output JSON retains the active-tape schema.
+Successful replay is byte-identical to ordinary execution, including reset.
+No tape-output write occurs on replay validation failure. The snapshot's new
+read-only effect_tape accessor permits transactional observation.
+
+Red evidence: `.tmp/pass-xi-04d-red.log`, five missing-option failures (the
+malformed-input diagnostic control already passed). Eight new integration
+regressions in tests/tape_replay.rs cover all four models, every field/order,
+short/extra/empty/prefix tapes, changed/depleted entropy, strict schema,
+duplicate/missing options and I/O, preserved output on errors, nested uncall,
+CC launch + real checked host replies + reset, and failed-prefix replay/reset.
+One main.rs unit regression rejects the same bad effect twice with complete
+snapshot/history/trace/cursor equality, then retries and reverses to entry.
+Targeted tests: 8 integration + 3 binary (including 2 existing), all green.
+Test-harness corrections: synthetic CC stub needed additional heap after its
+host-call allocation; the rollback harness uses three single steps rather
+than run(3), which correctly diagnoses fuel exhaustion on unfinished runs.
+No production-semantic fallback or fixture weakening was introduced.
+Required full-suite gates are running; final results recorded after completion.
+
 ## 2026-11-01 — n8j: persistent dynamic-instance checkpoints
 
 The growing dynamic-instance environment now uses a shared immutable AVL root

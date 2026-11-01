@@ -1,12 +1,12 @@
 use bennett_isa_ref::{
-    json::Json, Argument, BitVector, Budget, ClassicalMachine, ClassicalValue, Complex, Error,
-    Function, Object, OracleInput, OracleVectorInput, OracleVectorMachine, QuantumBindings,
-    QuantumRegion, QuantumRegisters, QuantumState, Result, SnapshotDelta, StepPoint, Type,
-    Xoshiro256,
+    json::Json, Argument, BitVector, Budget, ClassicalMachine, ClassicalSnapshot, ClassicalValue,
+    Complex, Error, Function, Object, OracleInput, OracleVectorInput, OracleVectorMachine,
+    QuantumBindings, QuantumRegion, QuantumRegisters, QuantumState, Result, SnapshotDelta,
+    StepPoint, TapeEntry, Type, Xoshiro256,
 };
 use std::collections::VecDeque;
 
-const USAGE:&str="bennett-isa-ref check <object>\nbennett-isa-ref hash <object>\nbennett-isa-ref run-oracle <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref step-check <object> <oracle> (--exhaustive [--max-bits N] | --suite | --samples N) [--seed a,b,c,d] [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref run-cc <object> <entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex]\nbennett-isa-ref reverse <object> <entry> [run-cc options] [--steps N]\nbennett-isa-ref reverse <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--steps N] [--mem name=hex] [--arg value]\nbennett-isa-ref reverse <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]>] [--adjoint]\nbennett-isa-ref run-action <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]> | --arg value...] [--adjoint]\nbennett-isa-ref run-program <object> <cc-entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex] [--reverse] [--target file]";
+const USAGE:&str="bennett-isa-ref check <object>\nbennett-isa-ref hash <object>\nbennett-isa-ref run-oracle <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref step-check <object> <oracle> (--exhaustive [--max-bits N] | --suite | --samples N) [--seed a,b,c,d] [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref run-cc <object> <entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--tape-out file] [--replay-tape file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex]\nbennett-isa-ref reverse <object> <entry> [run-cc options] [--steps N]\nbennett-isa-ref reverse <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--steps N] [--mem name=hex] [--arg value]\nbennett-isa-ref reverse <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]>] [--adjoint]\nbennett-isa-ref run-action <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]> | --arg value...] [--adjoint]\nbennett-isa-ref run-program <object> <cc-entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--tape-out file] [--replay-tape file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex] [--reverse] [--target file]";
 fn fail(message: impl std::fmt::Display) -> Error {
     Error::new(message.to_string())
 }
@@ -216,8 +216,11 @@ fn faults_json(fault: Option<u128>) -> Json {
     }
 }
 fn tape_json(m: &ClassicalMachine) -> Result<Json> {
+    tape_entries_json(m.effect_tape())
+}
+fn tape_entries_json(entries: &[TapeEntry]) -> Result<Json> {
     Ok(Json::Array(collect_output(
-        m.effect_tape().iter().map(|e| {
+        entries.iter().map(|e| {
             Ok(object([
                 (
                     "args".into(),
@@ -286,6 +289,8 @@ struct CcOptions {
     args: Vec<String>,
     entropy: Vec<u8>,
     replies: Option<String>,
+    tape_out: Option<String>,
+    replay_tape: Option<String>,
     draws: Vec<f64>,
     fuel: u64,
     token_defaults: Budget,
@@ -305,6 +310,8 @@ fn parse_cc_options(
         args: Vec::new(),
         entropy: Vec::new(),
         replies: None,
+        tape_out: None,
+        replay_tape: None,
         draws: Vec::new(),
         fuel: 1_000_000,
         token_defaults: limits,
@@ -380,6 +387,16 @@ fn parse_cc_options(
                     return Err(fail("--replies given twice"));
                 }
                 options.replies = Some(value.clone());
+            }
+            "--tape-out" | "--replay-tape" => {
+                if !once.insert(option) {
+                    return Err(fail(format!("{option} given twice")));
+                }
+                if option == "--tape-out" {
+                    options.tape_out = Some(value.clone());
+                } else {
+                    options.replay_tape = Some(value.clone());
+                }
             }
             "--draws" => {
                 if !once.insert(option) {
@@ -549,6 +566,99 @@ fn load_replies(path: Option<&str>) -> Result<VecDeque<Reply>> {
     }
     Ok(queue)
 }
+/// Consumer replay journal, separate from the active (reversible) device
+/// tape. Every successful forward effect is consumed once, including effects
+/// later cancelled by `uncall`. Checking occurs in the step's transaction;
+/// cursor/journal publication follows successful state/history publication.
+struct EffectTapeSession {
+    expected: Option<Vec<TapeEntry>>,
+    recorded: Vec<TapeEntry>,
+    output: Option<String>,
+}
+impl EffectTapeSession {
+    fn load(options: &CcOptions) -> Result<Option<Self>> {
+        if options.tape_out.is_none() && options.replay_tape.is_none() {
+            return Ok(None);
+        }
+        let expected = options
+            .replay_tape
+            .as_deref()
+            .map(|path| -> Result<Vec<TapeEntry>> {
+                let text = std::fs::read_to_string(path)
+                    .map_err(|e| fail(format!("§7.3/§10: replay tape {path}: {e}")))?;
+                let value = Json::parse(&text)?;
+                collect_output(
+                    value.array()?.iter().map(|entry| {
+                        entry.fields(&["args", "bytes", "dev", "op"], &[])?;
+                        Ok(TapeEntry {
+                            dev: entry.get("dev")?.string()?.into(),
+                            op: entry.get("op")?.string()?.into(),
+                            args: collect_output(
+                                entry.get("args")?.array()?.iter().map(Json::uint),
+                                "replay arguments",
+                            )?,
+                            bytes: parse_hex(entry.get("bytes")?.string()?)?.into(),
+                        })
+                    }),
+                    "replay tape",
+                )
+            })
+            .transpose()?;
+        Ok(Some(Self {
+            expected,
+            recorded: Vec::new(),
+            output: options.tape_out.clone(),
+        }))
+    }
+    fn prepare(
+        &mut self,
+        before: &ClassicalSnapshot,
+        after: &ClassicalSnapshot,
+    ) -> Result<Option<TapeEntry>> {
+        if after.effect_tape().len() <= before.effect_tape().len() {
+            return Ok(None);
+        }
+        let index = self.recorded.len();
+        let actual = after.effect_tape().last().expect("appended effect");
+        if let Some(expected) = &self.expected {
+            let next = expected.get(index).ok_or_else(|| fail(format!(
+                "§7.3/§10: replay mismatch at entry {index}: supplied tape exhausted before {}.{}", actual.dev, actual.op
+            )))?;
+            if actual != next {
+                return Err(fail(format!(
+                    "§7.3/§10: replay mismatch at entry {index}: dev/op/args/bytes differ for {}.{}", actual.dev, actual.op
+                )));
+            }
+        }
+        self.recorded.try_reserve(1).map_err(|e| {
+            Error::host_resource(format!("§7.3/§10: host limit: saved effect tape: {e}"))
+        })?;
+        Ok(Some(actual.clone()))
+    }
+    fn check_consumed(&self) -> Result<()> {
+        if let Some(expected) = &self.expected {
+            if self.recorded.len() != expected.len() {
+                return Err(fail(format!(
+                    "§7.3/§10: replay mismatch at entry {}: {} supplied entries unused at end of forward execution",
+                    self.recorded.len(), expected.len() - self.recorded.len()
+                )));
+            }
+        }
+        Ok(())
+    }
+    fn save(&self) -> Result<()> {
+        if let Some(path) = &self.output {
+            let mut text = tape_entries_json(&self.recorded)?.try_canonical()?;
+            text.try_reserve(1).map_err(|e| {
+                Error::host_resource(format!("§7.3/§10: host limit: saved tape newline: {e}"))
+            })?;
+            text.push('\n');
+            std::fs::write(path, text)
+                .map_err(|e| fail(format!("§7.3/§10: tape output {path}: {e}")))?;
+        }
+        Ok(())
+    }
+}
 fn delta_registers_json(delta: &SnapshotDelta) -> Result<Vec<Json>> {
     collect_output(
         delta.registers.iter().map(|r| {
@@ -628,6 +738,7 @@ fn drive(
     fuel: u64,
     max_steps: Option<u64>,
     mut trace: Option<&mut Vec<Json>>,
+    mut tape: Option<&mut EffectTapeSession>,
 ) -> Result<u64> {
     let mut steps = 0u64;
     loop {
@@ -712,20 +823,31 @@ fn drive(
                 Error::host_resource(format!("§7.4: host limit: CLI trace records: {e}"))
             })?;
         }
-        let (_, record) = machine
+        let (_, (record, entry)) = machine
             .step_once_observed(|point, before, after| {
-                if trace.is_some() {
+                let entry = match &mut tape {
+                    Some(tape) => tape.prepare(before, after)?,
+                    None => None,
+                };
+                let record = if trace.is_some() {
                     let delta = before.delta(after)?;
-                    Ok(Some(trace_record(steps, point, &delta)?))
+                    Some(trace_record(steps, point, &delta)?)
                 } else {
-                    Ok(None)
-                }
+                    None
+                };
+                Ok((record, entry))
             })?
             .ok_or_else(|| fail("§3.4: running machine took no step"))?;
+        if let (Some(tape), Some(entry)) = (&mut tape, entry) {
+            tape.recorded.push(entry); // capacity prepared before commit
+        }
         steps += 1;
         if let (Some(trace), Some(record)) = (trace.as_deref_mut(), record) {
             trace.push(record);
         }
+    }
+    if let Some(tape) = tape {
+        tape.check_consumed()?;
     }
     Ok(steps)
 }
@@ -785,6 +907,7 @@ fn classical_machine<'a>(
     Ok((machine, budgets))
 }
 fn run_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> {
+    let mut tape = EffectTapeSession::load(&options)?;
     let mut replies = load_replies(options.replies.as_deref())?;
     let (mut machine, budgets) = classical_machine(program, name, &options)?;
     let mut trace = Vec::new();
@@ -794,10 +917,11 @@ fn run_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> {
         options.fuel,
         None,
         Some(&mut trace),
+        tape.as_mut(),
     )?;
     check_replies_consumed(&replies)?;
     let outcome = machine.outcome();
-    Ok(object([
+    let output = object([
         ("budgets".into(), budgets),
         ("clock".into(), number(machine.clock() as u128)),
         ("console".into(), console_json(&machine)?),
@@ -827,7 +951,11 @@ fn run_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> {
         ("steps".into(), number(steps as u128)),
         ("tape".into(), tape_json(&machine)?),
         ("trace".into(), Json::Array(trace)),
-    ]))
+    ]);
+    if let Some(tape) = tape {
+        tape.save()?;
+    }
+    Ok(output)
 }
 /// Options for executing one Q action (`run-action`, and `reverse` on an
 /// action). The interface bit order for `--basis`, `--state` and the output
@@ -1272,6 +1400,7 @@ fn first_state_difference(a: &QuantumState, b: &QuantumState, total: usize) -> O
     None
 }
 fn reverse_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> {
+    let mut tape = EffectTapeSession::load(&options)?;
     let mut replies = load_replies(options.replies.as_deref())?;
     let (mut machine, budgets) = classical_machine(program, name, &options)?;
     let entry = machine.snapshot();
@@ -1282,6 +1411,7 @@ fn reverse_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> 
         options.fuel,
         options.steps,
         None,
+        tape.as_mut(),
     )?;
     check_replies_consumed(&replies)?;
     let forward = machine.outcome();
@@ -1292,7 +1422,7 @@ fn reverse_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> 
     machine.reverse()?;
     let after = machine.snapshot();
     let equals = after == entry;
-    Ok(object([
+    let output = object([
         ("budgets".into(), budgets),
         ("clock".into(), number(machine.clock() as u128)),
         ("console".into(), console_json(&machine)?),
@@ -1329,7 +1459,11 @@ fn reverse_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> 
         ),
         ("steps".into(), number(steps as u128)),
         ("tape".into(), forward_tape),
-    ]))
+    ]);
+    if let Some(tape) = tape {
+        tape.save()?;
+    }
+    Ok(output)
 }
 /// The run-oracle-shaped options for `reverse` on an oracle.
 struct OracleOptions {
@@ -1612,6 +1746,7 @@ fn run_action(program: &Object, name: &str, options: ActionOptions) -> Result<Js
 /// bennett_run_close. Paths that need staged deliverables 8-11 (PROGRESS)
 /// fail by name before any run is reported.
 fn run_program(program: &Object, name: &str, options: CcOptions) -> Result<Json> {
+    let mut tape = EffectTapeSession::load(&options)?;
     if options.target.is_some() {
         return Err(fail(
             "§10 bennett_load: a target description cannot be honoured yet (staged deliverable 9: §8 target descriptions, suite E; PROGRESS.md deliverables 8-11); no run is reported",
@@ -1648,7 +1783,14 @@ fn run_program(program: &Object, name: &str, options: CcOptions) -> Result<Json>
     let entry = machine.snapshot();
     let entry_digest = machine.memory_digest()?;
     let mut replies = load_replies(options.replies.as_deref())?;
-    let steps = drive(&mut machine, &mut replies, options.fuel, None, None)?;
+    let steps = drive(
+        &mut machine,
+        &mut replies,
+        options.fuel,
+        None,
+        None,
+        tape.as_mut(),
+    )?;
     check_replies_consumed(&replies)?;
     let outcome = machine.outcome();
     let failed = outcome.fault.is_some();
@@ -1676,7 +1818,7 @@ fn run_program(program: &Object, name: &str, options: CcOptions) -> Result<Json>
         status = "REVERSED";
     }
     let after = machine.snapshot();
-    Ok(object([
+    let output = object([
         ("budgets".into(), budgets),
         ("clock".into(), number(machine.clock() as u128)),
         ("console".into(), console_json(&machine)?),
@@ -1713,7 +1855,11 @@ fn run_program(program: &Object, name: &str, options: CcOptions) -> Result<Json>
         ("status".into(), string(status)),
         ("steps".into(), number(steps as u128)),
         ("tape".into(), forward_tape),
-    ]))
+    ]);
+    if let Some(tape) = tape {
+        tape.save()?;
+    }
+    Ok(output)
 }
 fn main() {
     if let Err(e) = run() {
@@ -2221,6 +2367,7 @@ mod r23_cli {
                         100,
                         Some(u64::from(kind != "reply")),
                         Some(trace),
+                        None,
                     )
                 };
             let (mut good, mut replies, mut trace) = setup();
@@ -2266,4 +2413,63 @@ mod r23_cli {
         }
         assert_eq!(cases, 15);
     }
+}
+
+#[test]
+fn replay_mismatch_rolls_back_effect_and_keeps_cursor_retryable() {
+    let text = include_str!("../tests/fixtures/classical.bisa");
+    let o = Object::parse(text).unwrap();
+    let mut m = ClassicalMachine::new(&o, "effects", &[], &[11, 22, 33]).unwrap();
+    for _ in 0..3 {
+        m.step_once().unwrap();
+    } // next instruction is entropy.read
+    let entry = m.snapshot();
+    let frames = m.outcome().steps;
+    let wanted = TapeEntry {
+        dev: "entropy".into(),
+        op: "read".into(),
+        args: vec![16, 3],
+        bytes: vec![11, 22, 33].into(),
+    };
+    let mut wrong = wanted.clone();
+    wrong.bytes = vec![0, 0, 0].into();
+    let mut tape = EffectTapeSession {
+        expected: Some(vec![wrong]),
+        recorded: Vec::new(),
+        output: None,
+    };
+    let mut trace = Vec::new();
+    for _ in 0..2 {
+        let error = drive(
+            &mut m,
+            &mut VecDeque::new(),
+            10,
+            Some(1),
+            Some(&mut trace),
+            Some(&mut tape),
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("replay mismatch at entry 0"));
+        assert_eq!(m.snapshot(), entry); // memory, device state, PC, instances
+        assert_eq!(m.outcome().steps, frames); // no terminal or committed frame
+        assert!(trace.is_empty());
+        assert!(tape.recorded.is_empty()); // no cursor consumption
+    }
+    tape.expected = Some(vec![wanted.clone()]);
+    drive(
+        &mut m,
+        &mut VecDeque::new(),
+        10,
+        Some(1),
+        Some(&mut trace),
+        Some(&mut tape),
+    )
+    .unwrap();
+    assert_eq!(tape.recorded, vec![wanted]);
+    assert_eq!(m.effect_tape_len(), 1);
+    assert_eq!(m.memory_bytes(16, 3).unwrap(), [11, 22, 33]);
+    assert_eq!(trace.len(), 1);
+    m.reverse().unwrap();
+    let fresh = ClassicalMachine::new(&o, "effects", &[], &[11, 22, 33]).unwrap();
+    assert_eq!(m.snapshot(), fresh.snapshot());
 }
