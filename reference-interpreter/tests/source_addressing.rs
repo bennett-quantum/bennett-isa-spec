@@ -37,11 +37,11 @@ fn hoisted_region_in_zero_trip_loop_remains_a_valid_reversible_source_program() 
         object
             .execute_action("gap", &mut q, &bindings, false, &[])
             .unwrap();
-        assert_eq!(q.read_basis(&wire).unwrap(), t ^ 1);
+        assert_eq!(q.read_basis(&wire).unwrap(), u128::from(t ^ 1));
         object
             .execute_action("gap", &mut q, &bindings, true, &[])
             .unwrap();
-        assert_eq!(q.read_basis(&wire).unwrap(), t);
+        assert_eq!(q.read_basis(&wire).unwrap(), u128::from(t));
     }
     let hash = object.identity().unwrap().closure_hashes["gap"]
         .clone()

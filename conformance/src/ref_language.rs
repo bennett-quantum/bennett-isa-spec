@@ -22,6 +22,13 @@ struct SourceCapture {
     oracle_invocation: Option<Json>,
     adjoint: bool,
 }
+#[derive(Clone)]
+struct CapturedArguments {
+    symbol: String,
+    actuals: Vec<Json>,
+    context: Box<Context>,
+    source: Option<SourceCapture>,
+}
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SourcePoint {
     pub symbol: String,
@@ -132,7 +139,7 @@ struct Context {
     events: BTreeMap<String, Json>,
     images: BTreeMap<String, Vec<u8>>,
     templates: BTreeMap<String, (Vec<Json>, Box<Context>)>,
-    arguments: BTreeMap<String, (String, Vec<Json>, Box<Context>, Option<SourceCapture>)>,
+    arguments: BTreeMap<String, CapturedArguments>,
     sources: BTreeMap<String, SourceCapture>,
     invocation_source: Option<SourceCapture>,
     values: BTreeMap<String, (Json, Json)>,
@@ -964,18 +971,18 @@ impl Expander {
                             .cloned()
                             .ok_or("unbound arguments")?
                     } else {
-                        (
-                            symbol.clone(),
-                            a(v)?.to_vec(),
-                            Box::new(caller.clone()),
-                            c.sources.get(s(f(p, "symbol")?)?).cloned(),
-                        )
+                        CapturedArguments {
+                            symbol: symbol.clone(),
+                            actuals: a(v)?.to_vec(),
+                            context: Box::new(caller.clone()),
+                            source: c.sources.get(s(f(p, "symbol")?)?).cloned(),
+                        }
                     };
-                    if &saved.0 != symbol {
+                    if &saved.symbol != symbol {
                         return Err("arguments closure mismatch".into());
                     }
                     let r = self.registry.get(symbol).ok_or("unbound closure")?;
-                    self.bind(r, &saved.1, &saved.2)?;
+                    self.bind(r, &saved.actuals, &saved.context)?;
                     c.arguments.insert(name.into(), saved);
                 }
                 "image" => {
@@ -1663,8 +1670,12 @@ impl Expander {
                 keys(j, &["call", "args"])?;
                 let hash = c.symbols.get(s(n)?).ok_or("unbound symbol")?.clone();
                 let (args, mut captured) = if let Some(name) = f(j, "args")?.as_str() {
-                    let (bound_hash, args, mut captured, source) =
-                        c.arguments.get(name).cloned().ok_or("unbound arguments")?;
+                    let CapturedArguments {
+                        symbol: bound_hash,
+                        actuals: args,
+                        context: mut captured,
+                        source,
+                    } = c.arguments.get(name).cloned().ok_or("unbound arguments")?;
                     if bound_hash != hash {
                         return Err("arguments closure mismatch".into());
                     }
