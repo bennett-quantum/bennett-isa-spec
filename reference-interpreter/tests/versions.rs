@@ -110,9 +110,14 @@ fn default_expansion_and_certificate_versions_follow_object() {
         ]
         .map(|k| format!("\"{k}\":\"{v}\""))
         .join(",");
-        // Borrow a complete certificate shape; version validation precedes its
-        // identity checks, which intentionally remain bound to the old object.
-        let cert = Object::parse(include_str!("fixtures/r21/domain-all-A0.bisa"))
+        // Use this version's complete certificate grammar. Version validation
+        // precedes identity checks, intentionally bound to a different object.
+        let certificate_source = if v == "0.9" {
+            include_str!("../../conformance/fixtures/controlled-action-09/controlled.bisa")
+        } else {
+            include_str!("fixtures/r21/domain-all-A0.bisa")
+        };
+        let cert = Object::parse(certificate_source)
             .unwrap()
             .section("certificate")
             .unwrap()

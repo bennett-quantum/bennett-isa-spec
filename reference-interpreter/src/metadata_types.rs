@@ -2,7 +2,11 @@
 use crate::{err, json::Json, metadata_schema, IsaVersion, Object, Result};
 impl Object {
     pub(crate) fn validate_metadata_types(&self) -> Result<()> {
-        metadata_schema::validate("metadata", &Json::Object(self.metadata.clone()))
+        metadata_schema::validate_for(
+            self.isa_version,
+            "metadata",
+            &Json::Object(self.metadata.clone()),
+        )
     }
     pub(crate) fn validate_metadata_versions(&self) -> Result<()> {
         let signature = |s: &Json| -> Result<()> {

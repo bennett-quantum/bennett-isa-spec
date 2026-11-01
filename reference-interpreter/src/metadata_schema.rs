@@ -15,6 +15,7 @@ pub enum Shape {
     Hex,
     Uint,
     U64String,
+    UnsignedDecimalString,
     Decimal,
     SignedDecimalString,
     Number,
@@ -215,15 +216,64 @@ pub static TABLE: &[Entry] = &[
     entry!("classification", "§13 classification", Enum(&["lowered","trapped","shimmed"])),
 ];
 
+// ISA 0.9 replaces these productions. The 0.8 grammar remains byte-for-byte
+// equivalent; recursion carries the object's version rather than widening it.
+#[rustfmt::skip]
+static TABLE09: &[Entry] = &[
+    entry!("frame", "§9.4 K16", obj!("slots":"slots09","scratch":"scratch09","history":"frames09","borrow":"frames09","ancillae":"ancillae09","live_ranges?":"live_ranges")),
+    entry!("slots09", "§9.4 K16", Array("slot09")),
+    entry!("slot09", "§9.4 K16", obj!("id":"text","role":"slot_role09","class":"text","width":"expression")),
+    entry!("slot_role09", "§9.4 K16", Enum(&["in","tgt","fault","mut","mem_in","mem_mut"])),
+    entry!("scratch09", "§9.4 K16", Array("scratch_record09")),
+    entry!("scratch_record09", "§9.4 K16", obj!("id":"text","class":"text","state":"state09","width":"expression")),
+    entry!("state09", "§9.4 K16", Enum(&["clean","dirty"])),
+    entry!("frames09", "§9.4 K16", Array("frame_record09")),
+    entry!("frame_record09", "§9.4 K16", obj!("id":"text","class":"text","width":"expression")),
+    entry!("ancillae09", "§9.4 K16", Array("ancilla09")),
+    entry!("ancilla09", "§9.4 K16", obj!("id":"text","scheme":"text","class":"text","state":"state09","width":"expression")),
+    entry!("certificate_bindings", "§12.3 K13", obj!("object_hash":"hash","interface_hash":"hash","closure_hash":"hash","reference_program_hash":"hash","dialect_mapping_version":"text","target_hash":"hash","schedule_hash?":"hash","invocation?":"invocation09")),
+    entry!("canonical_decimal09", "§12.3 K13", UnsignedDecimalString),
+    entry!("budget09", "§12.3 K13", Tuple(&["canonical_decimal09","canonical_decimal09","canonical_decimal09","canonical_decimal09"])),
+    entry!("value09", "§12.3 K13", Union(&["string","budget09"])),
+    entry!("values09", "§12.3 K13", Array("value09")),
+    entry!("invocation09", "§12.3 K13", obj!("args":"values09","budget":"budget09")),
+    entry!("all09", "§12.3 K13", Enum(&["all"])),
+    entry!("uniform09", "§12.3 K13", obj!("args":"all09","budget":"all09")),
+    entry!("claim_invocation09", "§12.3 K13", Union(&["invocation09","uniform09"])),
+    entry!("reference_subject09", "§12.1 K13", obj!("closure_hash":"hash","variant":"text","inherited_controls":"uint","schedule_hash?":"hash")),
+    entry!("exhaustive", "§12.1 K13", obj!("kind":"exhaustive_kind","domain":"domain","expected":"expected","label?":"label","subject":"reference_subject09","invocation?":"invocation09")),
+    entry!("sampled", "§12.1 K13", obj!("kind":"sampled_kind","domain":"domain","expected":"expected","subject":"reference_subject09","sampler":"sampler","label?":"label","invocation?":"invocation09")),
+    entry!("table", "§12.1 K13", Array("row09")),
+    entry!("row09", "§12.1 K13", obj!("before":"tuple09","after":"tuple09")),
+    entry!("tuple09", "§12.1 K13", obj!("bundles":"decimals09","borrowed":"decimals09","regions":"cells09")),
+    entry!("decimals09", "§12.1 K13", Array("canonical_decimal09")),
+    entry!("cells09", "§12.1 K13", Array("decimals09")),
+    entry!("adjoint_claim", "§12.1 K13", obj!("kind":"structural_kind","rule":"adjoint_rule","subclaims":"uints","witness":"empty","label?":"label","invocation?":"claim_invocation09")),
+    entry!("library_claim", "§12.1 K13", obj!("kind":"structural_kind","rule":"library_rule","subclaims":"uints","witness":"library_witness","label?":"label","invocation?":"claim_invocation09")),
+    entry!("translation_claim", "§12.1 K13", obj!("kind":"structural_kind","rule":"translation_rule","subclaims":"uints","witness":"translation_witness","label?":"label","invocation?":"claim_invocation09")),
+];
+
 pub fn entry(name: &str) -> &'static Entry {
     TABLE
         .iter()
+        .chain(TABLE09.iter())
         .find(|e| e.name == name)
         .expect("schema reference must exist")
 }
 pub fn validate(name: &str, value: &Json) -> Result<()> {
-    let e = entry(name);
-    check(e.shape, value).map_err(|err| Error::new(format!("§9.1: {} ({name}): {err}", e.clause)))
+    validate_for(crate::IsaVersion::V08, name, value)
+}
+pub fn validate_for(version: crate::IsaVersion, name: &str, value: &Json) -> Result<()> {
+    let e = if version == crate::IsaVersion::V09 {
+        TABLE09
+            .iter()
+            .find(|e| e.name == name)
+            .unwrap_or_else(|| entry(name))
+    } else {
+        entry(name)
+    };
+    check(e.shape, value, version)
+        .map_err(|err| Error::new(format!("§9.1: {} ({name}): {err}", e.clause)))
 }
 fn digits(s: &str) -> bool {
     !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit())
@@ -232,7 +282,7 @@ fn decimal_text(s: &str) -> bool {
     let (i, f) = s.split_once('.').map_or((s, None), |(i, f)| (i, Some(f)));
     digits(i) && f.is_none_or(digits)
 }
-fn check(shape: Shape, v: &Json) -> Result<()> {
+fn check(shape: Shape, v: &Json, version: crate::IsaVersion) -> Result<()> {
     match shape {
         String => {
             v.string()?;
@@ -260,6 +310,12 @@ fn check(shape: Shape, v: &Json) -> Result<()> {
         }
         Uint => {
             v.uint_text()?;
+        }
+        UnsignedDecimalString => {
+            let t = v.string()?;
+            if !digits(t) || (t.len() > 1 && t.starts_with('0')) {
+                return err("§12.3 K13", "noncanonical unsigned decimal string");
+            }
         }
         U64String => {
             let s = v.string()?;
@@ -299,7 +355,9 @@ fn check(shape: Shape, v: &Json) -> Result<()> {
             for (key, ty) in fields {
                 let actual = key.strip_suffix('?').unwrap_or(key);
                 match m.get(actual) {
-                    Some(child) => validate(ty, child).map_err(|e| e.context(actual))?,
+                    Some(child) => {
+                        validate_for(version, ty, child).map_err(|e| e.context(actual))?
+                    }
                     None if key.ends_with('?') => (),
                     None => return err("§9.1", format!("missing field {actual}")),
                 }
@@ -315,13 +373,13 @@ fn check(shape: Shape, v: &Json) -> Result<()> {
         }
         Map(key, ty) => {
             for (k, child) in v.object()? {
-                validate(key, &Json::String(k.clone()))?;
-                validate(ty, child)?;
+                validate_for(version, key, &Json::String(k.clone()))?;
+                validate_for(version, ty, child)?;
             }
         }
         Array(ty) => {
             for child in v.array()? {
-                validate(ty, child)?;
+                validate_for(version, ty, child)?;
             }
         }
         Tuple(types) => {
@@ -330,13 +388,13 @@ fn check(shape: Shape, v: &Json) -> Result<()> {
                 return err("§9.1", format!("tuple requires {} components", types.len()));
             }
             for (ty, child) in types.iter().zip(a) {
-                validate(ty, child)?;
+                validate_for(version, ty, child)?;
             }
         }
         Union(types) => {
             let mut errors = Vec::new();
             for ty in types {
-                match validate(ty, v) {
+                match validate_for(version, ty, v) {
                     Ok(()) => return Ok(()),
                     Err(e) => errors.push(e.to_string()),
                 }

@@ -50,6 +50,10 @@ fn samples(name: &str) -> Vec<Json> {
             j(r#""18446744073709551616""#),
             j(r#""340282366920938463463374607431768211456""#),
         ],
+        UnsignedDecimalString => vec![
+            j(r#""0""#),
+            j(r#""340282366920938463463374607431768211456""#),
+        ],
         U64String => vec![j(r#""0""#), j(r#""18446744073709551615""#)],
         Decimal => vec![
             j("0"),
@@ -187,7 +191,15 @@ fn replace(v: &mut Json, path: &[std::string::String], next: Json) {
 }
 fn kinds(name: &str) -> u8 {
     match entry(name).shape {
-        String | Text | Name | Hash | Hex | U64String | SignedDecimalString | Enum(_) => 2,
+        String
+        | Text
+        | Name
+        | Hash
+        | Hex
+        | U64String
+        | UnsignedDecimalString
+        | SignedDecimalString
+        | Enum(_) => 2,
         Uint | Decimal => 1 | 2,
         Number => 1,
         Null => 8,

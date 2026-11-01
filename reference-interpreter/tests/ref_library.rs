@@ -35,17 +35,16 @@ fn bound_catalog_checks_the_full_canonical_envelope() {
 #[test]
 fn default_and_explicit_09_binding_use_full_library_without_rewriting_schedule() {
     let source = include_str!("../../conformance/fixtures/controlled-action-09/controlled.bisa");
-    // Exercise the published source and schedule. Unmodified certificate
-    // admission is still a .3 blocker: K13 invocation and K16 typed frames
-    // are not implemented yet (red evidence: migration-s3-fixture-red.log).
-    let source = source.split("\nsection certificate\n").next().unwrap();
+    // Check the complete published object. The implicit-binding variant below
+    // is a different object, so it cannot retain this certificate's hash binding.
     let explicit = Object::parse(source).unwrap();
     explicit.check_hashes().unwrap();
     let before = explicit.identity().unwrap();
     let lib = explicit.bound_ref_library().unwrap();
     let binding = format!(r#","expansion":{{"hash":"{REF09_HASH}","name":"ref","version":"0.9"}}"#);
     assert!(source.contains(&binding));
-    let implicit = Object::parse(&source.replace(&binding, "")).unwrap();
+    let implicit_source = source.split("\nsection certificate\n").next().unwrap();
+    let implicit = Object::parse(&implicit_source.replace(&binding, "")).unwrap();
     assert_eq!(
         implicit.schedule_expansion().unwrap().unwrap().hash,
         Some(REF09_HASH)
@@ -382,4 +381,135 @@ fn captured_oracle_actuals_are_checked_before_builder_side_effects() {
         .expand(&lib, &[("x", 8), ("t", 8), ("f", 4)], |_| Ok(j("[]")))
         .unwrap();
     assert!(valid.is_empty());
+}
+
+#[test]
+fn complete_published_controlled_fixture_is_admitted_and_executes() {
+    use bennett_isa_ref::{QuantumBindings, QuantumState};
+    let source = include_str!("../../conformance/fixtures/controlled-action-09/controlled.bisa");
+    let o = Object::parse(source).unwrap();
+    o.check_hashes().unwrap();
+    assert_eq!(
+        o.identity().unwrap().object_hash,
+        "45bbb506541e3a8bb28a18e1bb0aef16ba01ee1e7cac74d5a190deb3ad36ef5a"
+    );
+    for t in 0..2 {
+        for c in 0..2 {
+            let mut q = QuantumState::new();
+            let wires = q.allocate(2).unwrap();
+            for (value, wire) in [(t, wires[0]), (c, wires[1])] {
+                if value == 1 {
+                    q.gate("x", &[wire], None, &[]).unwrap();
+                }
+            }
+            let entry = q.clone();
+            let mut bindings = QuantumBindings::default();
+            bindings.bundles.insert("t".into(), vec![wires[0]]);
+            bindings.bundles.insert("c".into(), vec![wires[1]]);
+            o.execute_action("controlled", &mut q, &bindings, false, &[])
+                .unwrap();
+            assert_eq!(q.read_basis(&[wires[0]]).unwrap(), t ^ c);
+            assert_eq!(q.read_basis(&[wires[1]]).unwrap(), c);
+            o.execute_action("controlled", &mut q, &bindings, true, &[])
+                .unwrap();
+            assert_eq!(q, entry);
+        }
+    }
+}
+
+#[test]
+fn published_certificate_rejects_conflicting_invocations_and_invalid_frames() {
+    let source = include_str!("../../conformance/fixtures/controlled-action-09/controlled.bisa");
+    for (from, to) in [
+        (
+            r#""invocation":{"args":[],"budget":["0","0","0","0"]},"#,
+            "",
+        ),
+        (
+            r#""budget":["0","0","0","0"]"#,
+            r#""budget":["00","0","0","0"]"#,
+        ),
+        (
+            r#""invocation":{"args":[]"#,
+            r#""invocation":{"args":["1"]"#,
+        ),
+        (
+            r#""budget":["0","0","0","0"]"#,
+            r#""budget":["1","0","0","0"]"#,
+        ),
+        (
+            r#""ancillae":[],"borrow":[],"history":[],"scratch":[],"slots""#,
+            r#""ancillae":[],"borrow":[],"history":[],"slots""#,
+        ),
+        (r#""id":"in:0""#, r#""id":"mut:0""#),
+        (
+            r#""id":"mut:0","role":"mut","width":1"#,
+            r#""id":"mut:0","role":"in","width":1"#,
+        ),
+        (
+            r#""id":"mut:0","role":"mut","width":1"#,
+            r#""id":"mut:0","role":"mut","width":2"#,
+        ),
+        (
+            r#""id":"mut:0","role":"mut","width":1"#,
+            r#""id":"mut:0","role":"mut","width":{"var":"k"}"#,
+        ),
+        (
+            r#""class":"fast","id":"mut:0""#,
+            r#""class":"","id":"mut:0""#,
+        ),
+        (
+            r#""history":[],"scratch":[],"slots""#,
+            r#""history":[],"scratch":[],"live_ranges":[{"frame":"absent","start":0,"end":1}],"slots""#,
+        ),
+        (
+            r#""history":[],"scratch":[],"slots""#,
+            r#""history":[],"scratch":[{"id":"s","class":"fast","state":"clean","width":1}],"live_ranges":[{"frame":"s","start":0,"end":2},{"frame":"s","start":1,"end":3}],"slots""#,
+        ),
+        (
+            r#""history":[],"scratch":[],"slots""#,
+            r#""history":[],"scratch":[{"id":"s","class":"fast","state":"clean","width":{"op":"/","args":[1,2]}}],"slots""#,
+        ),
+        (
+            r#""before":{"borrowed":[],"bundles":["0","0"]"#,
+            r#""before":{"borrowed":[],"bundles":["00","0"]"#,
+        ),
+        (
+            r#""before":{"borrowed":[],"bundles":["0","0"]"#,
+            r#""before":{"borrowed":[],"bundles":["0"]"#,
+        ),
+        (
+            r#""before":{"borrowed":[],"bundles":["0","0"]"#,
+            r#""before":{"borrowed":[],"bundles":["0","2"]"#,
+        ),
+        (
+            r#""before":{"borrowed":[],"bundles":["0","0"]"#,
+            r#""before":{"borrowed":["1"],"bundles":["0","0"]"#,
+        ),
+        (
+            r#""inherited_controls":0,"schedule_hash""#,
+            r#""inherited_controls":"340282366920938463463374607431768211455","schedule_hash""#,
+        ),
+    ] {
+        assert!(source.contains(from), "missing mutation {from}");
+        let bad = source.replacen(from, to, 1);
+        assert!(Object::parse(&bad).is_err(), "accepted {from} -> {to}");
+    }
+}
+
+#[test]
+fn published_08_certificate_retains_legacy_schema_and_identity() {
+    let source = include_str!("../../conformance/fixtures/controlled-action-09/compat-0.8.bisa");
+    let o = Object::parse(source).unwrap();
+    o.check_hashes().unwrap();
+    for (from, to) in [
+        (r#""interface":["#, r#""slots":["#),
+        (
+            r#""dialect_mapping_version":"worked-ctl.1""#,
+            r#""dialect_mapping_version":"worked-ctl.1","invocation":{"args":[],"budget":["0","0","0","0"]}"#,
+        ),
+    ] {
+        assert!(source.contains(from), "missing 0.8 mutation {from}");
+        assert!(Object::parse(&source.replacen(from, to, 1)).is_err());
+    }
 }
