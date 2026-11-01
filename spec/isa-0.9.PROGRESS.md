@@ -1,4 +1,61 @@
+## 2026-11-01 Pass XII — source cleanup-pair partition (9hv)
+
+**Pending council round 9; b-isa-spec-9hv in_progress.** Reading B is
+adopted for the filed qcopy/call/adjoint-call/quncopy pattern. The
+intrinsic cleanup owns only its direct production; changes to its
+produced targets must already be restored. K65 and K80 previously fixed
+selection/ownership only after a pair was known, so this is a normative
+partition addition, not a not-a-defect closure. K81 is the sole new MUST
+and inventory row; K1–K80 remain unchanged and accepted through round 8.
+
+§11's exact new text is headed **Source cleanup-pair partition (K81)**
+and **Intrinsic-boundary witness (K81)**. It defines occurrence/version
+matching, direct intrinsic pairs, maximal terminal release-ended inverse
+chains, indivisible joint inverses and first-release precedence, followed
+by independent call carriers. Disjoint rows do not change that partition.
+The witness gives every pair and carrier: entry:1/2 is the call pair with
+carrier entry:2; entry:0/3 is the copy pair with carrier entry:3. No row
+belongs to both. Duplicate maximal entries at entry:2 tie independently
+of entry:3. K80's qalloc/inverse/qfree case stays one release-ended pair;
+K64's oracle support and K65's private constructor exclusions stay intact.
+Call recompute restores nonzero pre-call targets from exact source history:
+for this witness fresh delta = mix(x) XOR x, rather than evaluating mix(0).
+Its new calls are entry:2/call_index 0 and 1, with separate callee spaces.
+
+Read-only reference evidence: `src/validation.rs` quncopy checks its
+Creation's source/control/version snapshot and requires all subsequent
+target changes undone; action-call `joint_change` captures the old joint
+output versions and cancels the most recent current matched event.
+`src/action.rs` executes the written adjoint call separately, then the
+intrinsic inverse copy/release. Neither implements a scheduled 0.9 pair
+builder. These support B for intrinsic cleanup; K80's accepted witness
+supports coalescing for a release-ended cleanup. No src alignment or
+semantic red-to-green fix was required or claimed.
+
+Three new tests in `reference-interpreter/tests/cleanup_partition.rs`
+exercise source admission/hash identity, primitive and semantic-call
+forms, disjoint interposition, full forward/adjoint state and allocator
+restoration on basis and coherent/entangled inputs; independent carriers,
+mixed selections and a real selector-engine tie; all four reverse/recompute
+combinations using unchanged catalog recipes and QuantumState, exact
+nonzero d=x before quncopy, fresh call edges and caller/callee spaces.
+The finite adapter supplies partition and coordinate metadata explicitly;
+these tests do not claim production 0.9 admission or source-builder support.
+No accepted fixture is weakened or changed. The filed indexed two-slot
+operand list is schematic under §16.2's NAME-only list grammar; the
+admitted bundled mix(d) CX has identical denotation. Both the grammar
+rejection and the admitted equivalent are locked. Initial harness errors
+were that schematic list and a constructor allocation actual passed
+without a lexical declaration, not a reference semantic discrepancy.
+Initial log: `.tmp/pass-xii-before-text.log`; final targeted run:
+`.tmp/pass-xii-regression.log`. Full required gates are recorded below
+when complete. ISA 0.8 and catalog bytes are frozen; exact-label diff
+regenerated. The orchestrator retains session-worklog/council ownership.
+No push, sibling write or remote/Dolt sync.
+
 ## 2026-11-01 Pass XI — rung-3 consumer prerequisites
+
+Round-9 tracking: **b-isa-spec-fuk** remains open for producer/executor support and contract-pin migration for typed R faults.
 
 ### b-isa-spec-221 — (c) no remaining ISA 0.9 wording defect
 

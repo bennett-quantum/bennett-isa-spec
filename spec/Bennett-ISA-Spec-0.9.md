@@ -16,6 +16,8 @@ acceptance of the core stands.
 **Round 8: accepted** (2026-11-01, codex seat, 0 blocking).
 K78–K80 (passes VIII–X) were accepted by the codex seat in fix round 8;
 K1–K80 are accepted in total. The three-seat acceptance of the core stands.
+**Pass XII: pending council round 9** (2026-11-01). K81 specifies source
+cleanup-pair formation; K1–K80 retain their accepted status.
 §0 lists every change from 0.8.
 Implementation is expected to expose frictions; revisions go back
 through the council. Founding text of
@@ -203,6 +205,7 @@ north star §3.1 requires).
 | K78 | §5.6 | **ENTRY-PRIMITIVE-IDENTITY**. Causal entry analysis uses resolved primitive identity: X-family spellings share the resolved target and effective control set; qxor/qexch contribute per-bit cx/swap events. All-operand causal matching remains; source hashes and occurrence identities are unchanged. Witness: cx a c; mcx (a) c restores c=0, while polynomial-only or reader-interleaved prefixes do not. | consumer 9eq; pass VIII | E | – |
 | K79 | §4.6, §16.2 | **COHERENT-EMPTY-ADDRESS**. Coherent memory rows bind exactly A address wires; A=0 has the address-only source actual `()`, bound to the catalog's empty wire list. Ordinary wire values remain nonempty. Witness: qload/qunload/qstore/qexchm on region[0,1] select cell 0; nonempty A=0 and empty A>0 addresses reject. | consumer 7js; pass IX | S | – |
 | K80 | §11 | **CLEANUP-LEAF-OWNERSHIP**. Reverse retains written cleanup points; recompute owns one fresh caller leaf/call space at the carrier, with separate callee spaces and fresh replay identities. Witness: a six-row two-CX computation/cleanup has reverse leaves at entry:3/4/5 and recompute leaves at entry:5 ordinals 0–7. | consumer 5cd; pass X | S | – |
+| K81 | §11 | **CLEANUP-PAIR-PARTITION**. Intrinsic cleanup pairs retain their direct computing operations; release-ended terminal inverse chains coalesce before independent adjoint-call carriers are formed. No inverse occurrence has two owners. Nonzero call targets retain their exact source-derived entry history under recompute. Witness: qcopy/mix/adj-mix/quncopy has carriers at entry:2 and entry:3, independently selectable. | consumer 9hv; pass XII; pending round 9 | S | – |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -2692,6 +2695,81 @@ For `d = qcopy s; quncopy s d`, selecting recompute at the quncopy point
 chooses fresh-copy/XOR/uncompute for the whole cleanup, while reverse
 chooses inverse-copy/release at the same carrier; an empty inverse
 sequence still has its ordinal-0 carrier at its release point. [deps: ISA-4.5, ISA-6.2-P1, ISA-6.4-P1, ISA-11-P6]
+
+**Source cleanup-pair partition (K81).** Consumers MUST form the following
+partition from the source before K65 selection and K80 expansion. Match
+source operation occurrences by §5.3 and §6.2, against the most recent
+still-current computing occurrence on all of the operation's outputs;
+matching restores its captured entry versions. A joint multi-output
+operation and its inverse are indivisible. This is occurrence/version
+matching, not equality of the composed unitary alone.
+
+An intrinsic `quncopy`, `qunload` or `lift.oracle_uncall` pairs only with
+its matching `qcopy`, `qload` or `lift.oracle_call`, respectively. Its
+computing sequence does not absorb subsequent changes to the produced
+targets, and its cleanup consists only of that intrinsic instruction.
+For `qfree` or `qreturn`, instead coalesce the maximal terminal chain of
+matched source inverses restoring the released lifetime to its allocation
+or borrow entry, together with that release. Terminal means that each
+restored version is retained until the next inverse in the chain or the
+release; an intervening new computation on that lifetime breaks the
+chain. Rows acting only on disjoint values do not break it and are not
+included. Intrinsic cleanup instructions remain boundaries and are never
+absorbed. A joint inverse restoring several released lifetimes belongs
+to the first such release in source execution order; later releases do
+not own it again. Each remaining matched adjoint-call or oracle-call
+inverse has its own K65 carrier. A primitive inverse outside a
+release-ended chain has no separate K65 carrier. Thus every explicit
+cleanup inverse occurrence has exactly one owner; pair formation neither
+requires textual adjacency nor depends on the selected realisation.
+Use instantiated source order, including §4.6 controls and iterations,
+without entering semantic callees or K64 support subtrees. K65's private
+constructor cleanups remain excluded, and §6's validity conditions still
+apply; this partition adds no source-program restriction.
+
+For an independent call pair, the pre-call mutable targets need not be
+zero. Its cleanup restores their exact pre-call versions. Recompute
+therefore includes the exact source-derived pre-call input history in
+its fresh computation, uncomputes that fresh history, and restores the
+pre-call targets rather than releasing or zeroing them. For a permutation
+on wire targets with pre-call value h and post-call value f(h), a
+zero-based fresh computation of f(h) XOR h, XORed into the current
+targets and then uncomputed, gives this restoration. The history is
+replayed input to that pair, not ownership of the earlier source rows;
+K80 assigns the fresh replay's caller leaves and calls to this pair's
+carrier. Other target kinds retain their instruction-defined inverse
+and §6.4's legality conditions.
+
+**Intrinsic-boundary witness (K81).** The consumer's reduced source is:
+
+```
+entry:0  d = qcopy x
+entry:1  action_call @mix (d[0], d[1]) () () ()
+entry:2  adj action_call @mix (d[0], d[1]) () () ()
+entry:3  quncopy x d
+mix:     cx a b
+```
+
+Here x is `wire[2]`, and mix is the permutation CX on two mutable bits.
+The displayed two-slot indexed list is schematic: §16.2's canonical
+NAME-only list spells the same operation as `action_call @mix (d) () () ()`
+with `mix (a:wire[2] mut)` and body `cx a[0] a[1]`.
+The pairs are computation `{entry:1}` / cleanup `{entry:2}`, carrier
+`entry:2`, and computation `{entry:0}` / cleanup `{entry:3}`, carrier
+`entry:3`. There are no other carriers. Neither carrier owns a row of
+the other pair. Both use cleanup ordinal 0 and can independently select
+reverse or recompute; duplicate maximal cleanup entries at `entry:2`
+tie there even when `entry:3` has a unique entry. Reverse retains the
+call at `entry:2/call_index:0` and the intrinsic inverse-copy/release
+leaves at `entry:3`. For call recompute, h=x: compute `mix(x) XOR x`
+into fresh u, XOR u into d, then uncompute/release u. The fresh mix and
+adjoint-mix have call_index 0 and 1 at `entry:2`; their callee CXs each
+have ordinal 0. The original call at `entry:1/call_index:0` is unchanged.
+The later quncopy still restores/releases d independently at `entry:3`.
+Inserting disjoint rows leaves those two pairs intact. Replacing the
+call pair by two primitive CX rows leaves only the quncopy carrier;
+replacing qcopy/quncopy by qalloc/qfree instead gives one release-ended
+carrier owning the inverse row and release, as in K80's witness below.
 
 **Cleanup leaf ownership (K80).** For `reverse`, emitted leaves retain the
 written cleanup's source points and per-point ordinal and semantic-call
