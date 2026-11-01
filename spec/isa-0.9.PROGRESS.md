@@ -1,8 +1,11 @@
 ## 2026-11-01 Editorial pass X — multirow cleanup leaf ownership (5cd)
 
+**round 8: accepted** (2026-11-01, codex seat, 0 blocking); 5cd closed.
+Historical implementation notes below describe the pre-review state.
+
 Reading **A for recompute** adopted; its optional reverse rebinding is
 **declined**. Reverse retains the written cleanup's source points.
-5cd remains **in_progress for council round 8**, the one-reviewer round
+5cd was **in_progress before council round 8**, the one-reviewer round
 covering passes VIII, IX and X together. This is a real missing ownership
 rule, not a not-a-defect closure: K65 determines the stable carrier and
 whole-pair selection before expansion, K64 partitions oracle support, and
@@ -102,7 +105,10 @@ statement-layer regeneration. No sibling write, push or remote/Dolt sync.
 
 ## 2026-11-01 Editorial pass IX — exact coherent addresses and A=0 (7js)
 
-Reading **1** adopted; 7js remains **in_progress for council**. This is a real
+**round 8: accepted** (2026-11-01, codex seat, 0 blocking); 7js closed.
+Historical implementation notes below describe the pre-review state.
+
+Reading **1** adopted; 7js was **in_progress before council**. This is a real
 source-binding gap, not a not-a-defect closure: §3.3 excludes wire[0] but
 §4.6 permits region[0,W]. The accepted reference's unchanged-before-edit
 validation requires exactly A address wires for all four rows; the published
@@ -186,7 +192,10 @@ statement-layer regeneration.
 
 ## 2026-11-01 Editorial pass VIII — resolved primitive causal identity (9eq)
 
-Reading **B** adopted. Bead 9eq stays in_progress for the orchestrator's
+**round 8: accepted** (2026-11-01, codex seat, 0 blocking); 9eq closed.
+Historical implementation notes below describe the pre-review state.
+
+Reading **B** adopted. Bead 9eq was in_progress before the orchestrator's
 codex-seat council fix round. This is a real ambiguity, rather than a
 not-a-defect closure: §4.4 defines the X-family as one exact controlled-X
 operation and K76 resolves controls/operands before transfer, but rule 2's

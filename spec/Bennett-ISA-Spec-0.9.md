@@ -13,12 +13,9 @@ repository).
 **Round 7: accepted** (2026-11-01, codex seat, 0 blocking). K76 and K77
 were accepted by the codex seat in fix rounds 6–7; the three-seat
 acceptance of the core stands.
-Pass VIII / K78 (resolved primitive identity in §5.6) awaits the
-codex-seat council fix round; the accepted core and prior amendments stand.
-Pass IX / K79 (exact-width coherent addresses and the A=0 empty actual,
-§4.6) awaits that council fix round; its binop/icmp wording is a clarification.
-Pass X / K80 (multirow cleanup leaf ownership, §11) awaits the same
-round-8 one-reviewer council round, covering passes VIII–X together.
+**Round 8: accepted** (2026-11-01, codex seat, 0 blocking).
+K78–K80 (passes VIII–X) were accepted by the codex seat in fix round 8;
+K1–K80 are accepted in total. The three-seat acceptance of the core stands.
 §0 lists every change from 0.8.
 Implementation is expected to expose frictions; revisions go back
 through the council. Founding text of
