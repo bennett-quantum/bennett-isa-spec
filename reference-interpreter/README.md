@@ -219,7 +219,23 @@ explicit staged diagnostics, never silently ignored: `--target file`
 §11). The rest of deliverable 8 (the full §10 C API as a library, estimates,
 coverage) remains staged as PROGRESS records.
 
-### Saved effect tapes and deterministic replay
+### Saved-tape profile v1
+
+This section defines **saved-tape profile v1**, a versioned tool-level
+contract, not an ISA interoperability MUST. Valid execution and reversal
+for the same complete explicit inputs are determined by the ISA.
+`bennett-vm` implements the same profile.
+
+Record every successfully executed effect in execution order, including effects later cancelled by uncall; a faulting effect records nothing. Replay compares dev, op, integer args and transferred bytes with the deterministic candidate before committing. Mismatch or missing input leaves that step and cursor unchanged; unconsumed trailing entries reject. Reversal changes the active tape but does not erase the saved journal. The journal does not replace entropy, host replies, measurement inputs or entry state.
+
+The saved file is a JSON array of objects with exactly the required keys
+`args`, `bytes`, `dev`, `op` (no extra or duplicate keys). `dev` and `op`
+are strings. `args` is an array of canonical unsigned integers fitting
+u128: JSON numbers through 2^53 − 1, decimal strings above that boundary;
+no leading zeros, signs, fractions or exponent forms. `bytes` is an
+even-length hexadecimal string, including empty (readers accept either
+hex case; writers emit lowercase). Writers
+emit canonical JSON followed by LF; readers validate this schema strictly.
 
 `run-cc`, `reverse` on a CC/R entry, and `run-program` accept:
 

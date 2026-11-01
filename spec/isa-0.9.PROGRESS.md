@@ -1,6 +1,6 @@
 ## 2026-11-01 Pass XII — source cleanup-pair partition (9hv)
 
-**Pending council round 9; b-isa-spec-9hv in_progress.** Reading B is
+**round 9: accepted** (codex seat, 0 blocking); b-isa-spec-9hv closed. Reading B is
 adopted for the filed qcopy/call/adjoint-call/quncopy pattern. The
 intrinsic cleanup owns only its direct production; changes to its
 produced targets must already be restored. K65 and K80 previously fixed
@@ -67,10 +67,11 @@ K1–K80, one new MUST/K81, and byte-exact generated diff with labels
 `a/spec/Bennett-ISA-Spec.md` and `b/spec/Bennett-ISA-Spec-0.9.md`.
 Ordinary single-space blank diff context lines are retained as required.
 Implementation/spec/regression/Beads commit: e0d007b; reference-green
-record: 5906f51. Final green disposition remains in_progress for council
-round 9; the final records and UTC handoff are committed next.
+record: 5906f51. Final green disposition: round 9 accepted by the codex seat; the final records and UTC handoff are committed next.
 
 ## 2026-11-01 Pass XI — rung-3 consumer prerequisites
+
+**round 9: accepted** (codex seat, 0 blocking).
 
 Round-9 tracking: **b-isa-spec-fuk** remains open for producer/executor support and contract-pin migration for typed R faults.
 

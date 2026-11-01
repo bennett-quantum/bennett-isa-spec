@@ -16,8 +16,9 @@ acceptance of the core stands.
 **Round 8: accepted** (2026-11-01, codex seat, 0 blocking).
 K78–K80 (passes VIII–X) were accepted by the codex seat in fix round 8;
 K1–K80 are accepted in total. The three-seat acceptance of the core stands.
-**Pass XII: pending council round 9** (2026-11-01). K81 specifies source
-cleanup-pair formation; K1–K80 retain their accepted status.
+**Round 9: accepted** (2026-11-01, codex seat, 0 blocking). Passes XI–XII
+are accepted; K81 was accepted by the codex seat in fix round 9.
+K1–K81 are accepted in total. The three-seat acceptance of the core stands.
 §0 lists every change from 0.8.
 Implementation is expected to expose frictions; revisions go back
 through the council. Founding text of
@@ -1611,6 +1612,8 @@ requires `heap_limit = stack_limit = depth_limit = 0` (§5.4). Example 1
 of §16.3 is memoryless.
 
 ### 7.3 Device models and tapes (R)
+
+The active effect tape is specified here; persistence and replay of saved execution journals are tool interfaces, whose interchange format and validation behavior are defined by an explicitly versioned replay profile.
 
 Every device operation takes classical-memory operands and writes its
 results to memory; each `effect` is **atomic**: validated (operands in
