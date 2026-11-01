@@ -1,7 +1,7 @@
 ## 2026-11-01 Editorial pass VII — oracle invocation-token binding (5xm)
 
-Reading **B** adopted. Bead 5xm remains in_progress for the orchestrator's
-round 7, together with 73y. Implementation commits: 1d86f00 and
+Reading **B** adopted. **Round 7: accepted** (codex seat, 0 blocking);
+5xm and 73y are closed with that acceptance. Implementation commits: 1d86f00 and
 4f7e18f (source-adjoint versus inverse identity clarification).
 
 | Item | Adopted/declined | Clauses / evidence | Commits |
@@ -62,7 +62,33 @@ envelope remains
 `90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e`.
 No catalog edit, sibling write, push or remote sync. Orchestrator owns
 session worklog, final 0.9 statement-layer regeneration/INV-3 citation
-resolution and the pending one-reviewer council round 7.
+resolution. The one-reviewer council round 7 accepted both passes.
+
+Round-7 S1 adopted in §15 suite H: explicit forwarding/capture/nesting/
+inverse vector, retaining the existing K77 rule and K1–K77 inventory.
+`reference-interpreter/tests/k77_adapter.rs` is a finite inc8 source-builder
+adapter witness: it uses the real catalog expander for arguments forwarded
+through invoke/call, captured body splicing and template application; its
+out-of-band source binding validates records and scopes nested builds under
+conflicting B=99 context. Each captured call instantiates the same linked
+closure/interface separately. Its carry-equation constructor is checked
+against the reference's independent literal frame machine over all 256 x,
+including exactly 2/3 frames, zero-seed (x+1 mod 256,1), retained forward
+indices 1/0 on inverse traversal and complete state restoration. Missing,
+malformed, noncanonical and source-inconsistent records reject before build.
+This is a finite adapter witness, not a general ISA-to-catalog source builder
+or a claim of complete 0.9 executor conformance. The source-execution test
+remains separate evidence. Statement-layer regeneration stays with the
+orchestrator in bennett-conformance; no sibling write.
+
+Round-7 housekeeping gates: reference **470 passed, 0 failed, 5 unchanged
+ignored**; conformance **113 passed, 0 failed, 0 ignored**; draft witnesses
+and catalog `--check` PASS. Logs: `.tmp/round7-{reference,conformance,witness,
+catalog}.log`. All four gates use the required headless environment and
+project-local TMPDIR; Cargo uses `--offline`. The two additional reference
+tests are the finite K77 adapter vector and its rejection cases. Rustfmt
+and owned-path whitespace checks pass. K1–K77, catalog bytes/envelope and
+accepted 0.8 bytes remain unchanged. The exact-label diff is regenerated.
 
 Exact new normative text and worked example (line wrapping as published):
 
@@ -139,7 +165,7 @@ adds a token to `inc8`'s empty signature `args` list or changes its hash.
 
 Source: `../bennett/docs/council/isa-09-2026-10-31/round-6/report.md`
 and `out-codex.json` (codex seat, astra). All requested dispositions are
-adopted; 73y remains in_progress for the orchestrator's round 7.
+adopted. **Round 7: accepted** (codex seat, 0 blocking); 73y is closed.
 
 | Item | Adopted/declined | Clauses / evidence | Commits |
 |---|---|---|---|

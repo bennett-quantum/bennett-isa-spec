@@ -10,6 +10,9 @@ revises draft 0.8, which was **accepted by the council in round 8**
 (2026-10-28; reports and the editor's responses under
 `docs/council/isa-2026-10-28/round-{1..8}/` in the `bennett` meta
 repository).
+**Round 7: accepted** (2026-11-01, codex seat, 0 blocking). K76 and K77
+were accepted by the codex seat in fix rounds 6–7; the three-seat
+acceptance of the core stands.
 §0 lists every change from 0.8.
 Implementation is expected to expose frictions; revisions go back
 through the council. Founding text of
@@ -3812,6 +3815,20 @@ Born probabilities, consuming the wires.
 | F | Producer | versioning, disjointness incl. control context; operand schema; row classes and frame sizing; index-space flattening; terminators; name resolution; permutation-only oracles; §6 transfer and windows; adjoint table; translation lemma side conditions with the four negative tests; `in`-wire use; acyclic action graphs; grammar; schemas; the §3.1 call-tier table (R → CC rejected); envelope and hashes, acyclic (inc8, zero, sum_db) and cyclic (sum, and a mutual SCC); SCC placement in the index space (mutual f, g whose member hashes order opposite to their names); empty data lines (`NAME SP LF` accepted, two spaces rejected); canonical `INT`/`FLOAT` at every literal site; const literal ranges; the region call graph with lifted calls and `qinplace`; `call` operand spelling; param role suffixes; interface-region names; local regions as call operands; the widened `in`-wire uses of §5.1; LIFO matched uncalls and an unmatched uncall rejected; the static view rule of §3.3 (a view passed through `br`, used twice, or left unconsumed is rejected); lifted-call `args` that are locations rejected; lproc header groups and `token`/`classical` suffixes (a suffix in the wrong group rejected), exact argument counts/types/region roles, missing nonempty lists and location-as-token/classical rejected, forwarding `iN ptr f64 token` without bit conversion, empty-list short form, fixed-binding closure and instance ordering (§3.7), lproc signatures including empty arrays and changed interface/closure hashes; `qreg[*]` typing, the `measure.iN` form and width checks; `budget.mint` rejected in regions; CC/R block terminators; `qinplace` signature compatibility, its short form exactly when the three lists are empty, and its §6.1 transfer (cleaning a value that depends on x after changing an `ins` wire is rejected); CC/R `fault` literal range; linking; frame-descriptor live ranges |
 | G | Launch | every §10 entry point, state transition, binding rule, ownership rule; HOST_REQUEST/reply (a reply whose length does not fit `ptr_width` bits is `E_ARG`); reverse eligibility and tree order; `QREG` bound to `qreg[*]`; `FAILED → REVERSED` (example 8) and `E_NOT_REVERSIBLE` after a `measure` or an unverified free; exactly one fault record per `FAILED` run; an R `fault C` returns `OK` from `bennett_wait` with a result and no request, zero values and the exact nonzero 64-bit C (including 2^64 − 1) from `bennett_result_fault(result, 0)`; a device-minted token used after its run is CLOSED is `E_ARG` |
 | H | Scheduler | §6 validity; capacity; reproducibility; specificity resolution; verbatim execution; INFEASIBLE/UNSUPPORTED; invocation contexts covering default-only invocations (an action calling one region twice, one call scheduled explicitly: a claim with one witness rejects, two passing witnesses accept); a device-minted tuple binds the schedule (a schedule bound to B = 3 is not applied to an invocation minted with B = 2, which runs under the defaults) |
+
+**Suite H / §11.1 K77 adapter vector.** Captured `oracle_invocation`
+follows the source call's arguments and body/template capture, irrespective
+of unrelated apply-site context; nested calls restore the enclosing context
+on exit. K77 conformance includes the same §16.3 `inc8` closure and
+positional vector `[x,t,f]` captured with B=2 and B=3, forwarded through
+`invoke`/`call` and captured body/template adapters under a conflicting
+apply-site context. Nested calls use their own explicit tuples. Assert
+frame counts 2 and 3, final `(t,f)=(x+1 mod 256,1)` from zero seeds,
+exact inverse restoration, and retained forward `call_index` values during
+inverse traversal (0/1 for the two calls within one source-row expansion;
+separate source points each start at 0). Reject absent, malformed or
+source-inconsistent records before concrete expansion. This vector tests
+the existing K77 binding rule; it adds no catalog argument or binding rule.
 
 ## 16. Canonical textual form (normative)
 
