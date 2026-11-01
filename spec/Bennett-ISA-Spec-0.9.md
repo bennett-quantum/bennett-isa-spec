@@ -192,6 +192,7 @@ north star §3.1 requires).
 | K73 | §12.1 | **EXPECTED-CORRESPONDENCE**. Compare programs by ordered roles, shapes and borrow positions; witness: crossed local names on two equal-width slots do not exchange those slots. [deps: ISA-5.1-P1, ISA-9.4-P2, ISA-12.1-P7, ISA-12.1-P8] | INV-6 gap 7; afu | E | – |
 | K74 | §12.2 | **CHECKER-VERDICT**. The checker records per-claim labels and counts in its report, never trusting a requested label; witness: the four-element CNOT slice reports evidence with count 4 and fraction 1/2. [deps: ISA-1.2-P4, ISA-12.1-P1, ISA-12.1-P2, ISA-12.1-P8, ISA-12.3-P1] | INV-6 gap 10; afu | S | – |
 | K75 | §12.2 | **UNCHECKED-HOST-LIMIT**. Report host exhaustion separately from labels and rejection without a domain cap; witness: region[63,1] at count 1 remains legal even when one element cannot be stored. [deps: ISA-3.3-P2.S2, ISA-3.3-P19, ISA-12.1-P2, ISA-12.2-P1, ISA-5.6-P2, ISA-14.3-P3, ISA-12.3] | INV-6 gap 12; afu | S | – |
+| K76 | §5.6 | **FRAME-ENTRY-DOMAIN**. Normative constant and causal-adjoint analysis fixes D_F; interface/borrowed components stay independent and full; checker establishes reachable-entry support before restricted T3 factorisation. Witness: CX(0,b) passes, polynomial-only prefix zero does not. | consumer 73y; pass V; SQ 20 | E | – |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -1322,9 +1323,13 @@ entangled with it.
 **Rule (suite F).** Borrowed wires (set B) are touched (as control or
 target) only inside **borrow frames**: maximal contiguous permutation-
 only subcircuits from the first to the last instruction touching B. The
-frame's realised permutation P_F on its wires MUST factor as `P_F = P' ⊗
-I_B`, established by a T3 claim over the frame's full domain
-(exhaustive, or a library certificate, §12 `borrow_frames`) or
+frame's domain D_F contains every value of every borrowed and interface
+wire, independently, and the values of its other wires admitted by the
+entry-state analysis below, starting from the region's D (§5.2). The
+frame's realised permutation P_F MUST satisfy
+`P_F|span(D_F) = (P' ⊗ I_B)|span(D_F)` for some P' independent of B,
+established by a T3 claim over all of D_F (exhaustive, or a library
+certificate, §12 `borrow_frames`) or
 **structurally by the translation lemma**: the frame is `V; W; V⁻¹; W`
 where
 
@@ -1352,6 +1357,56 @@ Maximality of a frame inside a `qloop` or `qif` body is judged within
 that body's static instruction sequence, separately for each borrowed
 lifetime, not across unrolled visits or across distinct arm sequences.
 [deps: ISA-4.3-P2, ISA-4.3-P4, ISA-4.6, ISA-5.6-P2]
+
+**Entry-state analysis (K76, normative).** This analysis fixes D_F; a
+stronger analysis cannot narrow it. Resolve classical arguments, tokens,
+controls, operand identities, allocations and the acyclic local call
+expansions from the object (§3.5, §4, §5.1, §5.3), for each permitted
+invocation. A wire's abstract value is 0, 1 or unknown (both values).
+Interface and freshly borrowed wires start unknown; `qalloc` starts 0;
+image preparation uses the corresponding X gates on allocated wires.
+The transfer rules are:
+
+1. An effective control known false disables the operation. Otherwise,
+   an X-family flip or controlled swap evaluates its targets only when
+   all its operands are known; any other target becomes unknown.
+   Read-only controls keep their values. Diagonal gates keep basis
+   values; other quantum gates make their targets unknown. An opaque
+   oracle or `qinplace` makes its outputs unknown; an unresolved action
+   makes its modified wires unknown. Local action bodies use these same
+   rules, with inherited controls.
+2. Each enabled reversible operation records its exact identity and the
+   preceding abstract values on **every** operand's causal stack,
+   including readers. Its exact §5.3 adjoint restores those values only
+   when that same event is the top event on every operand stack; pop
+   that event everywhere. Identity includes operands, effective controls,
+   callees, classical arguments and token identities/tuples. Disjoint
+   events may interleave; nested pairs may cancel. A lifetime boundary
+   or unresolved action invalidates the entire connected stack history
+   reached through its operands. Allocation and release add/remove the
+   corresponding abstract components.
+3. Structured bodies follow §4.6, including unconditional lifetimes and
+   predicated gates; bounded loops apply the transfer at each visit.
+   Equal complete abstract states permit exact cycle skipping. A proved
+   inductive over-approximation may represent remaining visits, but may
+   not establish a constant that these transfers do not establish.
+   This is a decidable finite rule set; Boolean polynomial simplification
+   and quantum identities beyond these exact adjoint pops supply no
+   entry facts.
+
+At a frame entry, retain only the known constants of its allocated local
+wires; every other local component independently takes both values, and
+every interface and borrowed component independently takes both values
+even if the prefix related or fixed them. D_F is this Cartesian product;
+for repeated visits it is the union of these products. Thus `CX c b`
+is identity on arbitrary b and its external reference when this analysis
+establishes c = 0, whereas an interleaved CNOT prefix that clears c only
+by polynomial algebra supplies no such entry fact. Exact Boolean
+reasoning remains available to prove the permutation **within** a frame.
+The checker MUST use this D_F for both exhaustive and library frame
+claims and establish that the reachable entry states lie in span(D_F).
+By linearity the restricted equality then applies to every reachable
+entry state, including superpositions entangled with an external system.
 
 ### 5.7 Executor transformations
 
