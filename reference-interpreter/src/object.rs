@@ -668,6 +668,15 @@ fn instruction(lines: &[(usize, &str)], pos: &mut usize) -> Result<Instruction> 
 }
 
 impl Object {
+    /// §5.4 effective cause; the published 0.8 executor keeps its old bytes.
+    pub(crate) fn fault_literal(&self, width: usize, literal: &str) -> Result<crate::BitVector> {
+        let code = crate::BitVector::parse_unsigned_exact(width, literal)?;
+        if self.isa_version == IsaVersion::V09 && code.is_zero() {
+            crate::BitVector::from_u128(width, 4)
+        } else {
+            Ok(code)
+        }
+    }
     pub(crate) fn declaration(&self, name: &str) -> Result<Function> {
         if let Some(f) = self.functions.get(name) {
             return Ok(f.clone());

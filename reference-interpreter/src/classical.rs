@@ -1584,6 +1584,13 @@ impl<'a> ClassicalMachine<'a> {
                     }
                     "effect" => fault = self.effect(&a[0], &a[1..], &mut undo)?,
                     "trap" => fault = Some(4),
+                    "fault" => {
+                        // Admission requires a canonical uint64 literal (K5).
+                        let code = a[0].parse::<u64>().map_err(|_| {
+                            Error::new("§4.1/§4.9: fault code is not a uint64".into())
+                        })?;
+                        fault = Some(if code == 0 { 4 } else { code as u128 });
+                    }
                     "hostcall" => {
                         let address = self.bits(&a[1])?;
                         let capacity = self.bits(&a[2])?;
@@ -1678,6 +1685,11 @@ impl<'a> ClassicalMachine<'a> {
             }
         }
         if let Some(code) = fault {
+            if object.isa_version == crate::IsaVersion::V09 {
+                // K5: only the terminal record is published. Retain the
+                // failing point and every open activation, not a successor.
+                self.state.control = undo.control.clone();
+            }
             self.state.fault = Some(code);
         } else if let Some(v) = output {
             self.define(&i.lhs[0], v, &mut undo)?;

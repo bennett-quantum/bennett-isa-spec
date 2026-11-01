@@ -10,6 +10,39 @@ The README admission milestone and new council acceptance remain pending.
 No sibling writes, spec/catalog edits or push. Gates use the headless
 prefix, offline Cargo and repo-local .tmp.
 
+## 2026-11-01 — ISA 0.9 migration, slice 2 (fuk.2)
+
+K5 fault C is a version-gated CC/R terminator, checked as a canonical uint64.
+All nonzero bits are preserved; zero maps to 4. The existing terminal-history
+path retains one record, no results and no caller continuation. 0.9 faults
+retain the failing control point as well as all instances, memory, device/tape
+history and open activations; 0.8 keeps its original control behavior. The
+shared effective-cause helper also maps explicit zero for both Q engines and
+the literal inverse, only on 0.9. run-program --reverse accepts FAILED 0.9
+runs through existing reversal eligibility; the 0.8 CLI diagnostic is retained.
+
+Eight tests in tests/typed_faults.rs cover 0..256 and every uint64 bit boundary
+and complement/adjacent value, both CC/R, all widths 1..128 for all four divide
+operations, implicit memory/heap/effect/entropy/illegal-uncall/use-before-definition
+and CC hostcall causes, repeated terminal observation, nested CC/R callers,
+unchanged pre-fault instances/control/memory/tape, and complete entry reversal.
+The source-counter test instruments every R instruction across a call and
+exercises every cut 0..9, including zero and both returns, plus direct zero
+entry before invalid memory and resumable host-fuel diagnostics. The executor
+does not invent a source budget: §4.9 assigns that counter to producer code.
+CLI checks run-cc, reverse, run-program and FAILED --reverse for exact codes
+through UINT64_MAX and one/no-results output. Q tests independently compare
+the sequential and literal engines at every cut, idle HALT and full inverse,
+including the unchanged 0.8 zero-cause behavior.
+
+Red: .tmp/migration-s2-red.log (seven failures); atomic-point red:
+.tmp/migration-s2-atomic-red.log (two failures). Harness fixes retained the
+R-only effect rule, used a CC wrapper calling R for prefix effects, and sized
+H=12 for a 1024-byte heap. Targeted eight tests pass. Full gates pending.
+New instruction families and their corresponding preconditions (dynamic
+qregs, budget.mint, parametrised qinplace, forwarding) remain in fuk.7;
+no complete 0.9 executor/producer or council-acceptance claim is made.
+
 ## 2026-11-01 — ISA 0.9 migration, slice 1 (fuk.1)
 
 Explicit IsaVersion selects coherent 0.8/0.9 headers, ABI signatures,

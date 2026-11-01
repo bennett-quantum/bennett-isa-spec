@@ -733,10 +733,10 @@ impl Object {
                     }
                     "lift.faultif" => {
                         if !rd(&a[0])?.is_zero() {
-                            fault!(BitVector::parse_unsigned_exact(fault_width, &a[1])?);
+                            fault!(self.fault_literal(fault_width, &a[1])?);
                         }
                     }
-                    "fault" => fault!(BitVector::parse_unsigned_exact(fault_width, &a[0])?),
+                    "fault" => fault!(self.fault_literal(fault_width, &a[0])?),
                     "qjump" => next = program.label(&f.name, &a[0])?,
                     "qbranch" => {
                         next = program

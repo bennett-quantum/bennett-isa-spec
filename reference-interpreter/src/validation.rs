@@ -877,9 +877,17 @@ impl Object {
                 "classical instruction cannot have Q structured body",
             );
         }
-        let term = matches!(op, "br" | "ret" | "trap");
+        let term = matches!(op, "br" | "ret" | "trap")
+            || (op == "fault" && self.isa_version == crate::IsaVersion::V09);
         if term != (ordinal + 1 == b.instructions.len()) {
-            return err("§3.4", "classical block requires final br/ret/trap");
+            return err(
+                "§3.4",
+                if self.isa_version == crate::IsaVersion::V09 {
+                    "classical block requires final br/ret/trap/fault"
+                } else {
+                    "classical block requires final br/ret/trap"
+                },
+            );
         }
         let mut result = None;
         if let Some(t) = op.strip_prefix("const.") {
@@ -1021,6 +1029,10 @@ impl Object {
                     }
                 }
                 "trap" => arity(0, 0)?,
+                "fault" if self.isa_version == crate::IsaVersion::V09 => {
+                    arity(1, 0)?;
+                    crate::object::unsigned_literal(&a[0], 64)?;
+                }
                 "call" | "uncall" => {
                     if a.is_empty() {
                         return err("§4.8", "missing callee");

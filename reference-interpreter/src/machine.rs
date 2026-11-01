@@ -671,7 +671,7 @@ impl<'a> OracleVectorMachine<'a> {
     fn fault_code(&self, f: &Function, i: &Instruction) -> Result<BitVector> {
         let fw = self.state.code.width();
         let code = match i.op.as_str() {
-            "lift.faultif" => return BitVector::parse_unsigned_exact(fw, &i.operands[1]),
+            "lift.faultif" => return self.object.fault_literal(fw, &i.operands[1]),
             "lift.call" => 3,
             "lift.ret" | "qjumpr" => 4,
             "lift.alloc" => 2,
@@ -952,8 +952,9 @@ impl<'a> OracleVectorMachine<'a> {
                 self.state.result_val = self.state.result_val.binary("xor", &v)?;
             }
             "fault" => {
-                let code =
-                    BitVector::parse_unsigned_exact(self.state.code.width(), &i.operands[0])?;
+                let code = self
+                    .object
+                    .fault_literal(self.state.code.width(), &i.operands[0])?;
                 self.state.code = self.state.code.binary("xor", &code)?;
                 self.state.faulted ^= true;
             }

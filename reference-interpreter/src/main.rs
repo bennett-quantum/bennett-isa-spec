@@ -1806,7 +1806,7 @@ fn run_program(program: &Object, name: &str, options: CcOptions) -> Result<Json>
     let mut status = if failed { "FAILED" } else { "COMPLETED" };
     let mut reversed = false;
     if options.reverse_flag {
-        if failed {
+        if failed && program.isa_version == bennett_isa_ref::IsaVersion::V08 {
             return Err(fail(
                 "§10: E_INVALID_STATE: bennett_reverse applies to a COMPLETED run; this run FAILED",
             ));
