@@ -396,11 +396,7 @@ fn fault_rows_full_domain() {
 
 #[test]
 fn repeated_location_sources_and_destination_aliases() {
-    let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9.json"),
-        Registry::new(),
-    )
-    .unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
     let mut count = 0;
     for n in 1..=4 {
         let size = 1u64 << n;
@@ -468,11 +464,7 @@ fn repeated_location_sources_and_destination_aliases() {
 #[test]
 fn positional_copy_exchange_bindings_full_domains() {
     use bennett_isa_conformance::ref_bdd::Bdd;
-    let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9.json"),
-        Registry::new(),
-    )
-    .unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
     let mut count = 0;
     for n in 1..=4 {
         for kind in ["bind.qxor", "bind.qexch"] {

@@ -20,11 +20,7 @@ fn get(m: &Machine, s: &[usize], n: &str) -> Vec<usize> {
 }
 #[test]
 fn heterogeneous_recursive_activation_full_symbolic_domains() {
-    let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9.json"),
-        Registry::new(),
-    )
-    .unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
     let mut totals = [0u128; 2];
     let mut configs = 0;
     for w in 1usize..=4 {

@@ -6,11 +6,7 @@ use bennett_isa_conformance::{
 };
 #[test]
 fn lifted_layout_memory_full_symbolic_domains() {
-    let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9.json"),
-        Registry::new(),
-    )
-    .unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
     for p in (1usize..=5).chain([8]) {
         for bytes in [1usize, 2, 3, 4, 16] {
             if (p == 5 && bytes != 16) || (p == 8 && bytes != 1) {
@@ -159,11 +155,7 @@ fn lifted_layout_memory_full_symbolic_domains() {
 
 #[test]
 fn memory_fault_write_ordinals_follow_all_assignment_exchanges() {
-    let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9.json"),
-        Registry::new(),
-    )
-    .unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
     let bundles = [
         ("a", 2),
         ("base", 2),

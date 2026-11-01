@@ -230,11 +230,7 @@ fn binary64_angles_round_trip_and_numerical_adjoint_matrices() {
 #[test]
 fn typed_native_permutation_ports_and_environments() {
     use bennett_isa_conformance::{ref_bdd::Bdd, ref_catalog::Machine, ref_language::permutation};
-    let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9.json"),
-        Registry::new(),
-    )
-    .unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
     let mut count = 0;
     for (g, ports) in [
         ("x", vec!["a"]),

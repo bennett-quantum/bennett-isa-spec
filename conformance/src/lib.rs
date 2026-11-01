@@ -21,6 +21,7 @@ pub mod ref_amplitudes;
 pub mod ref_bdd;
 pub mod ref_catalog;
 pub mod ref_hash;
+mod ref_integer;
 pub mod ref_language;
 
 use json::Json;

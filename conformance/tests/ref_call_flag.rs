@@ -60,11 +60,7 @@ fn check(
 }
 #[test]
 fn general_call_records_and_exact_example_counter_widths() {
-    let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9.json"),
-        Registry::new(),
-    )
-    .unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
     let mut count = 0;
     for d in 1..=4 {
         for s in 1..=4 {

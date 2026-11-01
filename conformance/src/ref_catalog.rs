@@ -3,7 +3,8 @@
 use crate::json::{self, Json};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub(crate) type Env = BTreeMap<String, i64>;
+use crate::ref_integer::Integer;
+pub(crate) type Env = BTreeMap<String, Integer>;
 fn field<'a>(v: &'a Json, k: &str) -> Result<&'a Json, String> {
     v.get(k).ok_or_else(|| format!("missing {k}: {v}"))
 }
@@ -24,29 +25,42 @@ fn keys(v: &Json, expected: &[&str]) -> Result<(), String> {
     }
     Ok(())
 }
-pub(crate) fn scalar(v: &Json, env: &Env) -> Result<i64, String> {
+pub(crate) fn integer(v: &Json, env: &Env) -> Result<Integer, String> {
     match v {
-        Json::Num(n) if n.fract() == 0.0 && n.abs() < (1u64 << 53) as f64 => Ok(*n as i64),
-        Json::Str(s) => env
-            .get(s)
-            .copied()
-            .ok_or_else(|| format!("unbound integer {s}")),
-        Json::Arr(a) if a.len() == 3 => {
-            let x = scalar(&a[1], env)?;
-            let y = scalar(&a[2], env)?;
-            match string(&a[0])? {
-                "+" => x.checked_add(y),
-                "-" => x.checked_sub(y),
-                "*" => x.checked_mul(y),
-                "div" if y > 0 => Some(x.div_euclid(y)),
-                "mod" if y > 0 => Some(x.rem_euclid(y)),
-                "bit" if x >= 0 && y >= 0 => Some(if y >= 63 { 0 } else { (x >> y) & 1 }),
-                _ => None,
+        Json::Num(n) if n.fract() == 0.0 && n.abs() < (1u64 << 53) as f64 => {
+            Ok(Integer::from(*n as i64))
+        }
+        Json::Str(s) => {
+            if let Some(v) = env.get(s) {
+                return Ok(v.clone());
             }
-            .ok_or_else(|| "invalid/overflowed integer expression".into())
+            let n = Integer::parse(s).map_err(|_| format!("unbound integer {s}"))?;
+            let safe = Integer::from(9_007_199_254_740_991i64);
+            if n <= safe && n >= Integer::from(-9_007_199_254_740_991i64) {
+                return Err("small integer literal must be a JSON number".into());
+            }
+            Ok(n)
+        }
+        Json::Arr(a) if a.len() == 3 => {
+            let x = integer(&a[1], env)?;
+            let y = integer(&a[2], env)?;
+            match string(&a[0])? {
+                "+" => Ok(x.add(&y)),
+                "-" => Ok(x.sub(&y)),
+                "*" => Ok(x.mul(&y)),
+                "div" => x.div_mod(&y).map(|v| v.0),
+                "mod" => x.div_mod(&y).map(|v| v.1),
+                "bit" => x.bit_at(&y),
+                _ => Err("invalid integer expression".into()),
+            }
         }
         _ => Err(format!("invalid scalar {v}")),
     }
+}
+pub(crate) fn scalar(v: &Json, env: &Env) -> Result<i64, String> {
+    integer(v, env)?
+        .to_i64()
+        .ok_or_else(|| "host resource limit: scalar count exceeds i64".into())
 }
 pub(crate) fn index(s: &str, env: &Env) -> Result<(String, usize), String> {
     let (name, expr) = s.split_once('[').ok_or("wire needs a subscript")?;
@@ -171,7 +185,7 @@ impl Catalog {
         let env = params
             .iter()
             .zip(args)
-            .map(|(p, v)| Ok((string(p)?.to_owned(), *v)))
+            .map(|(p, v)| Ok((string(p)?.to_owned(), Integer::from(*v))))
             .collect::<Result<Env, String>>()?;
         chain.push(kind.into());
         self.body(
@@ -225,7 +239,7 @@ impl Catalog {
                 }
                 for j in from..to {
                     let mut inner = env.clone();
-                    inner.insert(string(i)?.into(), j);
+                    inner.insert(string(i)?.into(), Integer::from(j));
                     self.body(array(field(c, "body")?)?, &inner, chain, widths, out)?;
                 }
             } else if let Some(v) = c.get("inverse") {

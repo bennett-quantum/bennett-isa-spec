@@ -37,11 +37,7 @@ fn verify(m: &Machine, b: &mut Bdd, old: &[usize], expected: &[usize], en: usize
 }
 #[test]
 fn inc8_and_sum_db_arithmetic_cast_and_successor_widths() {
-    let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9.json"),
-        Registry::new(),
-    )
-    .unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
     for (op, n) in [("add", 8), ("sub", 8), ("add", 32), ("icmp.eq", 8)] {
         let width = if op == "icmp.eq" { 1 } else { n };
         let bundles = [("a", n), ("b", n), ("slot", width), ("w", width)];
@@ -142,11 +138,7 @@ fn inc8_and_sum_db_arithmetic_cast_and_successor_widths() {
 }
 #[test]
 fn example_literal_pointer_bases_and_byte_constants() {
-    let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9.json"),
-        Registry::new(),
-    )
-    .unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
     for (kind, n, c) in [
         ("lift.addr", 32, 16),
         ("lift.addr", 32, 4096),
@@ -174,11 +166,7 @@ fn example_literal_pointer_bases_and_byte_constants() {
 }
 #[test]
 fn example_byte_region_dispatch_full_domain() {
-    let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9.json"),
-        Registry::new(),
-    )
-    .unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
     let bundles = [("address", 4), ("cells", 128), ("value", 8)];
     for kind in [
         "dispatch.copy",
@@ -232,11 +220,7 @@ fn example_byte_region_dispatch_full_domain() {
 }
 #[test]
 fn example_pinned_layout_full_pointer_domain() {
-    let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9.json"),
-        Registry::new(),
-    )
-    .unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
     let bundles = [
         ("p", 32),
         ("n", 1),

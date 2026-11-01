@@ -12,11 +12,7 @@ fn v(s: &str) -> Json {
 }
 #[test]
 fn heterogeneous_step_full_domains_and_idle_frames() {
-    let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9.json"),
-        Registry::new(),
-    )
-    .unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
     let mut count = 0u64;
     for w in 1..=4 {
         for n in [0usize, 1, 2, 3, 17] {

@@ -14,8 +14,7 @@ fn complete_call_interfaces_preserve_values_regions_and_callee_domains() {
             );
             let mut registry = Registry::new();
             registry.insert(hash.clone(), json::parse(&registry_body).unwrap());
-            let mut e =
-                Expander::new(include_str!("../../spec/ref-0.9.json"), registry).unwrap();
+            let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), registry).unwrap();
             for kind in [
                 "lift.oracle_call",
                 "lift.oracle_uncall",

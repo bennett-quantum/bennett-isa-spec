@@ -30,11 +30,7 @@ fn verify(m: &Machine, b: &mut Bdd, old: &[usize], expected: &[usize], en: usize
 }
 #[test]
 fn canonical_branches_and_successor_fragments() {
-    let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9.json"),
-        Registry::new(),
-    )
-    .unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
     let mut count = 0;
     for p in 1..=4 {
         let size = 1 << p;
@@ -134,11 +130,7 @@ fn canonical_branches_and_successor_fragments() {
 }
 #[test]
 fn function_local_indirect_jump_intervals() {
-    let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9.json"),
-        Registry::new(),
-    )
-    .unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
     let mut count = 0;
     for p in 1..=4 {
         let halt = (1 << p) - 1;
@@ -185,11 +177,7 @@ fn function_local_indirect_jump_intervals() {
 }
 #[test]
 fn effective_causes_and_wide_code_registers() {
-    let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9.json"),
-        Registry::new(),
-    )
-    .unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
     let mut count = 0;
     for f in [4, 5, 8] {
         for c in [0, 1, 10, (1 << f) - 1] {

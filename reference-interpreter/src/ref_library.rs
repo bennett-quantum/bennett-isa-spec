@@ -177,6 +177,15 @@ impl<'a> OracleInvocation<'a> {
             arguments: arguments.to_vec(),
         })
     }
+    /// Construct and expand this checked linked source invocation. No supplied
+    /// callback or basis-input witness participates in source construction.
+    pub fn expand_source(
+        &self,
+        library: &RefLibrary,
+        bundles: &[(&str, usize)],
+    ) -> Result<Vec<Leaf>> {
+        self.expand(library, bundles, crate::source_constructor::oracle)
+    }
     pub fn object(&self) -> &'a Object {
         self.object
     }

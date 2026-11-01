@@ -7,11 +7,7 @@ use bennett_isa_conformance::{
 };
 #[test]
 fn arbitrary_image_scopes_are_unconditional_and_restore_clean_allocation() {
-    let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9.json"),
-        Registry::new(),
-    )
-    .unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
     let mut tuples = 0;
     let mut columns = 0;
     for (width, cells) in (1..=4).flat_map(|w| [(w, 1), (w, 8)]) {
@@ -84,11 +80,7 @@ fn arbitrary_image_scopes_are_unconditional_and_restore_clean_allocation() {
 #[test]
 fn sparse_and_dense_exact_columns_agree_on_entangled_clifford_t_states() {
     use bennett_isa_conformance::ref_amplitudes::column;
-    let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9.json"),
-        Registry::new(),
-    )
-    .unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
     let args=json::parse(r#"[[{"gate":"h","wires":["a[0]"]},{"gate":"cx","wires":["a[0]","a[1]"]},{"gate":"t","wires":["a[0]"]},{"gate":"sdg","wires":["a[1]"]},{"gate":"h","wires":["a[1]"]},{"gate":"cz","wires":["a[0]","a[1]"]},{"gate":"swap","wires":["a[0]","a[1]"]}]]"#).unwrap();
     let leaves = e
         .expand("adj", args.as_arr().unwrap(), &[("a", 2)])

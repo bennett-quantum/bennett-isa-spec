@@ -2,7 +2,7 @@
 //! explicitly supplied closure-hash registry, never from interpreter code.
 use crate::{
     json::{self, Json},
-    ref_catalog::{index, scalar, Env},
+    ref_catalog::{index, integer, scalar, Env},
 };
 use std::{
     cell::RefCell,
@@ -747,7 +747,7 @@ impl Expander {
                         }
                         result
                     };
-                    let mut previous: Option<Vec<i64>> = None;
+                    let mut previous: Option<Vec<crate::ref_integer::Integer>> = None;
                     for record in &records {
                         let mut widths = c.ints.clone();
                         for field in fields {
@@ -760,7 +760,7 @@ impl Expander {
                             {
                                 widths.insert(
                                     n.into(),
-                                    *record.ints.get(n).ok_or("missing integer field")?,
+                                    record.ints.get(n).ok_or("missing integer field")?.clone(),
                                 );
                             } else if field.get("type").and_then(Json::as_str) == Some("wire")
                                 && usize::try_from(scalar(f(field, "width")?, &widths)?).ok()
@@ -775,7 +775,7 @@ impl Expander {
                                 record
                                     .ints
                                     .get(s(j)?)
-                                    .copied()
+                                    .cloned()
                                     .ok_or("unbound order field".into())
                             })
                             .collect::<Result<Vec<_>, String>>()?;
@@ -864,7 +864,7 @@ impl Expander {
                     c.templates.insert(name.into(), captured);
                 }
                 "integer" => {
-                    c.ints.insert(name.into(), scalar(v, &caller.ints)?);
+                    c.ints.insert(name.into(), integer(v, &caller.ints)?);
                 }
                 "angle" => {
                     c.angles.insert(name.into(), angle(v, caller)?);
@@ -1274,14 +1274,14 @@ impl Expander {
                 if to < from {
                     return Err("reversed range".into());
                 }
-                let old = c.ints.get(n).copied();
+                let old = c.ints.get(n).cloned();
                 let it: Box<dyn Iterator<Item = i64>> = if rev {
                     Box::new((from..to).rev())
                 } else {
                     Box::new(from..to)
                 };
                 for v in it {
-                    c.ints.insert(n.into(), v);
+                    c.ints.insert(n.into(), v.into());
                     self.body(a(f(j, "body")?)?, c, path, rev, chain, out)?;
                 }
                 if let Some(v) = old {

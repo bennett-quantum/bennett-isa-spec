@@ -265,11 +265,7 @@ fn unused_recipe_constructor_and_formal_shapes_are_still_closed() {
 
 #[test]
 fn canonical_integer_literal_has_only_lsb_ordered_x_leaves() {
-    let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9.json"),
-        Registry::new(),
-    )
-    .unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
     let args = json::parse(r#"[8,13,"w"]"#).unwrap();
     let leaves = e
         .expand("value.literal", args.as_arr().unwrap(), &[("w", 8)])

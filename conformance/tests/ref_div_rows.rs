@@ -136,11 +136,7 @@ fn division_rows_preserve_arbitrary_destinations_and_fault_entries() {
 
 #[test]
 fn wider_fault_entries_factor_as_identity_on_high_bits() {
-    let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9.json"),
-        Registry::new(),
-    )
-    .unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
     for n in 1..=4 {
         for op in ["udiv", "urem", "sdiv", "srem"] {
             let mut leaves = Vec::new();

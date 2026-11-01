@@ -195,3 +195,5 @@ pub(crate) mod allocation_test {
 
 #[cfg(test)]
 mod r23_transaction;
+
+mod source_constructor;

@@ -225,8 +225,7 @@ fn qinplace_full_domains_short_and_complete_interfaces_both_orientations() {
             }
         }
     }
-    let mut expander =
-        Expander::new(include_str!("../../spec/ref-0.9.json"), registry).unwrap();
+    let mut expander = Expander::new(include_str!("../../spec/ref-0.9.json"), registry).unwrap();
     for (hash, args, w, bound, full, adjoint) in cases {
         let bundles = [
             ("x", w),
@@ -326,13 +325,10 @@ fn exact_section_16_3_example_7_addya_and_adjoint() {
             registry.insert(root.clone(),parse(&format!(r#"{{"parameters":[{{"name":"G","type":"symbol"}},{{"name":"H","type":"symbol"}},{{"name":"x","type":"wire","width":2}},{{"name":"y","type":"wire","width":2}},{{"name":"control","type":"wire","width":1}}],"body":[{{"invoke":"qinplace","args":[2,4,"x",{},{},"control"]}}]}}"#,template(first),template(last))));
             let args = parse(&format!(r#"["{g}","{h}","x","y","control"]"#));
             let bundles = [("x", 2), ("y", 2), ("control", 1)];
-            let leaves = Expander::new(
-                include_str!("../../spec/ref-0.9.json"),
-                registry.clone(),
-            )
-            .unwrap()
-            .expand(&root, args.as_arr().unwrap(), &bundles)
-            .unwrap();
+            let leaves = Expander::new(include_str!("../../spec/ref-0.9.json"), registry.clone())
+                .unwrap()
+                .expand(&root, args.as_arr().unwrap(), &bundles)
+                .unwrap();
             check_order(&leaves, 2);
             let m = Machine::compile(&permutation(&leaves).unwrap(), &bundles).unwrap();
             for x in 0..4u64 {
