@@ -368,6 +368,8 @@ pub(crate) fn oracle(
             ]));
         }
     }
+    let fixed=root.params.iter().flatten().zip(call.arguments()).filter(|(p,_)|matches!(p.ty,crate::Type::Token|crate::Type::Int(_)|crate::Type::Ptr|crate::Type::F64)).map(|(p,v)|(p.name.clone(),v.clone())).collect::<BTreeMap<_,_>>();
+    let closure_hashes=object.identity()?.closure_hashes;
     let mut symbols = Vec::new();
     let mut rows = Vec::new();
     let mut successors = Vec::new();
@@ -483,7 +485,19 @@ pub(crate) fn oracle(
             ));
         } else {
             match op {
-                "lift.call" => {
+                "lift.oracle_call" | "lift.oracle_uncall" | "lift.perm_call" => {
+                let oracle=op!="lift.perm_call";let callee=&object.functions[a[0].trim_start_matches('@')];
+                let alias=format!("$source-call/{k}");
+                let context=if oracle {Some(obj([("token",fixed.get(&a[1]).cloned().ok_or_else(||Error::new(format!("§11.1: unresolved fixed source token {}",a[1])))?)]))}else{None};
+                symbols.push(bennett_isa_conformance::ref_language::SourceSymbol{name:alias.clone(),hash:closure_hashes[&callee.name].clone().ok_or_else(||Error::new("§11.1: unlinked nested source call".into()))?,oracle_invocation:context,adjoint:false});
+                let mut arguments=Vec::new();
+                if oracle {for n in crate::object::list(&a[2])? {arguments.push(text(read(&n)?));}arguments.extend([text(read(&a[3])?),text(read(&a[4])?)]);}
+                else {for group in [1usize,2] {for n in crate::object::list(&a[group])? {arguments.push(text(read(&n)?));}}}
+                let mem=if oracle {5}else{3};for n in crate::object::list(&a[mem])? {arguments.push(text(n));}
+                for n in crate::object::list(&a[mem+1])? {arguments.push(fixed.get(&n).cloned().ok_or_else(||Error::new(format!("§11.1: unresolved fixed source argument {n}")))?);}
+                row.push(invoke(op,[text(alias),array(arguments)]));
+            },
+            "lift.call" => {
                     let callee = &object.functions[a[0].trim_start_matches('@')];
                     let actuals = crate::object::list(&a[1])?;
                     let count = actuals.len();

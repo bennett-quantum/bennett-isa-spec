@@ -164,3 +164,33 @@ fn source_derived_lproc_captures_stack_and_complete_global_delivery() {
         assert_eq!(state, entry);
     }
 }
+
+#[test]
+fn parsed_two_token_source_action_captures_arguments_bodies_templates_and_nested_calls() {
+    let inc=include_str!("fixtures/inc8.bisa");let old=bennett_isa_ref::Object::parse(inc).unwrap();let oracle=old.functions["inc8"].signature_for(bennett_isa_ref::IsaVersion::V09).canonical();
+    let inc_body=inc.split("section functions\n").nth(1).unwrap();
+    let calls="oracle_call @inc8 tk2 (x) t f () ()\noracle_call @inc8 tk3 (x) t f () ()";
+    for route in ["arguments","body","template","nested"] {
+        let bounds=if route=="body" {"[1,1]"}else{"[]"};
+        let signature=format!(r#"{{"abi":"0.9","args":["token","token","token"],"bounds":{bounds},"in":[8],"kind":"action","mem":[],"mut":[8,4],"tier":"q"}}"#);
+        let prefix="action @a (t:wire[8] mut, f:wire[4] mut) (x:wire[8] in) () (tk2:token, tk3:token, poison:token) ()\n";
+        let body=match route {
+            "body"=>format!("{prefix}regs {{  }} bounds {{1, 1}}\n^entry():\nqloop 1 {{\noracle_call @inc8 tk2 (x) t f () ()\n}}\nqloop 1 {{\noracle_call @inc8 tk3 (x) t f () ()\n}}"),
+            "template"=>format!("{prefix}^entry():\nqregion unused 0 1\n{calls}"),
+            "nested"=>format!("{prefix}^entry():\naction_call @child (t, f) (x) () (tk2, tk3, poison)"),
+            _=>format!("{prefix}^entry():\n{calls}"),
+        };
+        let child=format!("{}^entry():\n{calls}",prefix.replace("@a ","@child "));
+        let childsig=signature.replace("\"bounds\":[1,1]","\"bounds\":[]");
+        let mut functions=vec![("inc8",oracle.as_str(),inc_body),("a",signature.as_str(),body.as_str())];
+        if route=="nested" {functions.push(("child",childsig.as_str(),child.as_str()));}
+        let source=support::object(&functions,"{}","").replace("=0.8","=0.9");let object=support::rehash(&source);
+        let args=json::parse(r#"["t","f","x",["2","0","0","0"],["3","0","0","0"],["99","0","0","0"]]"#).unwrap();
+        let leaves=object.expand_action_source("a",args.as_arr().unwrap(),&[("x",8),("t",8),("f",4)],false).unwrap();
+        let m=Machine::compile(&permutation(&leaves).unwrap(),&[("x",8),("t",8),("f",4)]).unwrap();
+        for x in 0..256 {let mut state=m.state();m.set(&mut state,"x",x);m.set(&mut state,"t",0xa5);m.set(&mut state,"f",9);let entry=state.clone();
+            m.run(&mut state,true,false).unwrap();assert_eq!(m.get(&state,"x"),x);assert_eq!(m.get(&state,"t"),0xa5^((x+1)&255),"{route} x={x}");assert_eq!(m.get(&state,"f"),8);
+            m.run(&mut state,true,true).unwrap();assert_eq!(state,entry,"{route} x={x}");
+        }
+    }
+}
