@@ -1,6 +1,7 @@
 # Bennett ISA reference interpreter
 
-Rust 2021, standard library only; still targets ISA 0.8. ISA 0.9 admission is not claimed. [PROGRESS.md](PROGRESS.md) records
+Rust 2021, standard library only. ISA 0.8 remains supported; ISA 0.9 migration
+is in progress. Complete ISA 0.9 execution is not yet claimed. [PROGRESS.md](PROGRESS.md) records
 what is verified, what is staged and in what order; [SPEC-QUESTIONS.md](SPEC-QUESTIONS.md)
 records every reading the specification leaves open;
 [council/response-round-1.md](council/response-round-1.md) answers the council's
@@ -45,13 +46,21 @@ implement arbitrary typed R faults. Closing the ISA wording issue does
 not clear that consumer blocker or certify rung 3. Open follow-up
 `b-isa-spec-fuk` retains that producer/executor migration prerequisite.
 
-The migration requires producer and executor support for ISA 0.9 K5,
-explicit version/ABI/envelope and contract-pin updates (including regenerated
-identities), and verification of exact terminal codes, first-fault boundaries,
-no subsequent effects and faulted-prefix restoration. This interpreter still
-admits ISA 0.8 only; neither its admission target nor sibling pins are changed
-here. The full musl hello-world, native equality, R console, reset and saved-tape
-replay acceptance remains owed (North Star §8 rung 3; dialect §19.2).
+The reference migration has landed explicit 0.8/0.9 envelope, ABI, identity,
+linking and device-version dispatch, plus K5 typed terminal faults and eligible
+FAILED-run reversal on 0.9. `tests/typed_faults.rs` checks source-instrumented
+pre-instruction boundaries (zero and returns included), exact uint64 codes,
+implicit causes, intact prefixes and entry restoration. The source counter
+remains producer instrumentation; host fuel is a separate diagnostic.
+
+Bound `ref` expansion, end-to-end K79–K81 execution, the 0.9 saved-tape matrix
+and the remaining authoritative delta (including dynamic qregs, minted tokens,
+parametrised qinplace and nonempty lproc forwarding) remain open under
+`b-isa-spec-fuk.3`–`.7`. The producer and sibling contract pins have not been
+migrated here. The full musl hello-world, native equality, R console, reset
+and saved-tape replay acceptance remains owed (North Star §8 rung 3;
+dialect §19.2). The council status above applies only to its pinned snapshot;
+a new milestone acceptance round remains the orchestrator's responsibility.
 
 ## Commands
 
@@ -211,8 +220,10 @@ kind `cc` (§10; other kinds are `E_ARG`). Output: `entry`, `status`
 creation), `console`, `console_hex`, `clock`, `effect_tape_length`,
 `memory_digest`, `entry_memory_digest`, and the final state's
 `equals_entry`, `memory_equals_entry` and `first_difference` against the
-entry state. `--reverse` on a FAILED run is `E_INVALID_STATE` and on a run
-that measured is `E_NOT_REVERSIBLE` (§10), both diagnostics. Two inputs are
+entry state. On 0.9, `--reverse` also accepts eligible FAILED runs, removing
+the terminal record and reversing the intact prefix. On 0.8, FAILED launch
+reversal retains its `E_INVALID_STATE` diagnostic. A run that measured is
+`E_NOT_REVERSIBLE` (§10). Two inputs are
 explicit staged diagnostics, never silently ignored: `--target file`
 (`bennett_load`'s target, staged deliverable 9: §8) and an object with a
 `schedule` section (verbatim scheduled execution, staged deliverable 10:
@@ -265,7 +276,7 @@ produce byte-identical stdout, including results, console bytes, trace, active
 tape and reset report, with no added replay-only JSON fields. Entropy is still
 supplied by `--entropy`; host request/reply payloads remain in `--replies`,
 not in the device journal. This interface does not replace source R step
-instrumentation or change the ISA 0.8 admission target.
+instrumentation. The complete 0.9 replay matrix remains migration slice 5.
 
 The output JSON's `tape` remains the **active** §7.3 tape. Segment `uncall`
 removes its cancelled entries from that active tape (§7.4); `--tape-out`
@@ -540,7 +551,7 @@ signed finite decimal strings; exhaustive tables contain arrays of canonical
 §9.1 integers of arbitrary size. The translation frame is a two-point tuple
 in the grammar; V and W remain point arrays. Schedule `bindings.expansion`
 is optional under §17 item 7: omission binds `ref` at the object's ISA version
-(currently 0.8). A present descriptor retains the closed name/version/hash
+(0.8 or 0.9). A present descriptor retains the closed name/version/hash
 grammar. `Object::schedule_expansion` resolves that binding for consumers,
 returning no supplied hash for the default and preserving an explicit binding.
 It never inserts a descriptor into the canonical schedule or changes its §9.2

@@ -6,6 +6,10 @@ b-isa-spec-fuk. Slices b-isa-spec-fuk.1–.6 track admission, typed faults,
 bound ref expansion, K79–K81 execution, CLI/replay and final documentation.
 Additional fuk.7 retains the remaining authoritative delta (K1–K4 and
 nonempty lproc forwarding among it); fuk.6 depends on that audit too.
+Code commits: 4d1a1c2 (slice 1, closed), 3788db9 (slice 2, closed).
+Slices 1 and 2 are closed. Final gates: reference 517 passed / 0 failed /
+5 unchanged ignored; conformance 113 passed / 0 failed; neutral 16/16;
+both Python checks, strict lib/bins Clippy and whitespace pass.
 The README admission milestone and new council acceptance remain pending.
 No sibling writes, spec/catalog edits or push. Gates use the headless
 prefix, offline Cargo and repo-local .tmp.
@@ -38,7 +42,11 @@ including the unchanged 0.8 zero-cause behavior.
 Red: .tmp/migration-s2-red.log (seven failures); atomic-point red:
 .tmp/migration-s2-atomic-red.log (two failures). Harness fixes retained the
 R-only effect rule, used a CC wrapper calling R for prefix effects, and sized
-H=12 for a 1024-byte heap. Targeted eight tests pass. Full gates pending.
+H=12 for a 1024-byte heap. Targeted eight tests pass. Full reference: 517 passed / 0 failed / 5 unchanged
+ignored; neutral 16/16; draft witnesses and catalog PASS; strict lib/bins Clippy
+and whitespace PASS. Full conformance: 113 passed / 0 failed / 0 ignored.
+All gates exit 0. fuk.2 closed. Logs: .tmp/migration-s2-*.
+All 64 reference fixtures and frozen 0.8/catalog bytes still match 8e481ce.
 New instruction families and their corresponding preconditions (dynamic
 qregs, budget.mint, parametrised qinplace, forwarding) remain in fuk.7;
 no complete 0.9 executor/producer or council-acceptance claim is made.
