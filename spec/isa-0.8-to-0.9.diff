@@ -2085,7 +2085,7 @@
  
  ```c
  typedef struct bennett_sched_request_t bennett_sched_request_t;   typedef struct bennett_sched_response_t bennett_sched_response_t;
-@@ -1247,69 +2436,1039 @@
+@@ -1247,69 +2436,1038 @@
  schedule MUST keep the ordinals of the operations they keep and MAY
  remove only operations the library marks removable.
  
@@ -2373,7 +2373,6 @@
 +chooses inverse-copy/release at the same carrier; an empty inverse
 +sequence still has its ordinal-0 carrier at its release point. [deps: ISA-4.5, ISA-6.2-P1, ISA-6.4-P1, ISA-11-P6]
 +
-+
 +**Cleanup leaf ownership (K80).** For `reverse`, emitted leaves retain the
 +written cleanup's source points and per-point ordinal and semantic-call
 +occurrence spaces, including the terminating release. For `recompute`,
@@ -2387,9 +2386,9 @@
 +neither reuses the original computation's edges or scratch identities.
 +Callees retain their own source points, nested chains and ordinal/call
 +spaces under these fresh edges. Internal replay does not import the
-+original rows' source-qloop coordinates. Raw inverse traversal of the
-+chosen expansion retains all forward addresses and identities; source-
-+adjoint formation remains K62. The carrier's ordinal 0 belongs only to
++original rows' source-qloop coordinates. Raw inverse traversal retains
++forward paths, leaf ordinals, call occurrences and scratch identities;
++step/phase follows §11 and source-adjoint formation remains K62. The carrier's ordinal 0 belongs only to
 +cleanup-kind matching; it does not consume emitted-leaf ordinal 0.
 +K64's oracle support partition is unchanged.
 +
@@ -3154,7 +3153,7 @@
  `error` entry (§12.3) is a **common upper bound over all contexts** of
  its key; the multiplicity composition of §12.3 is sound for that reason.
  
-@@ -1325,7 +3484,10 @@
+@@ -1325,7 +3483,10 @@
  rejects): Y − J(Φ) ⪰ 0, Y + J(Φ) ⪰ 0, mu·I − Tr_out(Y) ⪰ 0 (partial trace
  over the output factor), and mu ≤ `bound`; then ‖Φ‖◇ ≤ mu (the dual of
  Watrous's SDP with Y₀ = Y₁ = Y; this is the diamond norm itself, not
@@ -3166,7 +3165,7 @@
  hi, im_lo, im_hi]` (decimal strings). **Positivity test.** The checker
  proves each of the three matrices **positive definite** by an interval
  Cholesky (or Hermitian LDL†) factorisation in which the interval lower
-@@ -1335,33 +3497,257 @@
+@@ -1335,33 +3496,257 @@
  strictly feasible by replacing Y with Y + δI and mu with mu′ = mu + δ·(d
  + 1) for a small rational δ > 0 (any mu′ > mu + δ·d suffices): then Y ±
  J(Φ) ⪰ δI ≻ 0 and, since Tr_out(Y + δI) = Tr_out(Y) + δ·d·I, mu′·I −
@@ -3431,7 +3430,7 @@
                                                     fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
              cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },
              error:   { "<variant>:<inherited_controls>": { local: { "operator_norm"?: v, "diamond"?: v }, inclusive: { "operator_norm"?: v, "diamond"?: v } } },
-@@ -1369,6 +3755,63 @@
+@@ -1369,6 +3754,63 @@
    composition { multiplicities: { "<hash>:<variant>:<inherited_controls>": n (from the realised schedule) }, epsilon_total: { "diamond": v }, method: "sum_over_multiplicities" }
  ```
  
@@ -3495,7 +3494,7 @@
  `inclusive(R, key) = local(R, key) + Σ_callees n_c × inclusive(c, key_c)`
  **per metric**, keyed like `cleanup` by `<variant>:<inherited_controls>`
  (the realised error depends on both); every `local` value is a verified
-@@ -1380,27 +3823,41 @@
+@@ -1380,27 +3822,41 @@
  variants) require `operator_norm` bounds throughout. A controlled
  unitary variant requires a `numerical` claim; an ε > 0 realisation
  compared as a channel requires a `channel` claim. Executable claims
@@ -3543,7 +3542,7 @@
  ### 14.2 Quantum state semantics
  
  The state of a Q region is a vector in ⊗ over live wires in allocation
-@@ -1422,10 +3879,20 @@
+@@ -1422,10 +3878,20 @@
  - **T3 (permutation theorem).** If the realised unitary V of a circuit on
    span(D) is a permutation matrix and the final basis tuple equals P(x)
    for every x ∈ D, then V|span(D) = P.
@@ -3568,7 +3567,7 @@
  - **T5.** As §6.3.
  - **T6 (executor agreement).** Two executors conforming to §3–§7 on one
    target with the same schedule produce on every x ∈ D the same final
-@@ -1439,14 +3906,28 @@
+@@ -1439,14 +3905,28 @@
  
  | Suite | Class | Tests |
  |---|---|---|
@@ -3604,7 +3603,7 @@
  
  ## 16. Canonical textual form (normative)
  
-@@ -1458,7 +3939,17 @@
+@@ -1458,7 +3938,17 @@
  `INT := -?(0|[1-9][0-9]*)`; `FLOAT :=` shortest round-trip decimal with
  `.` or exponent, finite; `STRING := "…"` with escapes `\"`, `\\`, `\n`;
  `HEX := ([0-9a-f]{2})*`. Metadata lines are RFC 8785 canonical JSON
@@ -3623,7 +3622,7 @@
  
  ### 16.2 Grammar
  
-@@ -1472,10 +3963,10 @@
+@@ -1472,10 +3962,10 @@
    dataline  := NAME SP HEX NL
    function  := fhead NL regs? block+
    fhead     := ("fn" SP ("cc"|"r") | "oracle" | "action" | "perm_action" | "lproc") SP "@" NAME SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")"
@@ -3637,7 +3636,7 @@
    regs      := "regs" SP "{" SP (NAME ":" type ("," SP NAME ":" type)*)? SP "}" (SP "bounds" SP "{" INT ("," SP INT)* "}")? NL
    block     := "^" NAME "(" plist "):" NL instr+
    instr     := (lhs SP "=" SP)? OPCODE (SP operand)* (SP "{" NL instr+ "}" (SP "{" NL instr+ "}")?)? NL
-@@ -1485,16 +3976,38 @@
+@@ -1485,16 +3975,38 @@
    VER       := INT "." INT
  ```
  
@@ -3679,7 +3678,7 @@
  
  section functions
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
-@@ -1509,9 +4022,9 @@
+@@ -1509,9 +4021,9 @@
  empty and its envelope is exactly these bytes (each line LF-terminated):
  
  ```
@@ -3691,7 +3690,7 @@
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
  regs { one:reg[8], r:reg[8] }
  ^entry():
-@@ -1521,17 +4034,19 @@
+@@ -1521,17 +4033,19 @@
  ```
  
  With B ≥ 3 every x yields `(x + 1 mod 256, 0)` (`result_val` = 0 ⊕ r);
@@ -3714,7 +3713,7 @@
  
  section functions
  oracle @sum_db (n:wire[8] in) (t:wire[8]) (f:wire[4]) (db:region[4,8] in) ()
-@@ -1590,13 +4105,13 @@
+@@ -1590,13 +4104,13 @@
  is SHA-256 of the ASCII `<scc_hash hex>:0`:
  
  ```
@@ -3731,7 +3730,7 @@
  lift.boundscheck zp 1
  zv = lift.load.i8 zp
  z = lift.icmp.eq n zv
-@@ -1614,21 +4129,390 @@
+@@ -1614,21 +4128,390 @@
  ^done():
  lift.ret acc
  data zero 00
@@ -4128,7 +4127,7 @@
  ## 17. Decisions deferred to implementation, with defaults
  
  Each item is one an implementer must decide to build; any decision is
-@@ -1652,15 +4536,60 @@
+@@ -1652,15 +4535,60 @@
     level. Default: the library `ref` published by `bennett-isa-spec`
     (ripple-carry adders and comparators, linear `inrange` scans,
     one-hot address dispatch, clean scratch released in reverse order);
@@ -4193,7 +4192,7 @@
  10. **`any`-class resolution** (§11). Default: the first class in JCS
      order with capacity.
  11. **Occupancy rate of a class absent from `rate`** (§8.2). Default: 1.
-@@ -1669,7 +4598,65 @@
+@@ -1669,7 +4597,65 @@
  13. **Suite sizes** (§15): the exhaustive widths of suite C and the
      sample counts of `sampled` claims. Default: exhaustive for ≤ 16
      interface bits; 2^16 samples above.

@@ -2699,7 +2699,6 @@ chooses fresh-copy/XOR/uncompute for the whole cleanup, while reverse
 chooses inverse-copy/release at the same carrier; an empty inverse
 sequence still has its ordinal-0 carrier at its release point. [deps: ISA-4.5, ISA-6.2-P1, ISA-6.4-P1, ISA-11-P6]
 
-
 **Cleanup leaf ownership (K80).** For `reverse`, emitted leaves retain the
 written cleanup's source points and per-point ordinal and semantic-call
 occurrence spaces, including the terminating release. For `recompute`,
@@ -2713,9 +2712,9 @@ Fresh uncomputation has separate occurrences from fresh computation;
 neither reuses the original computation's edges or scratch identities.
 Callees retain their own source points, nested chains and ordinal/call
 spaces under these fresh edges. Internal replay does not import the
-original rows' source-qloop coordinates. Raw inverse traversal of the
-chosen expansion retains all forward addresses and identities; source-
-adjoint formation remains K62. The carrier's ordinal 0 belongs only to
+original rows' source-qloop coordinates. Raw inverse traversal retains
+forward paths, leaf ordinals, call occurrences and scratch identities;
+step/phase follows §11 and source-adjoint formation remains K62. The carrier's ordinal 0 belongs only to
 cleanup-kind matching; it does not consume emitted-leaf ordinal 0.
 K64's oracle support partition is unchanged.
 
