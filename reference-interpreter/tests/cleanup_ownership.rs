@@ -20,9 +20,17 @@ fn source(cleanup: &str) -> Object {
         &[("multi", sig, &format!("perm_action @multi (t:wire mut) (x:wire in, z:wire in) () () ()\n^entry():\n{COMPUTE}{cleanup}"))], "{}", ""))
 }
 
+fn source_calls() -> Object {
+    let sig = r#"{"abi":"0.8","args":[],"bounds":[],"in":[1,1],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}"#;
+    let child_sig = r#"{"abi":"0.8","args":[],"bounds":[],"in":[1],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}"#;
+    support::rehash(&support::object(&[
+        ("multi",sig,"perm_action @multi (t:wire mut) (x:wire in, z:wire in) () () ()\n^entry():\nd = qalloc any 1\naction_call @flip (d) (x) () ()\naction_call @flip (d) (z) () ()\nadj action_call @flip (d) (z) () ()\nadj action_call @flip (d) (x) () ()\nqfree d"),
+        ("flip",child_sig,"perm_action @flip (d:wire mut) (a:wire in) () () ()\n^entry():\ncx a d")],"{}",""))
+}
+
 #[test]
 fn pass_x_literal_multirow_reverse_keeps_written_rows_and_restores_full_state() {
-    let objects = [source(REVERSE)];
+    let objects = [source(REVERSE), source_calls()];
     // Literal source rows remain individually addressable in the reference.
     let instructions = &objects[0].functions["multi"].blocks[0].instructions;
     assert_eq!(instructions.len(), 6);
@@ -76,7 +84,7 @@ fn pass_x_literal_multirow_reverse_keeps_written_rows_and_restores_full_state() 
 fn expansion(calls: bool) -> Vec<Leaf> {
     let hash = "a".repeat(64);
     let parameters = j(
-        r#"[{"name":"x","type":"wire","width":1},{"name":"z","type":"wire","width":1},{"name":"S","type":"symbol"}]"#,
+        r#"[{"name":"x","type":"wire","width":1},{"name":"z","type":"wire","width":1},{"name":"p","type":"wire","width":1},{"name":"S","type":"symbol"}]"#,
     );
     let cx = |a: &str, b: &str| format!(r#"{{"gate":"cx","wires":["{a}","{b}"]}}"#);
     let call =
@@ -104,6 +112,7 @@ fn expansion(calls: bool) -> Vec<Leaf> {
         compute[1],
         compute[0]
     );
+    let body = format!(r#"[{{"under":"p","body":{body}}}]"#);
     let mut doc = j(include_str!("../../spec/ref-0.9.json"));
     let Json::Obj(fields) = &mut doc else {
         unreachable!()
@@ -124,8 +133,8 @@ fn expansion(calls: bool) -> Vec<Leaf> {
         .unwrap()
         .expand(
             "zz.cleanup-witness",
-            &[j(r#""x""#), j(r#""z""#), Json::Str(hash)],
-            &[("x", 1), ("z", 1)],
+            &[j(r#""x""#), j(r#""z""#), j(r#""p""#), Json::Str(hash)],
+            &[("x", 1), ("z", 1), ("p", 1)],
         )
         .unwrap()
 }
@@ -203,10 +212,19 @@ fn apply(q: &mut QuantumState, leaves: &[Leaf], reverse: bool, w: &[u64]) {
                 .map(|(name, bit)| match name.as_str() {
                     "x" => w[0],
                     "z" => w[1],
+                    "p" => w[2],
                     _ => allocations[name][*bit],
                 })
                 .collect::<Vec<_>>();
-            q.gate(&l.gate, &operands, None, &[]).unwrap();
+            let controls = l
+                .controls
+                .iter()
+                .map(|(name, bit)| match name.as_str() {
+                    "p" => w[2],
+                    _ => allocations[name][*bit],
+                })
+                .collect::<Vec<_>>();
+            q.gate(&l.gate, &operands, None, &controls).unwrap();
         }
     }
     assert!(allocations.is_empty());
@@ -233,9 +251,9 @@ fn pass_x_recompute_has_one_fresh_leaf_space_and_exact_cleanup_semantics() {
         ordinal,
     }));
     assert_eq!(actual, expected);
-    for input in 0..4 {
+    for input in 0..8 {
         let mut q = QuantumState::new();
-        let w = q.allocate(2).unwrap();
+        let w = q.allocate(3).unwrap();
         for (bit, wire) in w.iter().enumerate() {
             if input >> bit & 1 != 0 {
                 q.gate("x", &[*wire], None, &[]).unwrap();
@@ -298,6 +316,23 @@ fn pass_x_recompute_has_one_fresh_leaf_space_and_exact_cleanup_semantics() {
         };
         assert_eq!(selected, expected, "{l:?}, {a:?}");
     }
+    let schedule = o.metadata.get_mut("schedule").unwrap();
+    let bennett_isa_ref::json::Json::Object(fields) = schedule else {
+        unreachable!()
+    };
+    let bennett_isa_ref::json::Json::Array(selected) = fields.get_mut("entries").unwrap() else {
+        unreachable!()
+    };
+    selected.push(entries[3].clone());
+    assert!(o
+        .resolve_schedule(&operation(5, 1), "gate")
+        .unwrap_err()
+        .to_string()
+        .contains("multiple maximal"));
+    assert_eq!(
+        o.resolve_schedule(&operation(1, 0), "gate").unwrap(),
+        Some(&entries[1])
+    );
 }
 
 #[test]
@@ -344,9 +379,9 @@ fn pass_x_recompute_calls_are_fresh_edges_with_separate_callee_spaces() {
             .collect::<Vec<_>>(),
         [3, 2, 1, 0]
     );
-    for input in 0..4 {
+    for input in 0..8 {
         let mut q = QuantumState::new();
-        let w = q.allocate(2).unwrap();
+        let w = q.allocate(3).unwrap();
         for (bit, wire) in w.iter().enumerate() {
             if input >> bit & 1 != 0 {
                 q.gate("x", &[*wire], None, &[]).unwrap();
