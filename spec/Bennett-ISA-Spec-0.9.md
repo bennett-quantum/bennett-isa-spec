@@ -1367,7 +1367,9 @@ Interface and freshly borrowed wires start unknown; `qalloc` starts 0;
 image preparation uses the corresponding X gates on allocated wires.
 The transfer rules are:
 
-1. An effective control known false disables the operation. Otherwise,
+1. If any control literal is known false, counting the operation's own
+   controls together with its effective control context, the operation is
+   disabled: preserve all abstract values and record no causal event. Otherwise,
    an X-family flip or controlled swap evaluates its targets only when
    all its operands are known; any other target becomes unknown.
    Read-only controls keep their values. Diagonal gates keep basis
@@ -1390,6 +1392,10 @@ The transfer rules are:
    Equal complete abstract states permit exact cycle skipping. A proved
    inductive over-approximation may represent remaining visits, but may
    not establish a constant that these transfers do not establish.
+   The normative D_F is the union obtained by the stated finite transfers;
+   acceleration must preserve that domain. A coarser invariant may prove
+   the obligation on a superset, but failure on that superset is not a
+   counterexample on D_F.
    This is a decidable finite rule set; Boolean polynomial simplification
    and quantum identities beyond these exact adjoint pops supply no
    entry facts.
@@ -3447,6 +3453,12 @@ read as an unsigned integer of its width (`ptr`: ptr_width; `f64`: 64,
 its bits).
 A `proof` label requires the domain to equal D; otherwise the claim is
 `evidence` with the covered fraction.
+For a borrow-frame obligation, use D_F of §5.6; a region claim over D
+does not by itself establish the frame claim. For example, with c
+allocated at zero, the single frame `CX(c,b)` over {c=0} × {b=0,1}
+is identity on b. The interleaved prefix `CX a c; CX x c; CX a c;
+CX x c` clears c only by polynomial algebra; §5.6 instead admits both
+c values at entry, so the same single-CX frame fails its obligation.
 
 **Component resolution (K69/K70).** These component-domain rules apply
 to table/program/oracle relations; K4 inverse-pair claims retain their

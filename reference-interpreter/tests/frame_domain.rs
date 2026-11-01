@@ -3,6 +3,31 @@ mod support;
 use bennett_isa_ref::Object;
 
 #[test]
+fn pass_vi_own_false_control_preserves_zero_at_frame_entry() {
+    let signature = r#"{"abi":"0.8","args":[],"bounds":[],"in":[1],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}"#;
+    let body = "z = qalloc any 1\nc = qalloc any 1\nccx z u c\nb = qborrow any 1\ncx c b\nqreturn b\nccx z u c\nqfree c\nqfree z";
+    let object = |body: &str| {
+        support::object(
+            &[(
+                "a",
+                signature,
+                &format!("perm_action @a (t:wire mut) (u:wire in) () () ()\n^entry():\n{body}"),
+            )],
+            "{}",
+            "",
+        )
+    };
+    // z=0 disables CCX despite unknown u: c stays 0, and the frame's
+    // (c,b) domain is {0} × {0,1}. An unknown c would fail this frame.
+    Object::parse(&object(body)).expect("own false control must preserve c=0");
+    // Changing both CCXs keeps explicit cleanup valid but establishes c=1.
+    let error = Object::parse(&object(&body.replace("ccx z u c", "x c")))
+        .expect_err("CX(1,b) must not restore the borrowed bit")
+        .to_string();
+    assert!(error.contains("§5.6"), "{error}");
+}
+
+#[test]
 fn pass_v_four_council_zero_entry_fixtures_still_check() {
     for case in ["sol-oracle", "codex-oracle", "loop", "sol-qinplace"] {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
