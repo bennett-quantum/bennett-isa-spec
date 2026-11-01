@@ -368,3 +368,145 @@ fn pass_xii_independent_recompute_preserves_nonzero_history_and_call_domains() {
         }
     }
 }
+
+// K81 joint occurrence: indivisible, assigned to the first qualifying release.
+// Deliberately finite adapter, not a production source partition builder.
+fn joint_source(reverse_releases: bool) -> Object {
+    let sig = r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[],"tier":"q"}"#;
+    let child = r#"{"abi":"0.8","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1,1],"tier":"q"}"#;
+    let releases = if reverse_releases {
+        "qfree b\nqfree a"
+    } else {
+        "qfree a\nqfree b"
+    };
+    support::rehash(&support::object(&[
+        ("outer", sig, &format!("perm_action @outer () () () () ()\n^entry():\na = qalloc any 1\nb = qalloc any 1\naction_call @swap2 (a, b) () () ()\nadj action_call @swap2 (a, b) () () ()\n{releases}")),
+        ("swap2", child, "perm_action @swap2 (a:wire mut, b:wire mut) () () () ()\n^entry():\nswap a b"),
+    ], "{}", ""))
+}
+
+#[test]
+fn portable_k81_joint_first_release_vectors_exact_bytes() {
+    let mut vectors = Vec::new();
+    for reversed in [false, true] {
+        let mut o = joint_source(reversed);
+        o.check_hashes().unwrap();
+        let rows = &o.functions["outer"].blocks[0].instructions;
+        assert_eq!(rows.len(), 6);
+        // Source validation checks joint version matching. This finite adapter
+        // then assigns the whole inverse to the earliest release of an output.
+        let releases: Vec<_> = rows
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| r.op == "qfree")
+            .map(|(i, _)| i)
+            .collect();
+        let owners = vec![
+            (releases[0], vec![3, releases[0]]),
+            (releases[1], vec![releases[1]]),
+        ];
+        assert_eq!(owners, [(4, vec![3, 4]), (5, vec![5])]);
+        assert!(!owners.iter().any(|(p, _)| *p == 3));
+        let before = QuantumState::new();
+        let mut q = before.clone();
+        for adjoint in [false, true] {
+            o.execute_action("outer", &mut q, &QuantumBindings::default(), adjoint, &[])
+                .unwrap();
+            assert_eq!(q, before, "joint source restores amplitudes and allocator");
+        }
+        // Independently check the actual two-mutable-bit callee on all inputs,
+        // plus a coherent entangled input; source allocation itself starts zero.
+        let mut tuples = Vec::new();
+        for input in 0..5 {
+            let mut q = QuantumState::new();
+            let w = q.allocate(3).unwrap();
+            for (bit, wire) in w[..2].iter().enumerate() {
+                if input >> bit & 1 != 0 {
+                    q.gate("x", &[*wire], None, &[]).unwrap();
+                }
+            }
+            if input == 4 {
+                q.gate("h", &[w[0]], None, &[]).unwrap();
+                q.gate("cx", &[w[0], w[2]], None, &[]).unwrap();
+            }
+            let before = q.clone();
+            let bindings = QuantumBindings {
+                bundles: BTreeMap::from([("a".into(), vec![w[0]]), ("b".into(), vec![w[1]])]),
+                ..Default::default()
+            };
+            o.execute_action("swap2", &mut q, &bindings, false, &[])
+                .unwrap();
+            let mut expected = before.clone();
+            expected.gate("swap", &w[..2], None, &[]).unwrap();
+            assert_eq!(q.amplitudes().unwrap(), expected.amplitudes().unwrap());
+            if input < 4 {
+                let output = ((input & 1) << 1) | ((input >> 1) & 1);
+                let mut basis = QuantumState::new();
+                let v = basis.allocate(3).unwrap();
+                for (bit, wire) in v.iter().enumerate() {
+                    if output >> bit & 1 != 0 {
+                        basis.gate("x", &[*wire], None, &[]).unwrap();
+                    }
+                }
+                assert_eq!(q.amplitudes().unwrap(), basis.amplitudes().unwrap());
+                tuples.push(format!(
+                    r#"{{"input":{input},"output":{output},"phase":[1,0],"scratch":[]}}"#
+                ));
+            }
+            o.execute_action("swap2", &mut q, &bindings, true, &[])
+                .unwrap();
+            assert_eq!(q, before);
+        }
+        let hash = o.identity().unwrap().interface_hashes["outer"].clone();
+        let operation = |point| {
+            support::json(&format!(
+                r#"{{"path":[{{"symbol":"{hash}","point":"entry:{point}","iteration":[]}}],"step":"*","phase":"*","generated":0}}"#
+            ))
+        };
+        let entry = |point, mode| {
+            let bennett_isa_ref::json::Json::Object(mut fields) = operation(point) else {
+                unreachable!()
+            };
+            fields.insert("kind".into(), support::json("\"cleanup\""));
+            fields.insert(
+                "cleanup".into(),
+                support::json(&format!(r#"{{"realisation":"{mode}"}}"#)),
+            );
+            bennett_isa_ref::json::Json::Object(fields).canonical()
+        };
+        let first = entry(4, "recompute");
+        let second = entry(5, "reverse");
+        o.metadata.insert(
+            "schedule".into(),
+            support::json(&format!(r#"{{"entries":[{first},{second}]}}"#)),
+        );
+        assert_eq!(o.schedule_cleanup(&operation(4)).unwrap(), "recompute");
+        assert_eq!(o.schedule_cleanup(&operation(5)).unwrap(), "reverse");
+        o.metadata.insert(
+            "schedule".into(),
+            support::json(&format!(r#"{{"entries":[{first},{first},{second}]}}"#)),
+        );
+        let tie = o.schedule_cleanup(&operation(4)).unwrap_err().to_string();
+        assert!(tie.contains("multiple maximal"));
+        assert_eq!(o.schedule_cleanup(&operation(5)).unwrap(), "reverse");
+        let quote = |s: &str| bennett_isa_conformance::json::Json::Str(s.into()).to_string();
+        vectors.push(format!(r#"{{"id":"{}","source":{},"source_admission":"accept-0.8-compatibility-envelope","coordinate_provenance":"finite-source-adapter","catalog_expander_leaves":null,"release_order":{},"carriers":[{{"point":4,"generated":0,"owns":[3,4]}},{{"point":5,"generated":0,"owns":[5]}}],"independent_carrier_at_3":false,"selection":["recompute","reverse"],"duplicate_maximal_at_4":{{"result":"reject","diagnostic":{},"carrier_5":"reverse"}},"outer_output":{{"live_wires":[],"scratch":[],"phase":[1,0],"inverse_restores_allocator":true}},"swap2_tuple_order":["a","b"],"swap2_tuples":[{}]}}"#,
+            if reversed { "release-b-a" } else { "release-a-b" }, quote(&o.text),
+            if reversed { r#"["b","a"]"# } else { r#"["a","b"]"# }, quote(&tie), tuples.join(",")));
+    }
+    let raw = format!(
+        r#"{{"schema":"bennett.k81.v1","vectors":[{}]}}"#,
+        vectors.join(",")
+    );
+    let bytes = format!("{}\n", j(&raw));
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../conformance/fixtures/accepted-k81-09/k81.json");
+    if std::env::var_os("BENNETT_UPDATE_K81_VECTORS").is_some() {
+        std::fs::write(&path, &bytes).unwrap();
+    }
+    assert_eq!(
+        std::fs::read_to_string(path).unwrap(),
+        bytes,
+        "K81 portable bytes"
+    );
+}

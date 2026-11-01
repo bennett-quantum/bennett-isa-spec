@@ -3653,10 +3653,16 @@
  - **T5.** As §6.3.
  - **T6 (executor agreement).** Two executors conforming to §3–§7 on one
    target with the same schedule produce on every x ∈ D the same final
-@@ -1437,16 +3978,34 @@
+@@ -1437,16 +3978,40 @@
  
  ## 15. Conformance suites
  
++The K81 joint-operation / first-release vector is published in
++`conformance/fixtures/accepted-k81-09/`: both release orders, indivisible
++inverse ownership and a duplicate-maximal cleanup selector tie. Its source
++coordinates and ownership are explicitly finite-source-adapter data, not
++a production 0.9 partition-builder result.
++
 +Portable K78–K80 vectors and reproduction instructions are published in
 +`conformance/fixtures/accepted-k78-k80-09/`, beside the controlled-action fixture.
 +The vectors record source admission, complete output tuples and expanded source coordinates; adapter-assigned coordinates are identified separately from production-builder output.
@@ -3695,7 +3701,7 @@
  
  ## 16. Canonical textual form (normative)
  
-@@ -1458,7 +4017,17 @@
+@@ -1458,7 +4023,17 @@
  `INT := -?(0|[1-9][0-9]*)`; `FLOAT :=` shortest round-trip decimal with
  `.` or exponent, finite; `STRING := "…"` with escapes `\"`, `\\`, `\n`;
  `HEX := ([0-9a-f]{2})*`. Metadata lines are RFC 8785 canonical JSON
@@ -3714,7 +3720,7 @@
  
  ### 16.2 Grammar
  
-@@ -1472,10 +4041,10 @@
+@@ -1472,10 +4047,10 @@
    dataline  := NAME SP HEX NL
    function  := fhead NL regs? block+
    fhead     := ("fn" SP ("cc"|"r") | "oracle" | "action" | "perm_action" | "lproc") SP "@" NAME SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")"
@@ -3728,7 +3734,7 @@
    regs      := "regs" SP "{" SP (NAME ":" type ("," SP NAME ":" type)*)? SP "}" (SP "bounds" SP "{" INT ("," SP INT)* "}")? NL
    block     := "^" NAME "(" plist "):" NL instr+
    instr     := (lhs SP "=" SP)? OPCODE (SP operand)* (SP "{" NL instr+ "}" (SP "{" NL instr+ "}")?)? NL
-@@ -1485,16 +4054,38 @@
+@@ -1485,16 +4060,38 @@
    VER       := INT "." INT
  ```
  
@@ -3770,7 +3776,7 @@
  
  section functions
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
-@@ -1509,9 +4100,9 @@
+@@ -1509,9 +4106,9 @@
  empty and its envelope is exactly these bytes (each line LF-terminated):
  
  ```
@@ -3782,7 +3788,7 @@
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
  regs { one:reg[8], r:reg[8] }
  ^entry():
-@@ -1521,17 +4112,19 @@
+@@ -1521,17 +4118,19 @@
  ```
  
  With B ≥ 3 every x yields `(x + 1 mod 256, 0)` (`result_val` = 0 ⊕ r);
@@ -3805,7 +3811,7 @@
  
  section functions
  oracle @sum_db (n:wire[8] in) (t:wire[8]) (f:wire[4]) (db:region[4,8] in) ()
-@@ -1590,13 +4183,13 @@
+@@ -1590,13 +4189,13 @@
  is SHA-256 of the ASCII `<scc_hash hex>:0`:
  
  ```
@@ -3822,7 +3828,7 @@
  lift.boundscheck zp 1
  zv = lift.load.i8 zp
  z = lift.icmp.eq n zv
-@@ -1614,20 +4207,389 @@
+@@ -1614,20 +4213,389 @@
  ^done():
  lift.ret acc
  data zero 00
@@ -4218,7 +4224,7 @@
  
  ## 17. Decisions deferred to implementation, with defaults
  
-@@ -1652,15 +4614,60 @@
+@@ -1652,15 +4620,60 @@
     level. Default: the library `ref` published by `bennett-isa-spec`
     (ripple-carry adders and comparators, linear `inrange` scans,
     one-hot address dispatch, clean scratch released in reverse order);
@@ -4283,7 +4289,7 @@
  10. **`any`-class resolution** (§11). Default: the first class in JCS
      order with capacity.
  11. **Occupancy rate of a class absent from `rate`** (§8.2). Default: 1.
-@@ -1669,7 +4676,65 @@
+@@ -1669,7 +4682,65 @@
  13. **Suite sizes** (§15): the exhaustive widths of suite C and the
      sample counts of `sampled` claims. Default: exhaustive for ≤ 16
      interface bits; 2^16 samples above.

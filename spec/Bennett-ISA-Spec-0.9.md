@@ -3978,6 +3978,12 @@ Born probabilities, consuming the wires.
 
 ## 15. Conformance suites
 
+The K81 joint-operation / first-release vector is published in
+`conformance/fixtures/accepted-k81-09/`: both release orders, indivisible
+inverse ownership and a duplicate-maximal cleanup selector tie. Its source
+coordinates and ownership are explicitly finite-source-adapter data, not
+a production 0.9 partition-builder result.
+
 Portable K78–K80 vectors and reproduction instructions are published in
 `conformance/fixtures/accepted-k78-k80-09/`, beside the controlled-action fixture.
 The vectors record source admission, complete output tuples and expanded source coordinates; adapter-assigned coordinates are identified separately from production-builder output.

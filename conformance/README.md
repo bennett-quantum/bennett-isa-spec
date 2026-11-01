@@ -139,3 +139,7 @@ instruction release order, complete interface forwarding, widths1–4,
 bounds0/1/2/3/17, both orientations and §16.3 example 7. These cases remain
 unavailable pending accepted 0.9/publication and do not certify a 0.9 executor.
 Run `python3 -I conformance/tools/ref_gate.py` for the headless offline gate.
+
+| ISA 0.9 portable vector | Coverage | Reproduction |
+|---|---|---|
+| [K81](fixtures/accepted-k81-09/README.md) | Joint inverse / first-release ownership, reversed release order and selector tie | Reference `cleanup_partition::portable_k81_joint_first_release_vectors_exact_bytes` |

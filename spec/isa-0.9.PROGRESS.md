@@ -1,3 +1,32 @@
+## 2026-11-01 Pass XIII — round 9 acceptance and S1 tool/fixture follow-up
+
+**round 9: accepted**, codex seat, zero blocking. Passes XI–XII and
+K81 are accepted (K1–K81 total); b-isa-spec-9hv closed and exported.
+The core's three-seat acceptance stands. b-isa-spec-fuk remains open.
+
+`reference-interpreter/README.md` names saved-tape profile v1 as a versioned
+tool contract, with the reviewer's journal/transaction rules, strict Tape[]
+encoding, prefix/exhaustion and diagnostic/no-output behavior. The README
+states bennett-vm implements the same profile; no VM changes or independent
+VM verification are claimed. §7.3 carries the exact C4 cross-reference.
+No K row or ISA interoperability MUST is added.
+
+§15 and `conformance/fixtures/accepted-k81-09/{README.md,k81.json}` publish
+the joint swap inverse / first-release witness for a/b and b/a release
+orders, exact owners (4 owns 3/4; 5 owns only 5), absence of a carrier at 3,
+and a duplicate-maximal tie at 4 with independent selection at 5. New
+`portable_k81_joint_first_release_vectors_exact_bytes` in
+`reference-interpreter/tests/cleanup_partition.rs` derives and byte-locks
+the manifest using admitted/hash-checked 0.8 source, full source execution
+forward/adjoint, all four basis swap tuples per release order, coherent
+entangled callee execution, exact state/allocator restoration and the real
+schedule selector. Coordinates/ownership are finite-adapter data, with no
+catalog-expander leaves or production 0.9 builder/admission claim. The
+initial red run passed all semantic checks and failed on the absent fixture;
+explicit regeneration then passed. Log: `.tmp/pass-xiii-k81-red.log`.
+The generated diff uses exact a/spec/Bennett-ISA-Spec.md and
+b/spec/Bennett-ISA-Spec-0.9.md labels. Frozen 0.8/catalog bytes match e4eb657.
+
 ## 2026-11-01 Pass XII — source cleanup-pair partition (9hv)
 
 **round 9: accepted** (codex seat, 0 blocking); b-isa-spec-9hv closed. Reading B is
