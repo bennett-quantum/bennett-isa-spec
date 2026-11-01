@@ -2927,10 +2927,11 @@ captured body/template, preserves that captured channel; unrelated
 caller/apply-site context cannot replace it. The qinplace adapters capture
 the source `tk` for both calls. Each nested source oracle call resolves
 its own `tk` in its own fixed bindings, then restores the outer context.
-Inverse traversal and source-adjoint adapters retain each forward call's
-channel and forward occurrence identity while reversing/adjointing the
-operations as §5.3/§11 require. None of these captures adds a leaf,
-ordinal, source parameter or closure-hash component.
+Source-adjoint adapters retain their captured tuples and perform §5.3
+replacements before recipe instantiation (K62). Inverse traversal retains
+each instantiated forward call's channel and forward occurrence identity
+while reversing/adjointing its operations (§11). None of these captures
+adds a leaf, ordinal, source parameter or closure-hash component.
 
 **Two-token witness.** Use §16.3 example 1's `inc8` closure and two source
 calls `oracle_call @inc8 tk2 (x) t f () ()` and
