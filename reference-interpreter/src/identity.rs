@@ -307,7 +307,7 @@ impl Object {
             }
         }
         let mut lines = vec![
-            "isa=0.8".into(),
+            format!("isa={}", self.isa_version.as_str()),
             format!("ptr_width={}", self.ptr_width),
             symbol.get("signature")?.canonical(),
         ];

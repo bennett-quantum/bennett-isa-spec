@@ -233,7 +233,9 @@ impl Object {
                     .functions
                     .get(name)
                     .ok_or_else(|| Error::new("§12: certificate region is data".into()))?;
-                if r.get("kind")?.string()? != f.kind || r.get("signature")? != &f.signature() {
+                if r.get("kind")?.string()? != f.kind
+                    || r.get("signature")? != &f.signature_for(self.isa_version)
+                {
                     return err("§12", "region signature mismatch");
                 }
                 let bounds = r

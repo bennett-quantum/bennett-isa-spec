@@ -8,6 +8,7 @@ impl Object {
             .first()
             .ok_or_else(|| Error::new("§9.3: no objects to link".into()))?;
         let mut result = Self {
+            isa_version: first.isa_version,
             text: String::new(),
             ptr_width: first.ptr_width,
             metadata: BTreeMap::new(),
@@ -21,6 +22,9 @@ impl Object {
         let mut old_identities = Vec::new();
         let mut certificates: Vec<Json> = Vec::new();
         for object in objects {
+            if object.isa_version != result.isa_version {
+                return err("§9.3", "cannot link different ISA versions");
+            }
             object.check_hashes()?;
             if object.ptr_width != result.ptr_width {
                 return err("§9.3", "pointer widths differ");
@@ -179,7 +183,8 @@ impl Object {
         Ok(linked)
     }
     pub(crate) fn render(&self) -> Result<String> {
-        let mut text=format!("bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width={}\n",self.ptr_width);
+        let v = self.isa_version.as_str();
+        let mut text = format!("bennett-object isa={v} object={v} launch={v} sched={v} cert={v} coverage={v} target={v} ptr_width={}\n", self.ptr_width);
         for section in SECTIONS {
             let body = match section {
                 "functions" => {

@@ -1,10 +1,39 @@
 # Bennett ISA reference interpreter progress
 
-Resume here. The whole accepted ISA 0.8 remains in scope; staged deliverables
-are not complete. ISA 0.9 admission is not claimed. This implementation session
-owns the Pass-XI reference consumer interface and local progress/handoff records;
-no sibling writes or push. Cargo gates use the headless prefix and
-TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/.tmp.
+Resume here. The accepted ISA 0.8 remains supported; staged deliverables
+are not complete. The explicit ISA 0.9 migration is in progress under
+b-isa-spec-fuk. Slices b-isa-spec-fuk.1–.6 track admission, typed faults,
+bound ref expansion, K79–K81 execution, CLI/replay and final documentation.
+Additional fuk.7 retains the remaining authoritative delta (K1–K4 and
+nonempty lproc forwarding among it); fuk.6 depends on that audit too.
+The README admission milestone and new council acceptance remain pending.
+No sibling writes, spec/catalog edits or push. Gates use the headless
+prefix, offline Cargo and repo-local .tmp.
+
+## 2026-11-01 — ISA 0.9 migration, slice 1 (fuk.1)
+
+Explicit IsaVersion selects coherent 0.8/0.9 headers, ABI signatures,
+closure envelopes, linked rendering, certificate versions, device model
+versions and the implicit ref binding. Mixed/unknown versions reject;
+linking never silently upgrades a member. Function::signature remains the
+legacy 0.8 API; signature_for takes an explicit version. 0.9 lproc signatures
+require the new empty forwarding arrays for the existing unforwarded form;
+forwarded lproc execution remains part of the outstanding 0.9 delta.
+
+Five tests in tests/versions.rs cover the published 0.9 inc8 interface hash,
+ordinary execution, version-separated identities and linking, all seven header
+and certificate version fields, local/import data/function ABIs, mandatory
+lproc arrays, device models and the implicit schedule library version.
+Red evidence: .tmp/migration-s1-{red,devices-red}.log. Version coherence is a
+semantic pass after the unchanged grammar-family checks: moving it there
+preserves the latter's intentionally context-free generated positive cases.
+All required gates exit 0: reference 509 passed / 0 failed / 5 unchanged
+ignored; conformance 113 passed / 0 failed; draft witnesses PASS; catalog
+PASS (219 recipes, envelope 5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197);
+neutral 16/16. Strict lib/bins Clippy and whitespace pass. Logs:
+.tmp/migration-s1-{reference-final,conformance,witness,catalog,neutral}.log.
+All 64 reference fixture files and the frozen 0.8/catalog bytes match
+8e481ce. fuk.1 closed; no complete ISA 0.9 execution milestone claimed.
 
 ## 2026-11-01 — Pass XI: rung-3 prerequisites
 

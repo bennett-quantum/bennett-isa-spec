@@ -15,7 +15,7 @@ pub struct ScheduleExpansion<'a> {
 impl Object {
     /// Resolve the schedule's expansion descriptor for consumers, if scheduled.
     /// §17 item 7: omission binds ref at the object's ISA version. Parsing
-    /// currently admits only ISA 0.8 (crate::version). No synthetic hash is
+    /// supports the object version without conversion. No synthetic hash is
     /// inserted: §9.2 hashes the supplied canonical schedule unchanged.
     pub fn schedule_expansion(&self) -> Result<Option<ScheduleExpansion<'_>>> {
         let Some(schedule) = self.section("schedule") else {
@@ -24,7 +24,7 @@ impl Object {
         let Some(expansion) = schedule.get("bindings")?.object()?.get("expansion") else {
             return Ok(Some(ScheduleExpansion {
                 name: "ref",
-                version: crate::version(),
+                version: self.isa_version.as_str(),
                 hash: None,
             }));
         };

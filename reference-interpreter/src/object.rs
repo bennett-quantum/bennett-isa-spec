@@ -249,7 +249,7 @@ impl Function {
             }
         }
         validate_header(&f)?;
-        if &f.signature() != signature {
+        if &f.signature_for(IsaVersion::parse(signature.get("abi")?.string()?)?) != signature {
             return err(
                 "§9.1",
                 "invalid signature version, tier, or field representation",
@@ -272,7 +272,11 @@ impl Function {
     pub fn instructions(&self) -> impl Iterator<Item = &Instruction> {
         self.blocks.iter().flat_map(|b| &b.instructions)
     }
+    /// Legacy 0.8 signature; object consumers use signature_for with their version.
     pub fn signature(&self) -> Json {
+        self.signature_for(IsaVersion::V08)
+    }
+    pub fn signature_for(&self, version: IsaVersion) -> Json {
         let uint = |n: u64| {
             if n <= 9_007_199_254_740_991 {
                 Json::Number(n.to_string())
@@ -318,7 +322,7 @@ impl Function {
             )
         };
         let mut m = BTreeMap::from([
-            ("abi".into(), Json::String("0.8".into())),
+            ("abi".into(), Json::String(version.as_str().into())),
             ("kind".into(), Json::String(self.kind.clone())),
             (
                 "tier".into(),
@@ -344,6 +348,11 @@ impl Function {
                 m.insert("args".into(), types(&self.params[4]));
             }
             "lproc" => {
+                if version == IsaVersion::V09 {
+                    m.insert("tokens".into(), types(&self.params[2]));
+                    m.insert("args".into(), types(&self.params[3]));
+                    m.insert("mem".into(), mem(&self.params[4]));
+                }
                 m.insert("params".into(), widths(&self.params[0]));
                 m.insert(
                     "result".into(),
@@ -380,8 +389,31 @@ impl Function {
     }
 }
 
+/// Published object/ABI families. No implicit conversion is performed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IsaVersion {
+    V08,
+    V09,
+}
+impl IsaVersion {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::V08 => "0.8",
+            Self::V09 => "0.9",
+        }
+    }
+    pub(crate) fn parse(value: &str) -> Result<Self> {
+        match value {
+            "0.8" => Ok(Self::V08),
+            "0.9" => Ok(Self::V09),
+            _ => err("§1", format!("unsupported ISA version {value}")),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Object {
+    pub isa_version: IsaVersion,
     pub text: String,
     pub ptr_width: u16,
     pub metadata: BTreeMap<String, Json>,
@@ -697,14 +729,25 @@ impl Object {
         if header.len() != 9 || header[0] != "bennett-object" {
             return err("§16.2", "malformed object header");
         }
+        let isa_version = IsaVersion::parse(
+            header[1]
+                .strip_prefix("isa=")
+                .ok_or_else(|| Error::new("§1: expected isa=VERSION".into()))?,
+        )?;
         for (i, k) in [
             "isa", "object", "launch", "sched", "cert", "coverage", "target",
         ]
         .iter()
         .enumerate()
         {
-            if header[i + 1] != format!("{k}=0.8") {
-                return err("§1", format!("expected {k}=0.8"));
+            if header[i + 1] != format!("{k}={}", isa_version.as_str()) {
+                return err(
+                    "§1",
+                    format!(
+                        "mixed object versions: expected {k}={}",
+                        isa_version.as_str()
+                    ),
+                );
             }
         }
         let raw = header[8]
@@ -721,6 +764,7 @@ impl Object {
         }
         let ptr_width = ptr_width as u16;
         let mut obj = Object {
+            isa_version,
             text: text.into(),
             ptr_width,
             metadata: BTreeMap::new(),
@@ -930,6 +974,7 @@ impl Object {
     }
     fn validate(&self) -> Result<()> {
         self.validate_metadata_types()?;
+        self.validate_metadata_versions()?;
         self.validate_symbols()?;
         // Schemas and the region call graph first: later passes read callee
         // bodies and must never index malformed operands (suite F).
@@ -972,7 +1017,7 @@ impl Object {
                     .get(n)
                     .ok_or_else(|| Error::new(format!("§9.1: missing function definition {n}")))?;
                 validate_header(f)?;
-                if k != f.kind || sig != &f.signature() {
+                if k != f.kind || sig != &f.signature_for(self.isa_version) {
                     return err("§9.1", format!("signature mismatch for {n}"));
                 }
             }

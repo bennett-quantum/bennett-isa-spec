@@ -1245,7 +1245,7 @@ impl Object {
         if let Some(d) = self.section("devices") {
             for (n, v) in d.get("models")?.object()? {
                 if !["console", "clock", "entropy", "block"].contains(&n.as_str())
-                    || v.get("version")?.string()? != "0.8"
+                    || v.get("version")?.string()? != self.isa_version.as_str()
                 {
                     return err("§7.3", "unsupported device model/version");
                 }

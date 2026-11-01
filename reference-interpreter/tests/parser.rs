@@ -32,7 +32,7 @@ fn lexical_and_section_errors_cite_rules() {
     ] {
         rejects(&text, "§16.1");
     }
-    rejects(&INC.replace("isa=0.8", "isa=0.9"), "§1");
+    rejects(&INC.replace("isa=0.8", "isa=1.0"), "§1");
     rejects(&INC.replace("section symbols", "section unknown"), "§9.1");
     rejects(&format!("{INC}\nsection symbols\n{{}}\n"), "§9.1");
     rejects(&INC.replace("{\"0\":", "{ \"0\":"), "§16.1");
