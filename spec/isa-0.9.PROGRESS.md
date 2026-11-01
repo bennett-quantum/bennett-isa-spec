@@ -27,6 +27,14 @@ explicit regeneration then passed. Log: `.tmp/pass-xiii-k81-red.log`.
 The generated diff uses exact a/spec/Bennett-ISA-Spec.md and
 b/spec/Bennett-ISA-Spec-0.9.md labels. Frozen 0.8/catalog bytes match e4eb657.
 
+Reference full offline gate exit 0: **504 passed, 0 failed, 5 unchanged
+ignored** (503 baseline plus the K81 byte-lock regression). Python draft
+witness and catalog checks pass; 219 recipes and unchanged envelope
+`5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`.
+All gates use the prescribed headless environment and repo-local TMPDIR.
+Conformance full offline gate is still running at this record.
+Commits: 10e1607 (acceptance/profile); 5513d78 (K81 fixture/test/§15).
+
 ## 2026-11-01 Pass XII — source cleanup-pair partition (9hv)
 
 **round 9: accepted** (codex seat, 0 blocking); b-isa-spec-9hv closed. Reading B is
