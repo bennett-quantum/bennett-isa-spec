@@ -1,82 +1,92 @@
-# Current state — 2026-11-01 10:43:51 UTC
+# Current state — 2026-11-01 11:31:34 UTC
 
-Round-7 housekeeping and pass VIII are implemented in order with separate
-commits and complete headless gates. No push, remote/Dolt sync or sibling
-repository write. The orchestrator owns the session worklog, council fix
-round and final statement-layer regeneration / INV-3 citation refresh in
-bennett-conformance. This implementer did not run a council round.
+Both requested jobs are implemented, in order, with separate commits and
+complete headless gates. No push, remote/Dolt sync or sibling repository write.
+The orchestrator owns the session worklog, council fix round and downstream
+statement-layer regeneration. Preserve the pre-existing untracked .tmp/.
+Intervening Beads/pre-push-hook commits from the orchestrator were preserved;
+this implementer committed only explicitly listed owned paths.
 
-Round 7 accepted passes VI/VII (codex seat, 0 blocking). Beads
-b-isa-spec-73y and b-isa-spec-5xm are closed with that acceptance;
-PROGRESS and the 0.9 status/history header record K76/K77 acceptance in
-fix rounds 6–7 while preserving three-seat acceptance of the core.
-Housekeeping commit: 989948e. An intervening bead-only commit, 7dd1ffd,
-captured the exported closures while the housekeeping gates ran; it was
-preserved. Unrelated consumer issues in the shared Beads export were
-preserved. No source changes from another implementer were incorporated.
+Job 1 / b-isa-spec-n8j is CLOSED. Implementation commit: 7193103.
+Dynamic instances use a shared persistent AVL root and immutable linked value
+stacks. Instance checkpoints are O(1), updates copy O(log live keys) nodes,
+and retained values are not copied. Snapshot/delta ordering stays by key;
+long-stack equality/destruction is iterative. Existing transaction restoration
+assigns the old snapshot root and truncates candidate history without undo
+replay or allocation. Other control/device/quantum metadata retain their
+existing costs; this is not a guarantee of recovery from arbitrary allocator
+aborts. Committed frames still retain deltas.
 
-Round-7 S1: §15 H states the existing K77 argument/body/template capture,
-forwarding, nesting, inverse and rejection vector. The finite inc8 adapter
-witness in reference-interpreter/tests/k77_adapter.rs uses the actual
-catalog expander for invoke/call, body splicing and template application.
-Its out-of-band source binding captures B=2/B=3 under unrelated B=99
-context and restores outer bindings after nested builds. Across all 256 x,
-the independent literal frame machine checks exactly 2/3 frames,
-zero-seed (t,f)=(x+1 mod 256,1), retained forward indices under inverse
-traversal and full state restoration. Absent, malformed, noncanonical and
-source-inconsistent records reject. This is a finite adapter witness,
-not a general ISA-to-catalog source builder or complete 0.9 executor.
-The reference uses a local conformance-crate dev dependency for this test;
-no published catalog bytes changed. Statement-layer S1 stays with the
-orchestrator; no bennett-conformance write was made.
+The red-first 1k/2k-definition clone counter was 499500/1999000 before,
+0/0 after. A HostResource observer denied after the 2001st definition twice
+preserves the complete snapshot and frame count, then retry/reversal succeeds;
+this control passed before and after. Additional tests compare persistent
+updates/checkpoints with an independent BTreeMap/Vec model and check a 40k
+shared stack. All existing R23 instruction/reply/observer stage cases pass.
 
-Pass VIII / b-isa-spec-9eq: Reading B adopted. The existing text was
-ambiguous: §4.4 and pre-transfer resolution support primitive identity,
-while “exact §5.3 adjoint” can suggest source opcode identity. The
-accepted reference already lowers X-family gates to Node::Flip and
-qxor/qexch to per-bit flips/swaps before EntryAnalysis causal matching.
-§5.6 now explicitly requires resolved primitive operation identity,
-including all own/contextual control literals and polarity. It retains
-all-operand top-event matching and excludes target-scheme decomposition
-and Boolean-equivalent circuit replacement as entry facts. Source opcodes,
-hashes and occurrence identities are unchanged. K78 is the only new row
-and MUST; K1–K77 are byte-identical to 989948e. The status header marks
-K78 pending the codex-seat council fix round; 9eq remains in_progress.
-Exact normative text/dispositions: top block of spec/isa-0.9.PROGRESS.md.
+Release build used cargo build --release --offline with the interpreter
+manifest. Supplied rung-2 ht_demo_basic launch, budget
+10000000,1048576,65536,256, timeout 900:
+- n=0: 2.00 s wall; COMPLETED/CLOSED, no fault; result i64 0; 258272 steps;
+  peak RSS 244128 KiB. Old run exceeded 600 s.
+- n=1000: 4.88 s wall; COMPLETED/CLOSED, no fault; result i64
+  54380828142828; 436715 steps; peak RSS 417296 KiB.
+- 20k/40k fuel exhaustion: 0.14/0.17 s wall versus the reported pre-fix
+  3.48/27.6 s. Individual timings, not a stable benchmarking claim.
+Raw evidence: .tmp/n8j-red.log and
+.tmp/n8j-{20k,40k,rung0,rung1000}.{json,err,time}.
+Full design/evidence is the top block of reference-interpreter/PROGRESS.md.
 
-reference-interpreter/tests/frame_identity.rs adds three regression tests,
-green against unchanged reference src before the text edit. Six positive
-circuits pass CLI hash/check and forward identity on all 64 interface/
-borrowed basis configurations: cx/mcx both ways, ccx/mcx control order,
-contextual-X/cx, qxor/per-bit cx and qexch/per-bit swap. Different controls,
-intervening readers and mixed-spelling polynomial-only prefixes reject
-§5.6. No fixture edit, test removal or reference implementation fix.
-Before-text evidence: .tmp/pass-viii-before-text.log.
+Job 2 / ISA 0.9 pass IX / b-isa-spec-7js stays IN_PROGRESS FOR COUNCIL.
+Reading 1 is adopted: exactly A coherent address wires. The accepted
+reference and published qstore/qexchm catalog already enforce that shape;
+Reading 2 would broaden addressing and add an unsupported out-of-range no-op.
+There was a real A=0 source-binding gap because wire[0] is forbidden. New
+§4.6 accepts the address-only () actual at A=0, bound to catalog [], selecting
+cell 0 subject to the enclosing controls. Ordinary zero-width wire values,
+allocations and empty d/v remain forbidden. §16.2 cross-references the form.
+One new MUST and K79 only; K1–K78 are byte-identical to 7193103. Exact text,
+dispositions and evidence are the top block of spec/isa-0.9.PROGRESS.md.
+The status header marks K79 pending the council fix round; prior core
+acceptance and pending pass VIII/K78 are preserved.
+
+Before-change memory-address witnesses: 2 pass / 4 fail; all four A=0
+positives fail with unknown/live wire (). After alignment, eight regressions
+pass: all four rows; A=1/2 exact-width positive/negative controls; empty-form
+exclusions; borrow compiler and one-cell local-region restoration; catalog
+A=0, W=1/2/3 symbolic copy/store/exchange bindings and inverses. CLI hash/check
+and all target/cell/control basis values are included. Validation, action
+execution and the borrow compiler recognize () only in the coherent address
+position. No fixture was weakened or removed. The reference remains 0.8-gated;
+this does not claim a full 0.9 executor.
+
+Optional clarification: §3.3/§4.8 explicitly distinguish CC/R binop iN from
+icmp iN or ptr, with equal widths/types; lifted forms remain §4.2. No new MUST
+or K row for this. Existing r2_validation admission/execution/reversal tests
+and council response-round-2 B07/B05 establish the accepted reading.
 
 All required gates exit 0, with DISPLAY, WAYLAND_DISPLAY,
-DBUS_SESSION_BUS_ADDRESS and BROWSER unset and TMPDIR set to this repo's
-.tmp. Cargo used --offline and the specified manifest paths.
-- Housekeeping reference: 470 passed, 0 failed, 5 unchanged opt-in ignores.
-- Pass VIII reference: 473 passed, 0 failed, 5 unchanged opt-in ignores.
-- Both conformance runs: 113 passed, 0 failed, 0 ignored.
-- Both runs: draft_witnesses.py PASS; ref_catalog.py --check PASS,
-  219 recipes and unchanged envelope. Rustfmt and source whitespace pass.
-Logs: .tmp/round7-{reference,conformance,witness,catalog}.log and
-.tmp/pass-viii-{reference,conformance,witness,catalog}.log.
+DBUS_SESSION_BUS_ADDRESS and BROWSER unset and TMPDIR set to this repo's .tmp;
+Cargo uses --offline and the requested manifest paths:
+- Job 1: reference 477 passed / 0 failed / 5 unchanged ignored;
+  conformance 113 passed / 0 failed / 0 ignored; both Python checks PASS.
+- Pass IX: reference 485 passed / 0 failed / 5 unchanged ignored;
+  conformance 113 passed / 0 failed / 0 ignored; both Python checks PASS.
+Logs: .tmp/n8j-{reference,conformance,witness,catalog}.log and
+.tmp/pass-ix-{reference,conformance,witness,catalog}.log.
+Owned-source rustfmt and whitespace checks pass; generated diff is verified
+byte-for-byte with the exact labels (ordinary blank context lines retained).
+Strict Clippy on library/binaries and the new memory-address test passes.
+Optional all-target strict Clippy is blocked by the pre-existing
+needless_range_loop at tests/k77_adapter.rs:203, which was left unchanged.
 
-Accepted 0.8 is unchanged; SHA-256:
-90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e.
-Published catalog bytes are unchanged; SHA-256:
-52dbc3f8f0c91d587fd933a43080385fd5284abcfec0ce84788229fcb15c53d8.
-Catalog envelope:
-5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197.
-Final 0.9 spec SHA-256:
-3a665d6834b94e90646e65626a222f70d7788bf2ff885b449815e2fda9096126.
-Final exact-label diff SHA-256:
-3a71d9229859cfa158211ddc2ed364837706fbdadd7cfa2e11ef7654ed564b03.
-The reference's 0.8 admission/version gate is unchanged.
+Frozen accepted 0.8 SHA-256: 90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e.
+Published catalog bytes SHA-256: 52dbc3f8f0c91d587fd933a43080385fd5284abcfec0ce84788229fcb15c53d8.
+Catalog envelope: 5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197
+(219 recipes, unchanged).
+Final 0.9 spec SHA-256: 38a5b5c4cd04eeeb9ee930d77b3fcfa3554da0f38ba62aab827ba4a0e05fc3f1.
+Exact-label diff SHA-256: 4d5f3231e6fa7ce7e40983dc342c6396be6f737a17d5abe4058f3c518749ceca.
 
-The final pass-VIII commit includes the spec, exact-label diff, regression,
-PROGRESS, exported Beads and this handoff. Preserve the pre-existing
-untracked .tmp/; it also contains this session's logs and drafting files.
-After the final commit, only that directory should remain in git status.
+This final pass-IX commit includes the spec, exact-label diff, regressions,
+reference alignment, PROGRESS, exported Beads and this handoff. After committing,
+only the preserved untracked .tmp/ should remain in git status.

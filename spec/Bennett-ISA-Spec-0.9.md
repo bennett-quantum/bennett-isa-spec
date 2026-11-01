@@ -15,6 +15,8 @@ were accepted by the codex seat in fix rounds 6–7; the three-seat
 acceptance of the core stands.
 Pass VIII / K78 (resolved primitive identity in §5.6) awaits the
 codex-seat council fix round; the accepted core and prior amendments stand.
+Pass IX / K79 (exact-width coherent addresses and the A=0 empty actual,
+§4.6) awaits that council fix round; its binop/icmp wording is a clarification.
 §0 lists every change from 0.8.
 Implementation is expected to expose frictions; revisions go back
 through the council. Founding text of
@@ -200,6 +202,7 @@ north star §3.1 requires).
 | K76 | §5.6 | **FRAME-ENTRY-DOMAIN**. Normative constant and causal-adjoint analysis fixes D_F; interface/borrowed components stay independent and full; checker establishes reachable-entry support before restricted T3 factorisation. Witness: CX(0,b) passes, polynomial-only prefix zero does not. | consumer 73y; pass V; SQ 20 | E | – |
 | K77 | §4.7, §11.1, §16.2 | **ORACLE-INVOCATION-CONTEXT**. Explicit typed source-call token context is captured outside the declared argument vector, forwarded through adapters and retained under inverse traversal; each linked oracle construction uses its own tuple. Witness: the same inc8 closure and arguments at B=2 and B=3 in one expansion. | consumer 5xm; pass VII | S | – |
 | K78 | §5.6 | **ENTRY-PRIMITIVE-IDENTITY**. Causal entry analysis uses resolved primitive identity: X-family spellings share the resolved target and effective control set; qxor/qexch contribute per-bit cx/swap events. All-operand causal matching remains; source hashes and occurrence identities are unchanged. Witness: cx a c; mcx (a) c restores c=0, while polynomial-only or reader-interleaved prefixes do not. | consumer 9eq; pass VIII | E | – |
+| K79 | §4.6, §16.2 | **COHERENT-EMPTY-ADDRESS**. Coherent memory rows bind exactly A address wires; A=0 has the address-only source actual `()`, bound to the catalog's empty wire list. Ordinary wire values remain nonempty. Witness: qload/qunload/qstore/qexchm on region[0,1] select cell 0; nonempty A=0 and empty A>0 addresses reject. | consumer 7js; pass IX | S | – |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -395,8 +398,10 @@ fixed arity, operand kinds and a result type; results are written first
 (`w = op a b`), modes are never written, and **result types that are not
 determined by the operands are written as a suffix** (`r = const.i32 5`,
 `r = zext.i64 a`, `r = trunc.i8 a`, `r = ptrtoint.i64 p`, `p = inttoptr
-a`). Width rules: `binop`/`icmp` operands equal width; `select` arms equal
-width; `zext`/`sext` strictly widen, `trunc` strictly narrows; `load.iN`
+a`). Width rules: `binop`: `iN` operands of equal width; `icmp`: `iN` or
+`ptr` operands of equal width and the same type (CC/R; lifted forms:
+§4.2); `select` arms equal width; `zext`/`sext` strictly widen, `trunc`
+strictly narrows; `load.iN`
 and `lift.load.iN` require N ∈ {8, 16, …, 128}; `measure` of `qreg[n]`
 with n ≤ 128 yields `in`, and `measure.iN` (1 ≤ N ≤ 128) of a `qreg[*]`
 yields `iN`; signed division truncates toward zero. The
@@ -987,6 +992,18 @@ permutation actions require ε = 0** for every gate; actions MAY use ε > 0
 
 ### 4.6 Quantum memory, predication, structure
 
+For `qload`, `qunload`, `qstore` and `qexchm` on `region[A,W]`, consumers
+MUST accept exactly these address actuals: for A > 0, a live `wire[A]`
+bundle (or an indexed single wire when A = 1); for A = 0, the token `()`
+denoting the empty bundle. Every other address actual is ill-formed.
+At A = 0, `() == 0` is true, so the sole cell is selected, subject to the
+enclosing control context. This is an address-only actual, not a value or
+a declaration type; it admits neither `wire[0]`, zero-width `qalloc` or
+`qborrow`, nor an empty `d` or `v`. The value width is W. In the §11.1
+catalog binding the address is the ordered list of exactly A wires;
+source `()` binds the empty wire actual `[]` at A = 0. No padding,
+truncation or out-of-range-address no-op is implied.
+
 | Instruction | Form | Rules |
 |---|---|---|
 | `qregion` | `qregion name A W [@image]` | function-local region of 2^A cells of `wire[W]`, created at function entry (unconditional allocation, X gates from the data image, default zero), back at its image before exit, image gates reversed, cells released clean; scope is the function. `@image` is a `data` symbol reference (size 2^A·W/8 bytes, cell i = bits [iW, (i+1)W) of the little-endian image) and is part of the function's identity (§9.2) |
@@ -1035,7 +1052,7 @@ The invocation operand `tk` is separate from the callee's declared
 | Opcode family | Tiers | Operands | Result |
 |---|---|---|---|
 | `const.iN` | CC R Q(lift) | literal | iN / reg[N] |
-| `add..ashr`, `udiv..srem`, `icmp.*`, `select` | CC R Q(lift) | values of equal width (select: i1, a, b) | same width (icmp: i1) |
+| `add..ashr`, `udiv..srem`, `icmp.*`, `select` | CC R Q(lift) | CC/R binop: `iN`; icmp: `iN` or `ptr`, operands of equal width and the same type; Q(lift): §4.2 (select: i1, a, b) | same width (icmp: i1) |
 | `zext.iM sext.iM trunc.iM` | CC R Q(lift) | value | iM |
 | `ptrtoint.iM`, `inttoptr` | CC R | ptr / integer | iM / ptr |
 | `load.iN store.iN` | CC R | ptr [, value] | iN / – |
@@ -3891,6 +3908,10 @@ syntax; annotations travel outside the object.
   OPCODE    := a mnemonic of §4 with its dotted suffix (§4.8 fixes operand count, kinds and result placement)
   VER       := INT "." INT
 ```
+
+The empty list operand `()` also spells the address-only empty actual of
+§4.6, solely in the address position of its four coherent memory rows
+when A = 0. It is not an ordinary wire value.
 
 The oracle header and signature declare no invocation-token slot. Its
 catalog interface follows the five printed groups exactly; the separate

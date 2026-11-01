@@ -1,3 +1,87 @@
+## 2026-11-01 Editorial pass IX — exact coherent addresses and A=0 (7js)
+
+Reading **1** adopted; 7js remains **in_progress for council**. This is a real
+source-binding gap, not a not-a-defect closure: §3.3 excludes wire[0] but
+§4.6 permits region[0,W]. The accepted reference's unchanged-before-edit
+validation requires exactly A address wires for all four rows; the published
+qstore/qexchm catalog formals also have width A. Reading 2 would replace that
+established rule with variable-width/no-op addressing. Reading 1 preserves it
+and supplies the missing A=0 source actual. The existing §16.2 operand grammar
+already spells an empty list as `()`; §11.1 already admits empty wire lists.
+No catalog recipe or published byte is changed.
+
+| Item | Disposition / evidence |
+|---|---|
+| Exact A address width | retained: A=1 indexed wires and A=2 bundles pass before source edits; larger/smaller widths reject for all four rows |
+| A=0 source binding | new address-only `()` actual, selecting cell 0 under the enclosing control; binds catalog `[]`; ordinary zero-width wire/alloc/value forms remain excluded |
+| Reading 2 | declined: inconsistent with reference width validation and catalog A-bit formals; no padding, truncation or out-of-range no-op |
+| Inventory | one new MUST and K79 only; K1–K78 byte-identical to pre-pass snapshot 7193103 |
+| Reference alignment | validation/action/borrow compiler recognize the empty actual only at coherent memory addresses; no general empty wire lookup and no weakened fixture |
+| binop/icmp clarification | §3.3/§4.8 explicitly say binop iN; icmp iN or ptr, equal width and same type, with lifted forms still governed by §4.2; no new MUST or K row |
+
+Exact new normative text in §4.6:
+
+> For `qload`, `qunload`, `qstore` and `qexchm` on `region[A,W]`, consumers
+> MUST accept exactly these address actuals: for A > 0, a live `wire[A]`
+> bundle (or an indexed single wire when A = 1); for A = 0, the token `()`
+> denoting the empty bundle. Every other address actual is ill-formed.
+> At A = 0, `() == 0` is true, so the sole cell is selected, subject to the
+> enclosing control context. This is an address-only actual, not a value or
+> a declaration type; it admits neither `wire[0]`, zero-width `qalloc` or
+> `qborrow`, nor an empty `d` or `v`. The value width is W. In the §11.1
+> catalog binding the address is the ordered list of exactly A wires;
+> source `()` binds the empty wire actual `[]` at A = 0. No padding,
+> truncation or out-of-range-address no-op is implied.
+
+The §16.2 cross-reference reads:
+
+> The empty list operand `()` also spells the address-only empty actual of
+> §4.6, solely in the address position of its four coherent memory rows
+> when A = 0. It is not an ordinary wire value.
+
+Exact clarified width text in §3.3:
+
+> Width rules: `binop`: `iN` operands of equal width; `icmp`: `iN` or
+> `ptr` operands of equal width and the same type (CC/R; lifted forms:
+> §4.2); `select` arms equal width;
+
+The §4.8 operand cell is:
+
+> CC/R binop: `iN`; icmp: `iN` or `ptr`, operands of equal width and the same type; Q(lift): §4.2 (select: i1, a, b)
+
+Before-change evidence: `.tmp/pass-ix-before.log`, **2 passed / 4 failed**.
+All four A=0 positive tests reject with `§3.3: unknown/live wire ()`, while
+the nonzero exact-width and confined-empty negative families pass. Initial
+harness layout errors were corrected before this final red run. After alignment,
+`tests/memory_address.rs` has **8 passing regressions**: all four A=0 rows;
+A=1/2 exact-width positive/negative controls; address/value/declaration negative
+controls; borrow-frame compilation and a one-cell local region restored to its
+image in forward/inverse execution; and catalog `[]` binding for dispatch.copy,
+qstore and qexchm at A=0, W=1/2/3 with symbolic truth and inverse checks.
+Source witnesses are rehashed and pass CLI hash/check. Basis tests include
+arbitrary target/cell values and true/false inherited controls; local-region
+controls include a coherent spectator. No fixture was edited or removed.
+The retained `r2_validation` pointer/integer comparison and excluded-type
+regressions witness the optional wording clarification; round-2 council
+response B07/B05 already records that reading. The reference's 0.8 version
+admission gate is unchanged; this does not claim a full 0.9 executor.
+
+Required pass-IX headless gates, all exit 0: reference **485 passed,
+0 failed, 5 unchanged ignored** (477 after n8j plus eight regressions);
+conformance **113 passed, 0 failed, 0 ignored**; `draft_witnesses.py` PASS;
+`ref_catalog.py --check` PASS (219 recipes and unchanged envelope
+`5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`).
+Logs: `.tmp/pass-ix-{reference,conformance,witness,catalog}.log`.
+All four gates unset DISPLAY, WAYLAND_DISPLAY, DBUS_SESSION_BUS_ADDRESS and
+BROWSER and set project-local TMPDIR; Cargo used --offline. Strict Clippy for
+library/binaries/new memory-address test and owned-source rustfmt pass.
+K1–K78 and accepted 0.8/catalog bytes are unchanged. The regenerated diff
+matches `diff -u` with labels `a/spec/Bennett-ISA-Spec.md` and
+`b/spec/Bennett-ISA-Spec-0.9.md` byte for byte (its ordinary blank context
+lines are retained). No fixture weakening, sibling write, push or remote sync.
+The orchestrator owns the council fix round, session worklog and downstream
+statement-layer regeneration.
+
 ## 2026-11-01 Editorial pass VIII — resolved primitive causal identity (9eq)
 
 Reading **B** adopted. Bead 9eq stays in_progress for the orchestrator's

@@ -618,7 +618,11 @@ impl Object {
                         .get(&a[0])
                         .cloned()
                         .ok_or_else(|| Error::new("§4.6: quantum region not found".into()))?;
-                    let address = e.bundle(&a[1])?;
+                    let address = if a[1] == "()" {
+                        Vec::new()
+                    } else {
+                        e.bundle(&a[1])?
+                    };
                     let load = matches!(op, "qload" | "qunload");
                     let compute = (op == "qload") ^ adjoint;
                     let name = if op == "qload" { &i.lhs[0] } else { &a[2] };

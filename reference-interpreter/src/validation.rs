@@ -326,11 +326,18 @@ impl Object {
                         Some(Type::Region(aw, w)) => (*aw, *w),
                         _ => return err("§3.3", "unknown region"),
                     };
-                    if s.wires(&a[1])?.len() != aw as usize {
+                    // The empty actual is confined to this address position;
+                    // ordinary wire values and allocations remain nonempty.
+                    let address = if a[1] == "()" {
+                        Vec::new()
+                    } else {
+                        s.wires(&a[1])?
+                    };
+                    if address.len() != aw as usize {
                         return err("§3.3", "memory address width mismatch");
                     }
                     if load {
-                        let mut deps = s.wires(&a[1])?;
+                        let mut deps = address.clone();
                         deps.push(format!("{}[*]", a[0]));
                         s.produce(&i.lhs[0], Type::Wire(w), {
                             let versions = s.read_snapshot(&deps)?;
@@ -348,14 +355,16 @@ impl Object {
                         if s.wires(&a[2])?.len() != w as usize {
                             return err("§3.3", "memory value width mismatch");
                         }
-                        s.disjoint(&[&a[1], &a[2]])?;
+                        if a[1] != "()" {
+                            s.disjoint(&[&a[1], &a[2]])?;
+                        }
                         if op == "qunload" {
                             s.check_target(&a[2], false)?;
                             let c = s
                                 .created
                                 .get(&a[2])
                                 .ok_or_else(|| Error::new("§6.2: unmatched qunload".into()))?;
-                            let mut deps = s.wires(&a[1])?;
+                            let mut deps = address.clone();
                             deps.push(format!("{}[*]", a[0]));
                             if c.kind != "qload"
                                 || c.sources != a[..2]
@@ -373,7 +382,7 @@ impl Object {
                             if s.inputs.contains(&a[0]) {
                                 return err("§5.1", "in region cannot be modified by action");
                             }
-                            let mut reads = s.wires(&a[1])?;
+                            let mut reads = address.clone();
                             if op == "qstore" {
                                 reads.extend(s.wires(&a[2])?);
                             }

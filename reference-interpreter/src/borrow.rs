@@ -411,6 +411,10 @@ impl Compiler<'_> {
     }
     /// The address condition `a == i` as literals on the address wires.
     fn address(&self, a: &str, i: usize) -> Result<Vec<(String, bool)>> {
+        // Admission permits this spelling only for a region[0,W] address.
+        if a == "()" {
+            return Ok(Vec::new());
+        }
         Ok(self
             .bundle(a)?
             .into_iter()
