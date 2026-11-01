@@ -48,10 +48,25 @@ rejection and the admitted equivalent are locked. Initial harness errors
 were that schematic list and a constructor allocation actual passed
 without a lexical declaration, not a reference semantic discrepancy.
 Initial log: `.tmp/pass-xii-before-text.log`; final targeted run:
-`.tmp/pass-xii-regression.log`. Full required gates are recorded below
-when complete. ISA 0.8 and catalog bytes are frozen; exact-label diff
+`.tmp/pass-xii-regression.log`. Gate results follow. ISA 0.8 and catalog bytes are frozen; exact-label diff
 regenerated. The orchestrator retains session-worklog/council ownership.
 No push, sibling write or remote/Dolt sync.
+
+Required gates so far (all completed commands exit 0): reference Cargo
+**503 passed, 0 failed, 5 unchanged ignored** (500 baseline + three new
+regressions); `draft_witnesses.py` PASS; `ref_catalog.py --check` PASS,
+219 recipes and unchanged envelope
+`5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`.
+Conformance Cargo is still running; no full-gate completion is claimed yet.
+Every required gate uses the prescribed headless environment, project-local
+TMPDIR and offline Cargo where applicable. Logs:
+`.tmp/pass-xii-{reference,conformance,witness,catalog}.log`.
+Owned rustfmt and source/prose whitespace checks pass. Independent audit
+`.tmp/pass-xii-audit.log` confirms frozen 0.8/catalog bytes, unchanged
+K1–K80, one new MUST/K81, and byte-exact generated diff with labels
+`a/spec/Bennett-ISA-Spec.md` and `b/spec/Bennett-ISA-Spec-0.9.md`.
+Ordinary single-space blank diff context lines are retained as required.
+Implementation/spec/regression/Beads commit: e0d007b.
 
 ## 2026-11-01 Pass XI — rung-3 consumer prerequisites
 
