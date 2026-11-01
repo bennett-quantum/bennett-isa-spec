@@ -1,26 +1,20 @@
-//! §5.6 borrowed systems: the translation lemma, and an exact symbolic decision
-//! of the frame factorisation P_F = P' ⊗ I_B.
+//! §5.6 borrowed systems: normative constant/causal-adjoint entry analysis,
+//! followed by an exact symbolic proof on D_F (0.9 pass V; 0.8 erratum).
 //!
-//! A frame is a permutation, so its action on basis states is a vector of
-//! Boolean functions. Each is held in algebraic normal form (ANF: an XOR of
-//! AND-monomials over the frame's input wires), which is canonical: two ANFs
-//! denote the same function iff they are equal. P_F = P' ⊗ I_B iff every
-//! borrowed output equals its input variable and no other output mentions a
-//! borrowed variable. For Boolean-gate circuits this is a total, exact decision
-//! over the frame's full domain (T3), with no wire-count limit; permutation loops use repeated
-//! squaring; mixed loops carry facts through every iteration or a proved invariant. Opaque applications retain their full
-//! input expressions. Oracle self-adjoints and explicit qinplace g/ginv inverses
-//! join the same all-operand causal stacks as gates; unmatched readers block an
-//! outer pop. Loop transfers resolve each visit's live bindings, alpha-renaming
-//! nonoverlapping successor lifetimes to reusable slots; recurring environments
-//! share structured cycles, including first-visit width changes. ANF composition
-//! substitutes recursively into opaque inputs and
-//! interns the resulting application, rather than freezing an ANF variable.
-//! This proves identities valid for arbitrary black-box functions; unresolved
-//! function-specific identities need a checked claim. Calls whose outputs would
-//! depend on borrowed wires cannot be decided this way: they require the
-//! §12 borrow_frames claim the specification names, checked when present
-//! (src/claims.rs). SPEC-QUESTIONS 20 records this reading.
+//! EntryAnalysis retains only constants and exact all-operand adjoint pops;
+//! it never imports a polynomial identity from a frame or region prefix.
+//! At each frame entry, interface and borrowed bits are independent variables,
+//! allocated local constants survive, and other local bits become independent
+//! variables. The exact evaluator then uses canonical Boolean algebraic normal
+//! forms (ANFs) to decide restoration and independence over this entire D_F.
+//! ANF simplification inside a frame cannot strengthen a later entry domain.
+//! Loops compose exact frame maps by squaring; the entry analysis traverses
+//! visits with complete-state cycle skipping. Quantum/opaque inverse history
+//! retains every operand, so an unmatched reader blocks restoration. Opaque
+//! applications include their complete inputs; unresolved function-specific
+//! identities require a checked §12 borrow_frames claim on the same D_F.
+//! Every completed lifetime is checked before later borrowing can cancel it.
+//! SPEC-QUESTIONS 20 records the binding interpretation.
 use crate::{
     err,
     object::list,
@@ -1342,7 +1336,7 @@ fn translation_lemma(frame: &[Node], borrowed: &BTreeSet<String>) -> bool {
     }
     false
 }
-/// The exact route: P_F = P' ⊗ I_B on the frame's full domain.
+/// The exact route: restricted factorisation on the normative D_F.
 enum FrameFailure {
     Invalid(Error),
     NeedsClaim(Error),
@@ -1360,14 +1354,230 @@ struct InverseFact {
     gate: Node,
     before: BTreeMap<String, Poly>,
 }
+/// Normative §5.6 entry analysis, independent of the exact frame evaluator.
+/// None denotes both basis values; no Boolean expression is retained here.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct EntryAnalysis {
+    values: BTreeMap<String, Option<bool>>,
+    stacks: BTreeMap<String, Vec<EntryInverse>>,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct EntryInverse {
+    node: Node,
+    before: BTreeMap<String, Option<bool>>,
+}
+impl EntryAnalysis {
+    fn value(&self, w: &str) -> Option<bool> {
+        self.values.get(w).copied().flatten()
+    }
+    fn condition(&self, controls: &[(String, bool)]) -> Option<bool> {
+        if controls.iter().any(|(w, p)| self.value(w) == Some(!p)) {
+            Some(false)
+        } else if controls.iter().all(|(w, p)| self.value(w) == Some(*p)) {
+            Some(true)
+        } else {
+            None
+        }
+    }
+    fn barrier(&mut self, touched: &BTreeSet<String>) {
+        let mut affected = touched.clone();
+        loop {
+            let old = affected.len();
+            for w in affected.clone() {
+                if let Some(stack) = self.stacks.get(&w) {
+                    for event in stack {
+                        event.node.wires(&mut affected);
+                    }
+                }
+            }
+            if affected.len() == old {
+                break;
+            }
+        }
+        for w in affected {
+            self.stacks.remove(&w);
+        }
+    }
+    fn apply(&mut self, node: &Node) {
+        if let Node::Repeat(n, body) = node {
+            // Exact finite traversal; identical complete abstract states permit
+            // cycle skipping. This has no widening or polynomial shortcut.
+            let mut seen = Vec::new();
+            let mut i = 0;
+            while i < *n {
+                if let Some((previous, _)) = seen.iter().find(|(_, state)| state == self) {
+                    let period = i - previous;
+                    let skip = (*n - i) / period * period;
+                    if skip != 0 {
+                        i += skip;
+                        continue;
+                    }
+                }
+                seen.push((i, self.clone()));
+                for n in body {
+                    self.apply(n);
+                }
+                i += 1;
+            }
+            return;
+        }
+        if let Node::Call {
+            controls,
+            body: Some(body),
+            ..
+        } = node
+        {
+            if self.condition(controls) != Some(false) {
+                for n in body {
+                    self.apply(n);
+                }
+            }
+            return;
+        }
+        let mut touched = BTreeSet::new();
+        node.wires(&mut touched);
+        let controls = match node {
+            Node::Flip(c, _) | Node::Swap(c, _, _) => Some(c),
+            Node::Opaque { controls, .. }
+            | Node::Quantum { controls, .. }
+            | Node::Call { controls, .. } => Some(controls),
+            _ => None,
+        };
+        if controls.is_some_and(|c| self.condition(c) == Some(false)) {
+            return;
+        }
+        let reversible = matches!(
+            node,
+            Node::Flip(..) | Node::Swap(..) | Node::Opaque { .. } | Node::Quantum { .. }
+        );
+        if reversible {
+            let saved = touched
+                .iter()
+                .next()
+                .and_then(|w| self.stacks.get(w))
+                .and_then(|s| s.last())
+                .cloned();
+            if let Some(saved) = saved {
+                if saved.node.adjoint() == *node
+                    && touched
+                        .iter()
+                        .all(|w| self.stacks.get(w).and_then(|s| s.last()) == Some(&saved))
+                {
+                    for w in &touched {
+                        let s = self.stacks.get_mut(w).unwrap();
+                        s.pop();
+                        if s.is_empty() {
+                            self.stacks.remove(w);
+                        }
+                    }
+                    self.values.extend(saved.before);
+                    return;
+                }
+            }
+            let fact = EntryInverse {
+                node: node.clone(),
+                before: touched.iter().map(|w| (w.clone(), self.value(w))).collect(),
+            };
+            for w in &touched {
+                self.stacks.entry(w.clone()).or_default().push(fact.clone());
+            }
+        } else {
+            self.barrier(&touched);
+        }
+        match node {
+            Node::Alloc(w) => {
+                for w in w {
+                    self.values.insert(w.clone(), Some(false));
+                }
+            }
+            Node::Borrow(w) => {
+                for w in w {
+                    self.values.insert(w.clone(), None);
+                }
+            }
+            Node::Free(w) | Node::Return(w) => {
+                for w in w {
+                    self.values.remove(w);
+                }
+            }
+            Node::Flip(c, t) => {
+                let v = if self.condition(c) == Some(true) {
+                    self.value(t).map(|v| !v)
+                } else {
+                    None
+                };
+                self.values.insert(t.clone(), v);
+            }
+            Node::Swap(c, a, b) => {
+                let (x, y) = (self.value(a), self.value(b));
+                let (x, y) = if self.condition(c) == Some(true) && x.is_some() && y.is_some() {
+                    (y, x)
+                } else {
+                    (None, None)
+                };
+                self.values.insert(a.clone(), x);
+                self.values.insert(b.clone(), y);
+            }
+            Node::Opaque { outputs, .. }
+            | Node::Call {
+                modified: outputs, ..
+            } => {
+                for w in outputs {
+                    self.values.insert(w.clone(), None);
+                }
+            }
+            Node::Quantum {
+                targets,
+                diagonal: false,
+                ..
+            } => {
+                for w in targets {
+                    self.values.insert(w.clone(), None);
+                }
+            }
+            Node::Other(w) => {
+                for w in w {
+                    self.values.insert(w.clone(), None);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 struct Facts<'a> {
     e: Evaluation<'a>,
     borrowed: &'a BTreeSet<String>,
     inverses: BTreeMap<String, Vec<InverseFact>>,
     frame: Vec<Node>,
     unresolved: Option<Error>,
+    entry: EntryAnalysis,
+    frame_started: bool,
+    interface: BTreeSet<String>,
+    widened: BTreeSet<String>,
+    frame_unresolved: bool,
 }
 impl Facts<'_> {
+    fn begin_frame(&mut self) {
+        // Form D_F before applying even a disabled borrowed gate.
+        let wires: Vec<_> = self.e.state.keys().cloned().collect();
+        for w in wires {
+            let before = self.e.state[&w].clone();
+            if self.borrowed.contains(&w) || self.interface.contains(&w) {
+                self.e.state.insert(w.clone(), Poly::var(self.e.vars[&w]));
+            } else if let Some(v) = self.entry.value(&w) {
+                self.e
+                    .state
+                    .insert(w.clone(), if v { Poly::one() } else { Poly::zero() });
+            } else {
+                self.unknown(&w);
+            }
+            if self.e.state[&w] != before {
+                self.widened.insert(w);
+            }
+        }
+        self.frame_started = true;
+    }
     fn unknown(&mut self, w: &str) {
         let id = (self.e.vars.len() + self.e.opaque.len()) as u32;
         self.e.vars.insert(format!("unknown_{id}"), id);
@@ -1459,6 +1669,17 @@ impl Facts<'_> {
                 .unwrap();
             let structural = translation_lemma(&self.frame[first..=last], self.borrowed);
             let result = check_factorisation(&self.e, self.borrowed, structural);
+            let mut frame_wires = BTreeSet::new();
+            for n in &self.frame[first..=last] {
+                n.wires(&mut frame_wires);
+            }
+            if (self.frame_unresolved || matches!(&result, Err(FrameFailure::NeedsClaim(_))))
+                && !self.widened.is_disjoint(&frame_wires)
+            {
+                return Err(FrameFailure::Invalid(Error::new(
+                    "§5.6: region-domain borrow_frames replay does not cover the normative D_F; a frame-domain proof is required".into()
+                )));
+            }
             match result {
                 Err(FrameFailure::NeedsClaim(e)) => {
                     self.unresolved.get_or_insert(e);
@@ -1468,6 +1689,9 @@ impl Facts<'_> {
         }
         self.e.obligations.clear();
         self.frame.clear();
+        self.frame_started = false;
+        self.widened.clear();
+        self.frame_unresolved = false;
         Ok(())
     }
     fn sequence(&mut self, nodes: &[Node]) -> std::result::Result<(), FrameFailure> {
@@ -1499,6 +1723,7 @@ impl Facts<'_> {
                         self.sequence(body)?;
                         self.flush()?;
                     } else {
+                        self.entry.apply(node);
                         // Read-only values survive, but opaque entangling readers
                         // are a barrier to restoring any ancestor quantum history.
                         self.forget_inverses(&touched.iter().cloned().collect());
@@ -1506,6 +1731,8 @@ impl Facts<'_> {
                             self.unknown(w);
                         }
                     }
+                } else {
+                    self.entry.apply(node);
                 }
                 continue;
             }
@@ -1513,6 +1740,7 @@ impl Facts<'_> {
             node.wires(&mut touched);
             if !node.permutation() {
                 self.flush()?;
+                self.entry.apply(node);
                 if let Node::Quantum {
                     controls,
                     targets,
@@ -1540,7 +1768,17 @@ impl Facts<'_> {
                     }
                 }
             } else {
+                if matches!(node, Node::Repeat(..))
+                    && !self.frame_started
+                    && touches(node, self.borrowed)
+                {
+                    self.begin_frame();
+                }
                 let gate = matches!(node, Node::Flip(..) | Node::Swap(..) | Node::Opaque { .. });
+                if gate && !self.frame_started && touches(node, self.borrowed) {
+                    self.begin_frame();
+                }
+                self.entry.apply(node);
                 if gate
                     && self.e.condition(match node {
                         Node::Flip(c, _)
@@ -1560,12 +1798,16 @@ impl Facts<'_> {
                 };
                 if let Err(error) = if restored { Ok(()) } else { self.e.apply(node) } {
                     if self.e.opaque_seen {
+                        self.frame_unresolved = true;
                         self.unresolved.get_or_insert(error);
                     } else {
                         return Err(FrameFailure::Invalid(error));
                     }
                 }
                 self.frame.push(node.clone());
+                if matches!(node, Node::Return(_)) {
+                    self.flush()?;
+                }
             }
         }
         Ok(())
@@ -1579,6 +1821,7 @@ impl Facts<'_> {
                 self.e.obligations.clone(),
                 self.inverses.clone(),
                 self.frame.clone(),
+                self.entry.clone(),
             );
             if let Some((previous, _)) = seen.iter().find(|(_, state)| *state == snapshot) {
                 let period = iteration - previous;
@@ -1604,13 +1847,21 @@ impl Facts<'_> {
         // top variable. Every pass removes at least one precise wire fact, or
         // establishes closure. No bound is replaced by a finite sample.
         self.inverses.clear();
+        self.entry.stacks.clear();
         let mut tops: BTreeMap<String, Poly> = BTreeMap::new();
         loop {
             let entry = self.e.state.clone();
+            let entry_values = self.entry.values.clone();
             let obligations = self.e.obligations.clone();
             let frame = self.frame.clone();
             self.sequence(body)?;
             self.inverses.clear();
+            self.entry.stacks.clear();
+            for (w, value) in &entry_values {
+                if self.entry.values.get(w) != Some(value) {
+                    self.entry.values.insert(w.clone(), None);
+                }
+            }
             let mut joined = entry.clone();
             let wires: BTreeSet<_> = entry.keys().chain(self.e.state.keys()).cloned().collect();
             for w in &wires {
@@ -1641,8 +1892,8 @@ fn check_factorisation(
     borrowed: &BTreeSet<String>,
     structural: bool,
 ) -> std::result::Result<(), FrameFailure> {
-    let failure = |error| {
-        if e.opaque_seen {
+    let failure = |p: &Poly, error| {
+        if p.0.iter().flatten().any(|v| e.applications.contains_key(v)) {
             FrameFailure::NeedsClaim(error)
         } else {
             FrameFailure::Invalid(error)
@@ -1650,7 +1901,7 @@ fn check_factorisation(
     };
     for (p, message) in &e.obligations {
         if *p != Poly::zero() {
-            return Err(failure(Error::new(format!("§5.6: {message}"))));
+            return Err(failure(p, Error::new(format!("§5.6: {message}"))));
         }
     }
     if structural {
@@ -1660,15 +1911,21 @@ fn check_factorisation(
         match e.vars.get(w) {
             Some(v) if borrowed.contains(w) => {
                 if *p != Poly::var(*v) {
-                    return Err(failure(Error::new(format!(
-                        "§5.6: borrow frame does not restore borrowed wire {w}"
-                    ))));
+                    return Err(failure(
+                        p,
+                        Error::new(format!(
+                            "§5.6: borrow frame does not restore borrowed wire {w}"
+                        )),
+                    ));
                 }
             }
             _ if p.mentions(e.borrowed) => {
-                return Err(failure(Error::new(format!(
-                    "§5.6: borrow frame output {w} depends on borrowed entry values"
-                ))));
+                return Err(failure(
+                    p,
+                    Error::new(format!(
+                        "§5.6: borrow frame output {w} depends on borrowed entry values"
+                    )),
+                ));
             }
             _ => {}
         }
@@ -1910,7 +2167,13 @@ impl Object {
         let mut compiler = self.borrow_compiler(f)?;
         let mut nodes = Vec::new();
         compiler.compile_function(f, &[], &mut nodes)?;
-        check_permutation_touches(&nodes, &compiler.borrowed)
+        check_permutation_touches(&nodes, &compiler.borrowed)?;
+        // A whole-region replay cannot waive a definite failure on D_F,
+        // including an object reconstructed through the public fields.
+        match self.decide_frames(&nodes, &compiler.borrowed) {
+            Err(FrameFailure::Invalid(e)) => Err(e),
+            Ok(()) | Err(FrameFailure::NeedsClaim(_)) => Ok(()),
+        }
     }
     pub(crate) fn validate_borrow_frames(&self, f: &Function) -> Result<()> {
         fn has_borrow(seq: &[Instruction]) -> bool {
@@ -1942,6 +2205,21 @@ impl Object {
         for node in nodes {
             node.wires(&mut wires);
         }
+        fn locals(nodes: &[Node], out: &mut BTreeSet<String>) {
+            for n in nodes {
+                match n {
+                    Node::Alloc(w) | Node::Borrow(w) => out.extend(w.iter().cloned()),
+                    Node::Repeat(_, body)
+                    | Node::Call {
+                        body: Some(body), ..
+                    } => locals(body, out),
+                    _ => {}
+                }
+            }
+        }
+        let mut local = BTreeSet::new();
+        locals(nodes, &mut local);
+        let interface = wires.difference(&local).cloned().collect();
         let vars: BTreeMap<String, u32> = wires
             .into_iter()
             .enumerate()
@@ -1970,6 +2248,11 @@ impl Object {
             inverses: BTreeMap::new(),
             frame: Vec::new(),
             unresolved: None,
+            entry: EntryAnalysis::default(),
+            frame_started: false,
+            interface,
+            widened: BTreeSet::new(),
+            frame_unresolved: false,
         };
         facts.sequence(nodes)?;
         facts.flush()?;
@@ -1983,6 +2266,32 @@ impl Object {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn region_replay_cannot_cover_a_widened_opaque_frame_domain() {
+        let o = Object::parse(include_str!("../tests/fixtures/inc8.bisa")).unwrap();
+        let c = "c".to_string();
+        let b = "b".to_string();
+        let nodes = [
+            Node::Alloc(vec![c.clone()]),
+            Node::Flip(vec![("a".into(), true)], c.clone()),
+            Node::Flip(vec![("x".into(), true)], c.clone()),
+            Node::Flip(vec![("a".into(), true)], c.clone()),
+            Node::Flip(vec![("x".into(), true)], c.clone()),
+            Node::Borrow(vec![b.clone()]),
+            Node::Opaque {
+                key: "f".into(),
+                inverse: "f".into(),
+                controls: vec![],
+                inputs: vec![c],
+                outputs: vec![b.clone()],
+                assign: false,
+            },
+            Node::Return(vec![b.clone()]),
+        ];
+        assert!(matches!(o.decide_frames(&nodes, &BTreeSet::from([b])),
+            Err(FrameFailure::Invalid(e)) if e.to_string().contains("normative D_F")));
+    }
 
     #[test]
     fn unresolved_earlier_frame_cannot_hide_a_definite_later_nonpermutation() {

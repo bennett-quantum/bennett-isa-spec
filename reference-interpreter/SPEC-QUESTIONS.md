@@ -128,23 +128,25 @@ changed in response to the council's round-1 review
     as E_QREG_NOT_CLEAN) and a dead instance record 4; division 5/6; memory and
     hostcall ranges 7; `alloc` 2. *Proposed 0.9:* add the call matrix and "a CC
     trap records the fault code of the corresponding R fault record."
-20. **How a borrow frame's factorisation is established (§5.6)** *new (round 1)*.
-    §5.6 requires P_F = P′ ⊗ I_B "established by a T3 claim over the frame's full
-    domain (exhaustive, or a library certificate) or structurally by the
-    translation lemma". Reading: the reference checker establishes it itself,
-    exactly, by deciding the frame's Boolean functions in algebraic normal form
-    (a canonical form, so the decision is a proof over the full domain, with no
-    wire limit; loops by repeated squaring with recursive substitution into
-    opaque application inputs, corrected in round 3). With opaque functions this
-    is a sound symbolic proof, not a complete function-specific decision; a
-    frame it cannot prove (a black-box
-    call whose inputs depend on borrowed wires) is admitted only through verified
-    certificate `borrow_frames` claims (proofs over D whose borrowed components
-    are restored and do not influence the other outputs). *Proposed 0.9:* "A
-    checker MAY establish the factorisation by any exact decision procedure.
-    Every completed qborrow/qreturn lifetime MUST satisfy it independently of
-    future borrowing; a certificate of the final whole-region map alone does
-    not discharge internal return obligations."
+20. **How a borrow frame's factorisation is established (§5.6)**.
+    **Binding: 2026-11-01 maintainer ruling, 0.9 pass V / K76 / 73y;
+    accepted 0.8 erratum `spec/errata-0.8.md`.** The domain is D_F,
+    derived from the normative constant/causal-adjoint entry analysis,
+    with every interface and borrowed bit independent and unrestricted.
+    T3 establishes P_F|span(D_F) = (P′ ⊗ I_B)|span(D_F), and reachable
+    frame-entry states lie in span(D_F), so linearity gives identity on
+    arbitrary borrowed/reference systems. EntryAnalysis tracks constants
+    and exact all-operand inverse pops only; it imports no ANF-derived
+    prefix fact. The separate frame evaluator retains canonical Boolean
+    ANFs for exact permutation proofs, including nonadjacent identities.
+    Opaque, function-specific frame proofs need checked §12 borrow_frames
+    claims on this same D_F; they cannot narrow D_F. A region-D replay
+    cannot certify a widened frame domain; definite failures also guard
+    public certificate verification independently of parse admission. Each completed
+    lifetime is checked independently of later borrowing. The four r9
+    zero-entry council fixtures still check; an interleaved polynomial-only
+    prefix zero is rejected with §5.6. This supersedes the former reading
+    that called the region-prefix symbolic domain the full frame domain.
 21. **Checking exhaustive and sampled claims (§12.1–§12.2)** *new (round 1)*. The
     claim schema fixes neither the output tuple nor the table encoding, nor the
     budget of an oracle claim. Reading: a domain element's output tuple is the
