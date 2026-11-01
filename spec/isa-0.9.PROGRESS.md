@@ -18,9 +18,13 @@ Dialect 0.2.10 was inspected at 023f5a7, §11.5, §17 and §19.2; North Star
 Validation: documentation-only disposition; existing regressions retained.
 Reference gate: 491 passed / 0 failed / 5 unchanged ignored. Python draft
 witness and catalog checks pass (219 recipes, unchanged envelope). The
-conformance gate is running; final results will be recorded in this pass block.
-Logs: `.tmp/pass-xi-221-{reference,conformance,witness,catalog}.log`.
+conformance gate finished: 113 passed / 0 failed / 0 ignored. All four
+required gates exit 0, with DISPLAY, WAYLAND_DISPLAY, DBUS_SESSION_BUS_ADDRESS
+and BROWSER unset, project-local TMPDIR, and offline Cargo. Logs:
+`.tmp/pass-xi-221-{reference,conformance,witness,catalog}.log`.
 221 closed with its clause citations; b-isa-spec-fuk remains open. Beads exported.
+Disposition/migration documentation commit: c809fc0. No reference regression
+was added for this already-resolved normative issue; existing tests are retained.
 
 ### b-isa-spec-04d — (b) reference saved-tape consumer interface
 
