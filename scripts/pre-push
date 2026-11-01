@@ -23,7 +23,9 @@ for sha in "${shas[@]}"; do
   sha="$(git -C "$root" rev-parse --verify "${sha}^{commit}")"
   [ -n "${seen[$sha]:-}" ] && continue
   seen[$sha]=1
-  wt="$root/.tmp/gate-$sha"
+  # Beside the repo, not under .tmp: the witness script reaches the pinned review binary via
+  # ../bennett-isa-spec-review relative to the repo root.
+  wt="$(dirname "$root")/$(basename "$root")-gate-${sha:0:12}"
   cleanup() {
     git -C "$root" worktree remove --force "$wt" >/dev/null 2>&1 || true
     rm -rf "$wt"
