@@ -1,3 +1,56 @@
+## 2026-11-01 Editorial pass V — consumer borrow-domain gap (73y)
+
+Maintainer selects Reading B with a normative, object-checkable entry
+analysis. This amendment awaits the orchestrator's one-reviewer council
+fix round; no muse round. Earlier three-seat acceptances below apply to
+the pre-pass-V publication and remain history. Bead 73y stays in_progress.
+
+| Gap / proof step | Disposition | K | Clauses / coverage | Status |
+|---|---|---|---|---|
+| frame-domain ambiguity / INV-3 1.5.5 | a: define D_F from constant/causal-adjoint prefix analysis; full independent interface/borrowed values; restricted factorisation plus support and linearity | K76 (K1–K75 unchanged) | ISA-5.6-P2.S2–S3, P9–P13; T3; frame_domain.rs | council fix round pending |
+| 0.8 consumer binding | a: short erratum incorporating the new §5.6 interpretation; accepted 0.8 bytes unchanged | K76 in 0.9 | spec/errata-0.8.md; SQ20 | implemented |
+| reference alignment | a: independent EntryAnalysis; no polynomial prefix facts; retain exact ANF frame proofs and causal matching; definite failure guard on certificate API | K76 | borrow.rs; frame_domain.rs | implemented |
+| INV-3 missing premise | a: entry support in span(D_F), linearity including R, induction along the reachable prefix | K76 | sibling proof 1.5.5.1–1.5.5.3; 0.9 statement IDs explicitly versioned | committed in sibling |
+
+Least sufficient family: allocation constants and exact causal inverse
+restoration (including H/oracle-pair/H and H/qinplace-pair/H), with
+constant primitive-gate transfer. No exact polynomial prefix analysis is
+needed for the accepted corpus. Exact Boolean identities inside frames
+remain valid. CLI admission audit: all 48 fixture/neutral .bisa objects
+accepted before and after; all four named r9 cases remain accepted.
+Neutral full runner: 16/16 cases, including every expected hash and run.
+The polynomial-only prefix negative now rejects with §5.6; the original
+checker admitted it after a valid explicit §6.2 reversed cleanup.
+Interface/local correlation and whole-region-certificate bypass negatives
+also reject. No fixture edits, VM edits, 0.8 edits, push or remote sync.
+
+Spec/diff commit: 9df1541. Erratum commit: 6182d7c.
+Sibling proof commit: 2095a7d (only proofs/INV-3-discipline-soundness.md).
+Reference implementation commit: 1a19072 (entry analysis, SQ20 and tests).
+Final headless reference suite: **466 passed, 0 failed, 5 ignored** (the
+five existing opt-in exhaustive tests are unchanged); exit 0. Five tests
+were added relative to 461: four integration tests and one opaque-domain
+unit test. Log: `.tmp/pass-v-reference-verified.log`. The widened-domain
+library guard requires a true frame-domain proof when a region-D replay
+would miss values; it adds no producer-controlled domain override or new
+serialized claim kind.
+Final headless conformance suite: **113 passed, 0 failed, 0 ignored**;
+exit 0, `.tmp/pass-v-conformance.log`. Publication witness (including
+byte-exact labels/diff and 0.8 fingerprint) PASS; catalog --check PASS
+(219 recipes, bound envelope unchanged); neutral runner 16/16 PASS;
+fixture admission audit 48/48 PASS with zero losses. All commands unset
+DISPLAY, WAYLAND_DISPLAY, DBUS_SESSION_BUS_ADDRESS and BROWSER and use
+TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/.tmp.
+K1–K75 verified byte-for-byte unchanged; K76 is the only addition.
+Final 0.9 spec SHA-256:
+7b77c96e08a1f7e40d8a70155bef703bb4e7d2e9c850a95e3579a7ee7ae288ce.
+Exact-label diff SHA-256:
+4f7f506018bcd46769d2711eab2e3847391d58ed575247050608c65876d4335a.
+No push or remote/Dolt sync. The implementation sub-agent leaves the
+session worklog and the pending council round to the orchestrator.
+Detailed Lamport argument/dispositions:
+`docs/briefs/2026-11-01-isa-09-pass-v-73y.md`.
+
 ## Published alongside 0.8 on 2026-11-01 06:58:38 UTC
 
 ISA 0.9 is `spec/Bennett-ISA-Spec-0.9.md`, accepted by all three seats
