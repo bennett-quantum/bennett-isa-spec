@@ -39,14 +39,21 @@ for sha in "${shas[@]}"; do
     env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u DISPLAY -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u BROWSER \
         TMPDIR="$wt/.tmp" CARGO_TARGET_DIR="$root/.tmp/gate-target" "$@"
   }
-  { for crate in reference-interpreter conformance; do
-      echo "pre-push: cargo test in $crate" >&2
-      gate cargo test --offline --manifest-path "$wt/$crate/Cargo.toml"
-    done
-    echo "pre-push: diff witness and bound catalog" >&2
-    gate env -C "$wt" python3 -I conformance/tests/draft_witnesses.py
+  # The witness script and some tests address <crate>/target/debug/<bin>; point each
+  # crate's target at the shared build cache so builds stay warm and those paths resolve.
+  for crate in reference-interpreter conformance; do
+    rm -rf "$wt/$crate/target"; ln -s "$root/.tmp/gate-target" "$wt/$crate/target"
+  done
+  run_gate() {
+    echo "pre-push: cargo test in reference-interpreter" >&2 &&
+    gate cargo test --offline --manifest-path "$wt/reference-interpreter/Cargo.toml" &&
+    echo "pre-push: cargo test in conformance" >&2 &&
+    gate cargo test --offline --manifest-path "$wt/conformance/Cargo.toml" &&
+    echo "pre-push: diff witness and bound catalog" >&2 &&
+    gate env -C "$wt" python3 -I conformance/tests/draft_witnesses.py &&
     gate env -C "$wt" python3 -I conformance/tools/ref_catalog.py --check
-  } || status=$?
+  }
+  run_gate || status=$?
   cleanup
   trap - EXIT
   [ "$status" -eq 0 ] || break
