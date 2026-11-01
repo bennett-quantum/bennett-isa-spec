@@ -120,3 +120,71 @@ fn pass_viii_resolution_keeps_controls_and_all_operand_causality() {
         );
     }
 }
+
+#[path = "support/round8.rs"]
+mod round8;
+#[test]
+fn portable_k78_vectors_exact_bytes() {
+    let mut rows = Vec::new();
+    for (tag, prefix, cleanup, admitted) in [
+        (
+            "cx-mcx",
+            "cx a c[0]\nmcx (a) c[0]",
+            "mcx (a) c[0]\ncx a c[0]",
+            true,
+        ),
+        (
+            "different-controls",
+            "cx a c[0]\nmcx (x) c[0]",
+            "mcx (x) c[0]\ncx a c[0]",
+            false,
+        ),
+        (
+            "reader-interleaved",
+            "cx a c[0]\ncx a t\nmcx (a) c[0]",
+            "mcx (a) c[0]\ncx a t\ncx a c[0]",
+            false,
+        ),
+        (
+            "polynomial-only",
+            "cx a c[0]\ncx x c[0]\nmcx (a) c[0]\nmcx (x) c[0]",
+            "mcx (x) c[0]\nmcx (a) c[0]\ncx x c[0]\ncx a c[0]",
+            false,
+        ),
+    ] {
+        let text = object(prefix, cleanup);
+        let parsed = Object::parse(&text);
+        assert_eq!(parsed.is_ok(), admitted, "{tag}");
+        let mut tuples = Vec::new();
+        if let Ok(o) = parsed {
+            for input in 0..64u128 {
+                let mut q = QuantumState::new();
+                let w = q.allocate(6).unwrap();
+                for (i, wire) in w.iter().enumerate() {
+                    if input >> i & 1 != 0 {
+                        q.gate("x", &[*wire], None, &[]).unwrap();
+                    }
+                }
+                let mut b = QuantumBindings::default();
+                for (name, wires) in [
+                    ("t", &w[0..1]),
+                    ("a", &w[1..2]),
+                    ("x", &w[2..3]),
+                    ("s", &w[3..5]),
+                ] {
+                    b.bundles.insert(name.into(), wires.to_vec());
+                }
+                b.borrowed.push(w[5..6].to_vec());
+                let before = q.clone();
+                o.execute_action("a", &mut q, &b, false, &[]).unwrap();
+                assert_eq!(q, before);
+                tuples.push(format!(
+                    r#"{{"before":{input},"after":{},"phase":[1,0],"live_wires":6,"scratch":[]}}"#,
+                    q.read_basis(&w).unwrap()
+                ));
+            }
+        }
+        rows.push(format!(r#"{{"id":{},"source":{},"source_admission":{admitted},"tuple_order":["t","a","x","s[0]","s[1]","borrowed"],"tuples":[{}]}}"#, round8::quote(tag), round8::quote(&text), tuples.join(",")));
+    }
+    round8::lock("k78.json", rows);
+}

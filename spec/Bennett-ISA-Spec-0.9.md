@@ -429,10 +429,7 @@ regions whose `[A,W]` equal the callee's and whose role is `in` for an
 `lift.faultif p C` require the literal C < 2^F, where F is the fault
 width of the containing oracle or, in an lproc, of every oracle whose
 lproc closure contains it (checked at load and again at link; an lproc
-in no oracle's closure is checked when linked into one); the width rules above
-for `binop`, `icmp`, `select`, `zext`, `sext`, `trunc` apply verbatim to
-their `lift.*` counterparts; the destinations of one `lift.parmov` are
-pairwise distinct.
+in no oracle's closure is checked when linked into one). The equal-width and widening/narrowing constraints above apply to lifted rows on their location and pseudo-location bit-vectors as specified in §4.2; the CC/R iN and ptr operand-type restrictions do not retype lifted locations. The destinations of one `lift.parmov` are pairwise distinct.
 
 **Quantum registers in CC and R.** A **register** is n device-resident
 wires of one class with a nonzero 64-bit **id**, recorded in the
@@ -3899,6 +3896,10 @@ Born probabilities, consuming the wires.
 ### 14.4 Mechanisation *(deferred)*
 
 ## 15. Conformance suites
+
+Portable K78–K80 vectors and reproduction instructions are published in
+`conformance/fixtures/accepted-k78-k80-09/`, beside the controlled-action fixture.
+The vectors record source admission, complete output tuples and expanded source coordinates; adapter-assigned coordinates are identified separately from production-builder output.
 
 | Suite | Class | Tests |
 |---|---|---|

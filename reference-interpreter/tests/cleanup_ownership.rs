@@ -394,3 +394,119 @@ fn pass_x_recompute_calls_are_fresh_edges_with_separate_callee_spaces() {
         same_live_state(&q, &before);
     }
 }
+
+#[path = "support/round8.rs"]
+mod round8;
+#[test]
+fn portable_k80_vectors_exact_bytes() {
+    let mut rows = Vec::new();
+    for (mode, calls, looped) in [
+        ("reverse", false, false),
+        ("reverse", true, false),
+        ("recompute", false, false),
+        ("recompute", true, false),
+        ("recompute", false, true),
+    ] {
+        let o = if calls {
+            source_calls()
+        } else {
+            source(REVERSE)
+        };
+        // A one-iteration loop preserves the same paired computation. Source
+        // points for its nested body are adapter coordinates, never Expander IDs.
+        let text = if looped {
+            o.text
+                .replace(COMPUTE, "d = qalloc any 1\nqloop 1 {\ncx x d\ncx z d\n}\n")
+                .replace("\"bounds\":[]", "\"bounds\":[1]")
+                .replace("^entry():", "regs {  } bounds {1}\n^entry():")
+        } else {
+            o.text.clone()
+        };
+        let parsed = support::rehash(&text);
+        let text = parsed.text.clone();
+        let expanded = expansion(calls);
+        let address = addresses(&expanded);
+        let mut leaves = Vec::new();
+        // The reverse source stream is a subset of the same real primitive
+        // leaves; fresh scratch allocation and XOR exist only in recompute.
+        let indices: Vec<usize> = if mode == "reverse" {
+            vec![0, 1, 2, 2, 1, 10]
+        } else {
+            (0..expanded.len()).collect()
+        };
+        for (n, i) in indices.into_iter().enumerate() {
+            let l = &expanded[i];
+            let mut point = address[i].point;
+            let mut ordinal = address[i].ordinal;
+            let mut call_index = address[i].call_index;
+            if mode == "reverse" {
+                point = n;
+                ordinal = 0;
+                call_index = if calls && (1..=4).contains(&n) {
+                    Some(0)
+                } else {
+                    None
+                };
+            }
+            let (point_text, iteration) = if looped && (n == 1 || n == 2) {
+                (format!("entry:{}", n + 1), "[0]")
+            } else {
+                (
+                    format!("entry:{}", if looped && point == 5 { 6 } else { point }),
+                    "[]",
+                )
+            };
+            if looped && n >= 3 {
+                assert_eq!(iteration, "[]");
+                assert_eq!(point_text, "entry:6");
+            }
+            let ci = call_index.map_or("null".into(), |x| x.to_string());
+            let wires = l
+                .wires
+                .iter()
+                .map(|(s, b)| format!("[{},{}]", round8::quote(s), b))
+                .collect::<Vec<_>>()
+                .join(",");
+            let controls = l
+                .controls
+                .iter()
+                .map(|(s, b)| format!("[{},{}]", round8::quote(s), b))
+                .collect::<Vec<_>>()
+                .join(",");
+            leaves.push(format!(r#"{{"gate":{},"wires":[{wires}],"controls":[{controls}],"caller_point":{},"caller_iteration":{iteration},"instance":[],"step":null,"phase":null,"callee_iteration":[],"call_index":{ci},"callee_point":{},"generated":{ordinal},"allocation":{},"scratch":{},"coordinate_origin":"finite-source-adapter","leaf_origin":"catalog-expander"}}"#,round8::quote(&l.gate),round8::quote(&point_text),if call_index.is_some(){"\"entry:0\""}else{"null"},round8::quote(&format!("{:?}",l.allocation)),l.scratch));
+        }
+        let mut tuples = Vec::new();
+        for input in 0..16u128 {
+            let mut q = QuantumState::new();
+            let w = q.allocate(4).unwrap();
+            for (i, wire) in w.iter().enumerate() {
+                if input >> i & 1 != 0 {
+                    q.gate("x", &[*wire], None, &[]).unwrap();
+                }
+            }
+            let before = q.clone();
+            if mode == "reverse" {
+                let mut b = QuantumBindings::default();
+                for (name, wire) in ["x", "z", "p", "t"].iter().zip(&w) {
+                    b.bundles.insert((*name).into(), vec![*wire]);
+                }
+                parsed
+                    .execute_action("multi", &mut q, &b, false, &[w[2]])
+                    .unwrap();
+                assert_eq!(q, before);
+                parsed
+                    .execute_action("multi", &mut q, &b, true, &[w[2]])
+                    .unwrap();
+                assert_eq!(q, before);
+            } else {
+                apply(&mut q, &expanded, false, &w);
+                same_live_state(&q, &before);
+                apply(&mut q, &expanded, true, &w);
+                same_live_state(&q, &before);
+            }
+            tuples.push(format!(r#"{{"before":{input},"after":{input},"inverse_after":{input},"phase":[1,0],"live_wires":4,"scratch":[]}}"#));
+        }
+        rows.push(format!(r#"{{"realisation":{},"semantic_calls":{calls},"original_in_qloop":{looped},"source":{},"source_admission":true,"source_version":"0.8","scheduled_0_9_builder_admission":"not-implemented","tuple_order":["x","z","control","t"],"leaves":[{}],"tuples":[{}]}}"#,round8::quote(mode),round8::quote(&text),leaves.join(","),tuples.join(",")));
+    }
+    round8::lock("k80.json", rows);
+}

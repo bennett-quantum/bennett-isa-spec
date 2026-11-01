@@ -233,3 +233,56 @@ fn pass_ix_catalog_zero_address_binds_empty_wire_actual() {
         }
     }
 }
+
+#[path = "support/round8.rs"]
+mod round8;
+#[test]
+fn portable_k79_vectors_exact_bytes() {
+    let mut rows = Vec::new();
+    for op in ["qload", "qunload", "qstore", "qexchm"] {
+        for (a, address, admitted) in [(0, "()", true), (0, "a[0]", false), (1, "()", false)] {
+            let source = text(op, a, address);
+            let parsed = Object::parse(&source);
+            assert_eq!(parsed.is_ok(), admitted);
+            let mut tuples = Vec::new();
+            if let Ok(o) = parsed {
+                for input in 0..32u128 {
+                    let mut q = QuantumState::new();
+                    let w = q.allocate(5).unwrap();
+                    for (i, wire) in w.iter().enumerate() {
+                        if input >> i & 1 != 0 {
+                            q.gate("x", &[*wire], None, &[]).unwrap();
+                        }
+                    }
+                    let mut b = QuantumBindings::default();
+                    b.bundles.insert("t".into(), w[0..1].to_vec());
+                    b.bundles.insert("a".into(), w[1..3].to_vec());
+                    b.regions.insert(
+                        "r".into(),
+                        QuantumRegion {
+                            address_width: 0,
+                            cell_width: 1,
+                            cells: vec![w[4..5].to_vec()],
+                        },
+                    );
+                    let before = q.clone();
+                    o.execute_action("m", &mut q, &b, false, &[w[3]]).unwrap();
+                    let after = q.read_basis(&w).unwrap();
+                    let mut exact = QuantumState::new();
+                    let v = exact.allocate(5).unwrap();
+                    for (i, wire) in v.iter().enumerate() {
+                        if after >> i & 1 != 0 {
+                            exact.gate("x", &[*wire], None, &[]).unwrap();
+                        }
+                    }
+                    assert_eq!(q.amplitudes().unwrap(), exact.amplitudes().unwrap());
+                    o.execute_action("m", &mut q, &b, true, &[w[3]]).unwrap();
+                    assert_eq!(q, before);
+                    tuples.push(format!(r#"{{"before":{input},"after":{after},"inverse_after":{input},"phase":[1,0],"live_wires":5,"scratch":[]}}"#));
+                }
+            }
+            rows.push(format!(r#"{{"operation":{},"address_width":{a},"address_actual":{},"source":{},"source_admission":{admitted},"catalog_address":{},"tuple_order":["t","a[0]","a[1]","control","r[0][0]"],"tuples":[{}]}}"#, round8::quote(op), round8::quote(address), round8::quote(&source), if admitted {"[]"} else {"null"}, tuples.join(",")));
+        }
+    }
+    round8::lock("k79.json", rows);
+}
