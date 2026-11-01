@@ -3,7 +3,7 @@
 mod support;
 use bennett_isa_conformance::{
     json::Json,
-    ref_language::{Expander, Leaf, Registry},
+    ref_language::{Leaf, Registry},
 };
 use bennett_isa_ref::{Object, QuantumBindings, QuantumState};
 use std::collections::BTreeMap;
@@ -231,30 +231,23 @@ fn expansion(call_recompute: bool, copy_recompute: bool) -> Vec<(usize, Leaf)> {
         format!(r#"{copy_body},{{"invoke":"qfree","args":["d"]}}"#),
     ];
     let hash = "a".repeat(64);
-    let mut doc = j(include_str!("../../spec/ref-0.9.json"));
-    let Json::Obj(fields) = &mut doc else {
-        unreachable!()
-    };
-    let Json::Arr(recipes) = fields.get_mut("recipes").unwrap() else {
-        unreachable!()
-    };
-    recipes.retain(|r| {
-        matches!(
-            r.get("kind").unwrap().as_str().unwrap(),
-            "qalloc" | "qfree" | "action_call"
-        )
-    });
     let body = bodies.join(",");
-    recipes.push(j(&format!(r#"{{"kind":"zz.partition","parameters":[{{"name":"S","type":"symbol"}},{{"name":"x","type":"wire","width":2}}],"body":[{{"declare":"d","width":2,"class":{{"class":"any"}},"state":"clean","body":[{body}]}}],"scratch":[],"removable":[],"source":"K81 finite witness"}}"#)));
-    let registry = Registry::from([(
+    let mut registry = Registry::from([(
         hash.clone(),
         j(
             r#"{"parameters":[{"name":"a","type":"wire","width":1},{"name":"b","type":"wire","width":1}],"body":[{"gate":"cx","wires":["a","b"]}]}"#,
         ),
     )]);
-    let leaves = Expander::new(&doc.to_string(), registry)
+    let root = "b".repeat(64);
+    registry.insert(root.clone(), j(&format!(r#"{{"parameters":[{{"name":"S","type":"symbol"}},{{"name":"x","type":"wire","width":2}}],"body":[{{"declare":"d","width":2,"class":{{"class":"any"}},"state":"clean","body":[{body}]}}]}}"#)));
+    let leaves = bennett_isa_ref::ref_library::RefLibrary::published()
         .unwrap()
-        .expand("zz.partition", &[Json::Str(hash), j(r#""x""#)], &[("x", 2)])
+        .expand(
+            &root,
+            &[Json::Str(hash), j(r#""x""#)],
+            &[("x", 2)],
+            registry,
+        )
         .unwrap();
     let call_end = 4 + if call_recompute { 14 } else { 1 };
     leaves

@@ -1,66 +1,67 @@
-# Current state — 2026-11-01 16:00:46 UTC
+# Current state — 2026-11-01 17:05:13 UTC
 
-Reference ISA 0.9 migration, implementation passes 1–2 complete.
-Start HEAD: 8e481ce (pushed). Own code commits: 4d1a1c2 and 3788db9.
-This final gate/status/handoff record is committed next; the final report
-supplies HEAD. No push, sibling writes, spec/catalog edits or remote sync.
-Orchestrator retains session-worklog and council acceptance ownership.
+Reference ISA 0.9 migration: implementation pass 3, PARTIAL slice .3.
+Start HEAD: 530b301. This code/records commit is made after all required gates;
+its final HEAD is supplied in the final report. No push or remote sync.
+The orchestrator retains session-worklog, council acceptance and sibling pins.
 
-Created b-isa-spec-fuk.1–.7; .1 and .2 CLOSED. Parent fuk stays OPEN.
-.3–.6 are the requested remaining slices. .7 explicitly retains the rest of
-the authoritative 0.8-to-0.9 delta; final documentation .6 depends on it too.
-Resume at .3 (bound ref catalog expansion), after reading reference progress.
-Do not claim complete ISA 0.9 execution or close the producer/rung-3 blocker.
-README uses interim migration wording; its council line still names the
-original accepted 0.8 snapshot. Final admits-both status waits for all slices
-and the orchestrator runs the new milestone council round.
+b-isa-spec-fuk.1/.2 remain CLOSED. .3 remains IN_PROGRESS; .4–.7 remain OPEN.
+No new slice is closed. Resume .3 before starting .4. README still states
+migration in progress and retains its prior council snapshot honestly.
+Do not claim complete 0.9 execution or clear the producer/rung-3 blocker.
 
-Slice 1 (4d1a1c2): explicit IsaVersion for coherent headers, ABI signatures,
-closure envelopes, linked rendering, certificate versions, device model
-versions and implicit ref binding. Reject mixed/unknown versions; never
-silently upgrade linked inputs. Published 0.9 inc8 hash and execution pass.
-Mandatory 0.9 lproc arrays are checked for the existing unforwarded form;
-nonempty forwarding is still .7 work. Five version regressions added.
-Full gates: reference 509/0/5, conformance 113/0/0, neutral 16/16, both Python
-gates and strict lib/bins Clippy green. Logs: .tmp/migration-s1-*.
+Landed in this pass:
+- Production RefLibrary uses the conformance crate as a normal std-only
+  dependency and checks the pinned canonical full catalog/envelope in Rust.
+  A small conformance Expander::with_registry API reuses validated recipes
+  with fresh registry/counters; no constructor semantics or catalog changes.
+- Object::bound_ref_library resolves explicit/default 0.9 binding. K57's
+  omitted expansion exposes the full-library hash without inserting metadata
+  or changing schedule identity. 0.8 retains its previous default API.
+- Immutable OracleInvocation captures a K77 record and positional actuals,
+  checks the tuple against independently resolved source budget/layout and
+  exact declared arity, preflights actuals, and invokes a supplied builder
+  per capture. Source formals come from the linked oracle, with no extra token.
+- Seven new tests: pins/defaults, actual catalog expansion, exact controlled
+  leaf bytes and basis execution, B=2/B=3 inc8, malformed/source-inconsistent
+  records, nested rejection/retry and actual validation before builder effects.
+  K79–K81 existing byte locks now run against the checked complete catalog,
+  rather than private modified recipe subsets; all original bytes are retained.
 
-Slice 2 (3788db9): CC/R fault C, canonical uint64 validation, exact nonzero
-codes and zero -> 4. 0.9 faults retain the failing program point and intact
-instances/memory/tape/open activations; one terminal record, no result or
-caller continuation. Eligible FAILED 0.9 run-program --reverse works.
-0.8 launch restriction and Q zero-cause behavior remain unchanged.
-Both Q engines and literal inverses use the versioned effective cause.
-Eight new tests cover code bit boundaries, every integer division width
-1..128, implicit causes, nested CC/R callers, CLI exact records through
-UINT64_MAX, intact prefixes and full entry reversal. Every source-counter
-cut 0..9 across a nested R call covers zero and both returns, plus direct
-zero entry before invalid memory. Host fuel remains a resumable diagnostic;
-§4.9 puts the R counter in producer instrumentation, not the Q machine.
-Red logs: .tmp/migration-s2-red.log and migration-s2-atomic-red.log.
-The R-only effect rule was preserved in tests by a CC wrapper calling R.
+Why .3 is NOT closed:
+- The unmodified published controlled-action-09/controlled.bisa still rejects
+  certificate bindings.invocation (K13); K16 typed frames also remain legacy.
+  Exact current-binary diagnostic: .tmp/migration-s3-fixture-red.log.
+  New source/schedule tests explicitly exclude that certificate and do not
+  claim complete fixture acceptance. Implement versioned admission/validation.
+- A complete linked-source constructor builder, full invocation identity
+  composition and K77 capture across arguments/body/template adapters, nested
+  source calls and inverse traversal are still required. Finite callback inc8
+  tests and the immutable capture boundary are not that general builder.
+  Detailed findings/evidence are on existing .3/.7; no ambiguity bead was filed.
 
-Final required gates all exit 0, headless/offline with repo-local TMPDIR:
-- Reference: 517 passed, 0 failed, 5 unchanged ignored (504 + 5 + 8).
+Full required gates all EXIT 0 (headless, offline Cargo, repo-local TMPDIR):
+- Reference: 524 passed, 0 failed, 5 unchanged ignored (517 + seven new).
 - Conformance: 113 passed, 0 failed, 0 ignored.
 - python3 -I conformance/tests/draft_witnesses.py: PASS.
-- python3 -I conformance/tools/ref_catalog.py --check: PASS; 219 recipes;
+- python3 -I conformance/tools/ref_catalog.py --check: PASS, 219 recipes;
   envelope 5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197.
 - Neutral suite: 16/16.
-- Strict lib/bins Clippy, rustfmt and whitespace: PASS.
-Logs: .tmp/migration-s2-{reference,conformance,witness,catalog,neutral,clippy}.log.
-All 64 pre-existing reference fixture files, frozen ISA 0.8 and catalog bytes
-match 8e481ce. No fixture weakening or catalog regeneration. No spec ambiguity
-beads filed; .7 is implementation work, not a normative-text question.
+- Strict lib/bins Clippy, owned rustfmt and whitespace: PASS.
+Targeted tests: 24/0. Logs: .tmp/migration-s3-{reference,conformance,witness,
+catalog,neutral,clippy,targeted,library,preservation}.log.
+Initial missing-API reds: migration-s3-red.log and migration-s3-context-red.log.
 
-Outstanding .7 examples: qreg[*]/ledger/handle and runtime forms, budget.mint
-validity/undo, parametrised qinplace, lproc forwarding, and an exhaustive delta
-audit. Confirmed E17.13: Memory::lifted_free and literal direct(lift.free)
-still toggle matching pinned entries after checking for an unpinned match.
-0.9 needs to exclude pinned entries, especially a zero-sized same-base global,
-with version gating to retain 0.8. The exact finding is in .7 notes.
-.3 also requires K77 oracle_invocation and byte-exact K78–K81 catalog vectors;
-.4 needs actual 0.9 end-to-end ownership/addressing, .5 the full CLI/profile-v1
-replay matrix. Do not confuse existing finite adapters with those deliverables.
+All 64 pre-existing reference fixtures, frozen ISA 0.8 and catalog bytes match
+both 530b301 and pre-migration 8e481ce. All published controlled/K78–K81 fixture
+bytes match 530b301. No spec, fixture, sibling, worklog or remote writes.
+Only the Resume block of reference-interpreter/PROGRESS.md was updated; no
+per-slice log block or record-only commit. Preserve existing .tmp/ and logs.
 
-Preserve pre-existing .tmp/ plus gate logs and scratch red tests. Expected
-final git status: only ?? .tmp/. No pushes or sibling pin updates authorized.
+Remaining order: finish .3; .4 actual 0.9 K79–K81 ownership/addressing;
+.5 run-program/run-cc/reverse and saved-tape profile-v1 0.9 matrix; .7 remaining
+authoritative delta; .6 final admits-both documentation only after all close.
+.7 still includes dynamic qregs/ledger/handles, budget.mint, parametrised
+qinplace, nonempty lproc forwarding and the pinned lifted-free E17.13 fix in
+both engines with explicit version dispatch. Newly noted K13/K16 admission
+also blocks .3. Keep all 0.8 outputs/hashes and neutral 16/16 unchanged.

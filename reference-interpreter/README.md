@@ -553,9 +553,20 @@ in the grammar; V and W remain point arrays. Schedule `bindings.expansion`
 is optional under §17 item 7: omission binds `ref` at the object's ISA version
 (0.8 or 0.9). A present descriptor retains the closed name/version/hash
 grammar. `Object::schedule_expansion` resolves that binding for consumers,
-returning no supplied hash for the default and preserving an explicit binding.
+returning the published full-library hash for the 0.9 default, retaining the
+legacy absent hash for 0.8, and preserving an explicit binding.
 It never inserts a descriptor into the canonical schedule or changes its §9.2
-hash. `gate.epsilon_share` is optional under §§8.1/17 item 9, including
+hash. `Object::bound_ref_library` resolves the available 0.9 library with the
+conformance crate's Rust envelope check; `RefLibrary::expand` reuses its typed
+K19–K28 constructor engine with a fresh source-bound registry. `OracleInvocation`
+captures and validates a K77 record against a resolved source budget, retains
+its positional actuals, and calls a supplied body builder per invocation.
+These APIs do not implement general linked-source lowering or automatic
+capture through source arguments/body/template adapters. Full .3 acceptance
+also awaits K13 invocation/K16 frame admission for the unmodified published
+controlled-action certificate; removing that certificate is not acceptance.
+
+`gate.epsilon_share` is optional under §§8.1/17 item 9, including
 realisation-only entries. `Object::schedule_epsilon_share` preserves explicit
 shares or returns the exact region-epsilon / approximate-operation-count
 recipe after expansion supplies that count; exact operations stay exact.

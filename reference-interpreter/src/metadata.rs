@@ -4,8 +4,8 @@ use crate::{
     err, json::Json, validation::normalize_call, Error, Function, Instruction, Object, Result,
 };
 
-/// Effective §11/§17 item 7 expansion binding. An implicit binding has no
-/// supplied descriptor hash; resolving it never rewrites the canonical schedule.
+/// Effective §11/§17 item 7 expansion binding. Resolving the published 0.9
+/// default never rewrites the canonical schedule; 0.8 retains its legacy API.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ScheduleExpansion<'a> {
     pub name: &'a str,
@@ -16,7 +16,7 @@ impl Object {
     /// Resolve the schedule's expansion descriptor for consumers, if scheduled.
     /// §17 item 7: omission binds ref at the object's ISA version. Parsing
     /// supports the object version without conversion. No synthetic hash is
-    /// inserted: §9.2 hashes the supplied canonical schedule unchanged.
+    /// inserted into metadata: §9.2 hashes the supplied canonical schedule unchanged.
     pub fn schedule_expansion(&self) -> Result<Option<ScheduleExpansion<'_>>> {
         let Some(schedule) = self.section("schedule") else {
             return Ok(None);
@@ -25,7 +25,8 @@ impl Object {
             return Ok(Some(ScheduleExpansion {
                 name: "ref",
                 version: self.isa_version.as_str(),
-                hash: None,
+                hash: (self.isa_version == crate::IsaVersion::V09)
+                    .then_some(crate::ref_library::REF09_HASH),
             }));
         };
         crate::metadata_schema::validate("expansion", expansion)?;

@@ -20,6 +20,7 @@ mod metadata_types;
 mod object;
 mod oracle;
 mod quantum;
+pub mod ref_library;
 mod registers;
 mod retained;
 pub use retained::Retained;

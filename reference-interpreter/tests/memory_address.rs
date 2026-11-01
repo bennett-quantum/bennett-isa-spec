@@ -185,14 +185,16 @@ fn pass_ix_catalog_zero_address_binds_empty_wire_actual() {
         json,
         ref_bdd::Bdd,
         ref_catalog::Machine,
-        ref_language::{permutation, Expander, Registry},
+        ref_language::{permutation, Registry},
     };
-    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), Registry::new()).unwrap();
+    let e = bennett_isa_ref::ref_library::RefLibrary::published().unwrap();
     for kind in ["dispatch.copy", "qstore", "qexchm"] {
         for width in 1..=3 {
             let bundles = [("cells", width), ("v", width)];
             let args = json::parse(&format!(r#"[0,1,{width},[],"cells","v"]"#)).unwrap();
-            let leaves = e.expand(kind, args.as_arr().unwrap(), &bundles).unwrap();
+            let leaves = e
+                .expand(kind, args.as_arr().unwrap(), &bundles, Registry::new())
+                .unwrap();
             let m = Machine::compile(&permutation(&leaves).unwrap(), &bundles).unwrap();
             let mut b = Bdd::new();
             let mut state = m.symbolic_state();

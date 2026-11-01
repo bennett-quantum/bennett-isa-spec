@@ -1,18 +1,44 @@
 # Bennett ISA reference interpreter progress
 
-Resume here. The accepted ISA 0.8 remains supported; staged deliverables
-are not complete. The explicit ISA 0.9 migration is in progress under
-b-isa-spec-fuk. Slices b-isa-spec-fuk.1–.6 track admission, typed faults,
-bound ref expansion, K79–K81 execution, CLI/replay and final documentation.
-Additional fuk.7 retains the remaining authoritative delta (K1–K4 and
-nonempty lproc forwarding among it); fuk.6 depends on that audit too.
-Code commits: 4d1a1c2 (slice 1, closed), 3788db9 (slice 2, closed).
-Slices 1 and 2 are closed. Final gates: reference 517 passed / 0 failed /
-5 unchanged ignored; conformance 113 passed / 0 failed; neutral 16/16;
-both Python checks, strict lib/bins Clippy and whitespace pass.
-The README admission milestone and new council acceptance remain pending.
-No sibling writes, spec/catalog edits or push. Gates use the headless
-prefix, offline Cargo and repo-local .tmp.
+Resume here. Accepted ISA 0.8 remains supported; the explicit ISA 0.9
+migration is incomplete under b-isa-spec-fuk. Slices .1 and .2 remain CLOSED
+(commits 4d1a1c2 and 3788db9). This pass advances .3, still IN_PROGRESS;
+.4–.7 remain OPEN. No new slice is closed. Do not move the README admission
+milestone or council pin; producer/sibling migration and rung-3 acceptance
+remain outstanding.
+
+Partial .3: RefLibrary checks the complete published ref@0.9 canonical
+catalog/envelope with Rust conformance code, reuses validated typed recipes
+with fresh registries, and resolves the implicit 0.9 K57 full-library hash
+without rewriting schedule metadata. OracleInvocation is an immutable K77
+source-budget/actual capture and per-invocation callback boundary, not a
+general linked-source builder. Seven new tests cover binding rejection,
+default identity, checked expansion, B=2/B=3 inc8, malformed/inconsistent
+contexts, argument preflight, and the byte-exact controlled leaf stream.
+Existing K79–K81 vector locks now use the checked full catalog; K78 retains
+its existing byte lock. No published vector/catalog bytes changed.
+
+Resume .3 at the unmodified controlled-action-09/controlled.bisa admission
+failure: K13 certificate bindings.invocation is unknown, and K16 frames still
+use the legacy schema. Current-binary red: .tmp/migration-s3-fixture-red.log.
+The new controlled source/schedule test explicitly omits its certificate;
+it is NOT acceptance of that complete fixture. Also implement full source
+body construction, invocation identity composition and K77 capture through
+arguments/body/template adapters, nested source calls and inverse traversal.
+The finite callback inc8 tests do not discharge that obligation. Details and
+evidence are on .3/.7; these are clear implementation gaps, no spec ambiguity.
+Only then close .3 and proceed to .4, .5, remaining delta .7, and final .6.
+
+Full pass gates: reference 524 passed / 0 failed / 5 unchanged ignored;
+conformance 113 passed / 0 failed / 0 ignored; neutral 16/16; both Python
+checks PASS. Strict lib/bins Clippy, owned rustfmt and whitespace PASS.
+All 64 existing reference fixtures, frozen ISA 0.8 and catalog bytes match
+both 530b301 and pre-migration 8e481ce; published controlled/K78–K81 vectors
+match 530b301. Catalog: 219 recipes, unchanged envelope
+5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197.
+Logs: .tmp/migration-s3-*. All gates headless/offline, repo-local TMPDIR.
+No spec/sibling writes, push or remote sync. Preserve existing .tmp/.
+Orchestrator retains session-worklog and council acceptance ownership.
 
 ## 2026-11-01 — ISA 0.9 migration, slice 2 (fuk.2)
 

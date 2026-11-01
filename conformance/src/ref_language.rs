@@ -436,6 +436,7 @@ fn validate_body(body: &[Json]) -> Result<(), String> {
     }
     Ok(())
 }
+#[derive(Clone, Debug)]
 pub struct Expander {
     recipes: BTreeMap<String, Json>,
     registry: Registry,
@@ -521,6 +522,20 @@ impl Expander {
         }
         Ok(Self {
             recipes,
+            registry,
+            serial: 0,
+            ordinals: BTreeMap::new(),
+        })
+    }
+    /// Reuse a validated catalog with a fresh source-bound registry. Invocation
+    /// counters are reset; no captured context or expanded state is shared.
+    pub fn with_registry(&self, registry: Registry) -> Result<Self, String> {
+        for r in registry.values() {
+            validate_formals(a(f(r, "parameters")?)?)?;
+            validate_body(a(f(r, "body")?)?)?;
+        }
+        Ok(Self {
+            recipes: self.recipes.clone(),
             registry,
             serial: 0,
             ordinals: BTreeMap::new(),

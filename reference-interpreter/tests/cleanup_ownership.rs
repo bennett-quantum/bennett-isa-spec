@@ -4,7 +4,7 @@
 mod support;
 use bennett_isa_conformance::{
     json::{self, Json},
-    ref_language::{Expander, Leaf, Registry},
+    ref_language::{Leaf, Registry},
 };
 use bennett_isa_ref::{Object, QuantumBindings, QuantumState};
 use std::collections::BTreeMap;
@@ -113,28 +113,20 @@ fn expansion(calls: bool) -> Vec<Leaf> {
         compute[0]
     );
     let body = format!(r#"[{{"under":"p","body":{body}}}]"#);
-    let mut doc = j(include_str!("../../spec/ref-0.9.json"));
-    let Json::Obj(fields) = &mut doc else {
-        unreachable!()
-    };
-    let Json::Arr(recipes) = fields.get_mut("recipes").unwrap() else {
-        unreachable!()
-    };
-    recipes.retain(|r| {
-        matches!(
-            r.get("kind").unwrap().as_str().unwrap(),
-            "action_call" | "qalloc" | "qfree"
-        )
-    });
-    recipes.push(j(&format!(r#"{{"kind":"zz.cleanup-witness","parameters":{parameters},"body":{body},"scratch":[],"removable":[],"source":"§11 K80 finite multirow source binding"}}"#)));
     let mut registry = Registry::new();
     registry.insert(hash.clone(), j(r#"{"parameters":[{"name":"a","type":"wire","width":1},{"name":"b","type":"wire","width":1}],"body":[{"gate":"cx","wires":["a","b"]}]}"#));
-    Expander::new(&doc.to_string(), registry)
+    let root = "b".repeat(64);
+    registry.insert(
+        root.clone(),
+        j(&format!(r#"{{"parameters":{parameters},"body":{body}}}"#)),
+    );
+    bennett_isa_ref::ref_library::RefLibrary::published()
         .unwrap()
         .expand(
-            "zz.cleanup-witness",
+            &root,
             &[j(r#""x""#), j(r#""z""#), j(r#""p""#), Json::Str(hash)],
             &[("x", 1), ("z", 1), ("p", 1)],
+            registry,
         )
         .unwrap()
 }
