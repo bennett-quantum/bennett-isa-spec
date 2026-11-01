@@ -1,3 +1,105 @@
+## 2026-11-01 Editorial pass X — multirow cleanup leaf ownership (5cd)
+
+Reading **A for recompute** adopted; its optional reverse rebinding is
+**declined**. Reverse retains the written cleanup's source points.
+5cd remains **in_progress for council round 8**, the one-reviewer round
+covering passes VIII, IX and X together. This is a real missing ownership
+rule, not a not-a-defect closure: K65 determines the stable carrier and
+whole-pair selection before expansion, K64 partitions oracle support, and
+§11.1 numbers within a row without saying which row owns a replacement.
+§6.2/§6.4 fix the paired computation and its semantics, not its new addresses.
+
+| Item | Disposition / evidence |
+|---|---|
+| Reverse's written source points | retained: literal multirow action execution follows the written inverse instructions and release; `src/action.rs` action_sequence qalloc/qfree, qcopy/quncopy and call branches; no carrier rebinding |
+| A: carrier owns recompute replacement | adopted: materialise the new realisation, then number one caller leaf/call space at the carrier; §11 K80; `ref_language.rs` emit/invoke/call give contiguous caller ordinals and separate callee spaces for new constructor input |
+| B: replay retains original source points and numbers | declined for recompute: gives multiple fresh occurrences the old computation's addresses or needs another unstated partition; copying constructor bodies does not copy source schedule addresses |
+| Fresh uncomputation calls | separate instantiated occurrences, not inverse traversal of the already numbered fresh computation: calls 0/1 for computation, 2/3 for its new uncomputation, all beneath the carrier; original computation keeps entry:1/2, each call_index 0 |
+| Callee and raw-inverse identity | retained: callee source points/ordinal spaces stay below fresh carrier edges; raw reversal retains addresses and visits 3/2/1/0, rather than allocating new occurrence numbers; K62 source-adjoint formation remains separate |
+| Multirow publication witness | six source instructions; reverse entry:3/4/5 each generated 0; recompute entry:5 generated 0–7; gate selectors distinguish original CX, fresh allocation and fresh CX; two versus five cleanup CX gates |
+| Inventory | one new MUST, K80 only; K1–K79 byte-identical to ba7d13f; §0 inventory and pending status header updated; exact-label diff regenerated |
+| Reference / regression | three finite regressions; no src edit or fixture weakening; initial three tests green before wording in `.tmp/pass-x-before-text.log`; expanded source-call/control/tie checks green in `.tmp/pass-x-regression.log` |
+| Council brief | `docs/briefs/2026-11-01-isa-09-passes-viii-x.md`, summarising K78/K79/K80 with clauses and implementation limits |
+
+Exact new normative paragraph, §11 after K65:
+
+> **Cleanup leaf ownership (K80).** For `reverse`, emitted leaves retain the
+> written cleanup's source points and per-point ordinal and semantic-call
+> occurrence spaces, including the terminating release. For `recompute`,
+> consumers MUST assign the entire replacement's caller-level leaves and
+> call edges to the carrier's point and coordinates. The original
+> computation is unchanged; replaced inverse rows emit nothing. Materialise
+> fresh computation, XOR, fresh uncomputation and releases in §6.4 order;
+> number caller leaves contiguously from zero, excluding callee subtrees,
+> and number semantic-call occurrences independently from zero (§11.1/K63).
+> Fresh uncomputation has separate occurrences from fresh computation;
+> neither reuses the original computation's edges or scratch identities.
+> Callees retain their own source points, nested chains and ordinal/call
+> spaces under these fresh edges. Internal replay does not import the
+> original rows' source-qloop coordinates. Raw inverse traversal retains
+> forward paths, leaf ordinals, call occurrences and scratch identities;
+> step/phase follows §11 and source-adjoint formation remains K62. The carrier's ordinal 0 belongs only to
+> cleanup-kind matching; it does not consume emitted-leaf ordinal 0.
+> K64's oracle support partition is unchanged.
+
+`reference-interpreter/tests/cleanup_ownership.rs` supplies a finite source
+adapter, like the earlier K77 adapter, not a general source-cleanup builder.
+The published catalog's qalloc/qfree/action_call recipes are read unchanged
+and selected into the witness document; only its root constructor body and
+linked one-CX symbol are synthetic. Actual expander leaves lock allocation,
+XOR, computation and uncomputation order, distinct callee invocation paths
+and callee ordinal zero. Adapter metadata explicitly supplies source points
+and serialized call_index; those annotations are not currently supplied by
+production `ref_language::Expander`. Its invocation IDs are opaque constructor
+traversal IDs, not a claimed implementation of K63's serialized indices.
+The reference remains 0.8-gated and has no general scheduled multirow
+recompute executor; this pass neither claims otherwise nor needs a src
+alignment. No red-to-green interpreter fix is claimed.
+
+Literal primitive and semantic-call source witnesses pass CLI hash/check
+and run forward/adjoint on all x/z/target/control basis inputs plus coherent
+entangled x/z and control inputs, restoring the complete QuantumState and
+allocator checkpoint. The two catalog traces execute both forward and raw
+inverse on every x/z/control basis tuple, releasing all d/u workspace and
+comparing the complete live state including phase. Their low-level
+QuantumState allocation IDs are monotonic, so these raw harness comparisons
+check wire count and amplitudes rather than asserting allocator rollback.
+The real reference selector engine checks original/fresh CX selection,
+cleanup/gate kind separation and a duplicate fresh-selector tie isolated
+from the original source point; the metadata is injected into the parsed
+0.8 witness, not presented as 0.9 schedule admission.
+
+Initial harness fixes: comma-separated source parameter spacing; the raw
+quantum API's u64 wire type and monotonic IDs; the control formal's argument.
+A first attempt to admit the expanded recompute as ordinary source failed
+§6.2's source causal cleanup check. Scheduled §6.4 recompute is instead
+witnessed as constructor input and checked with the independent quantum
+executor; it is not advertised as accepted rewritten source. No accepted
+fixture was edited or removed, and no actual reference ownership mismatch
+was found behind these harness errors.
+
+Required pass-X headless gates, all exit 0: reference **488 passed,
+0 failed, 5 unchanged ignored** (485 baseline plus three regressions);
+conformance **113 passed, 0 failed, 0 ignored**;
+`python3 -I conformance/tests/draft_witnesses.py` PASS (rechecked on the
+final phase wording); `python3 -I conformance/tools/ref_catalog.py --check`
+PASS (219 recipes and unchanged envelope
+`5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`).
+All four gates unset DISPLAY, WAYLAND_DISPLAY, DBUS_SESSION_BUS_ADDRESS and
+BROWSER and set project-local TMPDIR; both Cargo gates use --offline and
+the requested manifest paths. Logs: `.tmp/pass-x-{reference,conformance,
+witness,catalog}.log`. Targeted final regression: `.tmp/pass-x-regression.log`.
+Owned Rust rustfmt and source/progress whitespace checks pass. K1–K79 are
+byte-identical to ba7d13f; K80 is the sole added row and sole new MUST.
+Accepted 0.8 and catalog bytes are unchanged; the final diff is byte-exact
+with labels `a/spec/Bennett-ISA-Spec.md` and
+`b/spec/Bennett-ISA-Spec-0.9.md`, retaining ordinary blank context lines.
+Test commits: 0f4e31c, a264277. Spec/brief commits: 22687a9, f3894f7
+(the latter keeps inverse step/phase governed by existing §11 semantics).
+
+The orchestrator owns the council run, session worklog and downstream
+statement-layer regeneration. No sibling write, push or remote/Dolt sync.
+
 ## 2026-11-01 Editorial pass IX — exact coherent addresses and A=0 (7js)
 
 Reading **1** adopted; 7js remains **in_progress for council**. This is a real
