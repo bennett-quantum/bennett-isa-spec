@@ -2,6 +2,56 @@ mod support;
 use bennett_isa_ref::{Argument, Budget, Object, OracleInput};
 
 #[test]
+fn pass_vii_same_oracle_and_arguments_keep_distinct_invocation_tokens() {
+    use bennett_isa_ref::{QuantumBindings, QuantumState};
+    let oracle =
+        r#"{"abi":"0.8","args":[],"fault":4,"in":[8],"kind":"oracle","mem":[],"tgt":8,"tier":"q"}"#;
+    let action = r#"{"abi":"0.8","args":["token","token"],"bounds":[],"in":[8],"kind":"action","mem":[],"mut":[8,4],"tier":"q"}"#;
+    let o = Object::parse(&support::object(&[
+        ("inc8", oracle, "oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()\nregs { one:reg[8], r:reg[8] }\n^entry():\none = lift.const.i8 1\nr = lift.add x one\nlift.retval r"),
+        ("twice", action, "action @twice (t:wire[8] mut, f:wire[4] mut) (x:wire[8] in) () (tk2:token, tk3:token) ()\n^entry():\noracle_call @inc8 tk2 (x) t f () ()\noracle_call @inc8 tk3 (x) t f () ()"),
+    ], "{}", "")).unwrap();
+    assert!(o.functions["inc8"].params[4].is_empty());
+    for input in 0..256 {
+        let mut q = QuantumState::new();
+        let x = q.allocate(8).unwrap();
+        let t = q.allocate(8).unwrap();
+        let f = q.allocate(4).unwrap();
+        for (wires, value) in [(&x, input), (&t, 0x55), (&f, 0xa)] {
+            for (bit, wire) in wires.iter().enumerate() {
+                if value >> bit & 1 != 0 {
+                    q.gate("x", &[*wire], None, &[]).unwrap();
+                }
+            }
+        }
+        let mut bindings = QuantumBindings::default();
+        for (name, wires) in [("x", &x), ("t", &t), ("f", &f)] {
+            bindings.bundles.insert(name.into(), wires.clone());
+        }
+        for (name, steps) in [("tk2", 2), ("tk3", 3)] {
+            bindings
+                .args
+                .insert(name.into(), Argument::Token(Budget::steps(steps)));
+        }
+        let before = q.clone();
+        o.execute_action("twice", &mut q, &bindings, false, &[])
+            .unwrap();
+        assert_eq!(q.read_basis(&x).unwrap(), input as u128);
+        assert_eq!(
+            q.read_basis(&t).unwrap(),
+            (0x55 ^ ((input + 1) & 255)) as u128
+        );
+        assert_eq!(q.read_basis(&f).unwrap(), 0xb);
+        o.execute_action("twice", &mut q, &bindings, true, &[])
+            .unwrap();
+        assert_eq!(
+            q, before,
+            "x={input}: inverse must retain both token tuples"
+        );
+    }
+}
+
+#[test]
 fn seed_inc8_full_input_domain_and_budget_boundaries() {
     let o = Object::parse(include_str!("fixtures/inc8.bisa")).unwrap();
     for x in 0..256 {

@@ -193,6 +193,7 @@ north star §3.1 requires).
 | K74 | §12.2 | **CHECKER-VERDICT**. The checker records per-claim labels and counts in its report, never trusting a requested label; witness: the four-element CNOT slice reports evidence with count 4 and fraction 1/2. [deps: ISA-1.2-P4, ISA-12.1-P1, ISA-12.1-P2, ISA-12.1-P8, ISA-12.3-P1] | INV-6 gap 10; afu | S | – |
 | K75 | §12.2 | **UNCHECKED-HOST-LIMIT**. Report host exhaustion separately from labels and rejection without a domain cap; witness: region[63,1] at count 1 remains legal even when one element cannot be stored. [deps: ISA-3.3-P2.S2, ISA-3.3-P19, ISA-12.1-P2, ISA-12.2-P1, ISA-5.6-P2, ISA-14.3-P3, ISA-12.3] | INV-6 gap 12; afu | S | – |
 | K76 | §5.6 | **FRAME-ENTRY-DOMAIN**. Normative constant and causal-adjoint analysis fixes D_F; interface/borrowed components stay independent and full; checker establishes reachable-entry support before restricted T3 factorisation. Witness: CX(0,b) passes, polynomial-only prefix zero does not. | consumer 73y; pass V; SQ 20 | E | – |
+| K77 | §4.7, §11.1, §16.2 | **ORACLE-INVOCATION-CONTEXT**. Explicit typed source-call token context is captured outside the declared argument vector, forwarded through adapters and retained under inverse traversal; each linked oracle construction uses its own tuple. Witness: the same inc8 closure and arguments at B=2 and B=3 in one expansion. | consumer 5xm; pass VII | S | – |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -1019,6 +1020,9 @@ and a `token` argument is usable only as the `tk` operand of
 or in `lift.call`'s token list. Lproc classical parameters have these
 same bit readings and may also be forwarded in `lift.call`'s classical
 list; token parameters retain their token identity and validity (§5.4).
+The invocation operand `tk` is separate from the callee's declared
+`args`; its explicit catalog context channel is `oracle_invocation`
+(§11.1, K77), including for the lifted calls of §4.2.
 
 ### 4.8 Opcode table (tier, operands, result)
 
@@ -2890,6 +2894,59 @@ binding rule does not replace §3.3's source interface region shape/role
 validation or the §9.2 linker obligation that the registry interface and
 body match the supplied closure hash.
 
+**Oracle invocation context (K77).** An oracle's catalog argument vector
+contains exactly its declared parameters, flattened in header-group order
+`in`, `tgt`, `fault`, `mem`, `args` (§16.2); empty groups add no entries.
+The invocation token is not an additional formal or vector entry.
+Before concrete expansion, consumers MUST supply and validate the
+explicit source-binding channel `oracle_invocation`, preserve it through
+the captures below, and reject missing, ill-typed or source-inconsistent
+context. The channel is a record with exactly one field, `token`, of
+K24's `value` type with `isa_type:"token"`: four canonical nonnegative
+decimal strings in §5.4 order `(B, heap_limit, stack_limit, depth_limit)`,
+resolved from that source call's `tk` and
+validated for the linked callee under §5.4. A root oracle instead binds
+the explicit launch/schedule request budget. Unresolved source parameters
+retain §11's admission/concrete-check staging.
+
+This channel is explicit input to the linked source-body builder, outside
+the catalog JSON and positional actuals, not an implicit name, default,
+new constructor key or token arithmetic inside a recipe. The registry
+binds the closure's source/interface; its builder instantiates the
+source-derived constructor body separately for each invocation, using
+this tuple and the linked source/layout to derive B, frames and every
+token-dependent limit or width supplied to `oracle.construct`.
+A registry keyed by closure hash alone cannot fix one invocation budget.
+The context is associated with the full §11 invocation identity, not
+with the closure hash or positional vector values alone.
+
+Source binding captures the channel with the corresponding `arguments`
+actual and with any body/template adapter containing that call. Forwarding
+an arguments name through `invoke` or `call`, or splicing/applying a
+captured body/template, preserves that captured channel; unrelated
+caller/apply-site context cannot replace it. The qinplace adapters capture
+the source `tk` for both calls. Each nested source oracle call resolves
+its own `tk` in its own fixed bindings, then restores the outer context.
+Inverse traversal and source-adjoint adapters retain each forward call's
+channel and forward occurrence identity while reversing/adjointing the
+operations as §5.3/§11 require. None of these captures adds a leaf,
+ordinal, source parameter or closure-hash component.
+
+**Two-token witness.** Use §16.3 example 1's `inc8` closure and two source
+calls `oracle_call @inc8 tk2 (x) t f () ()` and
+`oracle_call @inc8 tk3 (x) t f () ()` in one action expansion, with
+`tk2=(2,0,0,0)` and `tk3=(3,0,0,0)`. Both positional vectors are `[x,t,f]`;
+their captured contexts are respectively `{"token":["2","0","0","0"]}`
+and `{"token":["3","0","0","0"]}`. The linked closure hash is identical.
+The first construction has two frames and XORs `(0,FAULT_BUDGET_STEPS)`
+into `(t,f)`; the second has three frames and XORs `(x+1 mod 256,0)`.
+Starting from `(t,f)=(0,0)`, the final pair is `(x+1 mod 256,1)`.
+Their §11 edges are distinct: separate source points each have
+`call_index=0`; two calls within a single source-row forwarding expansion
+instead have forward `call_index=0,1`. Inverse traversal retains those
+identities and tuples and restores the complete input. Neither binding
+adds a token to `inc8`'s empty signature `args` list or changes its hash.
+
 **Ordered descriptors (K25).** A `records` formal has exactly `name`,
 `type`, `fields`, `order`. `fields` is an ordered typed formal list;
 its types are `integer`, `wire`, `region`, `class`, `allocation`, or
@@ -3801,6 +3858,11 @@ syntax; annotations travel outside the object.
   OPCODE    := a mnemonic of §4 with its dotted suffix (§4.8 fixes operand count, kinds and result placement)
   VER       := INT "." INT
 ```
+
+The oracle header and signature declare no invocation-token slot. Its
+catalog interface follows the five printed groups exactly; the separate
+`tk` operand binds the typed `oracle_invocation` channel of §11.1, not a
+reserved header name or an extra `args` element.
 
 Lproc groups have the types and roles of §3.7. A `token` suffix is
 permitted only in the third group and a `classical` suffix only in the
