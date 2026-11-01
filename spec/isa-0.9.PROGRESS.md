@@ -1,3 +1,62 @@
+## 2026-11-01 Editorial pass VI — council round 6 response (73y)
+
+Source: `../bennett/docs/council/isa-09-2026-10-31/round-6/report.md`
+and `out-codex.json` (codex seat, astra). All requested dispositions are
+adopted; 73y remains in_progress for the orchestrator's round 7.
+
+| Item | Adopted/declined | Clauses / evidence | Commits |
+|---|---|---|---|
+| R6-CODEX-1, S0 | adopted: own and contextual control literals participate in the false shortcut; preserve values and record no event | §5.6 rule 1; suite F `pass_vi_own_false_control_preserves_zero_at_frame_entry` | 44ffea0 |
+| S1 finite-transfer domain | adopted: acceleration preserves canonical D_F; failure on a coarser superset is inconclusive | §5.6 rule 3 | 44ffea0 |
+| S1 frame versus region claim | adopted: region-D claim alone is insufficient; zero-control and polynomial-only-prefix illustration | §12.2; existing frame-domain negatives | 44ffea0 |
+| S1 statement layer | adopted; regeneration and INV-3 citation resolution belong to the conformance orchestrator, after final pass VII text | final 0.9 statement layer in bennett-conformance, no sibling write here | orchestrator pending |
+
+Exact rule-1 replacement (the following all-operands-known rule remains):
+“If any control literal is known false, counting the operation's own
+controls together with its effective control context, the operation is
+disabled: preserve all abstract values and record no causal event.”
+
+Exact rule-3 addition:
+“The normative D_F is the union obtained by the stated finite transfers;
+acceleration must preserve that domain. A coarser invariant may prove
+the obligation on a superset, but failure on that superset is not a
+counterexample on D_F.”
+
+Exact §12.2 addition:
+“For a borrow-frame obligation, use D_F of §5.6; a region claim over D
+does not by itself establish the frame claim.” The illustration uses
+single-frame CX(c,b) over {c=0} × {b=0,1}; the interleaved CNOT prefix
+clears c only by polynomial algebra and therefore fails the normative
+frame domain. The witness remains rejected even with valid reverse cleanup.
+
+Lamport response: R6 <1>1–<1>3 expose a real terminology ambiguity;
+<1>4 identifies the sound implemented shortcut. The replacement explicitly
+counts both control sources, removing the divergent D_F in <1>5 without
+strengthening the analysis. The supplied complete CCX witness is admitted
+by the unchanged reference **before the text edit**, so this is a regression
+lock, not a claimed red-to-green implementation fix. Its single CX frame
+requires c=0 at entry; replacing both CCXs by X (valid cleanup, c=1 at
+entry) rejects with §5.6. All five frame_domain tests pass, including the
+polynomial-only-prefix, independent-interface and certificate negatives.
+Evidence: `.tmp/pass-vi-before-text.log`.
+
+Required headless gates, all exit 0: reference **467 passed, 0 failed,
+5 unchanged ignored**; conformance **113 passed, 0 failed, 0 ignored**;
+`python3 -I conformance/tests/draft_witnesses.py` PASS;
+`python3 -I conformance/tools/ref_catalog.py --check` PASS.
+Logs: `.tmp/pass-vi-{reference,conformance,witness,catalog}.log`.
+Both Cargo commands used `--offline` and the requested manifest paths;
+all four commands unset DISPLAY, WAYLAND_DISPLAY, DBUS_SESSION_BUS_ADDRESS
+and BROWSER, with project-local TMPDIR. The formatted frame-domain
+regression was rechecked separately, 5/5 PASS.
+
+K1–K76 are byte-for-byte unchanged. The exact-label 0.8-to-0.9 diff is
+regenerated. Accepted 0.8 and published catalog bytes are unchanged;
+catalog envelope remains
+`5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`
+(219 recipes). No new K row, reference implementation change, sibling
+write, push or remote sync. Orchestrator owns worklog and council round.
+
 ## 2026-11-01 Editorial pass V — consumer borrow-domain gap (73y)
 
 Maintainer selects Reading B with a normative, object-checkable entry
