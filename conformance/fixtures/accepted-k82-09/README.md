@@ -1,6 +1,6 @@
-# Pending K82 named-interface vector (ISA 0.9, §11.1, §15)
+# K82 named-interface vector (ISA 0.9, §11.1, §15)
 
-Status: **proposed, not accepted**. Rename to `accepted-k82-09` when the council accepts K82; the spec diff cites that name.
+Status: **accepted** (council round 10, 2026-11-01; `bennett/docs/council/isa-09-k82-2026-11-01/`).
 The proposal and diff are in `docs/notes/2026-11-01-ref-named-interface-k82.md`.
 
 | File | Contents |
@@ -16,10 +16,10 @@ wire bundles, then either the expected leaves or `"reject"`.
 Reproduce from the repository root:
 
 ```sh
-python3 -I conformance/fixtures/pending-k82-09/generate.py --check
+python3 -I conformance/fixtures/accepted-k82-09/generate.py --check
 CARGO_TARGET_DIR=.tmp/opus-isa-helpers/target cargo run -q --release --offline \
-  --manifest-path conformance/fixtures/pending-k82-09/probe/Cargo.toml -- \
-  conformance/fixtures/pending-k82-09/k82.json spec/ref-0.9.json
+  --manifest-path conformance/fixtures/accepted-k82-09/probe/Cargo.toml -- \
+  conformance/fixtures/accepted-k82-09/k82.json spec/ref-0.9.json
 ```
 
 Reference result on 2026-11-01: 86/86 edge digests match and 14/16 cases pass. The two failures are expected until

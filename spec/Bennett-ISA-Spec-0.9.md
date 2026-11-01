@@ -19,6 +19,8 @@ K1–K80 are accepted in total. The three-seat acceptance of the core stands.
 **Round 9: accepted** (2026-11-01, codex seat, 0 blocking). Passes XI–XII
 are accepted; K81 was accepted by the codex seat in fix round 9.
 K1–K81 are accepted in total. The three-seat acceptance of the core stands.
+**Round 10: accepted** (2026-11-01, sol and codex seats, 0 blocking; muse seat advisory
+for this one-row fix, pending). K82 is accepted; K1–K82 are accepted in total.
 §0 lists every change from 0.8.
 Implementation is expected to expose frictions; revisions go back
 through the council. Founding text of
@@ -207,6 +209,7 @@ north star §3.1 requires).
 | K79 | §4.6, §16.2 | **COHERENT-EMPTY-ADDRESS**. Coherent memory rows bind exactly A address wires; A=0 has the address-only source actual `()`, bound to the catalog's empty wire list. Ordinary wire values remain nonempty. Witness: qload/qunload/qstore/qexchm on region[0,1] select cell 0; nonempty A=0 and empty A>0 addresses reject. | consumer 7js; pass IX | S | – |
 | K80 | §11 | **CLEANUP-LEAF-OWNERSHIP**. Reverse retains written cleanup points; recompute owns one fresh caller leaf/call space at the carrier, with separate callee spaces and fresh replay identities. Witness: a six-row two-CX computation/cleanup has reverse leaves at entry:3/4/5 and recompute leaves at entry:5 ordinals 0–7. | consumer 5cd; pass X | S | – |
 | K81 | §11 | **CLEANUP-PAIR-PARTITION**. Intrinsic cleanup pairs retain their direct computing operations; release-ended terminal inverse chains coalesce before independent adjoint-call carriers are formed. No inverse occurrence has two owners. Nonzero call targets retain their exact source-derived entry history under recompute. Witness: qcopy/mix/adj-mix/quncopy has carriers at entry:2 and entry:3, independently selectable. | consumer 9hv; pass XII; pending round 9 | S | – |
+| K82 | §11.1, §15 | **NAMED-INTERFACE-RECIPES**. A recipe whose formals are all bare integer names, or none, reads its remaining wires by name from the invoking scope; every other recipe and every template is closed. No catalog byte or hash changes. Witness: bind.value.add(2,x,y,z) expands value.add over x,y,z; a typed recipe reading q, or a site with no q bound, rejects. | b-isa-spec-g2q; bennett-sched-enz; pass XIII; round 10 | S | – |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -2987,11 +2990,44 @@ nonfinite angle, unknown constructor/key/gate, invalid gate arity,
 coincident target/control, unmatched allocation/release, or cyclic
 `invoke`/symbol expansion. Static integer bounds must yield finite
 expansion; validation is repeated for every actual parameter tuple before
-its expansion can be used. There are no implicit bindings or defaults.
+its expansion can be used. There are no implicit bindings or defaults;
+K82 below is the only by-name binding, and it is explicit.
 Acyclicity concerns declared
 recipe/symbol dependencies, not repetition of a higher-order recipe name
 inside finite captured actual syntax: qloop(3, qloop(2, B)) expands to six
 copies of B. Consumers expand finite actual bodies to a constructor fixpoint.
+
+**Named-interface recipes (K82).** A recipe whose `parameters` are all
+bare names, including an empty list, is a named-interface recipe. Its
+named interface is every name its body uses as a wire before any lexical
+binding of that name, in body order, plus the named interface of each
+named-interface recipe it invokes, less the names bound at that invoke.
+Every other recipe, and every K22 template even with bare formals, is
+closed: a name it leaves unbound rejects.
+An `invoke` of a named-interface recipe evaluates each interface name as
+a wire actual in the invoke's lexical environment, under the same name,
+when it evaluates `args`. K26 and K27 apply as for any wire actual, and an
+invoke inside a captured body resolves in that capture. A name with no
+wire binding there rejects. Nothing else is imported: an integer, body or
+other non-wire name stays unbound in the callee, and any other caller name
+is invisible to it. The callee's allocations belong to its own scope, so
+they do not shadow an unrelated caller name.
+An interface name has no declared width. Each subscript must lie within
+the bound list, and a whole-name use takes the entire list under the
+gate's arity check; the bound list may be longer than the body reads.
+Equal-width checking belongs to the typed formals of the invoking recipe.
+Instantiating such a recipe other than by `invoke` requires an explicit
+map from exactly its interface names to wire lists. A body that releases
+an interface name still requires its matching live allocation.
+In `ref` version 0.9, 54 recipes have this form. Exactly 20 `invoke` sites
+reach them, each from a typed recipe whose wire formals carry the identical
+names, and none from another named-interface recipe. This rule changes no
+catalog byte, leaf, ordinal or hash.
+Witness: `bind.value.add(2,x,y,z)` binds typed formals a, b, t to x, y, z;
+its `invoke` of `value.add(2)` then reads those same three lists, emitting
+the leaves of `value.add` over x, y, z. A typed recipe reading a formal it
+does not declare rejects, as does an invoke with no `q` in scope of a recipe
+reading `q`.
 
 **Image binding (K21).** An `image` actual is a bound image formal or
 an even-length string of lowercase hexadecimal byte pairs in data-image
@@ -3977,6 +4013,10 @@ Born probabilities, consuming the wires.
 ### 14.4 Mechanisation *(deferred)*
 
 ## 15. Conformance suites
+
+The K82 named-interface vector is published in
+`conformance/fixtures/accepted-k82-09/`: the catalog's interfaces and invoke
+edges, expanded leaf digests for those edges and accept/reject binding cases.
 
 The K81 joint-operation / first-release vector is published in
 `conformance/fixtures/accepted-k81-09/`: both release orders, indivisible
