@@ -46,7 +46,24 @@ prerequisite remains open as b-isa-spec-fuk, and full musl rung-3 acceptance
 still requires the consumer pipeline and explicit verified pin updates.
 No sibling changes or production musl verdict is claimed.
 
-Full gates in progress: `.tmp/pass-xi-04d-{reference,conformance,witness,catalog}.log`.
+Full gates finished, all exit 0: reference **500 passed / 0 failed /
+5 unchanged ignored** (491 baseline + nine regressions); conformance
+**113 passed / 0 failed / 0 ignored**; both `draft_witnesses.py` and
+`ref_catalog.py --check` PASS (219 recipes, unchanged envelope
+`5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`).
+Each gate used the prescribed headless environment and project-local TMPDIR;
+both Cargo suites ran offline. Logs:
+`.tmp/pass-xi-04d-{reference,conformance,witness,catalog}.log`.
+Owned rustfmt/whitespace and strict library/binary Clippy pass. Release build
+passes, and the consumer's exact executor-control fixture passes debug and
+release saved replay, byte-identical stdout, full reset and corrupted entry-1
+rejection (exit 1, no stdout). These are device controls, not musl acceptance.
+Evidence: `.tmp/pass-xi-consumer-*`, `.tmp/pass-xi-release-info.json`.
+Independent audit `.tmp/pass-xi-audit.log` confirms frozen 0.8/0.9/catalog/diff
+bytes, exact-label diff regeneration equality and unchanged K1–K80 inventory.
+Implementation: fdf553e; 04d closed and Beads exported after full gates.
+A concurrent unrelated beads-only commit 1a7f011 was preserved; no source
+from that consumer question was changed here. No push or sibling writes.
 
 ## 2026-11-01 Round 8 acceptance and S1 portable-vector publication
 

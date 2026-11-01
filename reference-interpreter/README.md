@@ -229,7 +229,7 @@ coverage) remains staged as PROGRESS records.
   in execution order. A faulting effect contributes no entry (§7.3 atomicity).
   For `reverse --steps N`, save only that forward prefix. Whole-run reversal
   does not erase the saved journal. A normal JSON `FAILED` run can be saved;
-  command diagnostics do not publish a tape.
+  replay-validation or reversal failure does not write a tape.
 - `--replay-tape file`: read a saved `Tape[]` and consume its entries in order.
   The deterministic device model forms each candidate effect from the entry
   state and supplied entropy; its dev, op, integer args and transferred bytes

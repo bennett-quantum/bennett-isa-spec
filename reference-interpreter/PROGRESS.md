@@ -1,8 +1,9 @@
 # Bennett ISA reference interpreter progress
 
 Resume here. The whole accepted ISA 0.8 remains in scope; staged deliverables
-are not complete. Sole implementation sub-agent; owned interpreter and external
-round-23 response only. Never push. Cargo gates use the headless prefix and
+are not complete. ISA 0.9 admission is not claimed. This implementation session
+owns the Pass-XI reference consumer interface and local progress/handoff records;
+no sibling writes or push. Cargo gates use the headless prefix and
 TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/.tmp.
 
 ## 2026-11-01 — Pass XI: rung-3 prerequisites
@@ -40,7 +41,27 @@ Test-harness corrections: synthetic CC stub needed additional heap after its
 host-call allocation; the rollback harness uses three single steps rather
 than run(3), which correctly diagnoses fuel exhaustion on unfinished runs.
 No production-semantic fallback or fixture weakening was introduced.
-Required full-suite gates are running; final results recorded after completion.
+Required gates finished successfully (all exit 0), headless with project-local
+TMPDIR and offline Cargo:
+- 221 disposition: reference **491 passed / 0 failed / 5 ignored**;
+  conformance **113 passed / 0 failed / 0 ignored**; both Python gates PASS.
+- 04d implementation: reference **500 passed / 0 failed / 5 unchanged ignored**;
+  conformance **113 passed / 0 failed / 0 ignored**; both Python gates PASS.
+Catalog: 219 recipes and unchanged envelope
+`5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`.
+Logs: `.tmp/pass-xi-{221,04d}-{reference,conformance,witness,catalog}.log`.
+Owned rustfmt/whitespace and strict lib/bins Clippy pass; offline release build
+passes. The exact rung-3 consumer executor-control fixture passes both debug
+and release replay/reset and corrupted entry-1 rejection, with byte-identical
+stdout; `.tmp/pass-xi-consumer-*` and `.tmp/pass-xi-release-info.json` retain
+that evidence. Release binary lives in this repo's target/release; the pinned
+sibling release remains unchanged and needs an explicit consumer override/update.
+This is not a production musl verdict. Frozen artifacts, K1–K80 inventory and
+exact-label diff byte equality pass independent audit (`.tmp/pass-xi-audit.log`).
+221 disposition commit c809fc0; first-pass gate record 666cb6b; replay code/docs
+commit fdf553e. 04d closed after gates; open fuk retains actual 0.9 migration.
+Concurrent unrelated beads-only commit 1a7f011 is preserved. The orchestrator
+retains session-worklog ownership. No push, remote sync or sibling write.
 
 ## 2026-11-01 — n8j: persistent dynamic-instance checkpoints
 
