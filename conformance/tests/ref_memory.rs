@@ -6,7 +6,7 @@ use bennett_isa_conformance::{
 };
 #[test]
 fn generic_dispatch_full_symbolic_domains() {
-    let bytes = include_str!("../../spec/ref-0.9-draft.json");
+    let bytes = include_str!("../../spec/ref-0.9.json");
     let mut e = Expander::new(bytes, Registry::new()).unwrap();
     for a in 1..=4 {
         let cells = 1 << a;
@@ -85,7 +85,7 @@ fn generic_dispatch_full_symbolic_domains() {
 
 #[test]
 fn generic_scans_full_symbolic_domains() {
-    let bytes = include_str!("../../spec/ref-0.9-draft.json");
+    let bytes = include_str!("../../spec/ref-0.9.json");
     let mut e = Expander::new(bytes, Registry::new()).unwrap();
     for n in 1..=4 {
         for length_width in 1..=4 {

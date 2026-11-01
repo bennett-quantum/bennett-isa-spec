@@ -6,7 +6,7 @@ no allocations, releases, borrowed wires, local regions or classical
 arguments. The budget is [0,0,0,0] because neither action invokes an oracle.
 
 The complete published catalog is `spec/ref-0.9.json`, byte-identical to
-`spec/ref-0.9-draft.json`: 219 recipes, four-line envelope SHA-256
+`spec/ref-0.9.json`: 219 recipes, four-line envelope SHA-256
 `5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`.
 `controlled_action_fixture.py` uses the existing conformance JCS and §9.2
 envelope tooling to derive every asset; `--check` compares exact bytes.

@@ -1,6 +1,6 @@
 # Bennett ISA reference interpreter
 
-Rust 2021, standard library only, ISA 0.8. [PROGRESS.md](PROGRESS.md) records
+Rust 2021, standard library only; still targets ISA 0.8. ISA 0.9 admission is not claimed. [PROGRESS.md](PROGRESS.md) records
 what is verified, what is staged and in what order; [SPEC-QUESTIONS.md](SPEC-QUESTIONS.md)
 records every reading the specification leaves open;
 [council/response-round-1.md](council/response-round-1.md) answers the council's

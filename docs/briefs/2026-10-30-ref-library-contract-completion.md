@@ -3,7 +3,7 @@
 Repository `/home/tobias/Projects/bennett-workspace/bennett-isa-spec` (HEAD 51d45dc or later). You are the sole
 implementer of the 0.9 §11.1 recipe-language completion **and** the `ref` catalog that depends on it (one implementer,
 because the spec text and the catalog must agree in the same pass). The previous catalog job stopped correctly at a
-54-recipe checkpoint (`spec/ref-0.9-draft.json`, `.README.md`, `.PROGRESS.md`; checkpoint hash
+54-recipe checkpoint (`spec/ref-0.9.json`, `.README.md`, `.PROGRESS.md`; checkpoint hash
 3a99ce30…055d; 40 conformance tests; harness 445/0/60) and filed two contract gaps. Read first: `CLAUDE.md` (rules 1,
 3, 5, 8, 10, 11); `bd show b-isa-spec-cbk b-isa-spec-8sc` (from the repo root, `BEADS_HOOK_TIMEOUT=20`); the previous
 brief `docs/briefs/2026-10-30-ref-library-catalog.md` (its rules still bind); draft 0.9 §11.1 and the
@@ -63,11 +63,11 @@ change, record it, and finish every other row. Rule 10: no omission for cost.
 
 As in the previous brief: headless, offline, `TMPDIR` under the repo's `.tmp`; fmt, clippy -D warnings, `cargo test
 --offline` on `conformance/Cargo.toml`; harness stays 445 pass / 0 fail (unavailable may grow by your pending-0.9
-cases only). Owned paths: `spec/Bennett-ISA-Spec-0.9-draft.md` (§0 rows and §11.1 only), `spec/isa-0.8-to-0.9.diff`,
-`spec/isa-0.9.PROGRESS.md`, `spec/ref-0.9-draft.json`, `spec/ref-0.9-draft.README.md`, `spec/ref-0.9-draft.PROGRESS.md`,
+cases only). Owned paths: `spec/Bennett-ISA-Spec-0.9.md` (§0 rows and §11.1 only), `spec/isa-0.8-to-0.9.diff`,
+`spec/isa-0.9.PROGRESS.md`, `spec/ref-0.9.json`, `spec/ref-0.9-draft.README.md`, `spec/ref-0.9-draft.PROGRESS.md`,
 `conformance/`, `bd`. Never `spec/Bennett-ISA-Spec.md`, `spec/README.md`, `reference-interpreter/` (another agent
 commits there concurrently), `include/`, `docs/`, `worklog/`, `HANDOFF.md`, `CLAUDE.md`, siblings. Commit by explicit
-path list after Part 1 and after every family (`BEADS_HOOK_TIMEOUT=20 git -C /home/tobias/Projects/bennett-workspace/bennett-isa-spec commit -- spec/Bennett-ISA-Spec-0.9-draft.md spec/isa-0.8-to-0.9.diff spec/isa-0.9.PROGRESS.md spec/ref-0.9-draft.json spec/ref-0.9-draft.README.md spec/ref-0.9-draft.PROGRESS.md conformance`;
+path list after Part 1 and after every family (`BEADS_HOOK_TIMEOUT=20 git -C /home/tobias/Projects/bennett-workspace/bennett-isa-spec commit -- spec/Bennett-ISA-Spec-0.9.md spec/isa-0.8-to-0.9.diff spec/isa-0.9.PROGRESS.md spec/ref-0.9.json spec/ref-0.9-draft.README.md spec/ref-0.9-draft.PROGRESS.md conformance`;
 retry on `index.lock`); never push; no `cd` in compound commands; absolute paths. Close cbk and 8sc when Part 1 lands
 with their witnesses. Final message: commit hashes, the §11.1 additions in ten lines, the completed coverage table,
 recipe count, verified configurations and tuple counts per family, the library hash from both computations,

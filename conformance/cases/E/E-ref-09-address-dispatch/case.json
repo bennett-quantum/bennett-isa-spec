@@ -5,7 +5,7 @@
   "derivation": "For every one-bit address, complete two-cell memory and arbitrary value target, execute equality-selected XOR copy/store/exchange in address order; Rust integer cell extraction and bit masks provide independent outcomes. Widths 1\u20134, both ambient controls, immediate equality uncompute and full original ordinal reversal. This is a primitive checkpoint, not a claim of generic mapped-region or row binding.",
   "scenario": {
     "family": 5,
-    "catalog": "spec/ref-0.9-draft.json",
+    "catalog": "spec/ref-0.9.json",
     "checker": "address_dispatch_full_domain"
   },
   "expected_outcome": {

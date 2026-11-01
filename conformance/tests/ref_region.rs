@@ -8,7 +8,7 @@ use bennett_isa_conformance::{
 #[test]
 fn arbitrary_image_scopes_are_unconditional_and_restore_clean_allocation() {
     let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9-draft.json"),
+        include_str!("../../spec/ref-0.9.json"),
         Registry::new(),
     )
     .unwrap();
@@ -85,7 +85,7 @@ fn arbitrary_image_scopes_are_unconditional_and_restore_clean_allocation() {
 fn sparse_and_dense_exact_columns_agree_on_entangled_clifford_t_states() {
     use bennett_isa_conformance::ref_amplitudes::column;
     let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9-draft.json"),
+        include_str!("../../spec/ref-0.9.json"),
         Registry::new(),
     )
     .unwrap();

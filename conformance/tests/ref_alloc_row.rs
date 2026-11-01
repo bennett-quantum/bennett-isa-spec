@@ -12,7 +12,7 @@ fn mux(b: &mut Bdd, mask: usize, old: usize, new: usize) -> usize {
 #[test]
 fn allocator_four_slot_order_full_domains() {
     let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9-draft.json"),
+        include_str!("../../spec/ref-0.9.json"),
         Registry::new(),
     )
     .unwrap();

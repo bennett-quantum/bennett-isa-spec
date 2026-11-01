@@ -5,7 +5,7 @@
   "derivation": "Independent full-domain Rust integer arithmetic versus expanded Boolean/ripple/restoring-division gates, widths 1\u20134, arbitrary XOR and four-bit fault targets, both ambient control values; all scratch clean and original ordinal reversal restores every bit. 64 packed lanes execute independent basis states with bitwise operations; no sampling. Twelve shift recipes specialize widths 1\u20134; general widths and row compositions remain unfinished.",
   "scenario": {
     "family": 3,
-    "catalog": "spec/ref-0.9-draft.json",
+    "catalog": "spec/ref-0.9.json",
     "checker": "other_arithmetic_full_domain; casts_and_select_full_domain"
   },
   "expected_outcome": {

@@ -1,6 +1,6 @@
 //! Independent draft catalog checks; no interpreter source dependency.
 use bennett_isa_conformance::ref_catalog::{Catalog, Machine};
-const BYTES: &str = include_str!("../../spec/ref-0.9-draft.json");
+const BYTES: &str = include_str!("../../spec/ref-0.9.json");
 fn catalog() -> Catalog {
     Catalog::parse(BYTES).unwrap()
 }
@@ -417,7 +417,7 @@ fn independent_canonical_bytes_and_envelope_hashes() {
         sha256(b"abc"),
         "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
     );
-    let draft = include_str!("../../spec/Bennett-ISA-Spec-0.9-draft.md");
+    let draft = include_str!("../../spec/Bennett-ISA-Spec-0.9.md");
     let witness = draft
         .split("**ISA-REF-LIB witness**")
         .nth(1)
@@ -457,7 +457,7 @@ fn independent_canonical_bytes_and_envelope_hashes() {
         .unwrap()
         .len();
     assert!(draft.contains(&format!(
-        "Complete draft catalog: **{count} recipes**; envelope SHA-256\n`{hash}`."
+        "Complete catalog: **{count} recipes**; envelope SHA-256\n`{hash}`."
     )));
     println!("Rust and Python complete draft library: {count} recipes; envelope SHA-256 {hash}");
 }

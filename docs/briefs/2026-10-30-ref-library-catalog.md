@@ -6,7 +6,7 @@ implementer of the reference expansion library catalog. The maintainer ratified 
 schema, four-line LF envelope hashed over the whole canonical JSON document, per-row leaf ordinals, scratch identity by
 expansion path, `removable` empty everywhere, deterministic Boolean decomposition (left-to-right postorder, fresh
 scratch per node, no CSE, bit loops from the LSB), decomposition set = the §17 item 7 defaults made explicit. The
-contract text is draft 0.9 §11.1 (`spec/Bennett-ISA-Spec-0.9-draft.md`, "Proposed reference-library contract (K11)",
+contract text is draft 0.9 §11.1 (`spec/Bennett-ISA-Spec-0.9.md`, "Proposed reference-library contract (K11)",
 now decided) and its "Decomposition set" table. Your job is the **complete** catalog under that contract, with
 independent full-domain correctness evidence, and its hash. Publication to `ref/` happens after 0.9 acceptance, not
 in this job.
@@ -21,7 +21,7 @@ item 7, §3.5–§3.7, §4 (every instruction and row), §5.2, §5.3, §5.7, §1
 
 ## Deliverables
 
-1. `spec/ref-0.9-draft.json`: the canonical (RFC 8785, UTF-8, no trailing LF) library document with `isa`, `name`,
+1. `spec/ref-0.9.json`: the canonical (RFC 8785, UTF-8, no trailing LF) library document with `isa`, `name`,
    `version`, `recipes` exactly as §11.1 defines, recipes in bytewise `kind` order then parameter-tuple order, each
    with `kind`, parameters or instance widths, `operations` (fully instantiated leaves with `ordinal`) or
    `parameters` + `body` (closed constructors: gate, alloc, release, classical, for, invoke, inverse), `scratch`,
@@ -71,13 +71,13 @@ Headless, offline, `TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-s
 
 ## Owned paths and process
 
-- Write only `spec/ref-0.9-draft.json`, `spec/ref-0.9-draft.README.md`, `spec/ref-0.9-draft.PROGRESS.md` (your
+- Write only `spec/ref-0.9.json`, `spec/ref-0.9-draft.README.md`, `spec/ref-0.9-draft.PROGRESS.md` (your
   progress file: family, recipes done, widths checked, tuple counts, commit), `conformance/` (new modules, tests,
-  cases), the single marked hash/count edit in `spec/Bennett-ISA-Spec-0.9-draft.md` plus `spec/isa-0.8-to-0.9.diff`,
+  cases), the single marked hash/count edit in `spec/Bennett-ISA-Spec-0.9.md` plus `spec/isa-0.8-to-0.9.diff`,
   and `bd` notes/creates. Never `spec/Bennett-ISA-Spec.md`, `spec/README.md`, `reference-interpreter/`, `include/`,
   `docs/`, `worklog/`, `HANDOFF.md`, `CLAUDE.md`, any sibling repo.
 - Commit after every family by explicit path list:
-  `BEADS_HOOK_TIMEOUT=20 git -C /home/tobias/Projects/bennett-workspace/bennett-isa-spec commit -- spec/ref-0.9-draft.json spec/ref-0.9-draft.README.md spec/ref-0.9-draft.PROGRESS.md conformance`
+  `BEADS_HOOK_TIMEOUT=20 git -C /home/tobias/Projects/bennett-workspace/bennett-isa-spec commit -- spec/ref-0.9.json spec/ref-0.9-draft.README.md spec/ref-0.9-draft.PROGRESS.md conformance`
   (retry on `index.lock`); never push; no `cd` in compound commands; absolute paths.
 - Final message: commit hashes, the coverage table (every §4 row → recipe), recipe count, widths and tuple counts
   verified per family, the library hash from both computations, the conformance counts, and every contract gap you

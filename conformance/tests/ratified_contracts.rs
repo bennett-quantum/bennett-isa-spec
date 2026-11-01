@@ -67,7 +67,7 @@ fn grid_topology_bytes_hash_and_adjacency() {
             .unwrap()
             .parent()
             .unwrap()
-            .join("spec/Bennett-ISA-Spec-0.9-draft.md"),
+            .join("spec/Bennett-ISA-Spec-0.9.md"),
     )
     .unwrap();
     assert!(draft.contains(&doc.to_string()));
@@ -151,7 +151,7 @@ fn typed_frame_bytes_widths_and_disjoint_lifetimes() {
             .unwrap()
             .parent()
             .unwrap()
-            .join("spec/Bennett-ISA-Spec-0.9-draft.md"),
+            .join("spec/Bennett-ISA-Spec-0.9.md"),
     )
     .unwrap();
     assert!(draft.contains(&doc.to_string()));

@@ -77,7 +77,7 @@ fn oracle_construction_complete_lifetimes_bounded_steps_commit_and_reverse() {
             }
         }
     }
-    let mut e = Expander::new(include_str!("../../spec/ref-0.9-draft.json"), registry).unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), registry).unwrap();
     let mut tuples = 0u128;
     for (hash, w, bound, mode) in &cases {
         let bundles = [("x", *w), ("y", *w), ("tgt", *w), ("fr", 4), ("control", 1)];

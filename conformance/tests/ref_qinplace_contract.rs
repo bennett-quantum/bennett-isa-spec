@@ -6,7 +6,7 @@ use bennett_isa_conformance::{
 
 #[test]
 fn k28_preserves_instruction_release_sequence_and_row_ordinals() {
-    let draft = include_str!("../../spec/Bennett-ISA-Spec-0.9-draft.md");
+    let draft = include_str!("../../spec/Bennett-ISA-Spec-0.9.md");
     assert!(draft.contains("| K28 | §11.1 | **REF-INSTRUCTION-RELEASE**"));
     assert!(draft.contains("The reverse-allocation release rule governs recipe scratch; an instruction whose own semantics fix a release sequence (qinplace per §4.5: `qfree t; qfree f`) keeps that sequence, and its recipe MUST reproduce it exactly. [deps: ISA-4.5-P5, ISA-11.1-P29.S5]"));
     let d = r#"{"isa":"0.9","name":"ref","version":"0.9","recipes":[{"kind":"witness","parameters":[{"name":"G","type":"symbol"},{"name":"x","type":"wire","width":1}],"body":[{"declare":"t","width":1,"class":{"class":"any"},"state":"clean","body":[{"declare":"f","width":4,"class":{"class":"any"},"state":"clean","body":[{"acquire":"t"},{"acquire":"f"},{"call":"G","args":["x","t","f"]},{"gate":"swap","wires":["x","t"]},{"call":"G","args":["x","t","f"]},{"relinquish":"t"},{"relinquish":"f"}]}]}],"scratch":[],"removable":[],"source":"§4.5 qinplace; §11.1 K28"}]}"#;
@@ -82,7 +82,7 @@ fn scheduled_action_adj_consumes_source_adjoint_with_fresh_ordinals() {
         )
     };
     registry.insert(root.clone(), json::parse(&format!(r#"{{"parameters":[{{"name":"G","type":"symbol"}},{{"name":"H","type":"symbol"}},{{"name":"x","type":"wire","width":1}}],"body":[{{"invoke":"adj","args":[[{{"invoke":"qinplace","args":[1,4,"x",{}, {},[]]}}]]}}]}}"#, adapter("H"), adapter("G"))).unwrap());
-    let all = Expander::new(include_str!("../../spec/ref-0.9-draft.json"), registry)
+    let all = Expander::new(include_str!("../../spec/ref-0.9.json"), registry)
         .unwrap()
         .expand(
             &root,

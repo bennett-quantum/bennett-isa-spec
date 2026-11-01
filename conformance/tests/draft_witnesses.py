@@ -1,17 +1,17 @@
-"""Check printed draft witnesses independently, without importing any implementation."""
+"""Check printed publication witnesses independently, without importing any implementation."""
 from pathlib import Path
 from fractions import Fraction
 import hashlib
 import json
 
 root = Path(__file__).resolve().parents[2]
-draft = (root / "spec/Bennett-ISA-Spec-0.9-draft.md").read_text()
+draft = (root / "spec/Bennett-ISA-Spec-0.9.md").read_text()
 accepted = root / "spec/Bennett-ISA-Spec.md"
 assert hashlib.sha256(accepted.read_bytes()).hexdigest() == "90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e"
 
 def witness(name):
     marker = "**" + name + "**\n\n```json\n"
-    assert marker in draft, "missing draft witness " + name
+    assert marker in draft, "missing publication witness " + name
     return json.loads(draft.split(marker, 1)[1].split("\n```", 1)[0])
 
 # Index is ceil(log10(1/eps)), evaluated with exact rationals, no float log.
@@ -60,10 +60,9 @@ hash_value = hashlib.sha256(envelope.encode()).hexdigest()
 assert "Witness envelope SHA-256: `" + hash_value + "`." in draft
 assert "### 11.1 Reference-library contract (K11)" in draft
 published = (root / "spec/ref-0.9.json").read_bytes()
-assert published == (root / "spec/ref-0.9-draft.json").read_bytes()
 assert len(json.loads(published)["recipes"]) == 219
 assert hashlib.sha256(b"isa=0.9\nexpansion=ref\nversion=0.9\n" + published + b"\n").hexdigest() == "5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197"
-print("draft witnesses: eps boundaries, block sectors, 16 qxor tuples, ordinals/hash; unchanged 0.8")
+print("publication witnesses: eps boundaries, block sectors, 16 qxor tuples, ordinals/hash; unchanged 0.8")
 
 # hsd/clw witnesses: exact scheduled aggregation and replay independent of the VM.
 est = witness("LAUNCH-ESTIMATE witness")
@@ -131,7 +130,7 @@ for case_id, bead in [("G-estimate-resolved-class-decimal", "b-isa-spec-c15"), (
     assert "unavailable pending 0.9" in case["unavailable"]["reason"]
     assert bead in case["unavailable"]["reason"]
     assert "command" not in case  # no invented 0.8 CLI
-print("draft witnesses: exact rational class rows/rounding and full-tuple sampled replay; pending 0.9")
+print("publication witnesses: exact rational class rows/rounding and full-tuple sampled replay; pending 0.9")
 
 binding = witness("CLAIM-BINDING witness")
 assert binding["signature"] == ["i128", "f64", "token"]
@@ -253,12 +252,12 @@ for k in range(9, 19):
     assert len(re.findall(rf"^\| K{k} \|", draft, re.M)) == 1
 assert "target 0.9 has no topology field" not in draft
 assert "regions.<closure_hash>.invocation" not in draft
-assert "spec/ref-0.9-draft.json" in draft
+assert "spec/ref-0.9.json" in draft
 for name, bead in [("E-ref-09-qxor-witness", "b-isa-spec-8r4"), ("E-topology-grid-09", "b-isa-spec-wr7"), ("C-multiblock-09", "b-isa-spec-2c9"), ("F-frame-records-09", "b-isa-spec-2c9"), ("A-measure-draw-order-09", "b-isa-spec-bas"), ("F-ratified-confirmations-09", "b-isa-spec-2c9")]:
     case = json.loads((root / "conformance/cases" / name[0] / name / "case.json").read_text())
     assert "unavailable pending 0.9" in case["unavailable"]["reason"]
     assert bead in case["unavailable"]["reason"]
-result = subprocess.run(["diff", "-u", "--label", "a/spec/Bennett-ISA-Spec.md", "--label", "b/spec/Bennett-ISA-Spec-0.9-draft.md", str(accepted), str(root / "spec/Bennett-ISA-Spec-0.9-draft.md")], capture_output=True)  # stable labels: no absolute paths or mtimes in the committed diff
+result = subprocess.run(["diff", "-u", "--label", "a/spec/Bennett-ISA-Spec.md", "--label", "b/spec/Bennett-ISA-Spec-0.9.md", str(accepted), str(root / "spec/Bennett-ISA-Spec-0.9.md")], capture_output=True)  # stable labels: no absolute paths or mtimes in the committed diff
 assert result.returncode == 1
 assert result.stdout == (root / "spec/isa-0.8-to-0.9.diff").read_bytes()
 

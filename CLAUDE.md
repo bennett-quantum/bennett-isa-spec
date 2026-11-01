@@ -6,7 +6,7 @@ The virtual ISA contract: spec text, reference interpreter, formal model, confor
 
 ## Where the spec is
 
-Normative text: `spec/Bennett-ISA-Spec.md`, draft 0.8, council-accepted 2026-10-28 (see `spec/README.md` for the change rules). Versions in `SPEC_VERSIONS.toml`. `reference-interpreter/isa_check.py` is the Python seed of the reference interpreter and the spec's pre-flight check.
+Normative text: `spec/Bennett-ISA-Spec.md`, ISA 0.8, council-accepted 2026-10-28 in round 8, current for dialect 0.2.x and the reference interpreter; `spec/Bennett-ISA-Spec-0.9.md`, ISA 0.9, accepted by all three council seats on 2026-10-31, for new consumers (bennett-vm M5 onward). Both remain published (see `spec/README.md` for the change rules). Versions in `SPEC_VERSIONS.toml`. `reference-interpreter/isa_check.py` is the Python seed of the reference interpreter and the spec's pre-flight check.
 
 ## Non-negotiables
 

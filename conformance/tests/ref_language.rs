@@ -155,7 +155,7 @@ fn full_basis_h_and_phase_witnesses_are_exact() {
 
 #[test]
 fn bound_classical_catalog_preserves_every_event_operand_byte() {
-    let bytes = include_str!("../../spec/ref-0.9-draft.json");
+    let bytes = include_str!("../../spec/ref-0.9.json");
     let d = json::parse(bytes).unwrap();
     let mut count = 0;
     let mut expander = Expander::new(bytes, Registry::new()).unwrap();
@@ -266,7 +266,7 @@ fn unused_recipe_constructor_and_formal_shapes_are_still_closed() {
 #[test]
 fn canonical_integer_literal_has_only_lsb_ordered_x_leaves() {
     let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9-draft.json"),
+        include_str!("../../spec/ref-0.9.json"),
         Registry::new(),
     )
     .unwrap();

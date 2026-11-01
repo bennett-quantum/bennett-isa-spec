@@ -9,7 +9,7 @@ use bennett_isa_conformance::{
 #[test]
 fn published_ctl_leaf_and_every_exact_matrix_column() {
     let catalog = include_str!("../../spec/ref-0.9.json");
-    assert_eq!(catalog, include_str!("../../spec/ref-0.9-draft.json"));
+    assert_eq!(catalog, include_str!("../../spec/ref-0.9.json"));
     assert_eq!(
         envelope_hash(catalog),
         "5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197"

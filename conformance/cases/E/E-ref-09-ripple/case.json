@@ -5,7 +5,7 @@
   "derivation": "Ripple add/sub and unsigned/equality/signed comparator value helpers independently expanded and compared with plain integer wrap and signed comparisons; every a,b,target and both controls at widths 1\u20134. Every scratch release checked, then original leaf ordinals reversed to restore complete entry tuple. Assignment/frame/successor composition remains blocked on schema, not omitted from scope.",
   "scenario": {
     "family": 2,
-    "catalog": "spec/ref-0.9-draft.json",
+    "catalog": "spec/ref-0.9.json",
     "checker": "ripple_full_domain"
   },
   "expected_outcome": {

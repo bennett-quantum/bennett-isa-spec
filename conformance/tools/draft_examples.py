@@ -112,4 +112,4 @@ def check(draft):
 
 
 if __name__ == "__main__":
-    check((ROOT / "spec/Bennett-ISA-Spec-0.9-draft.md").read_text())
+    check((ROOT / "spec/Bennett-ISA-Spec-0.9.md").read_text())

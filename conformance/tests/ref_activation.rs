@@ -21,7 +21,7 @@ fn get(m: &Machine, s: &[usize], n: &str) -> Vec<usize> {
 #[test]
 fn heterogeneous_recursive_activation_full_symbolic_domains() {
     let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9-draft.json"),
+        include_str!("../../spec/ref-0.9.json"),
         Registry::new(),
     )
     .unwrap();

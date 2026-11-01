@@ -226,7 +226,7 @@ fn qinplace_full_domains_short_and_complete_interfaces_both_orientations() {
         }
     }
     let mut expander =
-        Expander::new(include_str!("../../spec/ref-0.9-draft.json"), registry).unwrap();
+        Expander::new(include_str!("../../spec/ref-0.9.json"), registry).unwrap();
     for (hash, args, w, bound, full, adjoint) in cases {
         let bundles = [
             ("x", w),
@@ -327,7 +327,7 @@ fn exact_section_16_3_example_7_addya_and_adjoint() {
             let args = parse(&format!(r#"["{g}","{h}","x","y","control"]"#));
             let bundles = [("x", 2), ("y", 2), ("control", 1)];
             let leaves = Expander::new(
-                include_str!("../../spec/ref-0.9-draft.json"),
+                include_str!("../../spec/ref-0.9.json"),
                 registry.clone(),
             )
             .unwrap()

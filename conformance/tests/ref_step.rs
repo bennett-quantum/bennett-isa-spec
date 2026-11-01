@@ -13,7 +13,7 @@ fn v(s: &str) -> Json {
 #[test]
 fn heterogeneous_step_full_domains_and_idle_frames() {
     let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9-draft.json"),
+        include_str!("../../spec/ref-0.9.json"),
         Registry::new(),
     )
     .unwrap();
@@ -147,7 +147,7 @@ fn heterogeneous_step_full_domains_and_idle_frames() {
 
 #[test]
 fn repeated_step_templates_use_distinct_frames_through_static_fixpoint() {
-    let mut d = json::parse(include_str!("../../spec/ref-0.9-draft.json")).unwrap();
+    let mut d = json::parse(include_str!("../../spec/ref-0.9.json")).unwrap();
     let root = v(
         r#"{"kind":"zzz.step.bounds","parameters":["B","W",{"name":"pc","type":"wire","width":1},{"name":"next","type":"wire","width":1},{"name":"frames","type":"wire","width":"B"},{"name":"Rows","type":"templates","length":1},{"name":"Next","type":"templates","length":1}],"body":[{"for":"t","from":0,"to":"B","body":[{"invoke":"step","args":[1,1,1,"pc","next",{"range":"frames","from":"t","to":["+","t",1]},"Rows","Next"]}]}],"scratch":[],"removable":[],"source":"§3.6 repeated frame-binding witness"}"#,
     );

@@ -5,7 +5,7 @@ use bennett_isa_conformance::{
 };
 #[test]
 fn division_rows_preserve_arbitrary_destinations_and_fault_entries() {
-    let bytes = include_str!("../../spec/ref-0.9-draft.json");
+    let bytes = include_str!("../../spec/ref-0.9.json");
     let mut e = Expander::new(bytes, Registry::new()).unwrap();
     let mut count = 0;
     for n in 1..=4 {
@@ -137,7 +137,7 @@ fn division_rows_preserve_arbitrary_destinations_and_fault_entries() {
 #[test]
 fn wider_fault_entries_factor_as_identity_on_high_bits() {
     let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9-draft.json"),
+        include_str!("../../spec/ref-0.9.json"),
         Registry::new(),
     )
     .unwrap();

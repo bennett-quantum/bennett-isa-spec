@@ -5,7 +5,7 @@ use bennett_isa_conformance::{
 };
 #[test]
 fn assignment_rows_full_domain() {
-    let bytes = include_str!("../../spec/ref-0.9-draft.json");
+    let bytes = include_str!("../../spec/ref-0.9.json");
     let mut expander = Expander::new(bytes, Registry::new()).unwrap();
     let mut count = 0;
     for n in 1..=4 {
@@ -87,7 +87,7 @@ fn assignment_rows_full_domain() {
 
 #[test]
 fn all_assignment_comparators_and_constants() {
-    let bytes = include_str!("../../spec/ref-0.9-draft.json");
+    let bytes = include_str!("../../spec/ref-0.9.json");
     let mut e = Expander::new(bytes, Registry::new()).unwrap();
     let mut count = 0;
     for n in 1..=4 {
@@ -170,7 +170,7 @@ fn all_assignment_comparators_and_constants() {
 #[test]
 fn cast_select_mov_and_parallel_alias_rows() {
     use bennett_isa_conformance::ref_language::permutation;
-    let bytes = include_str!("../../spec/ref-0.9-draft.json");
+    let bytes = include_str!("../../spec/ref-0.9.json");
     let mut e = Expander::new(bytes, Registry::new()).unwrap();
     let mut count = 0;
     for n in 1..=4 {
@@ -339,7 +339,7 @@ fn cast_select_mov_and_parallel_alias_rows() {
 #[test]
 fn fault_rows_full_domain() {
     use bennett_isa_conformance::ref_language::permutation;
-    let bytes = include_str!("../../spec/ref-0.9-draft.json");
+    let bytes = include_str!("../../spec/ref-0.9.json");
     let mut e = Expander::new(bytes, Registry::new()).unwrap();
     let mut count = 0;
     for op in ["fault", "lift.faultif"] {
@@ -397,7 +397,7 @@ fn fault_rows_full_domain() {
 #[test]
 fn repeated_location_sources_and_destination_aliases() {
     let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9-draft.json"),
+        include_str!("../../spec/ref-0.9.json"),
         Registry::new(),
     )
     .unwrap();
@@ -469,7 +469,7 @@ fn repeated_location_sources_and_destination_aliases() {
 fn positional_copy_exchange_bindings_full_domains() {
     use bennett_isa_conformance::ref_bdd::Bdd;
     let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9-draft.json"),
+        include_str!("../../spec/ref-0.9.json"),
         Registry::new(),
     )
     .unwrap();

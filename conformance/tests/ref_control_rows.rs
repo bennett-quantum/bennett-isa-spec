@@ -31,7 +31,7 @@ fn verify(m: &Machine, b: &mut Bdd, old: &[usize], expected: &[usize], en: usize
 #[test]
 fn canonical_branches_and_successor_fragments() {
     let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9-draft.json"),
+        include_str!("../../spec/ref-0.9.json"),
         Registry::new(),
     )
     .unwrap();
@@ -135,7 +135,7 @@ fn canonical_branches_and_successor_fragments() {
 #[test]
 fn function_local_indirect_jump_intervals() {
     let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9-draft.json"),
+        include_str!("../../spec/ref-0.9.json"),
         Registry::new(),
     )
     .unwrap();
@@ -186,7 +186,7 @@ fn function_local_indirect_jump_intervals() {
 #[test]
 fn effective_causes_and_wide_code_registers() {
     let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9-draft.json"),
+        include_str!("../../spec/ref-0.9.json"),
         Registry::new(),
     )
     .unwrap();

@@ -6,7 +6,7 @@ use bennett_isa_conformance::{
 };
 #[test]
 fn structured_bounds_and_full_domains() {
-    let bytes = include_str!("../../spec/ref-0.9-draft.json");
+    let bytes = include_str!("../../spec/ref-0.9.json");
     let mut e = Expander::new(bytes, Registry::new()).unwrap();
     for width in 1..=4 {
         for bound in [0, 1, 2, 3, 17] {
@@ -65,7 +65,7 @@ fn structured_bounds_and_full_domains() {
 }
 #[test]
 fn qif_and_nested_bodies_are_lexical() {
-    let bytes = include_str!("../../spec/ref-0.9-draft.json");
+    let bytes = include_str!("../../spec/ref-0.9.json");
     let mut e = Expander::new(bytes, Registry::new()).unwrap();
     let mut count = 0;
     for width in 1..=4 {
@@ -132,7 +132,7 @@ fn qif_and_nested_bodies_are_lexical() {
 #[test]
 fn coherent_scopes_qif_and_adjoint_full_matrix_columns() {
     use bennett_isa_conformance::ref_amplitudes::{column, Complex, Real};
-    let bytes = include_str!("../../spec/ref-0.9-draft.json");
+    let bytes = include_str!("../../spec/ref-0.9.json");
     let mut e = Expander::new(bytes, Registry::new()).unwrap();
     let q = Complex {
         re: Real::new(0, 1, 1),
@@ -206,7 +206,7 @@ fn coherent_scopes_qif_and_adjoint_full_matrix_columns() {
 #[test]
 fn hadamard_loop_matrix_columns_at_static_bounds() {
     use bennett_isa_conformance::ref_amplitudes::{column, Complex, Real};
-    let bytes = include_str!("../../spec/ref-0.9-draft.json");
+    let bytes = include_str!("../../spec/ref-0.9.json");
     let mut e = Expander::new(bytes, Registry::new()).unwrap();
     let q = Complex {
         re: Real::new(0, 1, 1),

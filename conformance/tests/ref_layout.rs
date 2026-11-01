@@ -7,7 +7,7 @@ use bennett_isa_conformance::{
 #[test]
 fn lifted_layout_memory_full_symbolic_domains() {
     let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9-draft.json"),
+        include_str!("../../spec/ref-0.9.json"),
         Registry::new(),
     )
     .unwrap();
@@ -160,7 +160,7 @@ fn lifted_layout_memory_full_symbolic_domains() {
 #[test]
 fn memory_fault_write_ordinals_follow_all_assignment_exchanges() {
     let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9-draft.json"),
+        include_str!("../../spec/ref-0.9.json"),
         Registry::new(),
     )
     .unwrap();

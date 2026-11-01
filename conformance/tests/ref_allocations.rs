@@ -40,7 +40,7 @@ fn allocation_output_copy_and_load_full_domains() {
             }
         }
     }
-    let mut e = Expander::new(include_str!("../../spec/ref-0.9-draft.json"), registry).unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), registry).unwrap();
     let mut tuples = 0u128;
     for (hash, n, a, kind, cls, bundles) in &cases {
         let leaves = e.expand(hash, &[], bundles).unwrap();
@@ -98,7 +98,7 @@ fn borrowed_output_restores_all_basis_columns_with_external_reference() {
             cases.push((hash, n));
         }
     }
-    let mut e = Expander::new(include_str!("../../spec/ref-0.9-draft.json"), registry).unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), registry).unwrap();
     let mut columns = 0;
     for (hash, n) in cases {
         let mut leaves = e.expand(&hash, &[], &[("out", 1)]).unwrap();
@@ -133,7 +133,7 @@ fn clean_allocation_source_rows_preserve_class_without_controls() {
             ),
         );
     }
-    let mut e = Expander::new(include_str!("../../spec/ref-0.9-draft.json"), registry).unwrap();
+    let mut e = Expander::new(include_str!("../../spec/ref-0.9.json"), registry).unwrap();
     for n in 1..=4 {
         let leaves = e.expand(&format!("{n:064x}"), &[], &[]).unwrap();
         assert_eq!(leaves.len(), 2);

@@ -1,3 +1,20 @@
+## Published alongside 0.8 on 2026-11-01 06:58:38 UTC
+
+ISA 0.9 is `spec/Bennett-ISA-Spec-0.9.md`, accepted by all three seats
+on 2026-10-31 (sol r3, codex r2/r4, muse r5; K64/K65 ratified).
+New consumers (bennett-vm M5 onward) implement 0.9. Accepted 0.8 remains
+unchanged for dialect 0.2.x and the reference interpreter until the dialect
+0.3 track moves. Catalog: `spec/ref-0.9.json`, 219 recipes, envelope
+`5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`;
+redundant draft JSON removed, consumers and exact-label diff updated.
+Mechanical publication; no council round. Bead b-isa-spec-fhp.
+Headless gate PASS: 113 tests, 0 failed/ignored; publication witness PASS
+(exact diff and forbidden-word checks retained); catalog --check PASS.
+Initial gate caught the stale `Complete draft catalog` assertion; it now
+expects `Complete catalog`, with no hash or semantic change. 0.8, K rows,
+fenced examples, printed hashes and catalog bytes verified unchanged.
+Reference-interpreter suite not run; its source is untouched.
+
 ## 2026-10-31 Final editorial pass IV — muse round 5 dispositions
 
 Source: council isa-09-2026-10-31 round-5 out-muse.json/report.md:
@@ -48,7 +65,7 @@ Final headless validation (exit 0 for both required commands):
 - Exact-label diff SHA-256:
   880d500df26c7495c6003771c17be6eab9f0930ec7cd54f2c2ca94e1fd1b18f8.
 The artifact is regenerated with `diff -u --label
- a/spec/Bennett-ISA-Spec.md --label b/spec/Bennett-ISA-Spec-0.9-draft.md
+ a/spec/Bennett-ISA-Spec.md --label b/spec/Bennett-ISA-Spec-0.9.md
  <absolute accepted> <absolute draft>` (exit 1 means the expected files
  differ). Bead 4a4 closes this editorial/publication-artifact work only;
  current-spec publication remains the maintainer's next step. Beads export
@@ -56,7 +73,7 @@ The artifact is regenerated with `diff -u --label
  sync, accepted-text edit, interpreter edit, sibling write or worklog edit.
 
 Item 4 verification/S0 check:
-- `spec/ref-0.9.json` is byte-identical to `spec/ref-0.9-draft.json`.
+- `spec/ref-0.9.json` is byte-identical to `spec/ref-0.9.json`.
   Python -I ref_catalog.py --check PASS: 219 recipes, four-line envelope
   5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197.
   Rust independently agrees with that envelope hash. No recipe changes.
@@ -246,7 +263,7 @@ Rejected alternatives and S0 cross-check:
 Validation (headless, Python -I; scratch .tmp/inv6-editorial):
 - Required standalone `python3 -I conformance/tests/draft_witnesses.py`
   PASS, exit 0, including the exact system `diff -u --label
-  a/spec/Bennett-ISA-Spec.md --label b/spec/Bennett-ISA-Spec-0.9-draft.md
+  a/spec/Bennett-ISA-Spec.md --label b/spec/Bennett-ISA-Spec-0.9.md
   <absolute accepted> <absolute draft>` byte comparison. That exact command
   generated the artifact (exit 1 means the expected files differ).
 - Independent `check_witness.py`: PASS on the final draft, after the
@@ -494,7 +511,7 @@ The older progress entries below are historical; the separate tracked
 `spec/isa-0.8-to-0.9.diff` is outside this task's owned paths and is not regenerated.
 
 Job: bead `b-isa-spec-so1` (claimed). Brief: `docs/briefs/2026-10-29-isa-09-draft.md`.
-Owned paths: `spec/Bennett-ISA-Spec-0.9-draft.md`, `spec/isa-0.8-to-0.9.diff`, this file, bd notes/creates
+Owned paths: `spec/Bennett-ISA-Spec-0.9.md`, `spec/isa-0.8-to-0.9.diff`, this file, bd notes/creates
 (label `isa-0.9-candidate`). Never touch `spec/Bennett-ISA-Spec.md`, `spec/README.md`, `reference-interpreter/`,
 `docs/`, `worklog/`, `HANDOFF.md`, `CLAUDE.md`. Commit owned paths after every group
 (`git commit -- <paths>`, retry on index.lock); never push. Headless.
@@ -950,7 +967,7 @@ Q14 verification (headless, only the two owned Markdown paths edited):
   job's tracked `spec/isa-0.8-to-0.9.diff` is outside this task's two owned paths and is not rewritten.
 - The accepted 0.8 file's SHA-256 remains
   `90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e`.
-- `git diff --check -- spec/Bennett-ISA-Spec-0.9-draft.md spec/isa-0.9.PROGRESS.md`: PASS.
+- `git diff --check -- spec/Bennett-ISA-Spec-0.9.md spec/isa-0.9.PROGRESS.md`: PASS.
 
 Remaining lproc mechanics: none deferred by Q14. Implementation and the 0.9 precheck (including executable
 conformance for example 10 and hash patching) remain pending under the draft's existing gate; this task does

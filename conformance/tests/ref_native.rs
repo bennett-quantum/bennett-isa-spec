@@ -5,7 +5,7 @@ use bennett_isa_conformance::{
 };
 #[test]
 fn native_phase_and_hadamard_full_basis_matrices() {
-    let bytes = include_str!("../../spec/ref-0.9-draft.json");
+    let bytes = include_str!("../../spec/ref-0.9.json");
     let mut e = Expander::new(bytes, Registry::new()).unwrap();
     let q = Real::new(0, 1, 1);
     let mut count = 0;
@@ -83,7 +83,7 @@ fn native_phase_and_hadamard_full_basis_matrices() {
 #[test]
 fn variadic_mcx_full_domain_including_zero_and_large_arity() {
     use bennett_isa_conformance::{ref_bdd::Bdd, ref_catalog::Machine, ref_language::permutation};
-    let bytes = include_str!("../../spec/ref-0.9-draft.json");
+    let bytes = include_str!("../../spec/ref-0.9.json");
     let mut e = Expander::new(bytes, Registry::new()).unwrap();
     let mut count = 0;
     for k in [0, 1, 2, 3, 4, 17] {
@@ -121,7 +121,7 @@ fn variadic_mcx_full_domain_including_zero_and_large_arity() {
 }
 #[test]
 fn binary64_angles_round_trip_and_numerical_adjoint_matrices() {
-    let bytes = include_str!("../../spec/ref-0.9-draft.json");
+    let bytes = include_str!("../../spec/ref-0.9.json");
     let mut e = Expander::new(bytes, Registry::new()).unwrap();
     let mut count = 0;
     // Each representative bit pattern round-trips through the required encoding; these eight
@@ -231,7 +231,7 @@ fn binary64_angles_round_trip_and_numerical_adjoint_matrices() {
 fn typed_native_permutation_ports_and_environments() {
     use bennett_isa_conformance::{ref_bdd::Bdd, ref_catalog::Machine, ref_language::permutation};
     let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9-draft.json"),
+        include_str!("../../spec/ref-0.9.json"),
         Registry::new(),
     )
     .unwrap();

@@ -38,7 +38,7 @@ fn verify(m: &Machine, b: &mut Bdd, old: &[usize], expected: &[usize], en: usize
 #[test]
 fn inc8_and_sum_db_arithmetic_cast_and_successor_widths() {
     let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9-draft.json"),
+        include_str!("../../spec/ref-0.9.json"),
         Registry::new(),
     )
     .unwrap();
@@ -143,7 +143,7 @@ fn inc8_and_sum_db_arithmetic_cast_and_successor_widths() {
 #[test]
 fn example_literal_pointer_bases_and_byte_constants() {
     let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9-draft.json"),
+        include_str!("../../spec/ref-0.9.json"),
         Registry::new(),
     )
     .unwrap();
@@ -175,7 +175,7 @@ fn example_literal_pointer_bases_and_byte_constants() {
 #[test]
 fn example_byte_region_dispatch_full_domain() {
     let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9-draft.json"),
+        include_str!("../../spec/ref-0.9.json"),
         Registry::new(),
     )
     .unwrap();
@@ -233,7 +233,7 @@ fn example_byte_region_dispatch_full_domain() {
 #[test]
 fn example_pinned_layout_full_pointer_domain() {
     let mut e = Expander::new(
-        include_str!("../../spec/ref-0.9-draft.json"),
+        include_str!("../../spec/ref-0.9.json"),
         Registry::new(),
     )
     .unwrap();

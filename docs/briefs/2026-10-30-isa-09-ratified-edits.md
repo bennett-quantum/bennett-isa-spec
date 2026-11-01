@@ -9,9 +9,9 @@ ratified decision into normative 0.9 text, surgically, so that the draft no long
 
 ## Owned paths (write nowhere else)
 
-- `spec/Bennett-ISA-Spec-0.9-draft.md` (surgical edits; the diff stays reviewable).
+- `spec/Bennett-ISA-Spec-0.9.md` (surgical edits; the diff stays reviewable).
 - `spec/isa-0.8-to-0.9.diff` — regenerate before every commit:
-  `diff -u /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/Bennett-ISA-Spec.md /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/Bennett-ISA-Spec-0.9-draft.md > /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/isa-0.8-to-0.9.diff` (exit 1 is normal).
+  `diff -u /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/Bennett-ISA-Spec.md /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/Bennett-ISA-Spec-0.9.md > /home/tobias/Projects/bennett-workspace/bennett-isa-spec/spec/isa-0.8-to-0.9.diff` (exit 1 is normal).
 - `spec/isa-0.9.PROGRESS.md` — append a dated "Ratified decisions applied" section (one row per decision:
   memo item, section edited, witness added, status, commit) so a restarted session resumes from it.
 - `conformance/` — new witness cases for new text, as the K12/K13 job did (`unavailable pending 0.9`,
@@ -45,7 +45,7 @@ implementations would differ" is the S0 test for every sentence you write).
 3. **A1 ISA-REF-LIB (§11.1, §17 item 7).** Replace "maintainer decision required" with the decided contract:
    schema, envelope hash rule, ordinals, scratch identity, `removable` empty, deterministic Boolean
    decomposition, decomposition set = the §17 defaults made explicit. State that the complete serialised
-   catalog `spec/ref-0.9-draft.json` is produced by a separate job (bead b-isa-spec-8r4) and that `ref/` is
+   catalog `spec/ref-0.9.json` is produced by a separate job (bead b-isa-spec-8r4) and that `ref/` is
    published after 0.9 acceptance; keep the qxor witness.
 4. **A6 topology (§8.2, §8.3, §17).** Add an optional `topology` field to the target description: an
    ordered array of physical vertices (each with its addressable class), an array of undirected edges as
@@ -88,7 +88,7 @@ must stay green; the full 0.8 harness count (currently 445 pass / 0 fail / 48 un
 ## Process
 
 - Commit owned paths after every numbered edit, never a red tree:
-  `BEADS_HOOK_TIMEOUT=20 git -C /home/tobias/Projects/bennett-workspace/bennett-isa-spec commit -- spec/Bennett-ISA-Spec-0.9-draft.md spec/isa-0.8-to-0.9.diff spec/isa-0.9.PROGRESS.md conformance`
+  `BEADS_HOOK_TIMEOUT=20 git -C /home/tobias/Projects/bennett-workspace/bennett-isa-spec commit -- spec/Bennett-ISA-Spec-0.9.md spec/isa-0.8-to-0.9.diff spec/isa-0.9.PROGRESS.md conformance`
   (retry on `index.lock`; the interpreter agent commits `reference-interpreter/` concurrently, so never
   `git add -A` or commit without a path list). Do not push. No `cd` in compound commands; absolute paths.
 - Rule 10: nothing you write may reject, refuse or omit a north-star capability; a deferral states a default

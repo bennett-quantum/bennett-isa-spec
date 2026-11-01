@@ -1,6 +1,6 @@
-# Bennett Virtual ISA — Specification, draft 0.9
+# Bennett Virtual ISA — Specification, version 0.9
 
-**Date:** 2026-10-31. **Status:** draft 0.9, **accepted by all three council seats** (sol r3, codex r2/r4, muse r5, 2026-10-31; K64/K65 ratified). Publication as the current ISA specification is the maintainer's next step.
+**Date:** 2026-10-31. **Status:** version 0.9, **accepted by all three council seats on 2026-10-31** (sol r3, codex r2/r4, muse r5; K64/K65 ratified). ISA 0.9 is the version new consumers (bennett-vm M5 onward) implement. ISA 0.8 remains published as `spec/Bennett-ISA-Spec.md` and remains the version the dialect 0.2.x gate and the reference interpreter target until the dialect 0.3 track moves.
 Snapshot `59eee9ad0d96` was accepted by the sol and codex seats (council run
 `isa-09-2026-10-31`: codex round 2, sol round 3, both core accept, 0 blocking; muse seat held).
 K64 and K65 were ratified by the maintainer on 2026-10-31; muse accepted
@@ -9,14 +9,13 @@ in round 5 that day, satisfying the council-vote publication gate
 revises draft 0.8, which was **accepted by the council in round 8**
 (2026-10-28; reports and the editor's responses under
 `docs/council/isa-2026-10-28/round-{1..8}/` in the `bennett` meta
-repository) and which remains the contract every other repository
-targets until the maintainer publishes 0.9 as the current specification.
+repository).
 §0 lists every change from 0.8.
 Implementation is expected to expose frictions; revisions go back
 through the council. Founding text of
 `bennett-isa-spec` (`Bennett-NorthStar.md` §4.4, §6.1); the north star
-governs where this draft is silent. The reference interpreter implements
-0.8; nothing of this draft is implemented. MUST, MUST
+governs where this document is silent. The reference interpreter targets
+0.8; 0.9 admission is not claimed. MUST, MUST
 NOT, SHOULD, MAY are normative; *(non-normative)* explains; *(deferred)*
 names items left open; every deferred decision that an implementer must
 take carries a **default** in §17, which implementers follow until the
@@ -2603,8 +2602,8 @@ sequence still has its ordinal-0 carrier at its release point. [deps: ISA-4.5, I
 This is the decided 0.9 contract. The catalog bound as ref version 0.9
 is the file `spec/ref-0.9.json` whose four-line envelope hashes to
 `5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`.
-It is a byte-identical publication of the complete 219-recipe
-`spec/ref-0.9-draft.json`. Consumers lacking the bound library report
+It publishes the complete 219-recipe catalog, byte-identical to the
+accepted catalog snapshot. Consumers lacking the bound library report
 `E_SCHEDULE_INFEASIBLE` as §11 requires. The witness below is not a
 full-library hash.
 
@@ -2665,7 +2664,7 @@ depth first, array order, and recipe dependencies are acyclic. An
 inverse reverses its fully expanded body and adjoints each leaf by
 §5.3, interchanging allocation/release. The complete serialized catalog
 must encode the algorithms below in these constructors before release;
-this draft does not claim that prose alone is an interchangeable file.
+this document does not claim that prose alone is an interchangeable file.
 
 **Typed binding (K19).** A formal is `{ "name": name, "type": type }`,
 with exactly these keys, except `wire`, which additionally requires
@@ -3115,7 +3114,7 @@ is balanced when the external control is false (§3.5, §4.3).
 The permutation algorithms define exact permutation circuits, preserving
 every input required by the row and cleaning scratch; circuit correctness must still be checked
 against full-domain T3 witnesses and §5.7, not inferred from costs or
-names. Complete draft catalog: **219 recipes**; envelope SHA-256
+names. Complete catalog: **219 recipes**; envelope SHA-256
 `5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`. [deps: ISA-11.1-P2, ISA-11.1-P3, ISA-11.1-P28, ISA-11.1-P29]
 Publication follows acceptance. [deps: ISA-11.1-P1, ISA-11.1-P2] In particular this is
 not permission to publish a partial library that omits division, stack,

@@ -5,7 +5,7 @@
   "derivation": "Independent integer interval, live/pinned, allocator max(n,1) and prospective stack/depth predicates versus Boolean/ripple leaves; endpoints widened before sums. Every tuple in recorded configurations, both controls, arbitrary predicate targets, scratch release and reverse ordinal restoration. One-entry widths 1\u20134; two-entry widths 1\u20132; allocator table exponent 1; call R_f=4. General tables/record binding remain unfinished.",
   "scenario": {
     "family": 4,
-    "catalog": "spec/ref-0.9-draft.json",
+    "catalog": "spec/ref-0.9.json",
     "checker": "linear_scan_full_domain; allocation_and_call_flags_full_domain"
   },
   "expected_outcome": {
