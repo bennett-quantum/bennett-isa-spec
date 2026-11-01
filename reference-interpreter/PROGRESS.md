@@ -5,6 +5,15 @@ are not complete. Sole implementation sub-agent; owned interpreter and external
 round-23 response only. Never push. Cargo gates use the headless prefix and
 TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/.tmp.
 
+## 2026-11-01 — Pass XI: rung-3 prerequisites
+
+b-isa-spec-221 is an already-resolved ISA 0.9 wording issue (classification c),
+not evidence that ISA 0.8 implements typed R faults. README cites accepted K5,
+§4.9 and §10 and names the required producer/executor/contract-pin migration.
+Host fuel is not the dialect §17.6 counter. This pass leaves interpreter
+admission at 0.8 and does not clear the consumer's BD-B-ISA7 blocker. Open b-isa-spec-fuk retains the actual migration prerequisite. No code
+or normative spec change for this bead; existing regressions retained.
+
 ## 2026-11-01 — n8j: persistent dynamic-instance checkpoints
 
 The growing dynamic-instance environment now uses a shared immutable AVL root

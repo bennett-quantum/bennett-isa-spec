@@ -27,6 +27,32 @@ cite their rule. Integers above 2^53 − 1 are decimal strings (§9.1).
 
 > **Council status (2026-10-31):** accepted by the sol and codex seats in round 24 of run `isa-ref-2026-10-29` on snapshot ad84e75 (461 tests, five exhaustive sweeps; rounds 1–24 under `bennett/docs/council/isa-ref-2026-10-29/`). Staged deliverables 8–11 remain disclosed as staged. Muse seat held.
 
+## Typed R faults and contract migration (ISA-7)
+
+ISA 0.9 already resolves b-isa-spec-221: §0.2 K5, §4.1 `fault`,
+§4.9 (implicit cause table, exact 64-bit terminal code, no successor or
+later source effect, intact prefix history), §7.4, §10 (FAILED → REVERSED,
+no result values, one fault record) and §14.3 T4. Zero maps to code 4;
+nonzero codes, including program-defined codes, are preserved exactly.
+This is a published 0.9 contract, not an amendment to accepted ISA 0.8.
+
+The dialect 0.2.10 at `023f5a7` §11.5/§17.6 correctly reports
+`blocked:BD-B-ISA7` for every R entry targeting ISA 0.8: the mandatory
+pre-instruction source step check needs `fault 1` before the instruction,
+with the same effect-tape prefix and reversible history. `--budget` here
+is host execution fuel, not that source counter; generic `trap` cannot
+implement arbitrary typed R faults. Closing the ISA wording issue does
+not clear that consumer blocker or certify rung 3. Open follow-up
+`b-isa-spec-fuk` retains that producer/executor migration prerequisite.
+
+The migration requires producer and executor support for ISA 0.9 K5,
+explicit version/ABI/envelope and contract-pin updates (including regenerated
+identities), and verification of exact terminal codes, first-fault boundaries,
+no subsequent effects and faulted-prefix restoration. This interpreter still
+admits ISA 0.8 only; neither its admission target nor sibling pins are changed
+here. The full musl hello-world, native equality, R console, reset and saved-tape
+replay acceptance remains owed (North Star §8 rung 3; dialect §19.2).
+
 ## Commands
 
 `check <object>` parses and validates the object, computes identities, and

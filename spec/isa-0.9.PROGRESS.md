@@ -1,3 +1,27 @@
+## 2026-11-01 Pass XI — rung-3 consumer prerequisites
+
+### b-isa-spec-221 — (c) no remaining ISA 0.9 wording defect
+
+The original ISA-7 gap is already resolved by accepted K5: §4.1 `fault`,
+§4.9's cause table/exact 64-bit code/terminality/intact history, §7.4,
+§10's FAILED → REVERSED and result accessors, and §14.3 T4. No new
+normative text, MUST, K row or inventory change. K1–K80, 0.8, 0.9,
+catalog and exact-label diff bytes are unchanged. The consumer's 0.8
+blocker is valid, not a misreading of 0.8: closing this historical ISA
+wording bead does not remove BD-B-ISA7; open b-isa-spec-fuk retains
+that implementation/pin-migration prerequisite. README now names the explicit
+producer/executor/version-pin migration and its verification obligations.
+No ISA 0.9 interpreter admission or downstream rung acceptance is claimed.
+Dialect 0.2.10 was inspected at 023f5a7, §11.5, §17 and §19.2; North Star
+§8 rung 3 and the consumer README/RESULTS retain full musl/R/reset/replay scope.
+
+Validation: documentation-only disposition; existing regressions retained.
+Reference gate: 491 passed / 0 failed / 5 unchanged ignored. Python draft
+witness and catalog checks pass (219 recipes, unchanged envelope). The
+conformance gate is running; final results will be recorded in this pass block.
+Logs: `.tmp/pass-xi-221-{reference,conformance,witness,catalog}.log`.
+221 closed with its clause citations; b-isa-spec-fuk remains open. Beads exported.
+
 ## 2026-11-01 Round 8 acceptance and S1 portable-vector publication
 
 **round 8: accepted** (codex seat, 0 blocking): passes VIII/IX/X,
