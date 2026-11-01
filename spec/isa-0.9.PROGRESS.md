@@ -32,8 +32,13 @@ ignored** (503 baseline plus the K81 byte-lock regression). Python draft
 witness and catalog checks pass; 219 recipes and unchanged envelope
 `5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`.
 All gates use the prescribed headless environment and repo-local TMPDIR.
-Conformance full offline gate is still running at this record.
-Commits: 10e1607 (acceptance/profile); 5513d78 (K81 fixture/test/§15).
+Conformance full offline gate exit 0: **113 passed, 0 failed, 0 ignored**.
+All four required gates pass. Cargo logs: `.tmp/pass-xiii-reference-interpreter.log`
+and `.tmp/pass-xiii-conformance.log`. Owned rustfmt/whitespace checks pass.
+Commits: 10e1607 (acceptance/profile); 5513d78 (K81 fixture/test/§15);
+293c266 (reference-green record). Final gate record and real UTC HANDOFF
+are committed next. No push or sibling writes; orchestrator retains
+session-worklog and generated council attachment ownership.
 
 ## 2026-11-01 Pass XII — source cleanup-pair partition (9hv)
 
