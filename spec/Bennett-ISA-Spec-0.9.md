@@ -24,6 +24,9 @@ for this one-row fix, pending). K82 is accepted; K1–K82 are accepted in total.
 **Contract z4c: accepted** (2026-11-02; council run `contract-z4c-2026-11-02` round 1, sol and codex seats, 0 blocking;
 bennett-4ht re-check `accept-4ht-recheck-2026-11-02` rounds 1–2, codex seat; muse seat accept in
 `accept-muse-batch-2026-11-02`). K83 is accepted; K1–K83 are accepted in total.
+**Contract checker-diagnostics: accepted** (2026-11-02; council run `contract-checker-diagnostics-2026-11-02`
+round 1, sol and codex seats, 0 blocking; bennett-4ht re-check `accept-4ht-recheck-2026-11-02` round 1, codex seat;
+muse seat accept in `accept-muse-batch-2026-11-02`). K84 is accepted; K1–K84 are accepted in total.
 §0 lists every change from 0.8.
 Implementation is expected to expose frictions; revisions go back
 through the council. Founding text of
@@ -214,6 +217,7 @@ north star §3.1 requires).
 | K81 | §11 | **CLEANUP-PAIR-PARTITION**. Intrinsic cleanup pairs retain their direct computing operations; release-ended terminal inverse chains coalesce before independent adjoint-call carriers are formed. No inverse occurrence has two owners. Nonzero call targets retain their exact source-derived entry history under recompute. Witness: qcopy/mix/adj-mix/quncopy has carriers at entry:2 and entry:3, independently selectable. | consumer 9hv; pass XII; pending round 9 | S | – |
 | K82 | §11.1, §15 | **NAMED-INTERFACE-RECIPES**. A recipe whose formals are all bare integer names, or none, reads its remaining wires by name from the invoking scope; every other recipe and every template is closed. No catalog byte or hash changes. Witness: bind.value.add(2,x,y,z) expands value.add over x,y,z; a typed recipe reading q, or a site with no q bound, rejects. | b-isa-spec-g2q; bennett-sched-enz; pass XIII; round 10 | S | – |
 | K83 | §4.6, §11, §15 | **ACTION-REGION-SUPPORT**. Action-local qregion construction/release have reserved root support addresses, including zero-trip declarations; no leaf changes. | b-isa-spec-z4c; council contract-z4c-2026-11-02 | S | – |
+| K84 | §12.3 | **CHECKER-DIAGNOSTIC-CODES**. Checker diagnostic codes not mandated elsewhere are implementation-defined, scoped by checker name and version; a checker SHOULD document them and report the failed obligation and certificate location. Spelling never alters a verdict, executor status or fault code; E_SCHEDULE_INFEASIBLE and K55 diagnostics stay mandated. No byte or hash changes. Witness: a table claim without `expected` rejects (K13) and a domain repeating a resolved component rejects (K72) under any documented local code. | b-isa-spec-0n5; council contract-checker-diagnostics-2026-11-02 | E | – |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -3978,6 +3982,14 @@ compared as a channel requires a `channel` claim. Executable claims
 `expected: "oracle"`, plus table/program comparisons of a realised
 operation) bind to `schedule_hash` through their subject. Standalone
 reference relations have only the invocation scope defined above (K13).
+
+Checker diagnostic codes other than codes explicitly mandated elsewhere
+in this specification are implementation-defined. A checker SHOULD
+document its stable code meanings and report the failed normative
+obligation and certificate location with a rejection. Such codes are
+scoped by checker name and version; their spelling does not alter the
+verdict or any executor status/fault code. This convention does not
+replace mandated E_SCHEDULE_INFEASIBLE behavior or K55 diagnostics.
 
 ## 13. Coverage (coverage 0.9)
 
