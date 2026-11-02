@@ -153,11 +153,11 @@ Audit severity: **makes harder**
 
 Source: [ISA §§7.3–7.4][isa-tape], [§10 tape API][isa-launch]. See [AUDIT.md](AUDIT.md), row F07, and the [shared scope](../2026-11-02-rev2/fat-object-scope.md).
 
-Determining sentence: Active R tape is device-effect order; CC host replies are retained in run frames. Saved journal interchange is explicitly a versioned tool profile, not implicit serialization of the native process. This is a makes harder finding for the mixed case described in F07; it does not establish a current runtime failure.
+Determining sentence: Active R tape is device-effect order; CC host replies are retained in run frames. Saved journal interchange is explicitly a versioned tool profile; tape_next returns dev/op/operand bytes, not a console-payload or native-process snapshot. This is a makes harder finding for the mixed case described in F07; it does not establish a current runtime failure.
 
-Requested change: Bind a mixed launch's journal to program/object/root, invocation, run and replay profile, with entropy/reply inputs and boundary ordering. Preserve separate R-effect, CC-reply and ordinary native-event ownership. Recovery must not issue external events again. Keep any saved-journal envelope outside the current bare active-tape API until versioned.
+Requested change: Bind a mixed launch's journal to program/object/root, invocation, run and replay profile, with entropy/reply inputs and boundary ordering. Preserve separate R-effect, CC-reply and ordinary native-event ownership. Recovery must not issue external events again. Define native access to device-model outputs (including console payload bytes) in that profile; current tape operands alone do not export them. Keep the saved-journal envelope outside the active-tape API until versioned.
 
-Acceptance: Define program/object/root/run/invocation and replay-profile associations plus entropy/reply and boundary ordering. Wrong-root or wrong-invocation saved journals fail before unrelated effects; R effects, CC replies and native host events keep separate owners, and recovery never reissues external events.
+Acceptance: Define program/object/root/run/invocation and replay-profile associations plus entropy/reply, boundary ordering and native access to model output bytes; tape operands alone are insufficient. Wrong-root or wrong-invocation saved journals fail before unrelated effects; R effects, CC replies and native host events keep separate owners, and recovery never reissues external events.
 
 Cheap now: Yes: associations and replay design.
 
@@ -270,7 +270,7 @@ Source: [0.2.12 §19.2][d2-mode]; [0.3 §19.2][d3-mode], including argc/argv/env
 
 Determining sentence: The **explicit whole-program reversible mode** makes main the device program and creates a CC argv stub; normal main return follows device exit/stdio cleanup. This is a neutral finding for the mixed case described in F12; it does not establish a current runtime failure.
 
-Requested change: Prefix the rule with its mode scope. Ordinary mixed mode retains native process startup, argv/envp, environ, libc context and exit handlers. Device functions receive declared arguments; an optional device process-context snapshot must be explicitly requested and marshalled. Returning from a marked function must return to native main, without running process-exit cleanup or fetching argv again.
+Requested change: Prefix the rule with its mode scope. Ordinary mixed mode retains native process startup, argv/envp, environ, libc context and exit handlers. Device functions receive declared arguments; an optional device process-context snapshot must be explicitly requested and marshalled with versioned argc/argv/envp lengths, byte/terminator encoding, error and lifetime rules. Returning from a marked function must return to native main, without running process-exit cleanup or fetching argv again.
 
 Acceptance: Document native mixed startup and ordinary marked-function return alongside unchanged whole-program R main startup/exit. Native argv/envp/libc need no ISA records; no implicit bennett.argv or exit-handler/stdio flush occurs for a scalar marked call. A requested device process-context snapshot has explicit marshalled lifetime/ownership.
 
