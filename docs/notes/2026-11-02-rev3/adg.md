@@ -470,6 +470,11 @@ reproduced all five stdout lines. Every assertion passed, including full
 cases. The reference interpreter and conformance sources were not edited.
 No full gate or actual repeated-launch ABI test was run.
 
+The bounded document self-check also passed: Muse's §7.3 paragraph and the
+accepted 4ht statement match verbatim, §10 has the scoped lifetime phrase,
+the citation is corrected, all four spec insertions apply at their stated
+anchors in an in-memory dry run, fences balance and all six links resolve.
+
 ## Additional conformance obligations
 
 At publication, suite G must exercise the **actual** two-launch sequences
