@@ -121,10 +121,19 @@ time and must not collide with concurrent proposals.
 ```diff
 --- a/spec/Bennett-ISA-Spec-0.9.md
 +++ b/spec/Bennett-ISA-Spec-0.9.md
-@@
+@@ -210,6 +210,7 @@
+ | K80 | §11 | **CLEANUP-LEAF-OWNERSHIP**. Reverse retains written cleanup points; recompute owns one fresh caller leaf/call space at the carrier, with separate callee spaces and fresh replay identities. Witness: a six-row two-CX computation/cleanup has reverse leaves at entry:3/4/5 and recompute leaves at entry:5 ordinals 0–7. | consumer 5cd; pass X | S | – |
+ | K81 | §11 | **CLEANUP-PAIR-PARTITION**. Intrinsic cleanup pairs retain their direct computing operations; release-ended terminal inverse chains coalesce before independent adjoint-call carriers are formed. No inverse occurrence has two owners. Nonzero call targets retain their exact source-derived entry history under recompute. Witness: qcopy/mix/adj-mix/quncopy has carriers at entry:2 and entry:3, independently selectable. | consumer 9hv; pass XII; pending round 9 | S | – |
+ | K82 | §11.1, §15 | **NAMED-INTERFACE-RECIPES**. A recipe whose formals are all bare integer names, or none, reads its remaining wires by name from the invoking scope; every other recipe and every template is closed. No catalog byte or hash changes. Witness: bind.value.add(2,x,y,z) expands value.add over x,y,z; a typed recipe reading q, or a site with no q bound, rejects. | b-isa-spec-g2q; bennett-sched-enz; pass XIII; round 10 | S | – |
++| K-next | §4.1, §15 | **DRAW-TIE-WITNESS**. Makes K17's existing half-open CDF intervals and single-H tie explicit; no sampling semantics changes. | b-isa-spec-0h4; b-isa-spec-bas | E | – |
+ 
+ **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
+ token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
+@@ -864,6 +865,15 @@
+ outcome. Returned integers remain little-endian (wire 0 is bit 0).
  This fixes the reference CLI convention; unsupplied draws follow the
  Born distribution (§14.2).
- 
++
 +For ordered outcomes s_j with Born weights w_j, let T = sum_j w_j > 0
 +and C_j = sum_(i<=j) w_i, with C_-1 = 0. Outcome s_j is selected exactly
 +when C_(j-1) <= draw*T < C_j; an outcome of weight zero is never selected.
@@ -133,17 +142,30 @@ time and must not collide with concurrent proposals.
 +and every later measurement uses the conditional state left by earlier
 +measurements. Witness: H on |0> followed by a draw of exactly 0.5 returns
 +bit 1; a draw strictly below 0.5 returns 0 and one above it returns 1.
-+
+ 
  **DRAW-ORDER witness**
+ 
+@@ -4013,6 +4023,11 @@
+ ### 14.4 Mechanisation *(deferred)*
+ 
+ ## 15. Conformance suites
++
++K17's measurement vectors include H on a fresh wire with draws immediately
++below, exactly at and immediately above 0.5; the exact tie returns 1.
++Multi-wire vectors retain wire-first lexicographic ordering and one draw
++per joint measurement, including deterministic-state consumption.
+ 
+ The K82 named-interface vector is published in
+ `conformance/fixtures/accepted-k82-09/`: the catalog's interfaces and invoke
 ```
 
-The §0.2 insertion, expressed as an exact added table row:
+The patch includes this §0.2 insertion, expressed as an exact added table row:
 
 ```text
 | K-next | §4.1, §15 | **DRAW-TIE-WITNESS**. Makes K17's existing half-open CDF intervals and single-H tie explicit; no sampling semantics changes. | b-isa-spec-0h4; b-isa-spec-bas | E | – |
 ```
 
-Optional §15 addition immediately before `The K82 named-interface vector`:
+The patch includes this §15 addition immediately before `The K82 named-interface vector`:
 
 ```text
 K17's measurement vectors include H on a fresh wire with draws immediately
@@ -178,9 +200,9 @@ explicit parsing vector. Decimal spellings use round-trip values.
 | H⊗H\|00> | 0.24999999999999997 / 0.25 / 0.25000000000000006 | `00`/`01`/`01`; 0/2/2 |
 | H⊗H\|00> | 0.49999999999999994 / 0.5 / 0.5000000000000001 | `01`/`10`/`10`; 2/1/1 |
 | H⊗H\|00> | 0.7499999999999999 / 0.75 / 0.7500000000000001 | `10`/`11`/`11`; 1/3/3 |
-| Two fresh |++> registers, joint measures | 0.25,0.75 | `01`,`11`; 2,3 (published K17 carrier) |
+| Two fresh \|++> registers, joint measures | 0.25,0.75 | `01`,`11`; 2,3 (published K17 carrier) |
 | Fresh deterministic 0, then fresh H\|0> | 0.75,0.25 | `0`,`0`; 0,0 |
-| Independent |++>, measured one wire at a time | 0.25,0.5 | `0`,`1`; 0,1 (conditional normalization) |
+| Independent \|++>, measured one wire at a time | 0.25,0.5 | `0`,`1`; 0,1 (conditional normalization) |
 | Bell pair, joint | 0.5 | `11`; 3 (unsupported outcomes skipped) |
 | Bell pair, separate wires | 0.5,0 | `1`,`1`; 1,1 |
 | H\|0>, decimal parsing witness | token 0.49999999999999999 | `1`; 1 after binary64 conversion |
