@@ -71,3 +71,14 @@ fn hoisted_region_in_zero_trip_loop_remains_a_valid_reversible_source_program() 
         );
     }
 }
+
+#[test]
+#[ignore = "b-isa-spec-z4c: orchestrator-routed contract decision for hoisted action qregion addresses"]
+fn pending_z4c_hoisted_region_support_has_a_defined_source_address() {
+    let object = source();
+    let actuals = json::parse(r#"["t"]"#).unwrap();
+    let leaves = object.expand_action_source("gap", actuals.as_arr().unwrap(), &[("t",1)], false).unwrap();
+    for leaf in leaves.iter().filter(|leaf| leaf.allocation.is_some()) {
+        assert!(leaf.source.is_some(), "b-isa-spec-z4c: hoisted qregion support still has no defined source address");
+    }
+}

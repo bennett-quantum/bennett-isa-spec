@@ -36,17 +36,16 @@ fn bind(caller:&Instance,callee:&Function,i:&Instruction)->Result<Instance> {
  }
  Ok(result)
 }
-impl<'a> Program<'a> {
- pub fn new(object:&'a Object,root:&str)->Result<Self> {
-  object.ensure_linked()?;
-  let oracle=object.functions.get(root).filter(|f|f.kind=="oracle").ok_or_else(||Error::new(format!("§5.2: unknown oracle @{root}")))?;
+fn close_instances(object:&Object,root:&str)->Result<BTreeMap<(String,Vec<usize>),Instance>> {
+ let oracle=object.functions.get(root).ok_or_else(||Error::new("§3.7: unknown oracle entry".into()))?;
   let entry=Instance{source:root.into(),key:Vec::new(),args:oracle.params[4].iter().enumerate().map(|(i,p)|(p.name.clone(),i)).collect(),regions:oracle.params[3].iter().enumerate().map(|(i,p)|(p.name.clone(),i)).collect()};
   let mut closed=BTreeMap::from([((root.to_string(),Vec::new()),entry.clone())]);let mut pending=vec![entry];
   while let Some(caller)=pending.pop() {
-   let function=&object.functions[&caller.source];
+   let function=object.declaration(&caller.source)?;
    for i in function.instructions().filter(|i|i.op=="lift.call") {
-    let callee=object.functions.get(i.operands[0].trim_start_matches('@')).ok_or_else(||Error::new("§9.3: unresolved lproc".into()))?;
-    let instance=bind(&caller,callee,i)?;let key=(instance.source.clone(),instance.key.clone());
+    let target=i.operands.first().and_then(|s|s.strip_prefix('@')).ok_or_else(||Error::new("§3.7: lift.call requires @symbol".into()))?;
+    let callee=object.declaration(target)?;
+    let instance=bind(&caller,&callee,i)?;let key=(instance.source.clone(),instance.key.clone());
     if !closed.contains_key(&key) {
      crate::preparation("§3.7","fixed binding instance")?;
      crate::reserve_more(&mut pending,1,"§3.7","pending fixed bindings")?;
@@ -54,6 +53,13 @@ impl<'a> Program<'a> {
     }
    }
   }
+ Ok(closed)
+}
+impl<'a> Program<'a> {
+ pub fn new(object:&'a Object,root:&str)->Result<Self> {
+  object.ensure_linked()?;
+  let oracle=object.functions.get(root).filter(|f|f.kind=="oracle").ok_or_else(||Error::new(format!("§5.2: unknown oracle @{root}")))?;
+  let closed=close_instances(object,root)?;
   let mut order=closed.values().filter(|i|i.source!=root).cloned().collect::<Vec<_>>();
   if !order.is_empty() {
    let identity=object.identity()?;let mut hashes=BTreeMap::new();
@@ -75,6 +81,13 @@ impl<'a> Program<'a> {
    instances.insert(name.clone(),instance);functions.insert(name,function);
   }
   let halt=rows.len();Ok(Self{rows,labels,ranges,halt,functions,instances,calls,root_args:oracle.params[4].iter().map(|p|p.name.clone()).collect(),root_regions:oracle.params[3].iter().map(|p|p.name.clone()).collect()})
+ }
+ pub(crate) fn index_space_size(object:&Object,root:&str,containing:&str)->Result<Option<u128>> {
+  let instances=close_instances(object,root)?;
+  if !instances.values().any(|i|i.source==containing) {return Ok(None);}
+  instances.values().try_fold(0u128,|count,instance|{
+   count.checked_add(object.declaration(&instance.source)?.instructions().count() as u128).ok_or_else(||crate::resource_error("§3.7","fixed binding index space exceeds host capacity"))
+  }).map(Some)
  }
  pub fn label(&self,f:&str,label:&str)->Result<usize> {self.labels.get(&(f.into(),label.trim_start_matches('^').into())).copied().ok_or_else(||Error::new(format!("§3.6: unknown label {label} in @{f}")))}
  pub fn call(&self,f:&Function,i:&Instruction)->Result<Arc<Function>> {let name=self.calls.get(&(f.name.clone(),i.line)).ok_or_else(||Error::new("§3.7: unresolved fixed call instance".into()))?;self.functions.get(name).cloned().ok_or_else(||Error::new("§3.7: fixed instance is absent".into()))}

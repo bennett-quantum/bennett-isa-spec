@@ -10,6 +10,10 @@ use std::{
     rc::Rc,
 };
 mod named_interface;
+/// Implementation resource limits, never ISA validity conditions.
+pub const SOURCE_SCOPE_LIMIT: usize = 512;
+pub const DEFAULT_SOURCE_LEAF_LIMIT: usize = 500_000;
+pub const HOST_RESOURCE_LIMIT_PREFIX: &str = "HOST_RESOURCE_LIMIT: ";
 /// Source context remains outside the closed catalog and positional arguments.
 #[derive(Clone, Debug)]
 pub struct SourceSymbol {
@@ -24,10 +28,11 @@ struct SourceCapture {
     adjoint: bool,
 }
 #[derive(Clone)]
+// Share immutable lexical snapshots; Context::clone copies only their handles.
 struct CapturedArguments {
     symbol: String,
     actuals: Vec<Json>,
-    context: Box<Context>,
+    context: Rc<Context>,
     source: Option<SourceCapture>,
 }
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -136,11 +141,11 @@ struct Context {
     wires: BTreeMap<String, Vec<Wire>>,
     wire_owners: BTreeMap<String, Rc<RefCell<Handle>>>,
     angles: BTreeMap<String, u64>,
-    bodies: BTreeMap<String, (Vec<Json>, Box<Context>)>,
+    bodies: BTreeMap<String, (Rc<Vec<Json>>, Rc<Context>)>,
     symbols: BTreeMap<String, String>,
     events: BTreeMap<String, Json>,
     images: BTreeMap<String, Vec<u8>>,
-    templates: BTreeMap<String, (Vec<Json>, Box<Context>)>,
+    templates: BTreeMap<String, (Rc<Vec<Json>>, Rc<Context>)>,
     arguments: BTreeMap<String, CapturedArguments>,
     sources: BTreeMap<String, SourceCapture>,
     invocation_source: Option<SourceCapture>,
@@ -558,6 +563,9 @@ fn validate_body(body: &[Json]) -> Result<(), String> {
 #[derive(Clone, Debug)]
 pub struct Expander {
     recipes: BTreeMap<String, Json>,
+    source_depth: usize,
+    source_leaf_limit: usize,
+    source_leaf_count: usize,
     named_interfaces: BTreeMap<String, Vec<String>>,
     source_factory: Option<std::sync::Arc<dyn SourceFactory>>,
     source_ordinals: BTreeMap<std::sync::Arc<SourceLocation>, usize>,
@@ -647,6 +655,9 @@ impl Expander {
             visit(k, &graph, &mut BTreeSet::new(), &mut done)?;
         }
         Ok(Self {
+            source_depth: 0,
+            source_leaf_limit: DEFAULT_SOURCE_LEAF_LIMIT,
+            source_leaf_count: 0,
             named_interfaces: named_interface::derive(&recipes)?,
             recipes,
             source_factory: None,
@@ -667,6 +678,9 @@ impl Expander {
             validate_body(a(f(r, "body")?)?)?;
         }
         Ok(Self {
+            source_depth: 0,
+            source_leaf_limit: self.source_leaf_limit,
+            source_leaf_count: 0,
             recipes: self.recipes.clone(),
             named_interfaces: self.named_interfaces.clone(),
             source_factory: self.source_factory.clone(),
@@ -681,6 +695,12 @@ impl Expander {
     }
     pub fn with_source_factory(mut self, factory: std::sync::Arc<dyn SourceFactory>) -> Self {
         self.source_factory = Some(factory);
+        self
+    }
+    /// Bound materialised source leaves, including replayed inverse leaves.
+    /// Exceeding this host limit is not an ISA source fault.
+    pub fn with_source_leaf_limit(mut self, limit: usize) -> Self {
+        self.source_leaf_limit = limit;
         self
     }
     /// Ordered K82 wire names; None denotes a closed typed recipe.
@@ -702,6 +722,28 @@ impl Expander {
         bundles: &[(&str, usize)],
         symbols: &[SourceSymbol],
     ) -> Result<Vec<Leaf>, String> {
+        // Lexically nested recipes must not depend on an embedding caller's
+        // (often 2 MiB) stack. Captures themselves remain shared snapshots.
+        std::thread::scope(|scope| {
+            std::thread::Builder::new()
+                .name("isa-recipe-expansion".into())
+                .stack_size(32 * 1024 * 1024)
+                .spawn_scoped(scope, || self.expand_bound_local(kind, args, bundles, symbols))
+                .map_err(|e| format!("{HOST_RESOURCE_LIMIT_PREFIX}cannot allocate expansion stack: {e}"))?
+                .join()
+                .map_err(|_| "recipe expansion worker panicked".to_string())?
+        })
+    }
+
+    fn expand_bound_local(
+        &mut self,
+        kind: &str,
+        args: &[Json],
+        bundles: &[(&str, usize)],
+        symbols: &[SourceSymbol],
+    ) -> Result<Vec<Leaf>, String> {
+        self.source_depth = 0;
+        self.source_leaf_count = 0;
         self.serial = 0;
         self.ordinals.clear();
         self.source_ordinals.clear();
@@ -999,7 +1041,7 @@ impl Expander {
                         CapturedArguments {
                             symbol: symbol.clone(),
                             actuals: a(v)?.to_vec(),
-                            context: Box::new(caller.clone()),
+                            context: Rc::new(caller.clone()),
                             source: c.sources.get(s(f(p, "symbol")?)?).cloned(),
                         }
                     };
@@ -1046,7 +1088,7 @@ impl Expander {
                             validate_formals(a(f(t, "parameters")?)?)?;
                             validate_body(a(f(t, "body")?)?)?;
                         }
-                        (ts.to_vec(), Box::new(caller.clone()))
+                        (Rc::new(ts.to_vec()), Rc::new(caller.clone()))
                     };
                     if usize::try_from(scalar(f(p, "length")?, &c.ints)?)
                         .map_err(|_| "negative template length")?
@@ -1084,7 +1126,7 @@ impl Expander {
                         {
                             let body = a(v)?;
                             validate_body(body)?;
-                            (body.to_vec(), Box::new(caller.clone()))
+                            (Rc::new(body.to_vec()), Rc::new(caller.clone()))
                         }
                     };
                     c.bodies.insert(name.into(), b);
@@ -1202,6 +1244,7 @@ impl Expander {
                             .clone();
                         leaf.source = Some(replacement);
                     }
+                    self.account_source_leaf()?;
                     out.push(leaf);
                 }
                 return Ok(());
@@ -1314,6 +1357,15 @@ impl Expander {
         chain.pop();
         Ok(())
     }
+    fn account_source_leaf(&mut self) -> Result<(), String> {
+        if self.source_factory.is_some() {
+            if self.source_leaf_count == self.source_leaf_limit {
+                return Err(format!("{HOST_RESOURCE_LIMIT_PREFIX}source expansion exceeds this host's materialised leaf budget ({})", self.source_leaf_limit));
+            }
+            self.source_leaf_count += 1;
+        }
+        Ok(())
+    }
     fn emit(&mut self, mut l: Leaf, rev: bool, out: &mut Vec<Leaf>) -> Result<(), String> {
         if rev {
             l.gate = match l.gate.as_str() {
@@ -1338,10 +1390,29 @@ impl Expander {
         };
         l.ordinal = *n;
         *n += 1;
+        self.account_source_leaf()?;
         out.push(l);
         Ok(())
     }
     fn body(
+        &mut self,
+        b: &[Json],
+        c: &mut Context,
+        path: &[usize],
+        rev: bool,
+        chain: &mut Vec<String>,
+        out: &mut Vec<Leaf>,
+    ) -> Result<(), String> {
+        if self.source_depth == SOURCE_SCOPE_LIMIT {
+            return Err(format!("{HOST_RESOURCE_LIMIT_PREFIX}source constructor nesting exceeds this host's expansion stack budget"));
+        }
+        self.source_depth += 1;
+        let result = self.body_inner(b, c, path, rev, chain, out);
+        self.source_depth -= 1;
+        result
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn body_inner(
         &mut self,
         b: &[Json],
         c: &mut Context,
@@ -1506,7 +1577,7 @@ impl Expander {
                 let t = ts.get(index).ok_or("template index out of bounds")?;
                 // Actuals resolve at the apply site, free names at capture.
                 let bound = self.bind(t, a(f(j, "args")?)?, c)?;
-                let mut local = *captured;
+                let mut local = (*captured).clone();
                 for p in a(f(t, "parameters")?)? {
                     let name = if let Json::Str(n) = p {
                         n.as_str()
@@ -1718,14 +1789,15 @@ impl Expander {
                     let CapturedArguments {
                         symbol: bound_hash,
                         actuals: args,
-                        context: mut captured,
+                        context,
                         source,
                     } = c.arguments.get(name).cloned().ok_or("unbound arguments")?;
                     if bound_hash != hash {
                         return Err("arguments closure mismatch".into());
                     }
+                    let mut captured = (*context).clone();
                     captured.invocation_source = source;
-                    (args, *captured)
+                    (args, captured)
                 } else {
                     let mut captured = c.clone();
                     captured.invocation_source = c.sources.get(s(n)?).cloned();
@@ -1769,7 +1841,8 @@ impl Expander {
                 )?;
             } else if let Some(n) = j.get("splice") {
                 keys(j, &["splice"])?;
-                let (b, mut captured) = c.bodies.get(s(n)?).cloned().ok_or("unbound body")?;
+                let (b, captured) = c.bodies.get(s(n)?).cloned().ok_or("unbound body")?;
+                let mut captured = (*captured).clone();
                 captured.controls.extend(c.controls.clone());
                 captured.controls.sort();
                 captured.controls.dedup();

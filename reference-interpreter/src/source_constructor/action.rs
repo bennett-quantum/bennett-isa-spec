@@ -652,6 +652,7 @@ pub(super) fn construct(
     if adjoint {
         body = source_adjoint(body, &mut compiler.symbols)?;
     }
+    let local_count = locals.len();
     for i in locals.into_iter().rev() {
         let a = &i.operands;
         let r = &env.regions[&a[0]];
@@ -706,6 +707,9 @@ pub(super) fn construct(
                 ("body", array(body)),
             ])];
         }
+    }
+    if compiler.declarations.len().saturating_add(local_count) >= bennett_isa_conformance::ref_language::SOURCE_SCOPE_LIMIT {
+        return Err(crate::resource_error("§11.1", "source declaration scopes exceed the host expansion stack budget"));
     }
     for (name, width, class, state) in compiler.declarations.into_iter().rev() {
         body = vec![obj([

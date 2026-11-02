@@ -1131,6 +1131,12 @@ impl Object {
     fn index_space_size(&self, containing: &Function) -> Result<u128> {
         let mut maximum = containing.instructions().count() as u128;
         for oracle in self.functions.values().filter(|f| f.kind == "oracle") {
+            if self.isa_version == IsaVersion::V09 {
+                if let Some(count) = crate::oracle::Program::index_space_size(self, &oracle.name, &containing.name)? {
+                    maximum = maximum.max(count);
+                }
+                continue;
+            }
             let mut pending = vec![oracle.name.clone()];
             let mut seen = BTreeSet::new();
             let mut count = 0u128;

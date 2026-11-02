@@ -1028,6 +1028,9 @@ pub(crate) fn oracle(
         construct,
         tag("$source-point/release", teardown),
     ];
+    if declarations.len() >= bennett_isa_conformance::ref_language::SOURCE_SCOPE_LIMIT {
+        return Err(crate::resource_error("§11.1", "source declaration scopes exceed the host expansion stack budget"));
+    }
     for (name, width) in declarations.into_iter().rev() {
         body = vec![obj([
             ("declare", text(name)),
@@ -1152,7 +1155,9 @@ impl bennett_isa_conformance::ref_language::SourceFactory for LinkedSource {
             let call = OracleInvocation::capture(&self.object, name, Some(context), budget, &args)?;
             oracle(&call)
         };
-        build().map_err(|e| e.to_string())
+        build().map_err(|e| if e.kind() == crate::ErrorKind::HostResource {
+            format!("{}{e}", bennett_isa_conformance::ref_language::HOST_RESOURCE_LIMIT_PREFIX)
+        } else { e.to_string() })
     }
 }
 

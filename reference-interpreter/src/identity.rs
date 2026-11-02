@@ -61,12 +61,13 @@ fn symbol_references<'a>(
     line: &'a str,
     function: Option<&Function>,
 ) -> Vec<(usize, usize, &'a str)> {
-    if let Some(f) = function.filter(|f| f.kind == "oracle") {
+    if let Some(f) = function.filter(|f| matches!(f.kind.as_str(), "oracle" | "lproc")) {
         if let Some(region) = line
             .split_once(" = ")
             .and_then(|(_, rhs)| rhs.strip_prefix("lift.addr @"))
         {
-            if f.params[3].iter().any(|p| p.name == region) {
+            let regions = if f.kind == "oracle" { &f.params[3] } else { &f.params[4] };
+            if regions.iter().any(|p| p.name == region) {
                 return Vec::new();
             }
         }
@@ -258,6 +259,7 @@ impl Object {
                         .instructions()
                         .filter(|i| i.op == "lift.addr")
                         .filter_map(|i| i.operands[0].strip_prefix('@').map(str::to_owned))
+                        .filter(|name| !self.functions[n].params[4].iter().any(|p| &p.name == name))
                         .collect();
                     leaves = all
                         .into_iter()

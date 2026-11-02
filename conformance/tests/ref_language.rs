@@ -277,3 +277,51 @@ fn canonical_integer_literal_has_only_lsb_ordered_x_leaves() {
         [0, 2, 3]
     );
 }
+
+#[test]
+fn nested_body_captures_share_lexical_snapshots_and_preserve_free_wires() {
+    // Every level captures two bodies. Deep copying both captured contexts
+    // recursively doubles storage even though the expanded result is two gates.
+    let mut recipes = Vec::new();
+    for level in 0..=32 {
+        let body = if level == 32 {
+            r#"[{"splice":"B"},{"splice":"C"}]"#.to_string()
+        } else {
+            format!(r#"[{{"invoke":"r{:02}","args":[[{{"splice":"B"}}],[{{"splice":"C"}}]]}}]"#, level + 1)
+        };
+        recipes.push(format!(r#"{{"kind":"r{level:02}","parameters":[{{"name":"B","type":"body"}},{{"name":"C","type":"body"}}],"body":{body}}}"#));
+    }
+    let catalog = doc(&format!("[{}]", recipes.join(",")));
+    let args = json::parse(r#"[[{"gate":"x","wires":["a"]}],[{"gate":"x","wires":["b"]}]]"#).unwrap();
+    let leaves = Expander::new(&catalog, Registry::new()).unwrap()
+        .expand("r00", args.as_arr().unwrap(), &[("a",1),("b",1)]).unwrap();
+    assert_eq!(leaves.iter().map(|leaf| leaf.wires.clone()).collect::<Vec<_>>(),
+        vec![vec![("a".into(),0)],vec![("b".into(),0)]]);
+}
+
+#[test]
+fn source_leaf_budget_fails_explicitly_resets_and_leaves_plain_catalogs_unchanged() {
+    use bennett_isa_conformance::ref_language::{SourceBody, SourceFactory, HOST_RESOURCE_LIMIT_PREFIX};
+    use std::{collections::BTreeMap, sync::Arc};
+    #[derive(Debug)]
+    struct Factory(json::Json);
+    impl SourceFactory for Factory {
+        fn construct(&self, hash:&str, _: &BTreeMap<String,json::Json>, _: &BTreeMap<String,json::Json>, _:Option<&json::Json>, _:bool) -> Result<SourceBody,String> {
+            Ok(SourceBody {body:self.0.clone(),symbols:vec![],symbol:hash.into(),oracle:false,points:BTreeMap::new(),rows:vec![]})
+        }
+    }
+    let body = json::parse(r#"[{"for":"i","from":0,"to":9,"body":[{"gate":"x","wires":["w"]}]}]"#).unwrap();
+    let hash = "c".repeat(64);
+    let recipe = json::parse(&format!(r#"{{"parameters":[{{"name":"w","type":"wire","width":1}}],"body":{body}}}"#)).unwrap();
+    let mut expander = Expander::new(&doc("[]"), Registry::from([(hash.clone(),recipe)])).unwrap()
+        .with_source_factory(Arc::new(Factory(body))).with_source_leaf_limit(8);
+    let args = [json::Json::Str("a".into())];
+    let error = expander.expand(&hash,&args,&[("a",1)]).unwrap_err();
+    assert!(error.starts_with(HOST_RESOURCE_LIMIT_PREFIX));
+    assert!(error.contains("leaf budget (8)"));
+    let mut expander = expander.with_source_leaf_limit(9);
+    for _ in 0..2 {assert_eq!(expander.expand(&hash,&args,&[("a",1)]).unwrap().len(),9);}
+    let plain = doc(r#"[{"kind":"plain","parameters":[{"name":"w","type":"wire","width":1}],"body":[{"gate":"x","wires":["w"]}]}]"#);
+    assert_eq!(Expander::new(&plain,Registry::new()).unwrap().with_source_leaf_limit(0)
+        .expand("plain",&args,&[("a",1)]).unwrap().len(),1);
+}

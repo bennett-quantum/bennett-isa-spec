@@ -23,7 +23,12 @@ pub struct RefLibrary {
     expander: Expander,
 }
 fn infeasible(e: impl std::fmt::Display) -> crate::Error {
-    crate::Error::new(format!("§11.1: E_SCHEDULE_INFEASIBLE: {e}"))
+    let text = e.to_string();
+    if let Some(reason) = text.strip_prefix(bennett_isa_conformance::ref_language::HOST_RESOURCE_LIMIT_PREFIX) {
+        crate::Error::host_resource(format!("§11.1: {reason}"))
+    } else {
+        crate::Error::new(format!("§11.1: E_SCHEDULE_INFEASIBLE: {text}"))
+    }
 }
 impl RefLibrary {
     pub fn published() -> Result<Self> {
@@ -242,6 +247,16 @@ impl<'a> OracleInvocation<'a> {
         library: &RefLibrary,
         bundles: &[(&str, usize)],
     ) -> Result<Vec<Leaf>> {
+        self.expand_source_with_leaf_limit(library, bundles, bennett_isa_conformance::ref_language::DEFAULT_SOURCE_LEAF_LIMIT)
+    }
+    /// Use a caller-selected materialisation capacity. This changes host
+    /// capacity only; the source token and its ISA fault boundaries are intact.
+    pub fn expand_source_with_leaf_limit(
+        &self,
+        library: &RefLibrary,
+        bundles: &[(&str, usize)],
+        leaf_limit: usize,
+    ) -> Result<Vec<Leaf>> {
         let registry = self
             .object
             .functions
@@ -270,7 +285,8 @@ impl<'a> OracleInvocation<'a> {
             .expander
             .with_registry(registry)
             .map_err(infeasible)?
-            .with_source_factory(factory);
+            .with_source_factory(factory)
+            .with_source_leaf_limit(leaf_limit);
         expander
             .expand_bound(
                 "oracle_call",
