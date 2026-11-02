@@ -528,6 +528,8 @@ classical_step_time. when, if present, is {outcome,equals:0|1}; it
 selects an ordinary gate or the identity in its fully charged slot,
 and cannot gate allocation, measurement, dispatch or release.
 Outcome names are unique within a witness and cannot escape it.
+when is classical feedforward and adds no coherent control to target
+gate matching or the region's inherited control count.
 Reset is the explicit gate X with when:{outcome,equals:1}.
 Allocation remains the existing clean allocation constructor and
 must be declared in the ordinary frame/event stream; no undeclared
@@ -688,8 +690,10 @@ bound root schedule_hash. One record covers each concrete carrier
 selected by the schedule; wildcard schedule selections must resolve
 to all of their concrete contexts before verification.
 
-contexts is in §12.1 concrete-context bytewise JCS order, without
-duplicates or omissions. context is the region invocation key,
+contexts is ordered by the bytewise JCS encoding of {context,carrier},
+without duplicate pairs or omissions. Several carriers in one region
+invocation have the same context and distinct carrier coordinates.
+context is the §12.1 region invocation key,
 carrier the complete terminal source coordinates with generated:0,
 and compute_points/cleanup_points are the exact ordered K81-owned
 source occurrences, not producer-chosen semantically similar gates.
@@ -1266,7 +1270,9 @@ the exact witnesses, source-anchor consistency and historical catalog identity.
 
 The [current interpreter](../../../reference-interpreter/src/metadata_schema.rs)
 enumerates cleanup as reverse/recompute and channel claims with the dual
-payload. sol-ref09 must change the following after contract acceptance;
+payload. Its `tests/cleanup_partition.rs` explicitly labels its K81 carrier
+formation a finite source adapter, not production Expander output.
+sol-ref09 must change the following after contract acceptance;
 none of these files is edited by this job:
 
 1. Version admission: add the agreed 0.10 ISA/object/sched/cert/target vector
@@ -1276,13 +1282,16 @@ none of these files is edited by this job:
    measure_fixup/witness, Boolean mbu, private measurement cost record,
    event union, exact channel payload and D3's closed record schemas.
    Reject unknown fields, missing costs, aliases and wrong conditional kinds.
-3. `source_constructor.rs`, `source_constructor/action.rs`, and the existing
-   cleanup partition implementation: derive legal K81 pairs before selection,
+3. `source_constructor.rs`, `source_constructor/action.rs`, `validation.rs`
+   and the production cleanup-partition path: implement/complete legal K81
+   pair derivation before selection rather than importing finite-adapter
+   carrier assignments. Use the source version/provenance checks and
    retain original source versions/carriers, then attach checked relocation
    and optional owned compute replacement. Do not admit literal late source
    cleanup or absorb excluded constructor cleanup. Preserve K63/K64/K80
    occurrence identities and unique ownership across every context.
-4. `ref_library.rs` and event expansion: implement the explicitly bound new
+4. `ref_library.rs` and `conformance/src/ref_language.rs` event expansion:
+   implement the explicitly bound new
    profile; emit measure_z, dispatch, reserved conditional gates, reset and
    release with C3's coordinates; bind every operand/lifetime version and
    nested argument/token/budget from source. Outcome choice cannot renumber.
@@ -1306,8 +1315,10 @@ none of these files is edited by this job:
    cleanup from source measure frames; expand and verify the logical inverse
    with fresh private outcomes for adjoint calls, segment uncall and whole-run
    reversal. Keep explicit-source-measure and unverified-free restrictions.
-9. Certificate loader/binding path: resolve schedule witness ids without a
-   hash cycle; require successful channel proof before affected effects;
+9. Certificate loader/binding path: resolve schedule witness ids, require
+   exact definition equality with the certificate, and bind all event bytes
+   in schedule_hash without a hash cycle; require successful channel proof
+   before affected effects;
    validate per-device object/root records and external inventory association
    without inventing an ISA record for native main or host libc. General
    mixed launch/host-memory mechanics remain with bennett-4ht owners.
@@ -1340,7 +1351,7 @@ definition are changed by this note.
 | Source cleanup relocation | Schedule/certificate implementation choice; for a fixed ISA version, no source-byte rewrite or semantic source-envelope field is added |
 | Optional literal C boundary | Claims do not enter source identity; changing source from CCX to literal C does change source bytes/hashes; a source hash does not certify the boundary |
 | Target | mbu/cost/profile/version byte changes alter target_hash; old mbu=false target remains valid for unitary cleanup |
-| Schedule | New expansion identity, witness id and entries change schedule_hash; relocation event details are verified against the matching certificate |
+| Schedule | New expansion identity, witness id, cleanup_witnesses definitions and entries change schedule_hash; every event/placement/dependency byte is committed and compared with the certificate |
 | Certificate | Channel claims, cleanup records/resources/context sets and version vector change certificate bytes and certificate_hash; source identity excludes these metadata sections |
 | Expansion | New ref@0.10 canonical document/profile and `isa=0.10/expansion=ref/version=0.10` envelope have a new published hash; no fabricated hash here, no mutation of ref@0.9 |
 | Fat object | Device roots bind their own migrated object/closure/schedule/certificate identities; outer inventory changes separately; native-container hash is not object_hash |

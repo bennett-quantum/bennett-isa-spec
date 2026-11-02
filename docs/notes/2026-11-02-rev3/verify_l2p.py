@@ -216,6 +216,11 @@ def document():
     for name, before in blocks:
         assert proposed.count(before) == 1, (name, 'overlapping replacements')
         proposed = proposed.replace(before, after[name], 1)
+    assert 'Measurement-based cleanup is not admitted' not in proposed
+    assert 'closed-window measurement-based cleanup is not\nadmitted' not in proposed
+    assert 'cleanup_witnesses' in after['11-witness-map']
+    assert 'schedule.cleanup_witnesses[id].contexts' in after['12.3-layout']
+    assert 'schedule_hash' not in after['11-witness-map'], 'hash cycle in definition map'
     for marker in ('B1', 'B2', 'L2P-1', 'L2P-2', 'sol-ref09', '0.10',
                    'measure_fixup', 'clean_isometry', 'mbu', 'matrix unit',
                    'argv/envp', 'feedforward_latency'):
