@@ -40,7 +40,11 @@ The input magic state in Figure 3 counts as a T resource. The paper
 credits Jones for an equivalent construction. PDF text and captions were
 read; the web screenshot facility failed, so the diagram's wire routing
 was not visually inspected. The explicit circuit and algebra below were
-derived independently, not transcribed from that diagram.
+derived independently, not transcribed from that diagram. The paper also
+describes a six-net-T unitary alternative when recovered magic-state
+resources are credited. The eight-T C/C† count below is the literal
+T/Tdg count of the stated gate list, without such recovery credit; it is
+not a unitary optimality claim.
 
 ## Worked circuit and alternatives
 
@@ -118,14 +122,21 @@ free K number; the following is proposed replacement/addition text.
 Replace the last two sentences of §6.2 by:
 
 ```diff
--Every perm value MUST be cleaned within its window ...
--... other values are released only by the adjoint ...
-+Unitary reverse/recompute cleanup retains the window, version, effective
-+control and outstanding-dependence obligations above. A closed window
-+does not forbid a measurement/fixup realisation whose complete channel
-+satisfies §6.4. An other value may alternatively use a certified
-+clean-isometry boundary as defined below. Neither exception licenses an
-+uncertified release or a basis-only phase assertion.
+-Every perm value MUST be
+-cleaned within its window and before its region exits; otherwise the
+-region is **ill-formed** (closed-window measurement-based cleanup is not
+-admitted). `other` values are released only by the adjoint of their
+-computing sequence, and only while no other live value, interface wire
+-or outstanding diagonal phase depends on them, as defined in §6.1.
++Every workspace value MUST be cleaned before its region exits. Unitary
++reverse/recompute cleanup retains the window, version and effective
++control obligations above; recompute remains legal only for perm values.
++Unitary cleanup of an uncertified other value requires the exact
++computing adjoint and no outstanding dependence as defined in §6.1.
++A closed window does not forbid a measurement/fixup realisation whose
++complete channel satisfies §6.4. A certified clean-isometry boundary may
++establish perm provenance as defined below. Neither exception licenses
++an uncertified release or a basis-only phase assertion.
 ```
 
 Append to §6.1 and add the indicated §12.1 structural rule:

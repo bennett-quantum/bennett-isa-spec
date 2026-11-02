@@ -43,7 +43,8 @@ For ISA/object 0.10, extend §§5.1, 9.1, 9.2, 11 and 16.2:
 
 ```text
 A region header MAY have [n,...] immediately after its symbol name.
-These are distinct positive i64-valued classical width parameters. A
+These are distinct unsigned-i64 classical parameters. Wire widths and
+cell widths are positive; address exponents may be zero. A
 signature adds width_params:[{name,bind:{group,slot}}], in header order.
 Each bind names a wire operand whose run-time qreg.width binds that
 parameter at the CC/R region call. Other slots may have either a literal
