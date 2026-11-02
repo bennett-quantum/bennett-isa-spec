@@ -9,7 +9,7 @@ struct Instance {
  regions:BTreeMap<String,usize>,
 }
 impl Instance {
- fn namespace(&self)->String {if self.key.is_empty() {self.source.clone()}else{format!("{}#{:?}",self.source,self.key)}}
+ fn namespace(&self)->String {if self.key.is_empty() {self.source.clone()}else{format!("{}#{}",self.source,self.key.iter().map(usize::to_string).collect::<Vec<_>>().join("_"))}}
 }
 pub(crate) struct Program<'a> {
  pub rows:Vec<(Arc<Function>, &'a Instruction)>,
@@ -54,11 +54,17 @@ impl<'a> Program<'a> {
     }
    }
   }
-  let identity=object.identity()?;
-  let hash=|name:&str|->Result<String> {if identity.scc_members[name].len()>1 {Ok(identity.scc_hashes[name].clone())}else{identity.closure_hashes[name].clone().ok_or_else(||Error::new("§9.3: unlinked instance".into()))}};
-  let mut order=closed.values().filter(|i|i.source!=root).cloned().map(|i|Ok((hash(&i.source)?,i))).collect::<Result<Vec<_>>>()?;
-  order.sort_by(|(ha,a),(hb,b)|ha.cmp(hb).then(a.source.cmp(&b.source)).then(a.key.cmp(&b.key)));
-  let mut ordered=vec![closed[&(root.to_string(),Vec::new())].clone()];ordered.extend(order.into_iter().map(|(_,i)|i));
+  let mut order=closed.values().filter(|i|i.source!=root).cloned().collect::<Vec<_>>();
+  if !order.is_empty() {
+   let identity=object.identity()?;let mut hashes=BTreeMap::new();
+   for instance in &order {
+    let name=&instance.source;
+    let hash=if identity.scc_members[name].len()>1 {identity.scc_hashes[name].clone()}else{identity.closure_hashes[name].clone().ok_or_else(||Error::new("§9.3: unlinked instance".into()))?};
+    hashes.insert(name.clone(),hash);
+   }
+   order.sort_by(|a,b|hashes[&a.source].cmp(&hashes[&b.source]).then(a.source.cmp(&b.source)).then(a.key.cmp(&b.key)));
+  }
+  let mut ordered=vec![closed[&(root.to_string(),Vec::new())].clone()];ordered.extend(order);
   let mut functions=BTreeMap::new();let mut instances=BTreeMap::new();let mut rows=Vec::new();let mut labels=BTreeMap::new();let mut ranges=BTreeMap::new();let mut calls=BTreeMap::new();
   for instance in ordered {
    let original=&object.functions[&instance.source];let name=instance.namespace();let mut function=original.clone();function.name=name.clone();let function=Arc::new(function);

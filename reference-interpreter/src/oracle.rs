@@ -622,7 +622,7 @@ impl Object {
                             self.ptr_width as usize,
                             *memory
                                 .addresses
-                                .get(a[0].trim_start_matches('@'))
+                                .get(&program.region_name(f, a[0].trim_start_matches('@')))
                                 .ok_or_else(|| Error::new("§4.2: address not mapped".into()))?,
                         )?);
                     }
