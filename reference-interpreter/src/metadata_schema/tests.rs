@@ -574,3 +574,27 @@ fn r17_section17_defaults_are_optional_and_applied() {
         );
     }
 }
+
+#[test]
+fn isa09_review_grammar_carries_k4_k12_k14_and_edge_selectors() {
+ let hash="0".repeat(64);let mut failures=Vec::new();
+ for (production,value) in [
+  ("path_element",j(&format!(r#"{{"symbol":"{hash}","point":"entry:0","iteration":[],"instance":[],"call_index":0}}"#))),
+  ("alloc_payload",j(r#"{"class":"any","vertices":[0,1]}"#)),
+  ("expected",j(r#""inverse_pair""#)),
+  ("domain",j(r#"{"bundles":[],"borrowed":[],"regions":[],"args":[{"name":"a","width":2,"lo":0,"hi":3}]}"#)),
+  ("inverse_pair",j(&format!(r#"{{"g":"{hash}","ginv":"{hash}","claim":0,"budget":[3,0,0,0],"arg_tokens":{{"tk":[2,0,0,0]}}}}"#))),
+ ] {
+  if let Err(e)=validate_for(crate::IsaVersion::V09,production,&value) {failures.push(format!("{production}: {e}"));}
+  assert!(validate_for(crate::IsaVersion::V08,production,&value).is_err(),"0.8 widened {production}");
+ }
+ let fixture=IsaObject::parse(include_str!("../../../conformance/fixtures/controlled-action-09/controlled.bisa")).unwrap();
+ for (production,mut value,key,added) in [
+  ("schedule",fixture.section("schedule").unwrap().clone(),"interface_vertices",j("[[0]]")),
+  ("region",fixture.section("certificate").unwrap().get("regions").unwrap().object().unwrap().values().next().unwrap().clone(),"estimate",j(r#"{"precision_digits":34,"exact_resources":{"ops":{"numerator":"0","denominator":"1"}}}"#)),
+ ] {
+  let Json::Object(fields)=&mut value else {panic!("object")};fields.insert(key.into(),added);
+  if let Err(e)=validate_for(crate::IsaVersion::V09,production,&value) {failures.push(format!("{production}: {e}"));}
+ }
+ assert!(failures.is_empty(),"{}",failures.join("\n"));
+}

@@ -9,6 +9,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     rc::Rc,
 };
+mod named_interface;
 /// Source context remains outside the closed catalog and positional arguments.
 #[derive(Clone, Debug)]
 pub struct SourceSymbol {
@@ -144,7 +145,6 @@ struct Context {
     invocation_source: Option<SourceCapture>,
     values: BTreeMap<String, (Json, Json)>,
     controls: Vec<Wire>,
-    legacy: bool,
     scratch_names: BTreeSet<String>,
     declarations: BTreeMap<String, Json>,
     allocations: BTreeMap<String, (String, usize, String, String)>,
@@ -549,6 +549,7 @@ fn validate_body(body: &[Json]) -> Result<(), String> {
 #[derive(Clone, Debug)]
 pub struct Expander {
     recipes: BTreeMap<String, Json>,
+    named_interfaces: BTreeMap<String, Vec<String>>,
     source_factory: Option<std::sync::Arc<dyn SourceFactory>>,
     source_ordinals: BTreeMap<std::sync::Arc<SourceLocation>, usize>,
     source_calls: BTreeMap<std::sync::Arc<SourceLocation>, usize>,
@@ -637,6 +638,7 @@ impl Expander {
             visit(k, &graph, &mut BTreeSet::new(), &mut done)?;
         }
         Ok(Self {
+            named_interfaces: named_interface::derive(&recipes)?,
             recipes,
             source_factory: None,
             source_ordinals: BTreeMap::new(),
@@ -657,6 +659,7 @@ impl Expander {
         }
         Ok(Self {
             recipes: self.recipes.clone(),
+            named_interfaces: self.named_interfaces.clone(),
             source_factory: self.source_factory.clone(),
             source_ordinals: BTreeMap::new(),
             source_calls: BTreeMap::new(),
@@ -670,6 +673,10 @@ impl Expander {
     pub fn with_source_factory(mut self, factory: std::sync::Arc<dyn SourceFactory>) -> Self {
         self.source_factory = Some(factory);
         self
+    }
+    /// Ordered K82 wire names; None denotes a closed typed recipe.
+    pub fn named_interface(&self, kind: &str) -> Option<&[String]> {
+        self.named_interfaces.get(kind).map(Vec::as_slice)
     }
     pub fn expand(
         &mut self,
@@ -716,6 +723,13 @@ impl Expander {
                     adjoint: symbol.adjoint,
                 },
             );
+        }
+        if let Some(names) = self.named_interface(kind) {
+            if names.iter().map(String::as_str).collect::<BTreeSet<_>>()
+                != caller.wires.keys().map(String::as_str).collect::<BTreeSet<_>>()
+            {
+                return Err("explicit named-interface map has missing or extra wires".into());
+            }
         }
         let mut out = Vec::new();
         self.invoke(kind, args, &caller, &[], false, &mut Vec::new(), &mut out)?;
@@ -766,7 +780,6 @@ impl Expander {
             source_edges: caller.source_edges.clone(),
             source_steps: caller.source_steps.clone(),
             source_location: caller.source_location.clone(),
-            legacy: ps.iter().all(|p| matches!(p, Json::Str(_))),
             ..Context::default()
         };
         if let Some(names) = r.get("scratch") {
@@ -901,7 +914,6 @@ impl Expander {
                                     caller,
                                     &widths,
                                 )?;
-                                b.legacy = false;
                                 b.ints.retain(|key, _| key == n);
                                 widths.extend(b.ints.clone());
                                 bound.merge(&b);
@@ -1096,11 +1108,6 @@ impl Expander {
                 _ => return Err(format!("unknown formal type {ty}")),
             }
         }
-        if c.legacy {
-            for (n, ws) in &caller.wires {
-                c.wires.entry(n.clone()).or_insert_with(|| ws.clone());
-            }
-        }
         Ok(c)
     }
     #[allow(clippy::too_many_arguments)]
@@ -1124,6 +1131,17 @@ impl Expander {
             .cloned()
             .ok_or_else(|| format!("unknown recipe {kind}"))?;
         let mut c = self.bind(&r, args, caller)?;
+        if let Some(names) = self.named_interface(kind) {
+            for name in names {
+                c.wires.insert(name.clone(), named_wires(name, caller)?);
+                if let Some(allocation) = caller.allocations.get(name) {
+                    c.allocations.insert(name.clone(), allocation.clone());
+                }
+                if caller.scratch_names.contains(name) {
+                    c.scratch_names.insert(name.clone());
+                }
+            }
+        }
         if self.source_factory.is_some() && kind == "step" {
             let step = c
                 .source_steps
@@ -1462,12 +1480,7 @@ impl Expander {
                     .map_err(|_| "negative template index")?;
                 let t = ts.get(index).ok_or("template index out of bounds")?;
                 // Actuals resolve at the apply site, free names at capture.
-                let mut bound = self.bind(t, a(f(j, "args")?)?, c)?;
-                // Bare integer template formals are abbreviations, not the
-                // legacy recipe API's implicit apply-site wire environment.
-                if bound.legacy {
-                    bound.wires.clear();
-                }
+                let bound = self.bind(t, a(f(j, "args")?)?, c)?;
                 let mut local = *captured;
                 for p in a(f(t, "parameters")?)? {
                     let name = if let Json::Str(n) = p {

@@ -147,7 +147,8 @@ impl Function {
     /// Its synthetic parameter names are local to validation, never executable.
     pub(crate) fn from_signature(name: &str, signature: &Json) -> Result<Self> {
         let kind = signature.get("kind")?.string()?;
-        crate::metadata_schema::validate("signature", signature)?;
+        let version = IsaVersion::parse(signature.get("abi")?.string()?)?;
+        crate::metadata_schema::validate_for(version, "signature", signature)?;
         let mut f = Self {
             kind: kind.into(),
             name: name.into(),
@@ -242,13 +243,18 @@ impl Function {
             "lproc" => {
                 f.params[0] = widths("params", true, None)?;
                 f.params[1] = scalar("result", true)?;
+                if version == IsaVersion::V09 {
+                    f.params[2] = types("tokens")?;
+                    f.params[3] = types("args")?;
+                    f.params[4] = memory()?;
+                }
             }
             _ => {
                 f.params[0] = types("params")?;
                 f.params[1] = types("results")?;
             }
         }
-        validate_header(&f)?;
+        validate_header(&f, version)?;
         if &f.signature_for(IsaVersion::parse(signature.get("abi")?.string()?)?) != signature {
             return err(
                 "§9.1",
@@ -1025,7 +1031,7 @@ impl Object {
                     .functions
                     .get(n)
                     .ok_or_else(|| Error::new(format!("§9.1: missing function definition {n}")))?;
-                validate_header(f)?;
+                validate_header(f, self.isa_version)?;
                 if k != f.kind || sig != &f.signature_for(self.isa_version) {
                     return err("§9.1", format!("signature mismatch for {n}"));
                 }
@@ -1690,7 +1696,7 @@ pub(crate) fn mask(width: u16) -> u128 {
         (1u128 << width) - 1
     }
 }
-fn validate_header(f: &Function) -> Result<()> {
+fn validate_header(f: &Function, version: IsaVersion) -> Result<()> {
     let empty = |indices: &[usize]| -> Result<()> {
         if indices.iter().any(|i| !f.params[*i].is_empty()) {
             err("§16.2", "nonempty reserved parameter list")
@@ -1736,8 +1742,22 @@ fn validate_header(f: &Function) -> Result<()> {
             }
         }
         "lproc" => {
-            empty(&[2, 3, 4])?;
-            if f.params.iter().flatten().any(|p| p.role.is_some()) {
+            if version == IsaVersion::V08 {
+                empty(&[2, 3, 4])?;
+            } else {
+                all(&f.params[2], |t| matches!(t, Type::Token))?;
+                all(&f.params[3], |t| matches!(t, Type::Int(_) | Type::Ptr | Type::F64))?;
+                all(&f.params[4], |t| matches!(t, Type::Region(..)))?;
+                for (group, role) in [(2, "token"), (3, "classical")] {
+                    if f.params[group].iter().any(|p| p.role.as_deref().is_some_and(|r| r != role)) {
+                        return err("§16.2", "lproc role suffix differs from its group");
+                    }
+                }
+                if f.params[4].iter().any(|p| p.role.as_deref() != Some("in")) {
+                    return err("§3.7", "lproc regions require in role");
+                }
+            }
+            if f.params[0].iter().chain(&f.params[1]).any(|p| p.role.is_some()) {
                 return err("§16.2", "lproc parameters carry no role");
             }
             if f.params[1].len() != 1 {
@@ -1759,7 +1779,7 @@ fn validate_header(f: &Function) -> Result<()> {
             for (group, role) in [(0, "mut"), (1, "in")] {
                 if f.params[group]
                     .iter()
-                    .any(|p| p.role.as_deref() != Some(role))
+                    .any(|p| p.role.as_deref().map_or(version == IsaVersion::V08, |r| r != role))
                 {
                     return err(
                         "§16.2",

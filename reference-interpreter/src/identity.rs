@@ -243,7 +243,7 @@ impl Object {
         let mut leaves = Vec::new();
         let mut images = BTreeSet::new();
         if let Some(layout) = self.section("layout") {
-            let all = layout_leaves(layout)?;
+            let all = layout_leaves(layout, self.isa_version)?;
             match kind {
                 "cc" | "r" => leaves = all,
                 // Ownership is an original JSON key, never a dotted prefix.
@@ -385,11 +385,15 @@ struct LayoutLeaf {
     path: String,
     value: Json,
 }
-fn layout_leaves(layout: &Json) -> Result<Vec<LayoutLeaf>> {
+fn layout_leaves(layout: &Json, version: crate::IsaVersion) -> Result<Vec<LayoutLeaf>> {
     let mut leaves = Vec::new();
     let mut push = |keys: Vec<String>, value: &Json| {
         leaves.push(LayoutLeaf {
-            path: keys.join("."),
+            path: if version == crate::IsaVersion::V09 {
+                Json::Array(keys.iter().cloned().map(Json::String).collect()).canonical()
+            } else {
+                keys.join(".")
+            },
             keys,
             value: value.clone(),
         });
@@ -411,7 +415,7 @@ fn layout_leaves(layout: &Json) -> Result<Vec<LayoutLeaf>> {
             _ => push(vec![k.clone()], v),
         }
     }
-    // §9.2 dotted-path order; value-independent tie reading in SPEC-QUESTIONS 31.
+    // 0.9 K46/K47 sort the JCS key-array spelling; 0.8 keeps dotted bytes.
     leaves.sort_by(|a, b| a.path.cmp(&b.path).then_with(|| a.keys.cmp(&b.keys)));
     Ok(leaves)
 }
