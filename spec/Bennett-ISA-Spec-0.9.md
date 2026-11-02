@@ -21,6 +21,9 @@ are accepted; K81 was accepted by the codex seat in fix round 9.
 K1–K81 are accepted in total. The three-seat acceptance of the core stands.
 **Round 10: accepted** (2026-11-01, sol and codex seats, 0 blocking; muse seat advisory
 for this one-row fix, pending). K82 is accepted; K1–K82 are accepted in total.
+**Contract z4c: accepted** (2026-11-02; council run `contract-z4c-2026-11-02` round 1, sol and codex seats, 0 blocking;
+bennett-4ht re-check `accept-4ht-recheck-2026-11-02` rounds 1–2, codex seat; muse seat accept in
+`accept-muse-batch-2026-11-02`). K83 is accepted; K1–K83 are accepted in total.
 §0 lists every change from 0.8.
 Implementation is expected to expose frictions; revisions go back
 through the council. Founding text of
@@ -210,6 +213,7 @@ north star §3.1 requires).
 | K80 | §11 | **CLEANUP-LEAF-OWNERSHIP**. Reverse retains written cleanup points; recompute owns one fresh caller leaf/call space at the carrier, with separate callee spaces and fresh replay identities. Witness: a six-row two-CX computation/cleanup has reverse leaves at entry:3/4/5 and recompute leaves at entry:5 ordinals 0–7. | consumer 5cd; pass X | S | – |
 | K81 | §11 | **CLEANUP-PAIR-PARTITION**. Intrinsic cleanup pairs retain their direct computing operations; release-ended terminal inverse chains coalesce before independent adjoint-call carriers are formed. No inverse occurrence has two owners. Nonzero call targets retain their exact source-derived entry history under recompute. Witness: qcopy/mix/adj-mix/quncopy has carriers at entry:2 and entry:3, independently selectable. | consumer 9hv; pass XII; pending round 9 | S | – |
 | K82 | §11.1, §15 | **NAMED-INTERFACE-RECIPES**. A recipe whose formals are all bare integer names, or none, reads its remaining wires by name from the invoking scope; every other recipe and every template is closed. No catalog byte or hash changes. Witness: bind.value.add(2,x,y,z) expands value.add over x,y,z; a typed recipe reading q, or a site with no q bound, rejects. | b-isa-spec-g2q; bennett-sched-enz; pass XIII; round 10 | S | – |
+| K83 | §4.6, §11, §15 | **ACTION-REGION-SUPPORT**. Action-local qregion construction/release have reserved root support addresses, including zero-trip declarations; no leaf changes. | b-isa-spec-z4c; council contract-z4c-2026-11-02 | S | – |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -2671,6 +2675,43 @@ B=0 has no `$step` leaves but still has construction, commit and release.
 [deps: ISA-5.2-P3, ISA-11-P7, ISA-11.1-P22]
 These addresses annotate the bound event stream without removing,
 reordering or changing the charge of any emitted leaf. [deps: ISA-11-P2, ISA-8.2, ISA-11.1-P29]
+
+**Action-local region support (K83).** For each action or perm_action
+invocation, collect all function-local qregion declarations, including
+declarations nested in zero-trip qloops and in either qif arm. Each
+declaration creates one region per invocation, not one per loop visit.
+Traverse declarations in canonical function text order, recursively
+visiting the then arm before the else arm and a loop body once, for
+function-entry allocation and image preparation. Their terminal point is
+$construct in that action. Function-exit image restoration and release
+traverse the declarations in reverse order and have terminal point
+$release. Within a declaration, use the bound library's region creation
+expansion; restoration/release is its exact inverse. These support leaves
+are unconditional as specified in §3.5 and §4.6.
+Number leaves contiguously from zero within each of these pseudo-points
+in forward instantiated support order, including allocation, image gates
+and release leaves, excluding the action body and semantic callee
+subtrees. Each leaf retains its allocation identity. Their own instance
+and source-qloop iteration vectors are []; outer invocation edges retain
+their actual coordinates. At that action level the support has no step
+or phase and matches only wildcard step and phase, under §11 Matching.
+A selector ending at an enclosing oracle level retains that level's
+existing step/phase interpretation.
+Raw inversion of an already expanded trace retains forward pseudo-points,
+ordinals, invocation edges and allocation identities while adjointing
+operations. Source-adjoint formation continues to follow K62.
+Path validation admits $construct and $release for action and perm_action
+support. $step and $commit remain oracle-only. A reserved point with no
+leaves has an empty generated domain. K64's oracle partition and K65's
+exclusion of implicit region cleanup are unchanged.
+In a mixed fat object, the new support coordinates belong to action or
+perm_action invocations within the linked device ISA object(s). Each
+affected device object's schedules and certificates use them under the
+existing object, closure and schedule bindings. Native host functions
+require neither these support coordinates nor ISA region entries in that
+device certificate. $construct and $release denote device action entry
+and exit, not native process entry and exit; this repair does not
+require the surrounding native binary to become an ISA object.
 
 **Whole-cleanup selection (K65).** Each explicit computing-sequence/cleanup
 pair has one non-emitting cleanup carrier at its source cleanup point,
