@@ -40,6 +40,15 @@ normalisation enables exact adjacent adjoint pops, not this stronger
 polynomial inference. A phase depending on b would also fail identity
 on its entangled reference even if printed basis values agreed.
 
+Union witness: two visits can establish local `(c,d)=(0,0)` and `(1,1)`
+respectively. The frame `cx c b; cx d b` restores arbitrary b on both
+entry products, hence on their union. It flips b on `(0,1)` or `(1,0)`;
+replacing that non-Cartesian union by its rectangular hull could produce
+a false counterexample. Conversely checking only the first product
+cannot establish the required union. A two-trip body that borrows/returns
+b and then flips both initially clean locals supplies these entry facts
+and restores the locals after the second trip.
+
 | Alternative | Assessment |
 |---|---|
 | Strengthen entry analysis to prove the negative prefix clean | Changes K76 and conceals a failing normative frame proof. |
@@ -63,12 +72,16 @@ workspace:[{allocation:<resolved allocation occurrence>,offset:n,
             width:n,lo:n,hi:n}, ...]
 ```
 
+For a non-Cartesian D_F, additionally permit
+`domain:{entry_products:[<product-domain>,...]}` instead of one product;
+each product has the existing component fields plus `workspace` above.
+
 Append the following normative text:
 
 ```text
 A borrow_frame claim identifies the checked borrowed lifetime k in
-K69/K70 allocation order and the exact maximal §5.6 frame for one
-resolved visit of that lifetime. Source occurrences include the full
+K69/K70 allocation order and the exact maximal §5.6 frame realisation
+being checked. Source occurrences include the full
 invocation chain, fixed instance and source-loop iteration; oracle
 step/phase are included where applicable. They are source coordinates,
 not target-scheme leaf ordinals. The first/last points must equal the
@@ -81,9 +94,14 @@ and borrowed wires. allocation is the source/expansion allocation
 occurrence with its current lifetime, never a reusable storage address.
 Offsets/widths select nonempty disjoint intervals within that allocation.
 All components use K71's exact width/range checks and §12.2 enumeration
-order. The checker computes D_F for this visit by K76/K78, never from
-the claimed constants. To discharge the frame obligation the domain
-must equal that entry product componentwise, with every interface and
+order. The checker computes D_F by K76/K78, including its normative
+union over repeated visits, never from the claimed constants. Correspond
+local identities by their source lifetime and bit position across visits.
+entry_products denotes the union of its product domains: list products
+in normative visit order, enumerate each by §12.2, and skip complete
+entry tuples already enumerated. It cannot be combined with top-level
+product fields. To discharge the frame obligation this union must equal
+the normative D_F, with every interface and
 borrowed component full and independent and every local entry component
 explicitly covered. A strict subset is evidence only. An omitted local
 component is fixed at zero for replay and cannot silently supply full
@@ -98,13 +116,15 @@ relation, output projection or same-input self-comparison does not.
 Non-permutation frames cannot discharge this T3 relation.
 
 An exhaustive successful complete-domain claim receives proof for that
-frame visit; sampled claims remain evidence and cannot discharge it.
+selected frame realisation; sampled claims remain evidence and cannot discharge it.
 verification.borrow_frames must resolve to covering proofs for every
 required maximal frame and every visit/context, or to an applicable
-existing structural/library proof. Separately checking each visit's
-entry product proves their §5.6 union; a single-visit claim does not
-cover other visits. A checker may share an identical verified relation
-only after checking its coverage of every selected entry product.
+existing structural/library proof. Each selected realisation must pass
+on the complete normative D_F, not only on the entry states reachable
+at that one visit. A checker may share one verified relation between
+visits only after checking equality of their realised frame operation,
+wire correspondence and complete required domain. Different schedules
+or effective controls are not presumed to supply that equality.
 ```
 
 The checker needs no expected-output table for `expected:"borrow_frame"`:
@@ -128,8 +148,10 @@ Positive: the two c=0 rows; adjacent `cx a c; mcx (a) c` restores the
 entry constant by K78. Negative: the interleaved prefix above followed by
 the CX frame (must include c=1); missing B value, narrower interface
 domain, stale allocation occurrence, nonmaximal frame, phase-on-B and a
-sampled label request. Include two loop visits with different entry facts,
-two reused borrowed lifetimes, and an inherited control in full range.
+sampled label request. Include two loop visits with different entry facts
+(both realisations must cover the normative union, not just their own slices),
+the two-product c/d union above, two reused borrowed lifetimes, and an
+inherited control in full range.
 Verify the tensor relation on basis columns, which establishes it with
 an external reference by linearity; basis probabilities alone do not.
 

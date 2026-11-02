@@ -18,12 +18,8 @@ legacy obligation does not deliver that capability.
 
 ## Alternatives and worked witness
 
-Retain the first pass's choices: exact scheme leaves already describe a
-realisation; an opaque approximate native gate needs hash-bound model
-bytes; ideal-opcode self-comparison is unsound. Its X and −X models have
-the same uncontrolled channel, but controlled outputs on |+>|0> are the
-orthogonal Bell states with plus/minus signs. Thus a model cannot be
-selected by opcode and advertised epsilon alone.
+Use the first pass's alternatives and concrete X/−X controlled-interference
+witness without another model-schema derivation here.
 
 Additional exact-entry witness: the §8.1 expression `{"op":"-",
 "args":[1,1]}` is identically zero. Its syntactic expression form does

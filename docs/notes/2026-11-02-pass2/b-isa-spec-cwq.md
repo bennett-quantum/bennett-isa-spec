@@ -17,14 +17,10 @@ maxima or omission of contexts cannot silently replace that contract.
 
 ## Alternatives and worked witness
 
-Reuse root a(t,c) calling flip once normally and once under c. At
-unit duration/rate, the two invocation footprints have time 1 each,
-one X-family leaf each, and live-wire footprints 1 and 2. Root t and c
-are live throughout two slots: time=2, occupancy=4, peak=2. Adding
-the two child peaks gives 3, which is not root peak. Adding child
-occupancy to root occupancy counts wires/leaves again. Interface wire
-**ownership charging** stays with the caller under §8.2; child views
-are independently checkable invocation footprints, not extra charges.
+Use the first pass's worked a(t,c)/flip witness and alternatives, including
+its root-versus-child totals. The added issue is **ownership charging**:
+interface wires stay with the caller under §8.2; child views are
+independently checkable invocation footprints, not extra charges.
 
 Additional witness from [v2v](b-isa-spec-v2v.md): two forward, uncontrolled
 flip contexts on A and B have identical time/count and different class
@@ -32,6 +28,12 @@ rows. A context key must choose both the right frame and resources.
 [4ta](b-isa-spec-4ta.md) additionally requires per-bit fragment classes
 within one of those frames. A variant/control-only resource key cannot
 resolve either difference in general.
+
+A new attribution witness: one wire is live over [0,2), with owner rate 1
+and borrowed over [0,1) at dirty_rate=1/4. Its combined occupancy charge
+is 1 + 1/4 = 5/4. Keeping the owner's full charge and then adding the
+borrower yields 2 + 1/4 = 9/4, which violates §8.2's replacement rule.
+These are declared accounting intervals, not an unreported circuit run.
 
 | Alternative | Result |
 |---|---|

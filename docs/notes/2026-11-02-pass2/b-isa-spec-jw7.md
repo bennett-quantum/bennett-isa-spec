@@ -15,15 +15,9 @@ invocation; it cannot be dropped or guessed from a convenient claim.
 
 ## Alternatives and worked witness
 
-The first pass's two-row oracle (`lift.add`, `lift.retval`) at fixed
-argument 1 and two-bit input/target, four-bit fault has 256 full interface
-tuples. B=1 faults on all 256; B=2 succeeds on all 256. The same region
-can carry claims for both. Reordering the claims cannot select the census.
-With incoming fault word 1, the failing invocation leaves fault word 0
-and the successful one leaves word 1: recount **code(F_B)**, not final
-nonzero words. Claim inheritance, one-claim restrictions and an implicit
-root budget retain the first pass's rejected status; explicit per-rate
-binding remains recommended.
+Use the first pass's fully worked B=1/B=2 oracle census and incoming-XOR
+counterexample. Its explicit-binding recommendation and rejected
+inheritance/one-claim alternatives stand; no competing encoding is added.
 
 The missing second-pass interaction is [0jq](b-isa-spec-0jq.md): an
 action's structural-only packet should have no own fault census. Making
