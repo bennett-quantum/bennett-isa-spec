@@ -1,0 +1,145 @@
+# 7s0 — bind a restricted-domain proof to an actual borrow frame
+
+Council proposal for `b-isa-spec-7s0` (P1).
+
+## Defect and North Star scope
+
+ISA 0.9 §5.6 K76/K78 defines a borrow frame's entry domain D_F and
+explicitly permits restricted-domain T3 factorisation proofs. §12.2
+says to use D_F for that obligation. But K69/K70 resolves `bundles` and
+`regions` only to interface components, and `borrowed` only to lifetime
+positions. There is no field selecting a frame or a local workspace
+entry value. §12.3 `borrow_frames:[i]` gives only claim indices.
+The structural translation witness selects `frame` and B, but its special
+V;W;V⁻¹;W syntax cannot represent every admitted finite T3 proof. This is
+a concrete certificate expressibility gap (C3/C5/C6), not a defect in
+K76's already specified analysis.
+
+North Star §§4.3/5.1 promises dirty borrowing with restored correlations
+and frame-local proofs. Neither banning these frames nor promoting a
+whole-region basis check into a frame proof preserves that capability.
+All interface and borrowed values remain independent and full; only the
+normative entry analysis may restrict allocated local values.
+
+## Alternatives and worked witness
+
+Allocate clean c, borrow b, execute the single-gate frame `cx c b`, then
+return b and free c. K76 establishes c=0 at frame entry. The two states
+`(c,b)=(0,0),(0,1)` are unchanged with exact +1 amplitude, so on D_F
+the map factorises as I_c⊗I_b, including arbitrary external entanglement.
+This is not a four-part translation-lemma witness. An interface domain
+cannot name c; choosing a whole-region input domain does not select
+the CX frame either.
+
+Negative prefix: `cx a c; cx x c; cx a c; cx x c` clears c by Boolean
+algebra, but K76's all-operand causal stacks do not establish that
+constant (the a and x events interleave on c). Thus c is unknown in
+normative D_F: all four `(c,b)` values must be checked. At c=1 the
+frame flips b, so the borrow proof fails. K78's `cx`/`mcx` identity
+normalisation enables exact adjacent adjoint pops, not this stronger
+polynomial inference. A phase depending on b would also fail identity
+on its entangled reference even if printed basis values agreed.
+
+| Alternative | Assessment |
+|---|---|
+| Strengthen entry analysis to prove the negative prefix clean | Changes K76 and conceals a failing normative frame proof. |
+| Restrict proof syntax to the translation lemma | Drops valid CX(c,b) at c=0. |
+| Add a selected-frame relation and local entry components | Expresses exactly the existing obligation. Recommended. |
+
+## Recommended exact spec diff
+
+Add to §12.1's exhaustive and sampled productions:
+
+```text
+expected:"borrow_frame",
+borrow_frame:{lifetime:k,first:<resolved source occurrence>,
+              last:<resolved source occurrence>}
+```
+
+Add to §12.2 domains, only for this expected relation:
+
+```text
+workspace:[{allocation:<resolved allocation occurrence>,offset:n,
+            width:n,lo:n,hi:n}, ...]
+```
+
+Append the following normative text:
+
+```text
+A borrow_frame claim identifies the checked borrowed lifetime k in
+K69/K70 allocation order and the exact maximal §5.6 frame for one
+resolved visit of that lifetime. Source occurrences include the full
+invocation chain, fixed instance and source-loop iteration; oracle
+step/phase are included where applicable. They are source coordinates,
+not target-scheme leaf ordinals. The first/last points must equal the
+frame determined by §5.6, not a selected subinterval. A schedule-bound
+claim additionally selects its subject invocation context explicitly.
+
+workspace components resolve to allocated local wires live at frame
+entry, including flattened local-region storage, excluding interface
+and borrowed wires. allocation is the source/expansion allocation
+occurrence with its current lifetime, never a reusable storage address.
+Offsets/widths select nonempty disjoint intervals within that allocation.
+All components use K71's exact width/range checks and §12.2 enumeration
+order. The checker computes D_F for this visit by K76/K78, never from
+the claimed constants. To discharge the frame obligation the domain
+must equal that entry product componentwise, with every interface and
+borrowed component full and independent and every local entry component
+explicitly covered. A strict subset is evidence only. An omitted local
+component is fixed at zero for replay and cannot silently supply full
+coverage of an unknown component.
+
+Replay the selected realised permutation frame from each entry element.
+Record every surviving output and check all internal release obligations.
+For fixed non-B entry values, varying B over all its values must leave
+B unchanged and produce the same complete non-B output, with exact +1
+basis phase. This establishes P' tensor I_B on span(D_F); an oracle
+relation, output projection or same-input self-comparison does not.
+Non-permutation frames cannot discharge this T3 relation.
+
+An exhaustive successful complete-domain claim receives proof for that
+frame visit; sampled claims remain evidence and cannot discharge it.
+verification.borrow_frames must resolve to covering proofs for every
+required maximal frame and every visit/context, or to an applicable
+existing structural/library proof. Separately checking each visit's
+entry product proves their §5.6 union; a single-visit claim does not
+cover other visits. A checker may share an identical verified relation
+only after checking its coverage of every selected entry product.
+```
+
+The checker needs no expected-output table for `expected:"borrow_frame"`:
+the tensor-factor test itself defines the relation. This avoids pretending
+that a reference program can receive local c through an interface slot.
+Existing K13 before/after tuples for other relation kinds stay unchanged.
+A host unable to complete the legal domain uses K75's unchecked outcome,
+not a source restriction or a proof from fewer rows.
+
+## Hashes, catalog and consumers
+
+New claim fields change certificate bytes only. Source/closure identities,
+ref catalog, K78 operation normalisation and schedule leaves stay fixed.
+Checkers and producers must agree on lifetime/occurrence resolution and
+the exact D_F, including repeated visits and inherited controls. Sharing
+physical borrow storage never merges logical lifetimes or proof indices.
+
+## Conformance vectors and verification
+
+Positive: the two c=0 rows; adjacent `cx a c; mcx (a) c` restores the
+entry constant by K78. Negative: the interleaved prefix above followed by
+the CX frame (must include c=1); missing B value, narrower interface
+domain, stale allocation occurrence, nonmaximal frame, phase-on-B and a
+sampled label request. Include two loop visits with different entry facts,
+two reused borrowed lifetimes, and an inherited control in full range.
+Verify the tensor relation on basis columns, which establishes it with
+an external reference by linearity; basis probabilities alone do not.
+
+The c/b truth tables and B-dependent phase counterexample are exact finite
+checks in [INDEX](INDEX.md). Source context read: sched's
+`.tmp/cross-repo-beads.md`, “exhaustive borrow-frame binding”. No new
+checker, Rust borrow proof or sibling gate was executed for this proposal.
+
+## Release and route
+
+Recommend a **0.9 K claim-binding repair**, preserving K76/K78 semantics.
+Keep 7s0 and the originating sched-awo implementation obligation open
+until schema, domain resolver and positive/negative checker vectors land.
