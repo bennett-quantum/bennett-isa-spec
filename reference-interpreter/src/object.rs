@@ -537,7 +537,7 @@ pub(crate) fn list(s: &str) -> Result<Vec<String>> {
     }
     Ok(v)
 }
-fn params(s: &str) -> Result<Vec<Param>> {
+fn params(s: &str, version: IsaVersion) -> Result<Vec<Param>> {
     if s.is_empty() {
         return Ok(Vec::new());
     }
@@ -551,7 +551,8 @@ fn params(s: &str) -> Result<Vec<Param>> {
             return err("§16.2", "invalid or duplicate parameter name");
         }
         let (t, role) = match rest.split_once(' ') {
-            Some((t, r)) if matches!(r, "in" | "mut") => (t, Some(r.to_string())),
+            Some((t, r)) if matches!(r, "in" | "mut")
+                || version == IsaVersion::V09 && matches!(r, "token" | "classical") => (t, Some(r.to_string())),
             Some(_) => return err("§16.2", "invalid parameter role"),
             None => (rest, None),
         };
@@ -897,7 +898,7 @@ impl Object {
                     .strip_prefix('(')
                     .and_then(|s| s.strip_suffix(')'))
                     .ok_or_else(|| Error::new("§16.2: invalid parameter list".into()))?;
-                ps[i] = params(inner)?;
+                ps[i] = params(inner, self.isa_version)?;
             }
             let mut f = Function {
                 kind: kind.into(),
@@ -915,7 +916,7 @@ impl Object {
                 let (rs, rest) = body
                     .split_once(" }")
                     .ok_or_else(|| Error::new("§16.2: malformed regs close".into()))?;
-                f.regs = params(rs)?;
+                f.regs = params(rs, self.isa_version)?;
                 if !rest.is_empty() {
                     let bs = rest
                         .strip_prefix(" bounds {")
@@ -945,7 +946,7 @@ impl Object {
                     .ok_or_else(|| Error::new("§16.2: malformed block parameter list".into()))?;
                 let mut block = Block {
                     name: bn.into(),
-                    params: params(ps)?,
+                    params: params(ps, self.isa_version)?,
                     instructions: Vec::new(),
                 };
                 let mut end = pos;
@@ -1206,11 +1207,12 @@ impl Object {
                     .iter()
                     .chain(&f.params[1])
                     .chain(&f.regs)
+                    .chain(&f.params[3])
                     .find(|p| p.name == n)
             };
-            p.ok_or_else(|| Error::new(format!("§3.7: unreadable location {n}")))?
-                .ty
-                .width(self.ptr_width)
+            let p = p.ok_or_else(|| Error::new(format!("§3.7: unreadable location {n}")))?;
+            if self.isa_version == IsaVersion::V09 && p.ty == Type::F64 { Ok(64) }
+            else { p.ty.width(self.ptr_width) }
         };
         let dest = |n: &str| -> Result<u64> {
             if !f.locations().iter().any(|p| p.name == n) {
@@ -1350,7 +1352,9 @@ impl Object {
                         .and_then(|l| l.get("globals").ok())
                         .and_then(|g| g.object().ok())
                         .is_some_and(|g| g.contains_key(n));
-                    if !global && !(f.kind == "oracle" && f.params[3].iter().any(|p| p.name == n)) {
+                    let mapped = f.kind == "oracle" && f.params[3].iter().any(|p| p.name == n)
+                        || self.isa_version == IsaVersion::V09 && f.kind == "lproc" && f.params[4].iter().any(|p| p.name == n);
+                    if !global && !mapped {
                         return err("§4.2", format!("addr cannot name {n} in {}", f.name));
                     }
                 }
@@ -1374,11 +1378,12 @@ impl Object {
                     code(&args[1])?;
                 }
                 "lift.call" => {
-                    arity(2, 1)?;
                     let callee =
-                        self.declaration(args[0].strip_prefix('@').ok_or_else(|| {
+                        self.declaration(args.first().and_then(|s|s.strip_prefix('@')).ok_or_else(|| {
                             Error::new("§4.8: lift.call requires @symbol".into())
                         })?)?;
+                    let fixed = self.isa_version == IsaVersion::V09 && callee.params[2..].iter().any(|g|!g.is_empty());
+                    arity(if fixed {5} else {2}, 1)?;
                     if callee.kind != "lproc" {
                         return err("§3.7", "lift.call requires lproc");
                     }
@@ -1393,6 +1398,18 @@ impl Object {
                         dest(&i.lhs[0])?,
                         callee.params[1][0].ty.width(self.ptr_width)?,
                     )?;
+                    if fixed {
+                        for group in 2..5 {
+                            let actuals = list(&args[group])?;
+                            if actuals.len() != callee.params[group].len() {return err("§3.7", "fixed binding argument count");}
+                            let source = if group == 4 { if f.kind == "oracle" {f.params[3].iter().collect::<Vec<_>>()} else {f.params[4].iter().collect()} }
+                                else if f.kind == "oracle" {f.params[4].iter().collect::<Vec<_>>()} else {f.params[2].iter().chain(&f.params[3]).collect()};
+                            for (name,expected) in actuals.iter().zip(&callee.params[group]) {
+                                let actual = source.iter().find(|p| p.name == *name).ok_or_else(|| Error::new("§3.7: fixed binding must name an entry argument or mapped region".into()))?;
+                                if actual.ty != expected.ty {return err("§3.7", "fixed binding type/region shape mismatch");}
+                            }
+                        }
+                    }
                 }
                 "lift.ret" | "lift.retval" => {
                     arity(1, 0)?;

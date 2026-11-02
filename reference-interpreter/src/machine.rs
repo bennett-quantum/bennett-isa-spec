@@ -376,12 +376,15 @@ impl<'a> OracleVectorMachine<'a> {
             locations.insert((name.into(), p.name.clone()), v.clone());
         }
         let arguments = object.bind_arguments(root, &input.args)?;
-        for (p, v) in root.params[4].iter().zip(&input.args) {
-            if let (Type::Int(_) | Type::Ptr, Argument::Bits(v)) = (&p.ty, v) {
-                locations.insert(
-                    (name.into(), p.name.clone()),
-                    BitVector::from_u128_exact(p.ty.bits(object.ptr_width)?, *v)?,
-                );
+        let mut pseudo_seen = std::collections::BTreeSet::new();
+        for (f, _) in &program.rows {
+            if !pseudo_seen.insert(f.name.clone()) {continue;}
+            let fixed = program.arguments(f, &arguments)?;
+            let params = if f.kind == "oracle" {&f.params[4]} else {&f.params[3]};
+            for p in params {
+                if let Some(bits) = crate::oracle::argument_bits(object, &p.ty, &fixed[&p.name])? {
+                    locations.insert((f.name.clone(), p.name.clone()), bits);
+                }
             }
         }
         let memory = Memory::initial(object, root, &input.regions)?;
@@ -491,7 +494,8 @@ impl<'a> OracleVectorMachine<'a> {
         let successor = if old == self.program.halt {
             self.program.halt
         } else {
-            let (f, i) = self.program.rows[old];
+            let (function, i) = self.program.rows[old].clone();
+            let f = function.as_ref();
             let (flag, code) = self.flag(f, i)?;
             frame.flag ^= flag;
             if i.op == "lift.ret" {
@@ -542,7 +546,8 @@ impl<'a> OracleVectorMachine<'a> {
         let successor = if old == self.program.halt {
             self.program.halt
         } else {
-            let (f, i) = self.program.rows[old];
+            let (function, i) = self.program.rows[old].clone();
+            let f = function.as_ref();
             self.successor(f, i, old, &frame)?
         };
         self.state.pc_prime ^= successor;
@@ -550,7 +555,8 @@ impl<'a> OracleVectorMachine<'a> {
             return err("§3.6", "inverse successor scratch did not clear");
         }
         if old != self.program.halt {
-            let (f, i) = self.program.rows[old];
+            let (function, i) = self.program.rows[old].clone();
+            let f = function.as_ref();
             if frame.flag {
                 let code = self.fault_code(f, i)?;
                 self.state.faulted ^= true;
@@ -756,7 +762,7 @@ impl<'a> OracleVectorMachine<'a> {
             "lift.retval" | "fault" => self.program.halt,
             "qjump" => self.program.label(&f.name, &i.operands[0])?,
             "qbranch" | "qjumpr" | "lift.ret" => frame.succ,
-            "lift.call" => self.program.ranges[i.operands[0].trim_start_matches('@')].0,
+            "lift.call" => self.program.ranges[&self.program.call(f, i)?.name].0,
             _ => k + 1,
         })
     }
@@ -839,7 +845,7 @@ impl<'a> OracleVectorMachine<'a> {
                         .state
                         .memory
                         .addresses
-                        .get(a[0].trim_start_matches('@'))
+                        .get(&self.program.region_name(f, a[0].trim_start_matches('@')))
                         .ok_or_else(|| Error::new("§4.2: address not mapped".into()))?,
                 )?],
                 "lift.alloc" => {
@@ -1002,7 +1008,8 @@ impl<'a> OracleVectorMachine<'a> {
         if frame.flag {
             return Ok(());
         }
-        let callee = &self.object.functions[i.operands[0].trim_start_matches('@')];
+        let instance = self.program.call(f, i)?;
+        let callee = instance.as_ref();
         let args = list(&i.operands[1])?;
         let m = args.len();
         // C1 capture before moving ANY callee location (recursive arguments too).
@@ -1046,7 +1053,8 @@ impl<'a> OracleVectorMachine<'a> {
         if frame.flag {
             return Ok(());
         }
-        let callee = &self.object.functions[i.operands[0].trim_start_matches('@')];
+        let instance = self.program.call(f, i)?;
+        let callee = instance.as_ref();
         let args = list(&i.operands[1])?;
         let m = args.len();
         // C5^-1: exchanges in reverse order, then clear from the restored counters.
@@ -1140,7 +1148,8 @@ impl<'a> OracleVectorMachine<'a> {
     fn nested_oracle(&mut self, f: &Function, i: &Instruction) -> Result<()> {
         let a = &i.operands;
         let callee = &self.object.functions[a[0].trim_start_matches('@')];
-        let Some(Argument::Token(budget)) = self.arguments.get(&a[1]).cloned() else {
+        let arguments = self.program.arguments(f, &self.arguments)?;
+        let Some(Argument::Token(budget)) = arguments.get(&a[1]).cloned() else {
             return err("§4.2", "tk must be a token argument of the calling oracle");
         };
         let mut input = OracleVectorInput {
@@ -1156,11 +1165,11 @@ impl<'a> OracleVectorMachine<'a> {
             };
             input
                 .regions
-                .insert(p.name.clone(), region_bytes(&self.state.memory, &n, aw)?);
+                .insert(p.name.clone(), region_bytes(&self.state.memory, &self.program.region_name(f, &n), aw)?);
         }
         for n in list(&a[6])? {
             input.args.push(
-                self.arguments
+                arguments
                     .get(&n)
                     .cloned()
                     .ok_or_else(|| Error::new(format!("§4.2: {n} is not a classical argument")))?,
@@ -1206,12 +1215,13 @@ impl<'a> OracleVectorMachine<'a> {
             let Type::Region(aw, _) = p.ty else {
                 return err("§5.1", "mem slot requires region type");
             };
-            regions.insert(p.name.clone(), region_bytes(&self.state.memory, &n, aw)?);
+            regions.insert(p.name.clone(), region_bytes(&self.state.memory, &self.program.region_name(f, &n), aw)?);
         }
+        let arguments = self.program.arguments(f, &self.arguments)?;
         let args = list(&a[4])?
             .iter()
             .map(|n| {
-                self.arguments
+                arguments
                     .get(n)
                     .cloned()
                     .ok_or_else(|| Error::new(format!("§4.2: {n} is not a classical argument")))

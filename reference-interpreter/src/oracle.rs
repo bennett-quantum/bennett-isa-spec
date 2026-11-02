@@ -11,7 +11,7 @@ use crate::{
     object::{integer, is_binop, is_div, list},
     BitVector, Error, Function, Instruction, Object, Result, Type,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Budget {
@@ -354,98 +354,29 @@ pub(crate) fn offset(base: u128, i: usize) -> Result<u128> {
         .ok_or_else(|| Error::new("§7.2: byte address exceeds 2^128".into()))
 }
 
-pub(crate) struct Program<'a> {
-    pub rows: Vec<(&'a Function, &'a Instruction)>,
-    pub labels: BTreeMap<(String, String), usize>,
-    pub ranges: BTreeMap<String, (usize, usize)>,
-    pub halt: usize,
-}
-impl<'a> Program<'a> {
-    /// §3.6 index space: the oracle's blocks in text order, then its lproc
-    /// closure ordered by closure hash (multi-member SCCs: SPEC-QUESTIONS 7).
-    pub fn new(object: &'a Object, root: &str) -> Result<Self> {
-        object.ensure_linked()?;
-        let oracle = object
-            .functions
-            .get(root)
-            .filter(|f| f.kind == "oracle")
-            .ok_or_else(|| Error::new(format!("§5.2: unknown oracle @{root}")))?;
-        let mut reachable = BTreeSet::new();
-        let mut pending = vec![root.to_string()];
-        while let Some(n) = pending.pop() {
-            let function = object.functions.get(&n).ok_or_else(|| {
-                Error::new(format!(
-                    "§9.3: oracle closure has unresolved lproc @{n}; link before execution"
-                ))
-            })?;
-            for i in function.instructions().filter(|i| i.op == "lift.call") {
-                let n = i.operands[0].trim_start_matches('@').to_string();
-                if reachable.insert(n.clone()) {
-                    pending.push(n);
-                }
-            }
-        }
-        let mut closure: Vec<_> = reachable.into_iter().collect();
-        if !closure.is_empty() {
-            let identity = object.identity()?;
-            let mut keys = BTreeMap::new();
-            for n in &closure {
-                let key = if identity.scc_members[n].len() > 1 {
-                    identity.scc_hashes[n].clone()
-                } else {
-                    identity.closure_hashes[n].clone().ok_or_else(|| {
-                        Error::new(format!("§9.3: lproc @{n} has no closure hash"))
-                    })?
-                };
-                keys.insert(n.clone(), key);
-            }
-            closure.sort_by(|a, b| keys[a].cmp(&keys[b]).then(a.cmp(b)));
-        }
-        let order = std::iter::once(&oracle.name).chain(closure.iter());
-        let mut rows = Vec::new();
-        let mut labels = BTreeMap::new();
-        let mut ranges = BTreeMap::new();
-        for n in order {
-            let f = &object.functions[n];
-            let start = rows.len();
-            for b in &f.blocks {
-                labels.insert((n.clone(), b.name.clone()), rows.len());
-                for i in &b.instructions {
-                    rows.push((f, i));
-                }
-            }
-            ranges.insert(n.clone(), (start, rows.len()));
-        }
-        let halt = rows.len();
-        Ok(Self {
-            rows,
-            labels,
-            ranges,
-            halt,
-        })
-    }
-    pub fn label(&self, f: &str, label: &str) -> Result<usize> {
-        self.labels
-            .get(&(f.into(), label.trim_start_matches('^').into()))
-            .copied()
-            .ok_or_else(|| Error::new(format!("§3.6: unknown label {label} in @{f}")))
-    }
-}
+mod program;
+pub(crate) use program::Program;
 
 /// Width of a readable operand of `f` (§3.7 name resolution).
 pub(crate) fn operand_width(object: &Object, f: &Function, n: &str) -> Result<u64> {
     let pseudo: Vec<_> = if f.kind == "oracle" {
         f.params[0].iter().chain(&f.params[4]).collect()
     } else {
-        Vec::new()
+        f.params[3].iter().collect()
     };
-    f.locations()
+    let p = f.locations()
         .into_iter()
         .chain(pseudo)
         .find(|p| p.name == n)
-        .ok_or_else(|| Error::new(format!("§3.7: unknown operand {n} in @{}", f.name)))?
-        .ty
-        .width(object.ptr_width)
+        .ok_or_else(|| Error::new(format!("§3.7: unknown operand {n} in @{}", f.name)))?;
+    if object.isa_version == crate::IsaVersion::V09 && p.ty == Type::F64 {Ok(64)}else{p.ty.width(object.ptr_width)}
+}
+pub(crate) fn argument_bits(object:&Object,ty:&Type,value:&Argument)->Result<Option<BitVector>> {
+    match (ty,value) {
+        (Type::Int(_) | Type::Ptr, Argument::Bits(v))=>Ok(Some(BitVector::from_u128_exact(ty.bits(object.ptr_width)?,*v)?)),
+        (Type::F64, Argument::Float(v)) if object.isa_version == crate::IsaVersion::V09=>Ok(Some(BitVector::from_u128_exact(64,v.to_bits() as u128)?)),
+        _=>Ok(None),
+    }
 }
 /// A length operand: an INT literal in [0, 2^ptr_width) or a location.
 pub(crate) fn literal_u128(s: &str) -> Result<u128> {
@@ -590,11 +521,8 @@ impl Object {
         }
         let arguments = self.bind_arguments(root, &input.args)?;
         for (p, v) in root.params[4].iter().zip(&input.args) {
-            if let (Type::Int(_) | Type::Ptr, Argument::Bits(v)) = (&p.ty, v) {
-                activation.values.insert(
-                    p.name.clone(),
-                    BitVector::from_u128(p.ty.bits(self.ptr_width)?, *v)?,
-                );
+            if let Some(bits) = argument_bits(self, &p.ty, v)? {
+                activation.values.insert(p.name.clone(), bits);
             }
         }
         let mut memory = Memory::initial(self, root, &input.regions)?;
@@ -619,7 +547,8 @@ impl Object {
             if pc == program.halt {
                 return err("§3.6", "only lift.retval reaches HALT with success");
             }
-            let (f, i) = program.rows[pc];
+            let (f, i) = &program.rows[pc];
+            let row_arguments = program.arguments(f, &arguments)?;
             if activation.function != f.name {
                 return err("§3.7", "control escaped its active function");
             }
@@ -750,7 +679,8 @@ impl Object {
                         }
                     }
                     "lift.call" => {
-                        let callee = &self.functions[a[0].trim_start_matches('@')];
+                        let instance = program.call(f, i)?;
+                        let callee = instance.as_ref();
                         let cells = callee.frame_cells() as u128;
                         if stack.len() as u128 + 1 > budget.depth
                             || sp.checked_add(cells).is_none_or(|p| p > budget.stack)
@@ -762,6 +692,12 @@ impl Object {
                             .map(|s| rd(s))
                             .collect::<Result<Vec<_>>>()?;
                         let mut called = Activation::new(callee, self.ptr_width)?;
+                        let fixed = program.arguments(callee, &arguments)?;
+                        for p in &callee.params[3] {
+                            if let Some(bits) = argument_bits(self, &p.ty, &fixed[&p.name])? {
+                                called.values.insert(p.name.clone(), bits);
+                            }
+                        }
                         called.ret_pc = pc + 1;
                         called.destination = i.lhs[0].clone();
                         for (p, v) in callee.params[0].iter().zip(values) {
@@ -780,7 +716,7 @@ impl Object {
                         let ret = activation.ret_pc;
                         let dest = activation.destination.clone();
                         activation = caller;
-                        let caller = &self.functions[&activation.function];
+                        let caller = program.function(&activation.function)?;
                         activation.write(caller, &dest, v, self.ptr_width)?;
                         next = ret;
                     }
@@ -794,7 +730,7 @@ impl Object {
                     }
                     "lift.oracle_call" | "lift.oracle_uncall" => {
                         let callee = &self.functions[a[0].trim_start_matches('@')];
-                        let tk = token(&arguments, &a[1])?;
+                        let tk = token(&row_arguments, &a[1])?;
                         let mut child = OracleVectorInput {
                             ins: list(&a[2])?
                                 .iter()
@@ -808,10 +744,10 @@ impl Object {
                             };
                             child
                                 .regions
-                                .insert(p.name.clone(), region_bytes(&memory, &n, aw)?);
+                                .insert(p.name.clone(), region_bytes(&memory, &program.region_name(f, &n), aw)?);
                         }
                         for n in list(&a[6])? {
-                            child.args.push(self.forward_argument(&arguments, &n)?);
+                            child.args.push(self.forward_argument(&row_arguments, &n)?);
                         }
                         // The matched inverse is the identical permutation (§4.2, §5.5).
                         let r = self.run_oracle_vectors(&callee.name, &child, tk)?;
@@ -836,11 +772,11 @@ impl Object {
                             let Type::Region(aw, _) = p.ty else {
                                 return err("§5.1", "mem slot requires region type");
                             };
-                            regions.insert(p.name.clone(), region_bytes(&memory, &n, aw)?);
+                            regions.insert(p.name.clone(), region_bytes(&memory, &program.region_name(f, &n), aw)?);
                         }
                         let args = list(&a[4])?
                             .iter()
-                            .map(|n| self.forward_argument(&arguments, n))
+                            .map(|n| self.forward_argument(&row_arguments, n))
                             .collect::<Result<Vec<_>>>()?;
                         let values = self.permutation_action_vectors(
                             &callee.name,

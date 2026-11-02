@@ -281,22 +281,38 @@ pub(crate) fn oracle(
         }
     }
 
+    let root_fixed = root
+        .params
+        .iter()
+        .flatten()
+        .zip(call.arguments())
+        .filter(|(p, _)| {
+            matches!(
+                p.ty,
+                crate::Type::Token | crate::Type::Int(_) | crate::Type::Ptr | crate::Type::F64
+            )
+        })
+        .map(|(p, v)| (p.name.clone(), v.clone()))
+        .collect::<BTreeMap<_, _>>();
     for param in &root.params[0] {
         names.insert((root.name.clone(), param.name.clone()), param.name.clone());
     }
-    for (param, actual) in root.params.iter().flatten().zip(call.arguments()) {
-        if matches!(param.ty, crate::Type::Int(_) | crate::Type::Ptr) {
-            let name = format!("$argument/{}", param.name);
-            let width = param.ty.bits(object.ptr_width)?;
-            let bits = BitVector::parse_decimal(
-                width,
-                actual
-                    .as_str()
-                    .ok_or_else(|| Error::new("§11.1: integer actual must be decimal".into()))?,
-            )?;
-            names.insert((root.name.clone(), param.name.clone()), name.clone());
-            declarations.push((name.clone(), width));
-            preparations.push((name, literal("$temporary", &bits)?));
+    let mut prepared = std::collections::BTreeSet::new();
+    for (f, _) in &program.rows {
+        if !prepared.insert(f.name.clone()) {continue;}
+        let fixed = program.arguments(f, &root_fixed)?;
+        let parameters = if f.kind == "oracle" {&f.params[4]} else {&f.params[3]};
+        for param in parameters {
+            if !matches!(param.ty, crate::Type::Int(_) | crate::Type::Ptr | crate::Type::F64) {continue;}
+            let actual = &fixed[&param.name];
+            let width = if param.ty == crate::Type::F64 {64} else {param.ty.bits(object.ptr_width)?};
+            let encoded = actual.as_str().ok_or_else(||Error::new("§11.1: fixed classical value encoding".into()))?;
+            let bits = if param.ty == crate::Type::F64 {
+                let hex=encoded.strip_prefix("0x").ok_or_else(||Error::new("§11.1: f64 requires hexadecimal bits".into()))?;
+                BitVector::from_u128_exact(64,u64::from_str_radix(hex,16).map_err(|_|Error::new("§11.1: malformed f64 bits".into()))? as u128)?
+            } else {BitVector::parse_decimal(width,encoded)?};
+            let name=format!("$argument/{}/{}",f.name,param.name);
+            names.insert((f.name.clone(),param.name.clone()),name.clone());declarations.push((name.clone(),width));preparations.push((name,literal("$temporary",&bits)?));
         }
     }
     for (f, _) in &program.rows {
@@ -368,24 +384,12 @@ pub(crate) fn oracle(
             ]));
         }
     }
-    let fixed = root
-        .params
-        .iter()
-        .flatten()
-        .zip(call.arguments())
-        .filter(|(p, _)| {
-            matches!(
-                p.ty,
-                crate::Type::Token | crate::Type::Int(_) | crate::Type::Ptr | crate::Type::F64
-            )
-        })
-        .map(|(p, v)| (p.name.clone(), v.clone()))
-        .collect::<BTreeMap<_, _>>();
     let closure_hashes = object.identity()?.closure_hashes;
     let mut symbols = Vec::new();
     let mut rows = Vec::new();
     let mut successors = Vec::new();
     for (k, (f, i)) in program.rows.iter().enumerate() {
+        let fixed = program.arguments(f, &root_fixed)?;
         let read = |name: &str| {
             names
                 .get(&(f.name.clone(), name.into()))
@@ -534,7 +538,7 @@ pub(crate) fn oracle(
                     }
                     let mem = if oracle { 5 } else { 3 };
                     for n in crate::object::list(&a[mem])? {
-                        arguments.push(text(n));
+                        arguments.push(text(program.region_name(f, &n)));
                     }
                     for n in crate::object::list(&a[mem + 1])? {
                         arguments.push(fixed.get(&n).cloned().ok_or_else(|| {
@@ -544,7 +548,7 @@ pub(crate) fn oracle(
                     row.push(invoke(op, [text(alias), array(arguments)]));
                 }
                 "lift.call" => {
-                    let callee = &object.functions[a[0].trim_start_matches('@')];
+                    let callee = program.call(f, i)?;
                     let actuals = crate::object::list(&a[1])?;
                     let count = actuals.len();
                     let cells = callee.frame_cells();
@@ -671,7 +675,7 @@ pub(crate) fn oracle(
                         .iter()
                         .enumerate()
                         .map(|(id, (ff, n, w))| {
-                            let local = object.functions[ff]
+                            let local = program.function(ff)?
                                 .locations()
                                 .iter()
                                 .position(|l| &l.name == n)
@@ -733,7 +737,7 @@ pub(crate) fn oracle(
                 }
                 "lift.addr" => {
                     let address = *addresses
-                        .get(a[0].trim_start_matches('@'))
+                        .get(&program.region_name(f, a[0].trim_start_matches('@')))
                         .ok_or_else(|| Error::new("§11.1: unmapped source address".into()))?;
                     row.push(invoke(
                         op,
@@ -1053,12 +1057,12 @@ pub(crate) fn oracle(
                     })
                     .ok_or_else(|| Error::new("§11.1: row has no source point".into()))?;
                 Ok(bennett_isa_conformance::ref_language::SourcePoint {
-                    symbol: closure_hashes[&f.name]
+                    symbol: closure_hashes[program.source_name(f)]
                         .clone()
                         .ok_or_else(|| Error::new("§11.1: row symbol is unlinked".into()))?,
                     point: format!("{block}:{index}"),
                     iteration: Vec::new(),
-                    instance: Vec::new(),
+                    instance: program.instance_key(f).to_vec(),
                 })
             })
             .collect::<Result<Vec<_>>>()?,
