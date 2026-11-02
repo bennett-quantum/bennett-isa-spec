@@ -1,0 +1,18 @@
+{
+  "id": "H-k83-nonempty-instance",
+  "suite": "H",
+  "spec": "ISA0.9 §11 K83 Action-local region support; §15 suitesF/H",
+  "derivation": "Action support has empty fixed-binding instance.",
+  "object": "../../../fixtures/accepted-k83-09/schedule-nonempty-instance.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 1,
+    "stdout_empty": true,
+    "stderr_contains": [
+      "§11"
+    ]
+  }
+}

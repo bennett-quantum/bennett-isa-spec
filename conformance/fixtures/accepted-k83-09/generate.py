@@ -68,7 +68,49 @@ def generate(binary, temporary):
     add("controlled-image-81","controlled",[("controlled",sig(ins=[1]),controlled),("image",sig(),child)],[("blob","81")],[["c",1]],["c"],image_events("81",edge=[]),True,{"a0":8})
     repeat = "perm_action @repeat () () () () ()\nregs {  } bounds {2}\n^entry():\nqloop 2 {\naction_call @image () () () ()\n}"
     add("repeated-image-81","repeat",[("repeat",sig(bounds=[2]),repeat),("image",sig(),child)],[("blob","81")],[],[],image_events("81",edge=[0])+image_events("81",owner="a1",edge=[1]),True,{"a0":8,"a1":8})
-    files["k83.json"] = j(dict(format="bennett.k83.v1", isa="0.9", ref_hash=REF_HASH, cases=cases)) + "\n"
+    empty = "perm_action @empty (t:wire) () () () ()\n^entry():\nx t"
+    files["empty-support.bisa"] = document([("empty",sig(mut=[1]),empty)],[],binary,temporary)
+    schedule_cases = []
+    def schedule_case(name, source, entry, entries, accepted, reason):
+        text = files[source+".bisa"]
+        temporary.write_text(text)
+        identity = json.loads(subprocess.run([binary,"hash",str(temporary)],check=True,capture_output=True,text=True).stdout)["symbols"][entry]
+        schedule = dict(bindings=dict(budget=[0,0,0,0],closure_hash=identity["closure_hash"],epsilon=0,inherited_controls=0,params_hash=hashlib.sha256(b"[]").hexdigest(),region=entry,scheduler=dict(name="portable-k83",version="1"),target_hash="0"*64,variant="forward"),entries=entries)
+        full = text + "\nsection schedule\n" + j(schedule) + "\n"
+        filename = "schedule-"+name+".bisa"
+        files[filename] = full
+        temporary.write_text(full)
+        result = subprocess.run([binary,"check",str(temporary)],capture_output=True,text=True)
+        assert result.returncode == (0 if accepted else 1), (name,result.stdout,result.stderr)
+        if not accepted:
+            assert "§11" in result.stderr, (name,result.stderr)
+        schedule_cases.append(dict(name=name,object=filename,sha256=hashlib.sha256(full.encode()).hexdigest(),accepted=accepted,derivation=reason))
+    def selector(source, entry, point, iteration=None, instance=None):
+        symbols=json.loads(files[source+".bisa"].split("section symbols\n")[1].split("\n")[0])
+        symbol=next(symbol["interface_hash"] for symbol in symbols.values() if symbol["name"]==entry)
+        return dict(generated=0,kind="alloc",path=[dict(symbol=symbol,point=point,iteration=[] if iteration is None else iteration,instance=[] if instance is None else instance)],step="*",phase="*",alloc=dict(**{"class":"A"}))
+    construct=selector("zero-trip","gap","$construct")
+    image_construct=selector("image-81","image","$construct")
+    release=selector("image-81","image","$release")
+    release.pop("alloc");release["kind"]="gate";release["gate"]=dict(realisation="native",epsilon_share=0)
+    schedule_case("valid-support","image-81","image",[image_construct,release],True,"Image81 alloc/0 and reverse-image X[7]/0 have legal action construct/release coordinates.")
+    for point in ["$step","$commit"]:
+        schedule_case("action-"+point[1:],"zero-trip","gap",[selector("zero-trip","gap",point)],False,"The reserved point "+point+" is oracle-only.")
+    schedule_case("nonempty-iteration","zero-trip","gap",[selector("zero-trip","gap","$construct",iteration=[0])],False,"Hoisted action support has its own empty source-loop iteration vector even in a zero-trip declaration.")
+    schedule_case("nonempty-instance","zero-trip","gap",[selector("zero-trip","gap","$construct",instance=[0])],False,"Action support has empty fixed-binding instance.")
+    schedule_case("duplicate-support","zero-trip","gap",[construct,construct],False,"The mandatory function-entry allocation witnesses two maximal matching alloc entries, despite loop bound0.")
+    no_support=selector("empty-support","empty","$construct")
+    schedule_case("empty-support","empty-support","empty",[no_support,no_support],True,"An action with no local region has no construct support leaves and cannot witness a tie.")
+    caller=selector("controlled-image-81","controlled","entry:0")["path"][0];caller["call_index"]=0
+    callee=selector("controlled-image-81","image","$construct")
+    callee["path"].insert(0,caller)
+    schedule_case("controlled-duplicate-support","controlled-image-81","controlled",[callee,callee],False,"Callee region preparation is unconditional for both external control values, so duplicate support entries reject at admission.")
+    files["k83.json"] = j(dict(format="bennett.k83.v1", isa="0.9", ref_hash=REF_HASH, cases=cases,schedule_cases=schedule_cases)) + "\n"
+    for suite, rows in [("F",cases),("H",schedule_cases)]:
+        for case in rows:
+            accepted=case.get("accepted",True)
+            item=dict(id=suite+"-k83-"+case["name"],suite=suite,spec="ISA0.9 §11 K83 Action-local region support; §15 suitesF/H",derivation=case.get("derivation","Canonical source admission for K83 "+case["name"]+"; exact source coordinates and reversible execution are gated by k83_source_support.rs."),object="../../../fixtures/accepted-k83-09/"+case["object"],command=["check","{object}"],expect=dict(exit=0,stdout_json=dict(status="ok")) if accepted else dict(exit=1,stdout_empty=True,stderr_contains=["§11"]))
+            files["../../cases/"+suite+"/"+item["id"]+"/case.json"] = json.dumps(item,ensure_ascii=False,indent=2)+"\n"
     return files
 
 def main():
@@ -84,7 +126,8 @@ def main():
         if args.check:
             assert path.read_text() == text, f"stale vector: {path}"
         else:
+            path.parent.mkdir(parents=True,exist_ok=True)
             path.write_text(text)
-    print(f"K83: {len(files)-1} canonical source vectors checked")
+    print("K83: 6 source vectors and 8 schedule vectors checked")
 if __name__ == "__main__":
     main()

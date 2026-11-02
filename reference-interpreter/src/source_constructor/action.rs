@@ -684,7 +684,6 @@ pub(super) fn construct(
                 array([]),
             ],
         )];
-
     }
     if compiler.declarations.len().saturating_add(local_count)
         >= bennett_isa_conformance::ref_language::SOURCE_SCOPE_LIMIT

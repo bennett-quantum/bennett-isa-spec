@@ -1,0 +1,17 @@
+{
+  "id": "H-k83-valid-support",
+  "suite": "H",
+  "spec": "ISA0.9 §11 K83 Action-local region support; §15 suitesF/H",
+  "derivation": "Image81 alloc/0 and reverse-image X[7]/0 have legal action construct/release coordinates.",
+  "object": "../../../fixtures/accepted-k83-09/schedule-valid-support.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "status": "ok"
+    }
+  }
+}

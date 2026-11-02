@@ -1,0 +1,17 @@
+{
+  "id": "F-k83-controlled-image-81",
+  "suite": "F",
+  "spec": "ISA0.9 §11 K83 Action-local region support; §15 suitesF/H",
+  "derivation": "Canonical source admission for K83 controlled-image-81; exact source coordinates and reversible execution are gated by k83_source_support.rs.",
+  "object": "../../../fixtures/accepted-k83-09/controlled-image-81.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "status": "ok"
+    }
+  }
+}

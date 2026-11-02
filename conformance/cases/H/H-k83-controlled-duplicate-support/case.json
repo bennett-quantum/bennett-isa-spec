@@ -1,0 +1,18 @@
+{
+  "id": "H-k83-controlled-duplicate-support",
+  "suite": "H",
+  "spec": "ISA0.9 §11 K83 Action-local region support; §15 suitesF/H",
+  "derivation": "Callee region preparation is unconditional for both external control values, so duplicate support entries reject at admission.",
+  "object": "../../../fixtures/accepted-k83-09/schedule-controlled-duplicate-support.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 1,
+    "stdout_empty": true,
+    "stderr_contains": [
+      "§11"
+    ]
+  }
+}

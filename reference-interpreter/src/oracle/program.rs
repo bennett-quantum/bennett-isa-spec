@@ -112,10 +112,10 @@ fn close_instances(
             let callee = object.declaration(target)?;
             let instance = bind(&caller, &callee, i)?;
             let key = (instance.source.clone(), instance.key.clone());
-            if !closed.contains_key(&key) {
+            if let std::collections::btree_map::Entry::Vacant(entry) = closed.entry(key) {
                 crate::preparation("§3.7", "fixed binding instance")?;
                 crate::reserve_more(&mut pending, 1, "§3.7", "pending fixed bindings")?;
-                closed.insert(key, instance.clone());
+                entry.insert(instance.clone());
                 pending.push(instance);
             }
         }
@@ -200,8 +200,16 @@ impl<'a> Program<'a> {
             root_regions: oracle.params[3].iter().map(|p| p.name.clone()).collect(),
         })
     }
-    pub(crate) fn binding_keys(object: &Object, root: &str, source: &str) -> Result<Vec<Vec<usize>>> {
-        Ok(close_instances(object, root)?.values().filter(|instance| instance.source == source).map(|instance| instance.key.clone()).collect())
+    pub(crate) fn binding_keys(
+        object: &Object,
+        root: &str,
+        source: &str,
+    ) -> Result<Vec<Vec<usize>>> {
+        Ok(close_instances(object, root)?
+            .values()
+            .filter(|instance| instance.source == source)
+            .map(|instance| instance.key.clone())
+            .collect())
     }
     pub(crate) fn index_space_size(
         object: &Object,

@@ -1,0 +1,12 @@
+bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"d6d74e7b1a5f61d9209c23743d36fa210614bfcd55738462715aa4fc30a8588c","kind":"perm_action","name":"empty","signature":{"abi":"0.9","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}}}
+
+section functions
+perm_action @empty (t:wire) () () () ()
+^entry():
+x t
+
+section schedule
+{"bindings":{"budget":[0,0,0,0],"closure_hash":"d6d74e7b1a5f61d9209c23743d36fa210614bfcd55738462715aa4fc30a8588c","epsilon":0,"inherited_controls":0,"params_hash":"4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945","region":"empty","scheduler":{"name":"portable-k83","version":"1"},"target_hash":"0000000000000000000000000000000000000000000000000000000000000000","variant":"forward"},"entries":[{"alloc":{"class":"A"},"generated":0,"kind":"alloc","path":[{"instance":[],"iteration":[],"point":"$construct","symbol":"d6d74e7b1a5f61d9209c23743d36fa210614bfcd55738462715aa4fc30a8588c"}],"phase":"*","step":"*"},{"alloc":{"class":"A"},"generated":0,"kind":"alloc","path":[{"instance":[],"iteration":[],"point":"$construct","symbol":"d6d74e7b1a5f61d9209c23743d36fa210614bfcd55738462715aa4fc30a8588c"}],"phase":"*","step":"*"}]}

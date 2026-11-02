@@ -1,0 +1,16 @@
+bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"79feaa27a8ecd75c3c65753b7fe6324dbb17900a9481c422394be9ab89176d7d","kind":"perm_action","name":"gap","signature":{"abi":"0.9","args":[],"bounds":[0],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}}}
+
+section functions
+perm_action @gap (t:wire) () () () ()
+regs {  } bounds {0}
+^entry():
+qloop 0 {
+qregion local 0 1
+}
+x t
+
+section schedule
+{"bindings":{"budget":[0,0,0,0],"closure_hash":"79feaa27a8ecd75c3c65753b7fe6324dbb17900a9481c422394be9ab89176d7d","epsilon":0,"inherited_controls":0,"params_hash":"4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945","region":"gap","scheduler":{"name":"portable-k83","version":"1"},"target_hash":"0000000000000000000000000000000000000000000000000000000000000000","variant":"forward"},"entries":[{"alloc":{"class":"A"},"generated":0,"kind":"alloc","path":[{"instance":[],"iteration":[0],"point":"$construct","symbol":"79feaa27a8ecd75c3c65753b7fe6324dbb17900a9481c422394be9ab89176d7d"}],"phase":"*","step":"*"}]}

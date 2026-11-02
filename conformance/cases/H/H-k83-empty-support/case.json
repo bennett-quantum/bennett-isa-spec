@@ -1,0 +1,17 @@
+{
+  "id": "H-k83-empty-support",
+  "suite": "H",
+  "spec": "ISA0.9 §11 K83 Action-local region support; §15 suitesF/H",
+  "derivation": "An action with no local region has no construct support leaves and cannot witness a tie.",
+  "object": "../../../fixtures/accepted-k83-09/schedule-empty-support.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "status": "ok"
+    }
+  }
+}

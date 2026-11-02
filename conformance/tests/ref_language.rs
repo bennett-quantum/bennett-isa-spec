@@ -372,7 +372,9 @@ fn source_leaf_budget_fails_explicitly_resets_and_leaves_plain_catalogs_unchange
 
 #[test]
 fn raw_inverse_retains_the_complete_forward_source_tree_and_leaf_identities() {
-    use bennett_isa_conformance::ref_language::{SourceBody, SourceFactory, SourcePoint, SourceSymbol};
+    use bennett_isa_conformance::ref_language::{
+        SourceBody, SourceFactory, SourcePoint, SourceSymbol,
+    };
     use std::{collections::BTreeMap, sync::Arc};
     #[derive(Debug)]
     struct Factory;
@@ -398,7 +400,16 @@ fn raw_inverse_retains_the_complete_forward_source_tree_and_leaf_identities() {
                 oracle: true,
                 points: BTreeMap::from([("$source-point/entry:0".into(), point)]),
                 rows: vec![],
-                symbols: if nested { vec![SourceSymbol{name:"C".into(),hash:child,oracle_invocation:None,adjoint:false}] } else { vec![] },
+                symbols: if nested {
+                    vec![SourceSymbol {
+                        name: "C".into(),
+                        hash: child,
+                        oracle_invocation: None,
+                        adjoint: false,
+                    }]
+                } else {
+                    vec![]
+                },
                 body: json::parse(if nested {
                     r#"[{"for":"$source-point/entry:0","from":0,"to":1,"body":[{"alloc":"tmp","width":1,"class":"any","state":"clean"},{"call":"C","args":["w"]},{"call":"C","args":["w"]},{"release":"tmp"}]}]"#
                 } else {
@@ -417,17 +428,32 @@ fn raw_inverse_retains_the_complete_forward_source_tree_and_leaf_identities() {
             r#"[{{"kind":"root","parameters":[{{"name":"S","type":"symbol"}},{{"name":"A","type":"arguments","symbol":"S"}}],"body":{body}}}]"#
         ));
         let args = json::parse(&format!(r#"["{hash}",["a"]]"#)).unwrap();
-        Expander::new(&catalog, Registry::from([(hash.clone(), source.clone()),("c".repeat(64),source.clone())]))
-            .unwrap()
-            .with_source_factory(Arc::new(Factory))
-            .expand("root", args.as_arr().unwrap(), &[("a", 1)])
-            .unwrap()
+        Expander::new(
+            &catalog,
+            Registry::from([
+                (hash.clone(), source.clone()),
+                ("c".repeat(64), source.clone()),
+            ]),
+        )
+        .unwrap()
+        .with_source_factory(Arc::new(Factory))
+        .expand("root", args.as_arr().unwrap(), &[("a", 1)])
+        .unwrap()
     };
     let fwd = expand(forward);
     let rev = expand(&inverse);
     assert_eq!(fwd.len(), rev.len());
-    let occurrences = fwd.iter().filter_map(|leaf| leaf.source.as_ref()?.path.first().map(|edge| edge.call_index)).collect::<std::collections::BTreeSet<_>>();
-    assert_eq!(occurrences,std::collections::BTreeSet::from([0,1]));
+    let occurrences = fwd
+        .iter()
+        .filter_map(|leaf| {
+            leaf.source
+                .as_ref()?
+                .path
+                .first()
+                .map(|edge| edge.call_index)
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(occurrences, std::collections::BTreeSet::from([0, 1]));
     for (a, b) in fwd.iter().zip(rev.iter().rev()) {
         assert_eq!(a.invocation, b.invocation);
         assert_eq!(a.ordinal, b.ordinal);

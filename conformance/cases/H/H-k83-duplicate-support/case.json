@@ -1,0 +1,18 @@
+{
+  "id": "H-k83-duplicate-support",
+  "suite": "H",
+  "spec": "ISA0.9 §11 K83 Action-local region support; §15 suitesF/H",
+  "derivation": "The mandatory function-entry allocation witnesses two maximal matching alloc entries, despite loop bound0.",
+  "object": "../../../fixtures/accepted-k83-09/schedule-duplicate-support.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 1,
+    "stdout_empty": true,
+    "stderr_contains": [
+      "§11"
+    ]
+  }
+}

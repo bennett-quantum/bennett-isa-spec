@@ -1,7 +1,7 @@
 //! Typed schedule/coverage validation and canonical program-point resolution.
 mod schedule_domains;
-mod source_paths;
 mod source_events;
+mod source_paths;
 use crate::{
     err, json::Json, validation::normalize_call, Error, Function, Instruction, Object, Result,
 };

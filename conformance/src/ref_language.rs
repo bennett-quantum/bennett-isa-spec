@@ -1302,17 +1302,32 @@ impl Expander {
             out.extend(leaves);
             return Ok(());
         }
-        if self.source_factory.is_some() && kind == "qregion" && c.source_owner.as_ref().is_some_and(|owner| !owner.oracle) {
-            let owner=c.source_owner.clone().ok_or("region support has no source action")?;
-            let body=a(f(&r,"body")?)?;
-            let previous=c.source_point.clone();
-            let indices:Vec<_>=if rev {(0..body.len()).rev().collect()} else {(0..body.len()).collect()};
+        if self.source_factory.is_some()
+            && kind == "qregion"
+            && c.source_owner.as_ref().is_some_and(|owner| !owner.oracle)
+        {
+            let owner = c
+                .source_owner
+                .clone()
+                .ok_or("region support has no source action")?;
+            let body = a(f(&r, "body")?)?;
+            let previous = c.source_point.clone();
+            let indices: Vec<_> = if rev {
+                (0..body.len()).rev().collect()
+            } else {
+                (0..body.len()).collect()
+            };
             chain.push(kind.into());
             for index in indices {
-                c.source_point=if index<2 {Some(SourcePoint::pseudo(&owner.symbol,"$construct"))}
-                    else if index>2 {Some(SourcePoint::pseudo(&owner.symbol,"$release"))} else {previous.clone()};
-                c.source_location=None;
-                self.body(&body[index..index+1],&mut c,path,rev,chain,out)?;
+                c.source_point = if index < 2 {
+                    Some(SourcePoint::pseudo(&owner.symbol, "$construct"))
+                } else if index > 2 {
+                    Some(SourcePoint::pseudo(&owner.symbol, "$release"))
+                } else {
+                    previous.clone()
+                };
+                c.source_location = None;
+                self.body(&body[index..index + 1], &mut c, path, rev, chain, out)?;
             }
             chain.pop();
             return Ok(());
@@ -1376,7 +1391,11 @@ impl Expander {
                     rows: built.rows,
                     raw_reverse: rev,
                 }));
-                c.source_invocations.push(SourceInvocation {invocation:path.to_vec(),symbol:built.symbol.clone(),oracle:built.oracle});
+                c.source_invocations.push(SourceInvocation {
+                    invocation: path.to_vec(),
+                    symbol: built.symbol.clone(),
+                    oracle: built.oracle,
+                });
                 c.source_point = if built.oracle {
                     Some(SourcePoint::pseudo(kind, "$construct"))
                 } else {
@@ -2007,22 +2026,32 @@ pub fn permutation(leaves: &[Leaf]) -> Result<Vec<crate::ref_catalog::Leaf>, Str
 /// addresses, ordinals, invocation edges and allocation identities. Invalid
 /// adjoints are detected before the trace is changed.
 pub fn invert_trace(leaves: &mut [Leaf]) -> Result<(), String> {
-    for leaf in leaves.iter() { adjoint_gate(&leaf.gate)?; }
+    for leaf in leaves.iter() {
+        adjoint_gate(&leaf.gate)?;
+    }
     leaves.reverse();
-    for leaf in leaves { adjoint_leaf(leaf)?; }
+    for leaf in leaves {
+        adjoint_leaf(leaf)?;
+    }
     Ok(())
 }
 fn adjoint_gate(gate: &str) -> Result<&str, String> {
     Ok(match gate {
-        "s"=>"sdg", "sdg"=>"s", "t"=>"tdg", "tdg"=>"t",
-        "alloc"=>"release", "release"=>"alloc",
-        "x"|"h"|"cx"|"cz"|"ccx"|"mcx"|"swap"|"rx"|"ry"|"rz"=>gate,
-        "classical"=>return Err("classical inverse requires retained history".into()),
-        _=>return Err(format!("unknown inverse gate {gate}")),
+        "s" => "sdg",
+        "sdg" => "s",
+        "t" => "tdg",
+        "tdg" => "t",
+        "alloc" => "release",
+        "release" => "alloc",
+        "x" | "h" | "cx" | "cz" | "ccx" | "mcx" | "swap" | "rx" | "ry" | "rz" => gate,
+        "classical" => return Err("classical inverse requires retained history".into()),
+        _ => return Err(format!("unknown inverse gate {gate}")),
     })
 }
 fn adjoint_leaf(leaf: &mut Leaf) -> Result<(), String> {
-    leaf.gate=adjoint_gate(&leaf.gate)?.into();
-    for angle in &mut leaf.angles { *angle ^= 1 << 63; }
+    leaf.gate = adjoint_gate(&leaf.gate)?.into();
+    for angle in &mut leaf.angles {
+        *angle ^= 1 << 63;
+    }
     Ok(())
 }

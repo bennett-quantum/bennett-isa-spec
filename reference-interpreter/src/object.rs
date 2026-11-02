@@ -1418,8 +1418,8 @@ impl Object {
                         callee.params[1][0].ty.width(self.ptr_width)?,
                     )?;
                     if fixed {
-                        for group in 2..5 {
-                            let actuals = list(&args[group])?;
+                        for (group, operands) in args.iter().enumerate().take(5).skip(2) {
+                            let actuals = list(operands)?;
                             if actuals.len() != callee.params[group].len() {
                                 return err("§3.7", "fixed binding argument count");
                             }

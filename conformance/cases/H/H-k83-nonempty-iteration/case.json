@@ -1,0 +1,18 @@
+{
+  "id": "H-k83-nonempty-iteration",
+  "suite": "H",
+  "spec": "ISA0.9 §11 K83 Action-local region support; §15 suitesF/H",
+  "derivation": "Hoisted action support has its own empty source-loop iteration vector even in a zero-trip declaration.",
+  "object": "../../../fixtures/accepted-k83-09/schedule-nonempty-iteration.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 1,
+    "stdout_empty": true,
+    "stderr_contains": [
+      "§11"
+    ]
+  }
+}
