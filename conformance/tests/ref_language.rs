@@ -287,41 +287,161 @@ fn nested_body_captures_share_lexical_snapshots_and_preserve_free_wires() {
         let body = if level == 32 {
             r#"[{"splice":"B"},{"splice":"C"}]"#.to_string()
         } else {
-            format!(r#"[{{"invoke":"r{:02}","args":[[{{"splice":"B"}}],[{{"splice":"C"}}]]}}]"#, level + 1)
+            format!(
+                r#"[{{"invoke":"r{:02}","args":[[{{"splice":"B"}}],[{{"splice":"C"}}]]}}]"#,
+                level + 1
+            )
         };
         recipes.push(format!(r#"{{"kind":"r{level:02}","parameters":[{{"name":"B","type":"body"}},{{"name":"C","type":"body"}}],"body":{body}}}"#));
     }
     let catalog = doc(&format!("[{}]", recipes.join(",")));
-    let args = json::parse(r#"[[{"gate":"x","wires":["a"]}],[{"gate":"x","wires":["b"]}]]"#).unwrap();
-    let leaves = Expander::new(&catalog, Registry::new()).unwrap()
-        .expand("r00", args.as_arr().unwrap(), &[("a",1),("b",1)]).unwrap();
-    assert_eq!(leaves.iter().map(|leaf| leaf.wires.clone()).collect::<Vec<_>>(),
-        vec![vec![("a".into(),0)],vec![("b".into(),0)]]);
+    let args =
+        json::parse(r#"[[{"gate":"x","wires":["a"]}],[{"gate":"x","wires":["b"]}]]"#).unwrap();
+    let leaves = Expander::new(&catalog, Registry::new())
+        .unwrap()
+        .expand("r00", args.as_arr().unwrap(), &[("a", 1), ("b", 1)])
+        .unwrap();
+    assert_eq!(
+        leaves
+            .iter()
+            .map(|leaf| leaf.wires.clone())
+            .collect::<Vec<_>>(),
+        vec![vec![("a".into(), 0)], vec![("b".into(), 0)]]
+    );
 }
 
 #[test]
 fn source_leaf_budget_fails_explicitly_resets_and_leaves_plain_catalogs_unchanged() {
-    use bennett_isa_conformance::ref_language::{SourceBody, SourceFactory, HOST_RESOURCE_LIMIT_PREFIX};
+    use bennett_isa_conformance::ref_language::{
+        SourceBody, SourceFactory, HOST_RESOURCE_LIMIT_PREFIX,
+    };
     use std::{collections::BTreeMap, sync::Arc};
     #[derive(Debug)]
     struct Factory(json::Json);
     impl SourceFactory for Factory {
-        fn construct(&self, hash:&str, _: &BTreeMap<String,json::Json>, _: &BTreeMap<String,json::Json>, _:Option<&json::Json>, _:bool) -> Result<SourceBody,String> {
-            Ok(SourceBody {body:self.0.clone(),symbols:vec![],symbol:hash.into(),oracle:false,points:BTreeMap::new(),rows:vec![]})
+        fn construct(
+            &self,
+            hash: &str,
+            _: &BTreeMap<String, json::Json>,
+            _: &BTreeMap<String, json::Json>,
+            _: Option<&json::Json>,
+            _: bool,
+        ) -> Result<SourceBody, String> {
+            Ok(SourceBody {
+                body: self.0.clone(),
+                symbols: vec![],
+                symbol: hash.into(),
+                oracle: false,
+                points: BTreeMap::new(),
+                rows: vec![],
+            })
         }
     }
-    let body = json::parse(r#"[{"for":"i","from":0,"to":9,"body":[{"gate":"x","wires":["w"]}]}]"#).unwrap();
+    let body = json::parse(r#"[{"for":"i","from":0,"to":9,"body":[{"gate":"x","wires":["w"]}]}]"#)
+        .unwrap();
     let hash = "c".repeat(64);
-    let recipe = json::parse(&format!(r#"{{"parameters":[{{"name":"w","type":"wire","width":1}}],"body":{body}}}"#)).unwrap();
-    let mut expander = Expander::new(&doc("[]"), Registry::from([(hash.clone(),recipe)])).unwrap()
-        .with_source_factory(Arc::new(Factory(body))).with_source_leaf_limit(8);
+    let recipe = json::parse(&format!(
+        r#"{{"parameters":[{{"name":"w","type":"wire","width":1}}],"body":{body}}}"#
+    ))
+    .unwrap();
+    let mut expander = Expander::new(&doc("[]"), Registry::from([(hash.clone(), recipe)]))
+        .unwrap()
+        .with_source_factory(Arc::new(Factory(body)))
+        .with_source_leaf_limit(8);
     let args = [json::Json::Str("a".into())];
-    let error = expander.expand(&hash,&args,&[("a",1)]).unwrap_err();
+    let error = expander.expand(&hash, &args, &[("a", 1)]).unwrap_err();
     assert!(error.starts_with(HOST_RESOURCE_LIMIT_PREFIX));
     assert!(error.contains("leaf budget (8)"));
     let mut expander = expander.with_source_leaf_limit(9);
-    for _ in 0..2 {assert_eq!(expander.expand(&hash,&args,&[("a",1)]).unwrap().len(),9);}
-    let plain = doc(r#"[{"kind":"plain","parameters":[{"name":"w","type":"wire","width":1}],"body":[{"gate":"x","wires":["w"]}]}]"#);
-    assert_eq!(Expander::new(&plain,Registry::new()).unwrap().with_source_leaf_limit(0)
-        .expand("plain",&args,&[("a",1)]).unwrap().len(),1);
+    for _ in 0..2 {
+        assert_eq!(expander.expand(&hash, &args, &[("a", 1)]).unwrap().len(), 9);
+    }
+    let plain = doc(
+        r#"[{"kind":"plain","parameters":[{"name":"w","type":"wire","width":1}],"body":[{"gate":"x","wires":["w"]}]}]"#,
+    );
+    assert_eq!(
+        Expander::new(&plain, Registry::new())
+            .unwrap()
+            .with_source_leaf_limit(0)
+            .expand("plain", &args, &[("a", 1)])
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn raw_inverse_retains_the_complete_forward_source_tree_and_leaf_identities() {
+    use bennett_isa_conformance::ref_language::{SourceBody, SourceFactory, SourcePoint, SourceSymbol};
+    use std::{collections::BTreeMap, sync::Arc};
+    #[derive(Debug)]
+    struct Factory;
+    impl SourceFactory for Factory {
+        fn construct(
+            &self,
+            hash: &str,
+            _: &BTreeMap<String, json::Json>,
+            _: &BTreeMap<String, json::Json>,
+            _: Option<&json::Json>,
+            _: bool,
+        ) -> Result<SourceBody, String> {
+            let point = SourcePoint {
+                symbol: hash.into(),
+                point: "entry:0".into(),
+                iteration: vec![],
+                instance: vec![],
+            };
+            let child = "c".repeat(64);
+            let nested = hash != child;
+            Ok(SourceBody {
+                symbol: hash.into(),
+                oracle: true,
+                points: BTreeMap::from([("$source-point/entry:0".into(), point)]),
+                rows: vec![],
+                symbols: if nested { vec![SourceSymbol{name:"C".into(),hash:child,oracle_invocation:None,adjoint:false}] } else { vec![] },
+                body: json::parse(if nested {
+                    r#"[{"for":"$source-point/entry:0","from":0,"to":1,"body":[{"alloc":"tmp","width":1,"class":"any","state":"clean"},{"call":"C","args":["w"]},{"call":"C","args":["w"]},{"release":"tmp"}]}]"#
+                } else {
+                    r#"[{"for":"$source-point/entry:0","from":0,"to":1,"body":[{"alloc":"tmp","width":1,"class":"any","state":"clean"},{"gate":"rx","wires":["w"],"params":["0x3ff0000000000000"]},{"release":"tmp"}]}]"#
+                })?,
+            })
+        }
+    }
+    let hash = "d".repeat(64);
+    let source =
+        json::parse(r#"{"parameters":[{"name":"w","type":"wire","width":1}],"body":[]}"#).unwrap();
+    let forward = r#"[{"call":"S","args":"A"}]"#;
+    let inverse = format!(r#"[{{"inverse":true,"body":{forward}}}]"#);
+    let expand = |body: &str| {
+        let catalog = doc(&format!(
+            r#"[{{"kind":"root","parameters":[{{"name":"S","type":"symbol"}},{{"name":"A","type":"arguments","symbol":"S"}}],"body":{body}}}]"#
+        ));
+        let args = json::parse(&format!(r#"["{hash}",["a"]]"#)).unwrap();
+        Expander::new(&catalog, Registry::from([(hash.clone(), source.clone()),("c".repeat(64),source.clone())]))
+            .unwrap()
+            .with_source_factory(Arc::new(Factory))
+            .expand("root", args.as_arr().unwrap(), &[("a", 1)])
+            .unwrap()
+    };
+    let fwd = expand(forward);
+    let rev = expand(&inverse);
+    assert_eq!(fwd.len(), rev.len());
+    let occurrences = fwd.iter().filter_map(|leaf| leaf.source.as_ref()?.path.first().map(|edge| edge.call_index)).collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(occurrences,std::collections::BTreeSet::from([0,1]));
+    for (a, b) in fwd.iter().zip(rev.iter().rev()) {
+        assert_eq!(a.invocation, b.invocation);
+        assert_eq!(a.ordinal, b.ordinal);
+        assert_eq!(a.source, b.source);
+        assert_eq!(a.wires, b.wires);
+        assert_eq!(a.controls, b.controls);
+        assert_eq!(a.allocation, b.allocation);
+        if a.gate == "rx" {
+            assert_eq!(a.angles[0] ^ (1u64 << 63), b.angles[0]);
+        } else {
+            assert!(matches!(
+                (a.gate.as_str(), b.gate.as_str()),
+                ("alloc", "release") | ("release", "alloc")
+            ));
+        }
+    }
 }

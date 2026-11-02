@@ -566,6 +566,7 @@ pub struct Expander {
     source_depth: usize,
     source_leaf_limit: usize,
     source_leaf_count: usize,
+    source_allocations: BTreeMap<Vec<usize>, usize>,
     named_interfaces: BTreeMap<String, Vec<String>>,
     source_factory: Option<std::sync::Arc<dyn SourceFactory>>,
     source_ordinals: BTreeMap<std::sync::Arc<SourceLocation>, usize>,
@@ -658,6 +659,7 @@ impl Expander {
             source_depth: 0,
             source_leaf_limit: DEFAULT_SOURCE_LEAF_LIMIT,
             source_leaf_count: 0,
+            source_allocations: BTreeMap::new(),
             named_interfaces: named_interface::derive(&recipes)?,
             recipes,
             source_factory: None,
@@ -681,6 +683,7 @@ impl Expander {
             source_depth: 0,
             source_leaf_limit: self.source_leaf_limit,
             source_leaf_count: 0,
+            source_allocations: BTreeMap::new(),
             recipes: self.recipes.clone(),
             named_interfaces: self.named_interfaces.clone(),
             source_factory: self.source_factory.clone(),
@@ -728,8 +731,12 @@ impl Expander {
             std::thread::Builder::new()
                 .name("isa-recipe-expansion".into())
                 .stack_size(32 * 1024 * 1024)
-                .spawn_scoped(scope, || self.expand_bound_local(kind, args, bundles, symbols))
-                .map_err(|e| format!("{HOST_RESOURCE_LIMIT_PREFIX}cannot allocate expansion stack: {e}"))?
+                .spawn_scoped(scope, || {
+                    self.expand_bound_local(kind, args, bundles, symbols)
+                })
+                .map_err(|e| {
+                    format!("{HOST_RESOURCE_LIMIT_PREFIX}cannot allocate expansion stack: {e}")
+                })?
                 .join()
                 .map_err(|_| "recipe expansion worker panicked".to_string())?
         })
@@ -744,6 +751,7 @@ impl Expander {
     ) -> Result<Vec<Leaf>, String> {
         self.source_depth = 0;
         self.source_leaf_count = 0;
+        self.source_allocations.clear();
         self.serial = 0;
         self.ordinals.clear();
         self.source_ordinals.clear();
@@ -1176,6 +1184,20 @@ impl Expander {
         chain: &mut Vec<String>,
         out: &mut Vec<Leaf>,
     ) -> Result<(), String> {
+        if rev && self.source_factory.is_some() && self.registry.contains_key(kind) {
+            // Instantiate the complete source tree in forward order first.
+            // Raw inversion preserves its source addresses, call occurrences,
+            // scratch identities and ordinals instead of renumbering a reverse
+            // traversal or asking an inverse step for a nonexistent plan.
+            let mut forward = Vec::new();
+            self.invoke(kind, args, caller, path, false, chain, &mut forward)?;
+            for mut leaf in forward.into_iter().rev() {
+                adjoint_leaf(&mut leaf)?;
+                self.account_source_leaf()?;
+                out.push(leaf);
+            }
+            return Ok(());
+        }
         if chain.iter().any(|x| x == kind) {
             return Err("cyclic invoke".into());
         }
@@ -1357,6 +1379,17 @@ impl Expander {
         chain.pop();
         Ok(())
     }
+    fn allocation_identity(&mut self, path: &[usize]) -> String {
+        if self.source_factory.is_none() {
+            return format!("@{:?}/{}", path, self.serial);
+        }
+        // A semantic invocation owns its expansion occurrences. Constructors
+        // in a caller's recipe composition do not renumber callee scratch.
+        let next = self.source_allocations.entry(path.to_vec()).or_default();
+        let identity = format!("@{:?}/{}", path, next);
+        *next += 1;
+        identity
+    }
     fn account_source_leaf(&mut self) -> Result<(), String> {
         if self.source_factory.is_some() {
             if self.source_leaf_count == self.source_leaf_limit {
@@ -1509,12 +1542,7 @@ impl Expander {
                 let h = Rc::new(RefCell::new(Handle {
                     declared_scratch: c.scratch_names.contains(n),
                     scratch: c.scratch_names.contains(n),
-                    metadata: (
-                        format!("@{:?}/{}", path, self.serial),
-                        width,
-                        cls,
-                        state.into(),
-                    ),
+                    metadata: (self.allocation_identity(path), width, cls, state.into()),
                     live: false,
                 }));
                 c.handles.insert(n.into(), h.clone());
@@ -1543,7 +1571,7 @@ impl Expander {
                 }
                 h.live = acquire;
                 if acquire {
-                    h.metadata.0 = format!("@{:?}/{}", path, self.serial);
+                    h.metadata.0 = self.allocation_identity(path);
                 }
                 leaf.gate = if acquire { "alloc" } else { "release" }.into();
                 leaf.allocation = Some(h.metadata.clone());
@@ -1690,7 +1718,7 @@ impl Expander {
                     if c.wires.contains_key(name) {
                         return Err(format!("allocation shadows live wire {name}"));
                     }
-                    let identity = format!("@{:?}/{}", path, self.serial);
+                    let identity = self.allocation_identity(path);
                     c.wires.insert(
                         name.into(),
                         (0..width).map(|i| (identity.clone(), i)).collect(),

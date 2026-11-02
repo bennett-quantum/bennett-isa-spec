@@ -708,8 +708,13 @@ pub(super) fn construct(
             ])];
         }
     }
-    if compiler.declarations.len().saturating_add(local_count) >= bennett_isa_conformance::ref_language::SOURCE_SCOPE_LIMIT {
-        return Err(crate::resource_error("§11.1", "source declaration scopes exceed the host expansion stack budget"));
+    if compiler.declarations.len().saturating_add(local_count)
+        >= bennett_isa_conformance::ref_language::SOURCE_SCOPE_LIMIT
+    {
+        return Err(crate::resource_error(
+            "§11.1",
+            "source declaration scopes exceed the host expansion stack budget",
+        ));
     }
     for (name, width, class, state) in compiler.declarations.into_iter().rev() {
         body = vec![obj([

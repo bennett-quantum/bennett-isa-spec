@@ -66,7 +66,11 @@ fn symbol_references<'a>(
             .split_once(" = ")
             .and_then(|(_, rhs)| rhs.strip_prefix("lift.addr @"))
         {
-            let regions = if f.kind == "oracle" { &f.params[3] } else { &f.params[4] };
+            let regions = if f.kind == "oracle" {
+                &f.params[3]
+            } else {
+                &f.params[4]
+            };
             if regions.iter().any(|p| p.name == region) {
                 return Vec::new();
             }

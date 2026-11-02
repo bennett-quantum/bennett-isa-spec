@@ -31,7 +31,7 @@ impl Budget {
     }
 }
 /// A classical argument: iN (N <= 128) and ptr (ptr_width <= 128) values,
-/// f64 angles and budget tokens (§3.3).
+/// classical binary64 values and budget tokens (§3.3).
 #[derive(Clone, Debug, PartialEq)]
 pub enum Argument {
     Bits(u128),
@@ -364,18 +364,32 @@ pub(crate) fn operand_width(object: &Object, f: &Function, n: &str) -> Result<u6
     } else {
         f.params[3].iter().collect()
     };
-    let p = f.locations()
+    let p = f
+        .locations()
         .into_iter()
         .chain(pseudo)
         .find(|p| p.name == n)
         .ok_or_else(|| Error::new(format!("§3.7: unknown operand {n} in @{}", f.name)))?;
-    if object.isa_version == crate::IsaVersion::V09 && p.ty == Type::F64 {Ok(64)}else{p.ty.width(object.ptr_width)}
+    if object.isa_version == crate::IsaVersion::V09 && p.ty == Type::F64 {
+        Ok(64)
+    } else {
+        p.ty.width(object.ptr_width)
+    }
 }
-pub(crate) fn argument_bits(object:&Object,ty:&Type,value:&Argument)->Result<Option<BitVector>> {
-    match (ty,value) {
-        (Type::Int(_) | Type::Ptr, Argument::Bits(v))=>Ok(Some(BitVector::from_u128_exact(ty.bits(object.ptr_width)?,*v)?)),
-        (Type::F64, Argument::Float(v)) if object.isa_version == crate::IsaVersion::V09=>Ok(Some(BitVector::from_u128_exact(64,v.to_bits() as u128)?)),
-        _=>Ok(None),
+pub(crate) fn argument_bits(
+    object: &Object,
+    ty: &Type,
+    value: &Argument,
+) -> Result<Option<BitVector>> {
+    match (ty, value) {
+        (Type::Int(_) | Type::Ptr, Argument::Bits(v)) => Ok(Some(BitVector::from_u128_exact(
+            ty.bits(object.ptr_width)?,
+            *v,
+        )?)),
+        (Type::F64, Argument::Float(v)) if object.isa_version == crate::IsaVersion::V09 => {
+            Ok(Some(BitVector::from_u128_exact(64, v.to_bits() as u128)?))
+        }
+        _ => Ok(None),
     }
 }
 /// A length operand: an INT literal in [0, 2^ptr_width) or a location.
@@ -742,9 +756,10 @@ impl Object {
                             let Type::Region(aw, _) = p.ty else {
                                 return err("§5.1", "mem slot requires region type");
                             };
-                            child
-                                .regions
-                                .insert(p.name.clone(), region_bytes(&memory, &program.region_name(f, &n), aw)?);
+                            child.regions.insert(
+                                p.name.clone(),
+                                region_bytes(&memory, &program.region_name(f, &n), aw)?,
+                            );
                         }
                         for n in list(&a[6])? {
                             child.args.push(self.forward_argument(&row_arguments, &n)?);
@@ -772,7 +787,10 @@ impl Object {
                             let Type::Region(aw, _) = p.ty else {
                                 return err("§5.1", "mem slot requires region type");
                             };
-                            regions.insert(p.name.clone(), region_bytes(&memory, &program.region_name(f, &n), aw)?);
+                            regions.insert(
+                                p.name.clone(),
+                                region_bytes(&memory, &program.region_name(f, &n), aw)?,
+                            );
                         }
                         let args = list(&a[4])?
                             .iter()
@@ -836,7 +854,11 @@ pub(crate) fn check_argument(object: &Object, ty: &Type, v: &Argument) -> Result
     match (ty, v) {
         (Type::Int(w), Argument::Bits(n)) if fits(*w as u64, *n) => Ok(()),
         (Type::Ptr, Argument::Bits(n)) if fits(object.ptr_width as u64, *n) => Ok(()),
-        (Type::F64, Argument::Float(x)) if x.is_finite() => Ok(()),
+        (Type::F64, Argument::Float(x))
+            if object.isa_version == crate::IsaVersion::V09 || x.is_finite() =>
+        {
+            Ok(())
+        }
         (Type::Token, Argument::Token(b)) => object.validate_budget(*b),
         _ => err(
             "§3.3",

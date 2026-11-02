@@ -551,8 +551,12 @@ fn params(s: &str, version: IsaVersion) -> Result<Vec<Param>> {
             return err("§16.2", "invalid or duplicate parameter name");
         }
         let (t, role) = match rest.split_once(' ') {
-            Some((t, r)) if matches!(r, "in" | "mut")
-                || version == IsaVersion::V09 && matches!(r, "token" | "classical") => (t, Some(r.to_string())),
+            Some((t, r))
+                if matches!(r, "in" | "mut")
+                    || version == IsaVersion::V09 && matches!(r, "token" | "classical") =>
+            {
+                (t, Some(r.to_string()))
+            }
             Some(_) => return err("§16.2", "invalid parameter role"),
             None => (rest, None),
         };
@@ -1132,7 +1136,9 @@ impl Object {
         let mut maximum = containing.instructions().count() as u128;
         for oracle in self.functions.values().filter(|f| f.kind == "oracle") {
             if self.isa_version == IsaVersion::V09 {
-                if let Some(count) = crate::oracle::Program::index_space_size(self, &oracle.name, &containing.name)? {
+                if let Some(count) =
+                    crate::oracle::Program::index_space_size(self, &oracle.name, &containing.name)?
+                {
                     maximum = maximum.max(count);
                 }
                 continue;
@@ -1217,8 +1223,11 @@ impl Object {
                     .find(|p| p.name == n)
             };
             let p = p.ok_or_else(|| Error::new(format!("§3.7: unreadable location {n}")))?;
-            if self.isa_version == IsaVersion::V09 && p.ty == Type::F64 { Ok(64) }
-            else { p.ty.width(self.ptr_width) }
+            if self.isa_version == IsaVersion::V09 && p.ty == Type::F64 {
+                Ok(64)
+            } else {
+                p.ty.width(self.ptr_width)
+            }
         };
         let dest = |n: &str| -> Result<u64> {
             if !f.locations().iter().any(|p| p.name == n) {
@@ -1359,7 +1368,9 @@ impl Object {
                         .and_then(|g| g.object().ok())
                         .is_some_and(|g| g.contains_key(n));
                     let mapped = f.kind == "oracle" && f.params[3].iter().any(|p| p.name == n)
-                        || self.isa_version == IsaVersion::V09 && f.kind == "lproc" && f.params[4].iter().any(|p| p.name == n);
+                        || self.isa_version == IsaVersion::V09
+                            && f.kind == "lproc"
+                            && f.params[4].iter().any(|p| p.name == n);
                     if !global && !mapped {
                         return err("§4.2", format!("addr cannot name {n} in {}", f.name));
                     }
@@ -1384,12 +1395,14 @@ impl Object {
                     code(&args[1])?;
                 }
                 "lift.call" => {
-                    let callee =
-                        self.declaration(args.first().and_then(|s|s.strip_prefix('@')).ok_or_else(|| {
-                            Error::new("§4.8: lift.call requires @symbol".into())
-                        })?)?;
-                    let fixed = self.isa_version == IsaVersion::V09 && callee.params[2..].iter().any(|g|!g.is_empty());
-                    arity(if fixed {5} else {2}, 1)?;
+                    let callee = self.declaration(
+                        args.first()
+                            .and_then(|s| s.strip_prefix('@'))
+                            .ok_or_else(|| Error::new("§4.8: lift.call requires @symbol".into()))?,
+                    )?;
+                    let fixed = self.isa_version == IsaVersion::V09
+                        && callee.params[2..].iter().any(|g| !g.is_empty());
+                    arity(if fixed { 5 } else { 2 }, 1)?;
                     if callee.kind != "lproc" {
                         return err("§3.7", "lift.call requires lproc");
                     }
@@ -1407,12 +1420,25 @@ impl Object {
                     if fixed {
                         for group in 2..5 {
                             let actuals = list(&args[group])?;
-                            if actuals.len() != callee.params[group].len() {return err("§3.7", "fixed binding argument count");}
-                            let source = if group == 4 { if f.kind == "oracle" {f.params[3].iter().collect::<Vec<_>>()} else {f.params[4].iter().collect()} }
-                                else if f.kind == "oracle" {f.params[4].iter().collect::<Vec<_>>()} else {f.params[2].iter().chain(&f.params[3]).collect()};
-                            for (name,expected) in actuals.iter().zip(&callee.params[group]) {
+                            if actuals.len() != callee.params[group].len() {
+                                return err("§3.7", "fixed binding argument count");
+                            }
+                            let source = if group == 4 {
+                                if f.kind == "oracle" {
+                                    f.params[3].iter().collect::<Vec<_>>()
+                                } else {
+                                    f.params[4].iter().collect()
+                                }
+                            } else if f.kind == "oracle" {
+                                f.params[4].iter().collect::<Vec<_>>()
+                            } else {
+                                f.params[2].iter().chain(&f.params[3]).collect()
+                            };
+                            for (name, expected) in actuals.iter().zip(&callee.params[group]) {
                                 let actual = source.iter().find(|p| p.name == *name).ok_or_else(|| Error::new("§3.7: fixed binding must name an entry argument or mapped region".into()))?;
-                                if actual.ty != expected.ty {return err("§3.7", "fixed binding type/region shape mismatch");}
+                                if actual.ty != expected.ty {
+                                    return err("§3.7", "fixed binding type/region shape mismatch");
+                                }
                             }
                         }
                     }

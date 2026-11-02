@@ -134,3 +134,141 @@ fn oracle_construction_complete_lifetimes_bounded_steps_commit_and_reverse() {
     assert_eq!(tuples, 2246400);
     println!("construction: 60 shapes / {tuples} full-domain tuples at W1..4 B0/1/2/3/17");
 }
+
+#[test]
+fn whole_source_constructor_inverse_retains_support_row_and_step_identities() {
+    use bennett_isa_conformance::ref_language::{SourceBody, SourceFactory, SourcePoint};
+    use std::{collections::BTreeMap, sync::Arc};
+    #[derive(Debug)]
+    struct Factory;
+    impl SourceFactory for Factory {
+        fn construct(
+            &self,
+            hash: &str,
+            _: &BTreeMap<String, Json>,
+            _: &BTreeMap<String, Json>,
+            _: Option<&Json>,
+            _: bool,
+        ) -> Result<SourceBody, String> {
+            let names = [
+                ("pc", 1),
+                ("next", 1),
+                ("faulted", 1),
+                ("code", 4),
+                ("result", 1),
+                ("frame0", 4),
+            ];
+            let state = names
+                .iter()
+                .map(|(name, width)| {
+                    format!(r#"{{"width":{width},"initial":0,"I":"","storage":"{name}"}}"#)
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            let rows = r#"[{"parameters":[{"name":"frame","type":"wire","width":4}],"body":[{"invoke":"lift.retval","args":[1,"x","result"]}]}]"#;
+            let next = r#"[{"parameters":[{"name":"frame","type":"wire","width":4},{"name":"out","type":"wire","width":1}],"body":[{"invoke":"value.literal","args":[1,1,"out"]}]}]"#;
+            let mut body = parse(&format!(
+                r#"[{{"invoke":"oracle.construct","args":[1,1,4,1,4,1,"pc","next","faulted","code","result","tgt","fr",[{state}],[{{"index":0,"frame":"frame0"}}],{rows},{next}]}}]"#
+            ));
+            for (name, width) in names.iter().rev() {
+                body = parse(&format!(
+                    r#"[{{"declare":"{name}","width":{width},"class":{{"class":"any"}},"state":"clean","body":{body}}}]"#
+                ));
+            }
+            Ok(SourceBody {
+                body,
+                symbols: vec![],
+                symbol: hash.into(),
+                oracle: true,
+                points: BTreeMap::new(),
+                rows: vec![SourcePoint {
+                    symbol: hash.into(),
+                    point: "entry:0".into(),
+                    iteration: vec![],
+                    instance: vec![],
+                }],
+            })
+        }
+    }
+    let hash = "f".repeat(64);
+    let source = parse(
+        r#"{"parameters":[{"name":"x","type":"wire","width":1},{"name":"tgt","type":"wire","width":1},{"name":"fr","type":"wire","width":4}],"body":[]}"#,
+    );
+    let mut catalog = parse(include_str!("../../spec/ref-0.9.json"));
+    if let Json::Obj(root) = &mut catalog {
+        if let Json::Arr(recipes) = root.get_mut("recipes").unwrap() {
+            recipes.push(parse(r#"{"kind":"raw.inverse","parameters":[{"name":"S","type":"symbol"},{"name":"A","type":"arguments","symbol":"S"}],"body":[{"inverse":true,"body":[{"call":"S","args":"A"}]}],"scratch":[],"removable":[],"source":"§11 K64 full source inversion"}"#));
+            recipes.sort_by(|a, b| {
+                a.get("kind")
+                    .unwrap()
+                    .as_str()
+                    .cmp(&b.get("kind").unwrap().as_str())
+            });
+        }
+    }
+    let args = parse(&format!(r#"["{hash}",["x","t","f"]]"#));
+    let bundles = [("x", 1), ("t", 1), ("f", 4)];
+    let expand = |kind| {
+        Expander::new(
+            &catalog.to_string(),
+            Registry::from([(hash.clone(), source.clone())]),
+        )
+        .unwrap()
+        .with_source_factory(Arc::new(Factory))
+        .expand(kind, args.as_arr().unwrap(), &bundles)
+        .unwrap()
+    };
+    let forward = expand("oracle_call");
+    let inverse = expand("raw.inverse");
+    assert_eq!(forward.len(), inverse.len());
+    assert!(forward.iter().any(|l| l
+        .source
+        .as_ref()
+        .is_some_and(|s| s.terminal.point == "$construct")));
+    assert!(forward.iter().any(|l| l
+        .source
+        .as_ref()
+        .is_some_and(|s| s.terminal.point == "$step")));
+    assert!(forward.iter().any(|l| l
+        .source
+        .as_ref()
+        .is_some_and(|s| s.terminal.point == "$commit")));
+    assert!(forward.iter().any(|l| l
+        .source
+        .as_ref()
+        .is_some_and(|s| s.terminal.point == "$release")));
+    for (a, b) in forward.iter().zip(inverse.iter().rev()) {
+        assert_eq!(a.source, b.source);
+        assert_eq!(a.invocation, b.invocation);
+        assert_eq!(a.ordinal, b.ordinal);
+        assert_eq!(a.wires, b.wires);
+        assert_eq!(a.controls, b.controls);
+        assert_eq!(a.allocation, b.allocation);
+        assert!(
+            a.gate == b.gate
+                || matches!(
+                    (a.gate.as_str(), b.gate.as_str()),
+                    ("alloc", "release") | ("release", "alloc")
+                )
+        );
+    }
+    for leaves in [forward, inverse] {
+        let machine = Machine::compile(&permutation(&leaves).unwrap(), &bundles).unwrap();
+        for x in 0..2 {
+            for t in 0..2 {
+                for f in 0..16 {
+                    let mut state = machine.state();
+                    machine.set(&mut state, "x", x);
+                    machine.set(&mut state, "t", t);
+                    machine.set(&mut state, "f", f);
+                    let entry = state.clone();
+                    machine.run(&mut state, true, false).unwrap();
+                    assert_eq!(machine.get(&state, "t"), t ^ x);
+                    assert_eq!(machine.get(&state, "f"), f);
+                    machine.run(&mut state, true, true).unwrap();
+                    assert_eq!(state, entry);
+                }
+            }
+        }
+    }
+}

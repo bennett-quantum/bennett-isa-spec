@@ -299,20 +299,48 @@ pub(crate) fn oracle(
     }
     let mut prepared = std::collections::BTreeSet::new();
     for (f, _) in &program.rows {
-        if !prepared.insert(f.name.clone()) {continue;}
+        if !prepared.insert(f.name.clone()) {
+            continue;
+        }
         let fixed = program.arguments(f, &root_fixed)?;
-        let parameters = if f.kind == "oracle" {&f.params[4]} else {&f.params[3]};
+        let parameters = if f.kind == "oracle" {
+            &f.params[4]
+        } else {
+            &f.params[3]
+        };
         for param in parameters {
-            if !matches!(param.ty, crate::Type::Int(_) | crate::Type::Ptr | crate::Type::F64) {continue;}
+            if !matches!(
+                param.ty,
+                crate::Type::Int(_) | crate::Type::Ptr | crate::Type::F64
+            ) {
+                continue;
+            }
             let actual = &fixed[&param.name];
-            let width = if param.ty == crate::Type::F64 {64} else {param.ty.bits(object.ptr_width)?};
-            let encoded = actual.as_str().ok_or_else(||Error::new("§11.1: fixed classical value encoding".into()))?;
+            let width = if param.ty == crate::Type::F64 {
+                64
+            } else {
+                param.ty.bits(object.ptr_width)?
+            };
+            let encoded = actual
+                .as_str()
+                .ok_or_else(|| Error::new("§11.1: fixed classical value encoding".into()))?;
             let bits = if param.ty == crate::Type::F64 {
-                let hex=encoded.strip_prefix("0x").ok_or_else(||Error::new("§11.1: f64 requires hexadecimal bits".into()))?;
-                BitVector::from_u128_exact(64,u64::from_str_radix(hex,16).map_err(|_|Error::new("§11.1: malformed f64 bits".into()))? as u128)?
-            } else {BitVector::parse_decimal(width,encoded)?};
-            let name=format!("$argument/{}/{}",f.name,param.name);
-            names.insert((f.name.clone(),param.name.clone()),name.clone());declarations.push((name.clone(),width));preparations.push((name,literal("$temporary",&bits)?));
+                let hex = encoded
+                    .strip_prefix("0x")
+                    .ok_or_else(|| Error::new("§11.1: f64 requires hexadecimal bits".into()))?;
+                BitVector::from_u128_exact(
+                    64,
+                    u64::from_str_radix(hex, 16)
+                        .map_err(|_| Error::new("§11.1: malformed f64 bits".into()))?
+                        as u128,
+                )?
+            } else {
+                BitVector::parse_decimal(width, encoded)?
+            };
+            let name = format!("$argument/{}/{}", f.name, param.name);
+            names.insert((f.name.clone(), param.name.clone()), name.clone());
+            declarations.push((name.clone(), width));
+            preparations.push((name, literal("$temporary", &bits)?));
         }
     }
     for (f, _) in &program.rows {
@@ -675,7 +703,8 @@ pub(crate) fn oracle(
                         .iter()
                         .enumerate()
                         .map(|(id, (ff, n, w))| {
-                            let local = program.function(ff)?
+                            let local = program
+                                .function(ff)?
                                 .locations()
                                 .iter()
                                 .position(|l| &l.name == n)
@@ -1029,7 +1058,10 @@ pub(crate) fn oracle(
         tag("$source-point/release", teardown),
     ];
     if declarations.len() >= bennett_isa_conformance::ref_language::SOURCE_SCOPE_LIMIT {
-        return Err(crate::resource_error("§11.1", "source declaration scopes exceed the host expansion stack budget"));
+        return Err(crate::resource_error(
+            "§11.1",
+            "source declaration scopes exceed the host expansion stack budget",
+        ));
     }
     for (name, width) in declarations.into_iter().rev() {
         body = vec![obj([
@@ -1155,9 +1187,16 @@ impl bennett_isa_conformance::ref_language::SourceFactory for LinkedSource {
             let call = OracleInvocation::capture(&self.object, name, Some(context), budget, &args)?;
             oracle(&call)
         };
-        build().map_err(|e| if e.kind() == crate::ErrorKind::HostResource {
-            format!("{}{e}", bennett_isa_conformance::ref_language::HOST_RESOURCE_LIMIT_PREFIX)
-        } else { e.to_string() })
+        build().map_err(|e| {
+            if e.kind() == crate::ErrorKind::HostResource {
+                format!(
+                    "{}{e}",
+                    bennett_isa_conformance::ref_language::HOST_RESOURCE_LIMIT_PREFIX
+                )
+            } else {
+                e.to_string()
+            }
+        })
     }
 }
 

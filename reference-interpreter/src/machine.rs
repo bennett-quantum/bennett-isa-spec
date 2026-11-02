@@ -378,9 +378,15 @@ impl<'a> OracleVectorMachine<'a> {
         let arguments = object.bind_arguments(root, &input.args)?;
         let mut pseudo_seen = std::collections::BTreeSet::new();
         for (f, _) in &program.rows {
-            if !pseudo_seen.insert(f.name.clone()) {continue;}
+            if !pseudo_seen.insert(f.name.clone()) {
+                continue;
+            }
             let fixed = program.arguments(f, &arguments)?;
-            let params = if f.kind == "oracle" {&f.params[4]} else {&f.params[3]};
+            let params = if f.kind == "oracle" {
+                &f.params[4]
+            } else {
+                &f.params[3]
+            };
             for p in params {
                 if let Some(bits) = crate::oracle::argument_bits(object, &p.ty, &fixed[&p.name])? {
                     locations.insert((f.name.clone(), p.name.clone()), bits);
@@ -1163,9 +1169,10 @@ impl<'a> OracleVectorMachine<'a> {
             let Type::Region(aw, _) = p.ty else {
                 return err("§5.1", "mem slot requires region type");
             };
-            input
-                .regions
-                .insert(p.name.clone(), region_bytes(&self.state.memory, &self.program.region_name(f, &n), aw)?);
+            input.regions.insert(
+                p.name.clone(),
+                region_bytes(&self.state.memory, &self.program.region_name(f, &n), aw)?,
+            );
         }
         for n in list(&a[6])? {
             input.args.push(
@@ -1215,7 +1222,10 @@ impl<'a> OracleVectorMachine<'a> {
             let Type::Region(aw, _) = p.ty else {
                 return err("§5.1", "mem slot requires region type");
             };
-            regions.insert(p.name.clone(), region_bytes(&self.state.memory, &self.program.region_name(f, &n), aw)?);
+            regions.insert(
+                p.name.clone(),
+                region_bytes(&self.state.memory, &self.program.region_name(f, &n), aw)?,
+            );
         }
         let arguments = self.program.arguments(f, &self.arguments)?;
         let args = list(&a[4])?
