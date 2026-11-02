@@ -64,11 +64,19 @@ pub struct SourceStep {
     pub step: usize,
     pub reverse: bool,
 }
+/// Semantic invocation ancestry, including oracle support outside any step.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SourceInvocation {
+    pub invocation: Vec<usize>,
+    pub symbol: String,
+    pub oracle: bool,
+}
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SourceLocation {
     pub path: Vec<SourceEdge>,
     pub terminal: SourcePoint,
     pub steps: Vec<SourceStep>,
+    pub invocations: Vec<SourceInvocation>,
 }
 #[derive(Clone, Debug)]
 pub struct SourceBody {
@@ -131,6 +139,7 @@ struct Context {
     source_point: Option<SourcePoint>,
     source_edges: Vec<SourceEdge>,
     source_steps: Vec<SourceStep>,
+    source_invocations: Vec<SourceInvocation>,
     source_location: Option<std::sync::Arc<SourceLocation>>,
 
     records: BTreeMap<String, Vec<Context>>,
@@ -163,6 +172,7 @@ impl Context {
                     path: self.source_edges.clone(),
                     terminal: point.clone(),
                     steps: self.source_steps.clone(),
+                    invocations: self.source_invocations.clone(),
                 })
             });
         }
@@ -842,6 +852,7 @@ impl Expander {
             source_point: caller.source_point.clone(),
             source_edges: caller.source_edges.clone(),
             source_steps: caller.source_steps.clone(),
+            source_invocations: caller.source_invocations.clone(),
             source_location: caller.source_location.clone(),
             ..Context::default()
         };
@@ -1350,6 +1361,7 @@ impl Expander {
                     rows: built.rows,
                     raw_reverse: rev,
                 }));
+                c.source_invocations.push(SourceInvocation {invocation:path.to_vec(),symbol:built.symbol.clone(),oracle:built.oracle});
                 c.source_point = if built.oracle {
                     Some(SourcePoint::pseudo(kind, "$construct"))
                 } else {
@@ -1616,6 +1628,7 @@ impl Expander {
                 }
                 local.merge(&bound);
                 local.source_steps = bound.source_steps.clone();
+                local.source_invocations = bound.source_invocations.clone();
                 local.source_edges = bound.source_edges.clone();
                 local.source_location = None;
                 if self.source_factory.is_some() && matches!(s(n)?, "Rows" | "Next") {
@@ -1835,6 +1848,7 @@ impl Expander {
                 captured.controls.sort();
                 captured.controls.dedup();
                 captured.source_steps = c.source_steps.clone();
+                captured.source_invocations = c.source_invocations.clone();
                 captured.source_location = None;
                 let mut child = path.to_vec();
                 if self.source_factory.is_some() {

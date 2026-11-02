@@ -62,6 +62,9 @@ impl Object {
     /// The empty prefix is split over every root instruction (not a fictitious
     /// operation with an empty chain). validate_path already checked call edges.
     fn shortest_chains(&self, path: &Json, region: &str) -> Result<Vec<Vec<Json>>> {
+        if self.isa_version == crate::IsaVersion::V09 {
+            return self.source_chains(path, region);
+        }
         if !path.array()?.is_empty() {
             return Ok(vec![path.array()?.to_vec()]);
         }
@@ -104,10 +107,16 @@ impl Object {
         // Only an oracle call opens a new token-governed invocation (§11).
         let mut steps = root_budget.map_or(InvocationSteps::Action, InvocationSteps::Root);
         let mut arguments = arguments.cloned();
-        if root_budget == Some(0) {
+        if root_budget == Some(0) && !(self.isa_version == crate::IsaVersion::V09
+            && chain.first().and_then(|element| element.get("point").ok()).and_then(|point| point.string().ok()).is_some_and(|point| matches!(point, "$construct" | "$commit" | "$release"))) {
             return Ok(None);
         }
         for (index, element) in chain.iter().enumerate() {
+            let spelling = element.get("point")?.string()?;
+            if self.isa_version == crate::IsaVersion::V09 && source_paths::support_point(spelling) {
+                if spelling != "$step" { steps = InvocationSteps::Action; }
+                continue;
+            }
             let (block, ordinal) = element
                 .get("point")?
                 .string()?
@@ -191,7 +200,11 @@ impl Object {
         if upper == 0 {
             return Ok(None);
         }
-        domain.extend([(1, upper), (0, 1), (0, u128::MAX)]);
+        if self.isa_version == crate::IsaVersion::V09 && matches!(steps, InvocationSteps::Action) {
+            domain.extend([(0,0),(0,0),(0,u128::MAX)]);
+        } else {
+            domain.extend([(1, upper), (0, 1), (0, u128::MAX)]);
+        }
         Ok(Some((domain, steps, format!("{arguments:?}"))))
     }
 
@@ -203,26 +216,24 @@ impl Object {
         let mut domain = base.clone();
         let mut offset = 0;
         for (i, element) in chain.iter().enumerate() {
-            let (block, ordinal) = element
-                .get("point")?
-                .string()?
-                .rsplit_once(':')
-                .ok_or_else(|| Error::new("§11: invalid point".into()))?;
-            let depth = self
-                .point(
-                    element.get("symbol")?.string()?,
-                    block,
-                    ordinal
-                        .parse()
-                        .map_err(|_| Error::new("§11: invalid point ordinal".into()))?,
-                )?
-                .loops
-                .len();
+            let spelling=element.get("point")?.string()?;
+            let support=self.isa_version == crate::IsaVersion::V09 && source_paths::support_point(spelling);
+            let depth=if support {0} else {
+                let (block,ordinal)=spelling.rsplit_once(':').ok_or_else(||Error::new("§11: invalid point".into()))?;
+                self.point(element.get("symbol")?.string()?,block,ordinal.parse().map_err(|_|Error::new("§11: invalid point ordinal".into()))?)?.loops.len()
+            };
+            if support && spelling != "$step" && path.len()==chain.len()
+                && (!wildcard(entry.get("step")?) || !wildcard(entry.get("phase")?)) {return Ok(None);}
             if let Some(selector) = path.get(i) {
                 if selector.get("symbol")? != element.get("symbol")?
                     || selector.get("point")? != element.get("point")?
                 {
                     return Ok(None);
+                }
+                for field in ["instance", "call_index"] {
+                    if let (Some(a),Some(b))=(selector.object()?.get(field),element.object()?.get(field)) {
+                        if !wildcard(a) && !wildcard(b) && a != b {return Ok(None);}
+                    }
                 }
                 let iterations = selector.get("iteration")?;
                 if !wildcard(iterations) {
@@ -234,6 +245,8 @@ impl Object {
             }
             offset += depth;
         }
+        if self.isa_version == crate::IsaVersion::V09 && base[offset] == (0,0)
+            && (!wildcard(entry.get("step")?) || !wildcard(entry.get("phase")?)) {return Ok(None);}
         for (i, key) in ["step", "phase", "generated"].iter().enumerate() {
             let value = entry.get(key)?;
             if !wildcard(value) {
@@ -288,7 +301,7 @@ impl Object {
             else {
                 continue;
             };
-            if !matches!(steps, InvocationSteps::Action) {
+            if !matches!(steps, InvocationSteps::Action) && !(self.isa_version == crate::IsaVersion::V09 && chain.last().and_then(|element|element.get("point").ok()).and_then(|point|point.string().ok()).is_some_and(source_paths::support_point)) {
                 let last = chain
                     .last()
                     .ok_or_else(|| Error::new("§11: empty operation chain".into()))?;
@@ -373,21 +386,11 @@ impl Object {
         let mut path = chain.to_vec();
         let mut offset = 0;
         for element in &mut path {
-            let (block, ordinal) = element
-                .get("point")?
-                .string()?
-                .rsplit_once(':')
-                .ok_or_else(|| Error::new("§11: invalid point".into()))?;
-            let depth = self
-                .point(
-                    element.get("symbol")?.string()?,
-                    block,
-                    ordinal
-                        .parse()
-                        .map_err(|_| Error::new("§11: invalid ordinal".into()))?,
-                )?
-                .loops
-                .len();
+            let spelling=element.get("point")?.string()?;
+            let depth=if self.isa_version == crate::IsaVersion::V09 && source_paths::support_point(spelling) {0} else {
+                let (block,ordinal)=spelling.rsplit_once(':').ok_or_else(||Error::new("§11: invalid point".into()))?;
+                self.point(element.get("symbol")?.string()?,block,ordinal.parse().map_err(|_|Error::new("§11: invalid ordinal".into()))?)?.loops.len()
+            };
             let iterations = domain[offset..offset + depth]
                 .iter()
                 .map(|d| Json::Number(d.0.to_string()))
@@ -397,19 +400,20 @@ impl Object {
             }
             offset += depth;
         }
+        let no_step=self.isa_version == crate::IsaVersion::V09 && domain[offset] == (0,0);
         Ok(Json::Object(std::collections::BTreeMap::from([
             ("path".into(), Json::Array(path)),
-            ("step".into(), Json::Number(domain[offset].0.to_string())),
+            ("step".into(), if no_step {Json::Null} else {Json::Number(domain[offset].0.to_string())}),
             (
                 "phase".into(),
-                Json::String(
+                if no_step {Json::Null} else {Json::String(
                     if domain[offset + 1].0 == 0 {
                         "fwd"
                     } else {
                         "rev"
                     }
                     .into(),
-                ),
+                )},
             ),
             (
                 "generated".into(),

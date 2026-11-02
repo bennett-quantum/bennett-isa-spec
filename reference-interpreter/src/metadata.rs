@@ -1,5 +1,7 @@
 //! Typed schedule/coverage validation and canonical program-point resolution.
 mod schedule_domains;
+mod source_paths;
+mod source_events;
 use crate::{
     err, json::Json, validation::normalize_call, Error, Function, Instruction, Object, Result,
 };
@@ -198,6 +200,11 @@ impl Object {
         })
     }
     pub(crate) fn validate_path(&self, path: &Json, root: Option<&str>) -> Result<()> {
+        if self.isa_version == crate::IsaVersion::V09 {
+            if let Some(root) = root {
+                return self.validate_source_path(path, root);
+            }
+        }
         let mut expected = root.map(str::to_string);
         for element in path.array()? {
             let (block, ordinal) = text(element.get("point")?)?
@@ -381,10 +388,14 @@ fn overlaps(a: &Json, b: &Json) -> Result<bool> {
         if x.get("symbol")? != y.get("symbol")? || x.get("point")? != y.get("point")? {
             return Ok(false);
         }
-        let x = x.get("iteration")?;
-        let y = y.get("iteration")?;
-        if !wildcard(x) && !wildcard(y) && x != y {
-            return Ok(false);
+        for field in ["iteration", "instance", "call_index"] {
+            let a = x.object()?.get(field);
+            let b = y.object()?.get(field);
+            if let (Some(a), Some(b)) = (a, b) {
+                if !wildcard(a) && !wildcard(b) && a != b {
+                    return Ok(false);
+                }
+            }
         }
     }
     Ok(true)

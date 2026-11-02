@@ -200,6 +200,9 @@ impl<'a> Program<'a> {
             root_regions: oracle.params[3].iter().map(|p| p.name.clone()).collect(),
         })
     }
+    pub(crate) fn binding_keys(object: &Object, root: &str, source: &str) -> Result<Vec<Vec<usize>>> {
+        Ok(close_instances(object, root)?.values().filter(|instance| instance.source == source).map(|instance| instance.key.clone()).collect())
+    }
     pub(crate) fn index_space_size(
         object: &Object,
         root: &str,
