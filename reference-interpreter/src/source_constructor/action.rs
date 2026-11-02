@@ -684,29 +684,7 @@ pub(super) fn construct(
                 array([]),
             ],
         )];
-        let (point, depth) =
-            compiler.locations.get(&i.line).cloned().ok_or_else(|| {
-                Error::new("§11.1: region declaration has no source point".into())
-            })?;
-        if depth == 0 {
-            let tag = format!("$source-point/region/{}", compiler.counter);
-            compiler.counter += 1;
-            compiler.points.insert(
-                tag.clone(),
-                SourcePoint {
-                    symbol: symbol.clone(),
-                    point,
-                    iteration: Vec::new(),
-                    instance: Vec::new(),
-                },
-            );
-            body = vec![obj([
-                ("for", text(tag)),
-                ("from", Value::Num(0.0)),
-                ("to", Value::Num(1.0)),
-                ("body", array(body)),
-            ])];
-        }
+
     }
     if compiler.declarations.len().saturating_add(local_count)
         >= bennett_isa_conformance::ref_language::SOURCE_SCOPE_LIMIT

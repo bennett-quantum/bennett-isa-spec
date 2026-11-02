@@ -30,8 +30,8 @@ impl Object {
             let spelling=text(element.get("point")?)?;
             let symbol=hash(element.get("symbol")?)?;
             if support_point(spelling) {
-                let valid=scopes.iter().any(|name| self.functions.get(name).is_some_and(|f|f.kind=="oracle") && identities.interface_hashes.get(name).is_some_and(|hash|hash==symbol));
-                if !valid || !instance_matches(element,&[vec![]])? {return err("§11","support point is not in the selected oracle invocation");}
+                let valid=scopes.iter().any(|name| self.functions.get(name).is_some_and(|f|f.kind=="oracle" || (matches!(f.kind.as_str(),"action"|"perm_action") && matches!(spelling,"$construct"|"$release"))) && identities.interface_hashes.get(name).is_some_and(|hash|hash==symbol));
+                if !valid || !instance_matches(element,&[vec![]])? {return err("§11","support point is not in the selected source invocation");}
                 if !wildcard(element.get("iteration")?) && !element.get("iteration")?.array()?.is_empty() {return err("§11","support points have no source-loop iterations");}
                 if element.object()?.get("call_index").is_some_and(|value|!wildcard(value)) {return err("§11","support point has no semantic call occurrence");}
                 scopes.clear();
@@ -91,10 +91,12 @@ impl Object {
                     }
                 }
             }
-            if root_function.kind=="oracle" {
-                for point in ["$construct","$step","$commit","$release"] {
+            let support: &[&str]=if root_function.kind=="oracle" {&["$construct","$step","$commit","$release"]}
+                else if !crate::validation::region_declarations(root_function).is_empty() {&["$construct","$release"]} else {&[]};
+            {
+                for point in support {
                     out.push(vec![Json::Object(std::collections::BTreeMap::from([
-                        ("symbol".into(),Json::String(identities.interface_hashes[root].clone())),("point".into(),Json::String(point.into())),
+                        ("symbol".into(),Json::String(identities.interface_hashes[root].clone())),("point".into(),Json::String((*point).into())),
                         ("iteration".into(),Json::Array(vec![])),("instance".into(),Json::Array(vec![])),
                     ]))]);
                 }

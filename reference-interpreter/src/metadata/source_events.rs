@@ -24,7 +24,9 @@ fn matches(entry:&Json,leaf:&Leaf,source:&SourceLocation)->Result<bool> {
     // A terminal call point does not enter its callee; a proper prefix does.
     let depth=path.len().min(source.path.len())+1;
     let owner=source.invocations.iter().filter(|scope|scope.oracle && scope.invocation.len()<=depth).max_by_key(|scope|scope.invocation.len());
-    let step=owner.and_then(|owner|source.steps.iter().find(|step|step.invocation==owner.invocation));
+    let action_support=source.invocations.last().is_some_and(|scope|!scope.oracle && depth>=scope.invocation.len())
+        && matches!(source.terminal.point.as_str(),"$construct"|"$release");
+    let step=if action_support {None} else {owner.and_then(|owner|source.steps.iter().find(|step|step.invocation==owner.invocation))};
     if !wildcard(entry.get("step")?) && step.is_none_or(|step|entry.get("step").and_then(Json::uint)!=Ok(step.step as u128)) {return Ok(false);}
     if !wildcard(entry.get("phase")?) && step.is_none_or(|step|entry.get("phase").and_then(Json::string)!=Ok(if step.reverse {"rev"}else{"fwd"})) {return Ok(false);}
     Ok(wildcard(entry.get("generated")?) || entry.get("generated")?.uint()?==leaf.ordinal as u128)

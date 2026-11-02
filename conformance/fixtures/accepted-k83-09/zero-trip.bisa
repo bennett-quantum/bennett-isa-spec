@@ -1,0 +1,13 @@
+bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"79feaa27a8ecd75c3c65753b7fe6324dbb17900a9481c422394be9ab89176d7d","kind":"perm_action","name":"gap","signature":{"abi":"0.9","args":[],"bounds":[0],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}}}
+
+section functions
+perm_action @gap (t:wire) () () () ()
+regs {  } bounds {0}
+^entry():
+qloop 0 {
+qregion local 0 1
+}
+x t

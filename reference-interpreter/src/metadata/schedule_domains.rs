@@ -114,6 +114,10 @@ impl Object {
         for (index, element) in chain.iter().enumerate() {
             let spelling = element.get("point")?.string()?;
             if self.isa_version == crate::IsaVersion::V09 && source_paths::support_point(spelling) {
+                let identity=self.identity()?;
+                let symbol=element.get("symbol")?.string()?;
+                let owner=self.functions.values().find(|f|identity.interface_hashes.get(&f.name).is_some_and(|hash|hash==symbol)).ok_or_else(||Error::new("§11: unknown support owner".into()))?;
+                if owner.kind != "oracle" && crate::validation::region_declarations(owner).is_empty() {return Ok(None);}
                 if spelling != "$step" { steps = InvocationSteps::Action; }
                 continue;
             }

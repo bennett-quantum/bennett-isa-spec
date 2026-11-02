@@ -1,0 +1,12 @@
+bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"28d5b42de5392a9f840e1a6483a329c288ff0c5d0999c22e0713cd6bc30b271f","kind":"perm_action","name":"image","signature":{"abi":"0.9","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[],"tier":"q"}},"1":{"interface_hash":"96b45821e1aa925bc5b534d922bdbdedf20ef8e5b013bf29e8d32c30f6ce6933","kind":"data","name":"blob","signature":{"abi":"0.9","kind":"data","size":1,"tier":"-"}}}
+
+section functions
+perm_action @image () () () () ()
+^entry():
+qregion r 0 8 @blob
+
+section data
+blob 81

@@ -1,6 +1,6 @@
 mod support;
 use bennett_isa_conformance::{json, ref_catalog::Machine, ref_language::permutation};
-use bennett_isa_ref::{sha256_hex, Object, QuantumBindings, QuantumState};
+use bennett_isa_ref::{Object, QuantumBindings, QuantumState};
 fn source() -> Object {
     let signature = r#"{"abi":"0.9","args":[],"bounds":[0],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
     support::rehash(&support::object(&[("gap",signature,"action @gap (t:wire mut) () () () ()\nregs {  } bounds {0}\n^entry():\nqloop 0 {\nqregion local 0 1\n}\nx t")],"{}","").replace("=0.8","=0.9"))
@@ -43,49 +43,23 @@ fn hoisted_region_in_zero_trip_loop_remains_a_valid_reversible_source_program() 
             .unwrap();
         assert_eq!(q.read_basis(&wire).unwrap(), u128::from(t));
     }
-    let hash = object.identity().unwrap().closure_hashes["gap"]
-        .clone()
-        .unwrap();
-    eprintln!("hoisted qregion declaration: {hash}/entry:1; lexical loop bound is 0");
-    // Diagnostic candidates document b-isa-spec-z4c. Do not assert rejection:
-    // that would preserve the missing-address rule after the contract is fixed.
-    for (point, iteration) in [
-        ("entry:1", "[]"),
-        ("entry:1", "[0]"),
-        ("$construct", "[]"),
-        ("$release", "[]"),
-    ] {
-        let schedule = format!(
-            r#"{{"bindings":{{"budget":[0,0,0,0],"closure_hash":"{hash}","epsilon":0,"inherited_controls":0,"params_hash":"{}","region":"gap","scheduler":{{"name":"address-gap","version":"1"}},"target_hash":"{}","variant":"forward"}},"entries":[{{"alloc":{{"class":"any"}},"generated":"*","kind":"alloc","path":[{{"iteration":{iteration},"point":"{point}","symbol":"{hash}"}}],"phase":"*","step":"*"}}]}}"#,
-            sha256_hex(b"[]"),
-            "0".repeat(64)
-        );
-        let schedule = support::json(&schedule).canonical();
-        let result = Object::parse(&format!("{}\nsection schedule\n{schedule}\n", object.text));
-        eprintln!(
-            "candidate point={point} iteration={iteration}: {}",
-            match result {
-                Ok(_) => "accepted".to_string(),
-                Err(e) => e.to_string(),
-            }
-        );
-    }
+
 }
 
 #[test]
-#[ignore = "b-isa-spec-z4c: orchestrator-routed contract decision for hoisted action qregion addresses"]
-fn pending_z4c_hoisted_region_support_has_a_defined_source_address() {
+fn k83_zero_trip_hoisted_region_support_has_reserved_addresses() {
     let object = source();
     let actuals = json::parse(r#"["t"]"#).unwrap();
     let leaves = object
         .expand_action_source("gap", actuals.as_arr().unwrap(), &[("t", 1)], false)
         .unwrap();
-    for leaf in leaves.iter().filter(|leaf| leaf.allocation.is_some()) {
-        assert!(
-            leaf.source.is_some(),
-            "b-isa-spec-z4c: hoisted qregion support still has no defined source address"
-        );
-    }
+    assert_eq!(leaves.len(),3);
+    let trace=leaves.iter().map(|leaf| {
+        let source=leaf.source.as_ref().expect("K83 defines every hoisted support address");
+        assert!(source.terminal.iteration.is_empty());assert!(source.terminal.instance.is_empty());assert!(source.steps.is_empty());
+        (leaf.gate.as_str(),source.terminal.point.as_str(),leaf.ordinal)
+    }).collect::<Vec<_>>();
+    assert_eq!(trace,vec![("alloc","$construct",0),("x","entry:2",0),("release","$release",0)]);
 }
 
 #[test]
