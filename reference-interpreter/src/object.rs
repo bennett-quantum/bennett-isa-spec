@@ -1725,10 +1725,11 @@ fn validate_header(f: &Function, version: IsaVersion) -> Result<()> {
                 return err("§5.4", "fault width must be at least 4");
             }
             all(&f.params[3], |t| matches!(t, Type::Region(..)))?;
-            if f.params[0]
-                .iter()
-                .chain(&f.params[3])
-                .any(|p| p.role.as_deref() != Some("in"))
+            if f.params[0].iter().any(|p| {
+                p.role
+                    .as_deref()
+                    .map_or(version == IsaVersion::V08, |r| r != "in")
+            }) || f.params[3].iter().any(|p| p.role.as_deref() != Some("in"))
             {
                 return err("§5.1", "oracle inputs and regions require in role");
             }
@@ -1746,10 +1747,15 @@ fn validate_header(f: &Function, version: IsaVersion) -> Result<()> {
                 empty(&[2, 3, 4])?;
             } else {
                 all(&f.params[2], |t| matches!(t, Type::Token))?;
-                all(&f.params[3], |t| matches!(t, Type::Int(_) | Type::Ptr | Type::F64))?;
+                all(&f.params[3], |t| {
+                    matches!(t, Type::Int(_) | Type::Ptr | Type::F64)
+                })?;
                 all(&f.params[4], |t| matches!(t, Type::Region(..)))?;
                 for (group, role) in [(2, "token"), (3, "classical")] {
-                    if f.params[group].iter().any(|p| p.role.as_deref().is_some_and(|r| r != role)) {
+                    if f.params[group]
+                        .iter()
+                        .any(|p| p.role.as_deref().is_some_and(|r| r != role))
+                    {
                         return err("§16.2", "lproc role suffix differs from its group");
                     }
                 }
@@ -1757,7 +1763,11 @@ fn validate_header(f: &Function, version: IsaVersion) -> Result<()> {
                     return err("§3.7", "lproc regions require in role");
                 }
             }
-            if f.params[0].iter().chain(&f.params[1]).any(|p| p.role.is_some()) {
+            if f.params[0]
+                .iter()
+                .chain(&f.params[1])
+                .any(|p| p.role.is_some())
+            {
                 return err("§16.2", "lproc parameters carry no role");
             }
             if f.params[1].len() != 1 {
@@ -1777,10 +1787,11 @@ fn validate_header(f: &Function, version: IsaVersion) -> Result<()> {
             // §16.2 fhead: action groups are (mut..) (in..) (mem..) (args..) ();
             // a written role must agree with its group (muse suggestion).
             for (group, role) in [(0, "mut"), (1, "in")] {
-                if f.params[group]
-                    .iter()
-                    .any(|p| p.role.as_deref().map_or(version == IsaVersion::V08, |r| r != role))
-                {
+                if f.params[group].iter().any(|p| {
+                    p.role
+                        .as_deref()
+                        .map_or(version == IsaVersion::V08, |r| r != role)
+                }) {
                     return err(
                         "§16.2",
                         format!("action parameter group {group} holds {role} wires and says so"),

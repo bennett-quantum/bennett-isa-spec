@@ -550,13 +550,18 @@ impl Object {
                             == Some(b.get("closure_hash").and_then(Json::string).unwrap_or("")))
                         .then_some(n)
                     })
-                    .expect("root closure checked");
+                    .ok_or_else(|| {
+                        Error::new("§12.3: certificate root closure is not defined".into())
+                    })?;
+                let root_function = self.functions.get(root).ok_or_else(|| {
+                    Error::new("§12.3: certificate root must name a function, not data".into())
+                })?;
                 let invocation = b.object()?.get("invocation");
                 if self.section("schedule").is_some() && invocation.is_none() {
                     return err("§12.3 K13", "scheduled certificate requires invocation");
                 }
                 if let Some(v) = invocation {
-                    self.validate_invocation09(v, &self.functions[root])?;
+                    self.validate_invocation09(v, root_function)?;
                     if let Some(schedule) = self.section("schedule") {
                         let sb = schedule.get("bindings")?;
                         let values = v.get("budget")?.array()?;
@@ -663,6 +668,21 @@ impl Object {
     fn validate_claim(&self, c: &Json, f: &Function, position: usize) -> Result<()> {
         crate::metadata_schema::validate_for(self.isa_version, "claim", c)?;
         if self.isa_version == crate::IsaVersion::V09 {
+            let inverse_pair =
+                c.object()?.get("expected") == Some(&Json::String("inverse_pair".into()));
+            let subject_schedule = c
+                .object()?
+                .get("subject")
+                .and_then(|s| s.object().ok())
+                .and_then(|s| s.get("schedule_hash"));
+            if c.object()?.get("expected") == Some(&Json::String("oracle".into()))
+                && subject_schedule.is_none()
+            {
+                return err(
+                    "§12.1 K13",
+                    "expected:oracle requires subject.schedule_hash",
+                );
+            }
             if matches!(c.get("kind")?.string()?, "exhaustive" | "sampled") {
                 table09(c, f)?;
             }
@@ -670,7 +690,8 @@ impl Object {
                 if v.get("args")? != &Json::String("all".into()) {
                     self.validate_invocation09(v, f)?;
                 }
-            } else if self.section("schedule").is_none()
+            } else if subject_schedule.is_none()
+                && !inverse_pair
                 && matches!(
                     c.get("kind")?.string()?,
                     "exhaustive" | "sampled" | "structural"

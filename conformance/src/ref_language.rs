@@ -134,6 +134,7 @@ struct Context {
     classes: BTreeMap<String, String>,
     handles: BTreeMap<String, Rc<RefCell<Handle>>>,
     wires: BTreeMap<String, Vec<Wire>>,
+    wire_owners: BTreeMap<String, Rc<RefCell<Handle>>>,
     angles: BTreeMap<String, u64>,
     bodies: BTreeMap<String, (Vec<Json>, Box<Context>)>,
     symbols: BTreeMap<String, String>,
@@ -181,6 +182,7 @@ impl Context {
     fn clear_name(&mut self, n: &str) {
         self.ints.remove(n);
         self.wires.remove(n);
+        self.wire_owners.remove(n);
         self.angles.remove(n);
         self.bodies.remove(n);
         self.symbols.remove(n);
@@ -208,6 +210,7 @@ impl Context {
     fn merge(&mut self, b: &Context) {
         self.ints.extend(b.ints.clone());
         self.wires.extend(b.wires.clone());
+        self.wire_owners.extend(b.wire_owners.clone());
         self.angles.extend(b.angles.clone());
         self.bodies.extend(b.bodies.clone());
         self.symbols.extend(b.symbols.clone());
@@ -352,6 +355,12 @@ fn class(j: &Json, c: &Context) -> Result<String, String> {
     Ok(name)
 }
 fn named_wires(n: &str, c: &Context) -> Result<Vec<Wire>, String> {
+    if c.wire_owners
+        .get(n)
+        .is_some_and(|owner| !owner.borrow().live)
+    {
+        return Err("wire actual's allocation is not live".into());
+    }
     if let Some(h) = c.handles.get(n) {
         let h = h.borrow();
         if !h.live {
@@ -726,7 +735,11 @@ impl Expander {
         }
         if let Some(names) = self.named_interface(kind) {
             if names.iter().map(String::as_str).collect::<BTreeSet<_>>()
-                != caller.wires.keys().map(String::as_str).collect::<BTreeSet<_>>()
+                != caller
+                    .wires
+                    .keys()
+                    .map(String::as_str)
+                    .collect::<BTreeSet<_>>()
             {
                 return Err("explicit named-interface map has missing or extra wires".into());
             }
@@ -1139,6 +1152,18 @@ impl Expander {
                 }
                 if caller.scratch_names.contains(name) {
                     c.scratch_names.insert(name.clone());
+                }
+                if let Some(owner) = caller
+                    .handles
+                    .get(name)
+                    .or_else(|| caller.wire_owners.get(name))
+                {
+                    c.wire_owners.insert(name.clone(), owner.clone());
+                    let handle = owner.borrow();
+                    c.allocations.insert(name.clone(), handle.metadata.clone());
+                    if handle.scratch {
+                        c.scratch_names.insert(name.clone());
+                    }
                 }
             }
         }
@@ -1612,6 +1637,13 @@ impl Expander {
                         .remove(name)
                         .ok_or_else(|| format!("release unbound {name}"))?;
                     leaf.allocation = Some(c.allocations.remove(name).ok_or("unmatched release")?);
+                    if let Some(owner) = c.wire_owners.remove(name) {
+                        let mut handle = owner.borrow_mut();
+                        if !handle.live {
+                            return Err("release of inactive allocation".into());
+                        }
+                        handle.live = false;
+                    }
                 }
                 leaf.gate = if allocating { "alloc" } else { "release" }.into();
                 leaf.controls.clear();

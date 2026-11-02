@@ -220,6 +220,19 @@ pub static TABLE: &[Entry] = &[
 // equivalent; recursion carries the object's version rather than widening it.
 #[rustfmt::skip]
 static TABLE09: &[Entry] = &[
+    entry!("schedule", "§11 K14", obj!("bindings":"schedule_bindings","entries":"schedule_entries","interface_vertices?":"vertex_lists09")),
+    entry!("vertex_lists09", "§11 K14", Array("uints")),
+    entry!("path_element", "§11 K63", obj!("symbol":"hash","point":"text","iteration":"iteration","instance?":"iteration","call_index?":"selector")),
+    entry!("alloc_payload", "§11 K14", obj!("class":"text","vertices?":"uints")),
+    entry!("expected", "§12.1 K4", Union(&["oracle_expected","table_expected","program_expected","inverse_pair_expected09"])),
+    entry!("inverse_pair_expected09", "§12.1 K4", Enum(&["inverse_pair"])),
+    entry!("domain", "§12.2 K4", obj!("bundles":"bundles","borrowed":"bundles","regions":"domain_regions","args?":"bundles")),
+    entry!("inverse_pair", "§12.3 K4", obj!("g":"hash","ginv":"hash","claim":"uint","budget":"budget","arg_tokens?":"arg_tokens09")),
+    entry!("arg_tokens09", "§12.3 K4", Map("text","budget")),
+    entry!("region", "§12.3 K12", obj!("kind":"kind","signature":"signature","bounds":"uints","estimate?":"estimate09","frame":"frame","resources":"resources","gates_used":"gates_used","claims":"claims","verification":"verification","cleanup":"cleanup","error":"errors","definedness_assumptions":"texts")),
+    entry!("estimate09", "§12.3 K12", obj!("precision_digits":"uint","exact_resources":"exact_resources09")),
+    entry!("exact_resources09", "§12.3 K12", Map("text","rational09")),
+    entry!("rational09", "§12.3 K12", obj!("numerator":"canonical_decimal09","denominator":"canonical_decimal09")),
     entry!("frame", "§9.4 K16", obj!("slots":"slots09","scratch":"scratch09","history":"frames09","borrow":"frames09","ancillae":"ancillae09","live_ranges?":"live_ranges")),
     entry!("slots09", "§9.4 K16", Array("slot09")),
     entry!("slot09", "§9.4 K16", obj!("id":"text","role":"slot_role09","class":"text","width":"expression")),
