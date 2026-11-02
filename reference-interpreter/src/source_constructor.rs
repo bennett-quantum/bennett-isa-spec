@@ -573,7 +573,49 @@ pub(crate) fn oracle(
                             Error::new(format!("§11.1: unresolved fixed source argument {n}"))
                         })?);
                     }
-                    row.push(invoke(op, [text(alias), array(arguments)]));
+                    let written = invoke(op, [text(&alias), array(arguments.clone())]);
+                    if op == "lift.oracle_uncall" {
+                        // The intrinsic pairs only with its XOR delivery. Its
+                        // fresh computation does not own intervening source rows.
+                        let t = format!("$cleanup/{k}/target");
+                        let fr = format!("$cleanup/{k}/fault");
+                        let tw = callee.params[1][0].ty.bits(object.ptr_width)?;
+                        let fw = callee.params[2][0].ty.bits(object.ptr_width)?;
+                        declarations.extend([(t.clone(), tw), (fr.clone(), fw)]);
+                        let target_index = callee.params[0].len();
+                        let original_t = arguments[target_index].clone();
+                        let original_f = arguments[target_index + 1].clone();
+                        arguments[target_index] = text(&t);
+                        arguments[target_index + 1] = text(&fr);
+                        let compute = invoke("lift.oracle_call", [text(alias), array(arguments)]);
+                        let mut fresh = vec![
+                            obj([("acquire", text(&t))]),
+                            obj([("acquire", text(&fr))]),
+                            compute.clone(),
+                        ];
+                        for (name, width, original) in [(&t, tw, original_t), (&fr, fw, original_f)]
+                        {
+                            for b in 0..width {
+                                let wire = original.as_str().ok_or_else(|| {
+                                    Error::new("§11 K65: lifted target is not a location".into())
+                                })?;
+                                fresh.push(gate("cx", [bit(name, b), bit(wire, b)]));
+                            }
+                        }
+                        fresh.extend([
+                            inverse(vec![compute]),
+                            obj([("relinquish", text(&fr))]),
+                            obj([("relinquish", text(&t))]),
+                        ]);
+                        row.push(obj([
+                            ("source_cleanup", text("$current")),
+                            ("perm", Value::Bool(true)),
+                            ("reverse", array([written])),
+                            ("recompute", array(fresh)),
+                        ]));
+                    } else {
+                        row.push(written);
+                    }
                 }
                 "lift.call" => {
                     let callee = program.call(f, i)?;
@@ -1122,6 +1164,14 @@ impl LinkedSource {
     }
 }
 impl bennett_isa_conformance::ref_language::SourceFactory for LinkedSource {
+    fn cleanup_recompute(
+        &self,
+        carrier: &bennett_isa_conformance::ref_language::SourceLocation,
+    ) -> std::result::Result<bool, String> {
+        self.object
+            .source_cleanup_recompute(carrier)
+            .map_err(|e| e.to_string())
+    }
     fn construct(
         &self,
         hash: &str,

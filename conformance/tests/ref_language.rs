@@ -471,3 +471,34 @@ fn raw_inverse_retains_the_complete_forward_source_tree_and_leaf_identities() {
         }
     }
 }
+
+#[test]
+fn direct_empty_registry_entry_uses_its_explicit_bundle_map_and_nested_calls_stay_closed() {
+    let hash = "a".repeat(64);
+    let free =
+        json::parse(r#"{"parameters":[],"body":[{"gate":"x","wires":["external"]}]}"#).unwrap();
+    let out = Expander::new(&doc("[]"), Registry::from([(hash.clone(), free.clone())]))
+        .unwrap()
+        .expand(&hash, &[], &[("external", 1)])
+        .unwrap();
+    assert_eq!(out[0].wires, vec![("external".into(), 0)]);
+    let caller = doc(
+        r#"[{"kind":"caller","parameters":[{"name":"S","type":"symbol"}],"body":[{"call":"S","args":[]}]}]"#,
+    );
+    assert!(
+        Expander::new(&caller, Registry::from([(hash.clone(), free)]))
+            .unwrap()
+            .expand(
+                "caller",
+                &[json::Json::Str(hash.clone())],
+                &[("external", 1)]
+            )
+            .is_err()
+    );
+    let typed=json::parse(r#"{"parameters":[{"name":"w","type":"wire","width":1}],"body":[{"gate":"x","wires":["w"]}]}"#).unwrap();
+    let out = Expander::new(&doc("[]"), Registry::from([(hash.clone(), typed)]))
+        .unwrap()
+        .expand(&hash, &[json::Json::Str("a".into())], &[("a", 1), ("w", 2)])
+        .unwrap();
+    assert_eq!(out[0].wires, vec![("a".into(), 0)]);
+}

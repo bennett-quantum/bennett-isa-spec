@@ -8,6 +8,7 @@ use crate::{
 use std::collections::{BTreeMap, BTreeSet};
 
 const UNDEFINED: &str = "§3.3: undefined classical operand";
+pub(crate) mod cleanup;
 impl Object {
     pub(crate) fn validate_structured(
         &self,
@@ -1287,6 +1288,7 @@ struct Creation {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Discipline {
+    recording: Option<cleanup::Recorder>,
     types: BTreeMap<String, Type>,
     inputs: BTreeSet<String>,
     predicates: Vec<String>,
@@ -1313,6 +1315,7 @@ struct Discipline {
 impl Discipline {
     fn new(f: &Function, types: BTreeMap<String, Type>) -> Self {
         Self {
+            recording: None,
             types,
             inputs: f.params[1]
                 .iter()
@@ -1505,6 +1508,9 @@ impl Discipline {
     /// `h d0; ccx d0 p d1; cx d1 t; ccx d0 p d1; h d0` leaves d0 entangled with t).
     fn note_reads(&mut self, version: &str, wires: &[String]) -> Result<()> {
         let direct = self.read_snapshot(wires)?;
+        if let Some(recording) = &mut self.recording {
+            recording.read(direct.iter().map(|(w, _)| w.clone()));
+        }
         let mut all: Vec<String> = direct.iter().map(|(w, _)| w.clone()).collect();
         all.extend(self.dependencies(&all));
         all.sort();
@@ -1518,6 +1524,9 @@ impl Discipline {
             return err("§3.3", "linear name produced twice");
         }
         self.types.insert(n.into(), ty);
+        if let Some(recording) = &mut self.recording {
+            recording.read(c.versions.iter().map(|(w, _)| w.clone()));
+        }
         self.created.insert(n.into(), c);
         Ok(())
     }
@@ -1573,6 +1582,9 @@ impl Discipline {
     ) -> Result<()> {
         let other = force_other || wires.iter().any(|w| self.wire_is_other(w));
         let context = self.read_snapshot(extra_reads)?;
+        if let Some(recording) = &mut self.recording {
+            recording.read(context.iter().map(|(w, _)| w.clone()));
+        }
         let base = format!(
             "{version}:context{context:?}:polarity{:?}",
             self.effective_controls()?
@@ -1705,11 +1717,14 @@ impl Discipline {
             .or_insert_with(|| format!("v{next}"));
         self.modified.insert(wire.into());
         let log = self.versions.entry(wire.into()).or_default();
-        if !blocked
+        let cancels = !blocked
             && log
                 .last()
-                .is_some_and(|prior| operation_inverse(prior).as_deref() == Some(version))
-        {
+                .is_some_and(|prior| operation_inverse(prior).as_deref() == Some(version));
+        if let Some(recording) = &mut self.recording {
+            recording.write(wire, cancels);
+        }
+        if cancels {
             log.pop();
         } else {
             log.push(version.into());
@@ -1727,11 +1742,14 @@ impl Discipline {
             .entry(version.clone())
             .or_insert_with(|| format!("v{next}"));
         for wire in self.wires(n)? {
-            let log = self.versions.entry(wire).or_default();
-            if log
+            let log = self.versions.entry(wire.clone()).or_default();
+            let cancels = log
                 .last()
-                .is_some_and(|p| operation_inverse(p).as_deref() == Some(&version))
-            {
+                .is_some_and(|p| operation_inverse(p).as_deref() == Some(&version));
+            if let Some(recording) = &mut self.recording {
+                recording.write(&wire, cancels);
+            }
+            if cancels {
                 log.pop();
             } else {
                 log.push(version.clone());

@@ -12,7 +12,7 @@ use std::{
 mod named_interface;
 /// Implementation resource limits, never ISA validity conditions.
 pub const SOURCE_SCOPE_LIMIT: usize = 512;
-pub const DEFAULT_SOURCE_LEAF_LIMIT: usize = 500_000;
+pub const DEFAULT_SOURCE_LEAF_LIMIT: usize = 1_000_000;
 pub const HOST_RESOURCE_LIMIT_PREFIX: &str = "HOST_RESOURCE_LIMIT: ";
 /// Source context remains outside the closed catalog and positional arguments.
 #[derive(Clone, Debug)]
@@ -101,6 +101,11 @@ struct StepPlan {
     arguments: BTreeMap<String, Vec<Wire>>,
 }
 pub trait SourceFactory: std::fmt::Debug + Send + Sync {
+    /// A non-emitting K65 carrier. This channel belongs to linked source,
+    /// outside the immutable catalog's constructor grammar.
+    fn cleanup_recompute(&self, _carrier: &SourceLocation) -> Result<bool, String> {
+        Ok(false)
+    }
     fn construct(
         &self,
         hash: &str,
@@ -481,15 +486,18 @@ fn validate_formals(ps: &[Json]) -> Result<(), String> {
     Ok(())
 }
 fn validate_body(body: &[Json]) -> Result<(), String> {
+    validate_body_mode(body, false)
+}
+fn validate_body_mode(body: &[Json], source: bool) -> Result<(), String> {
     for c in body {
         if c.get("visit").is_some() {
             keys(c, &["visit", "body"])?;
             s(f(c, "visit")?)?;
-            validate_body(a(f(c, "body")?)?)?;
+            validate_body_mode(a(f(c, "body")?)?, source)?;
         } else if c.get("declare").is_some() {
             keys(c, &["declare", "width", "class", "state", "body"])?;
             s(f(c, "declare")?)?;
-            validate_body(a(f(c, "body")?)?)?;
+            validate_body_mode(a(f(c, "body")?)?, source)?;
         } else if c.get("acquire").is_some() || c.get("relinquish").is_some() {
             let key = if c.get("acquire").is_some() {
                 "acquire"
@@ -544,23 +552,31 @@ fn validate_body(body: &[Json]) -> Result<(), String> {
             } else {
                 a(f(c, "args")?)?;
             }
+        } else if source && c.get("source_cleanup").is_some() {
+            keys(c, &["source_cleanup", "reverse", "recompute", "perm"])?;
+            s(f(c, "source_cleanup")?)?;
+            f(c, "perm")?
+                .as_bool()
+                .ok_or("cleanup provenance must be boolean")?;
+            validate_body_mode(a(f(c, "reverse")?)?, true)?;
+            validate_body_mode(a(f(c, "recompute")?)?, true)?;
         } else if c.get("for").is_some() {
             keys(c, &["for", "from", "to", "body"])?;
             s(f(c, "for")?)?;
-            validate_body(a(f(c, "body")?)?)?;
+            validate_body_mode(a(f(c, "body")?)?, source)?;
         } else if c.get("each").is_some() {
             keys(c, &["each", "in", "body"])?;
             s(f(c, "each")?)?;
-            validate_body(a(f(c, "body")?)?)?;
+            validate_body_mode(a(f(c, "body")?)?, source)?;
         } else if c.get("under").is_some() {
             keys(c, &["under", "body"])?;
-            validate_body(a(f(c, "body")?)?)?;
+            validate_body_mode(a(f(c, "body")?)?, source)?;
         } else if c.get("inverse").is_some() {
             keys(c, &["inverse", "body"])?;
             if f(c, "inverse")?.as_bool() != Some(true) {
                 return Err("inverse must be true".into());
             }
-            validate_body(a(f(c, "body")?)?)?;
+            validate_body_mode(a(f(c, "body")?)?, source)?;
         } else if c.get("splice").is_some() {
             keys(c, &["splice"])?;
             s(f(c, "splice")?)?;
@@ -1105,7 +1121,7 @@ impl Expander {
                         for t in ts {
                             keys(t, &["parameters", "body"])?;
                             validate_formals(a(f(t, "parameters")?)?)?;
-                            validate_body(a(f(t, "body")?)?)?;
+                            validate_body_mode(a(f(t, "body")?)?, self.source_factory.is_some())?;
                         }
                         (Rc::new(ts.to_vec()), Rc::new(caller.clone()))
                     };
@@ -1144,7 +1160,7 @@ impl Expander {
                     } else {
                         {
                             let body = a(v)?;
-                            validate_body(body)?;
+                            validate_body_mode(body, self.source_factory.is_some())?;
                             (Rc::new(body.to_vec()), Rc::new(caller.clone()))
                         }
                     };
@@ -1219,6 +1235,15 @@ impl Expander {
             .cloned()
             .ok_or_else(|| format!("unknown recipe {kind}"))?;
         let mut c = self.bind(&r, args, caller)?;
+        // A directly entered, empty-formal registry constructor is the
+        // caller's script over its explicit bundle map. Semantic `call`
+        // invocations always have a nonempty path and bind a closed interface.
+        if path.is_empty()
+            && self.registry.contains_key(kind)
+            && a(f(&r, "parameters")?)?.is_empty()
+        {
+            c.wires = caller.wires.clone();
+        }
         if let Some(names) = self.named_interface(kind) {
             for name in names {
                 c.wires.insert(name.clone(), named_wires(name, caller)?);
@@ -1380,7 +1405,7 @@ impl Expander {
                         .and_then(|s| s.oracle_invocation.as_ref()),
                     caller.invocation_source.as_ref().is_some_and(|s| s.adjoint),
                 )?;
-                validate_body(a(&built.body)?)?;
+                validate_body_mode(a(&built.body)?, true)?;
                 if built.symbol != kind {
                     return Err("constructed body is bound to a different closure".into());
                 }
@@ -1811,6 +1836,38 @@ impl Expander {
                 } else {
                     c.wires.remove(n);
                 }
+            } else if let Some(n) = j.get("source_cleanup") {
+                keys(j, &["source_cleanup", "reverse", "recompute", "perm"])?;
+                let factory = self
+                    .source_factory
+                    .as_ref()
+                    .ok_or("source cleanup requires linked source")?;
+                let point = if s(n)? == "$current" {
+                    c.source_point.clone()
+                } else {
+                    c.source_owner
+                        .as_ref()
+                        .and_then(|o| o.points.get(s(n).ok()?))
+                        .cloned()
+                }
+                .ok_or("cleanup carrier has no source point")?;
+                let location = c
+                    .location()
+                    .ok_or("cleanup carrier has no source invocation")?;
+                let mut carrier = (*location).clone();
+                carrier.terminal = point;
+                let recompute = factory.cleanup_recompute(&carrier)?;
+                if recompute && f(j, "perm")?.as_bool() != Some(true) {
+                    return Err("§6.4: recompute requires permutation provenance".into());
+                }
+                self.body(
+                    a(f(j, if recompute { "recompute" } else { "reverse" })?)?,
+                    c,
+                    path,
+                    rev,
+                    chain,
+                    out,
+                )?;
             } else if let Some(n) = j.get("for") {
                 keys(j, &["for", "from", "to", "body"])?;
                 let n = s(n)?;

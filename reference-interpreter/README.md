@@ -53,6 +53,13 @@ pre-instruction boundaries (zero and returns included), exact uint64 codes,
 implicit causes, intact prefixes and entry restoration. The source counter
 remains producer instrumentation; host fuel is a separate diagnostic.
 
+Compatibility note (`b-isa-spec-0u1`): the interpreter's 0.8 mode already
+admitted the address-only `()` actual for `region[0,W]` before this migration.
+That historical extension is preserved; the published 0.8 contract is unchanged.
+`tests/memory_address.rs` retains its existing 0.8 regressions, while
+`tests/isa09_memory_address.rs` checks actual 0.9 source expansion and native
+execution against K79, including zero-width addresses.
+
 Bound `ref` expansion, end-to-end K79–K81 execution, the 0.9 saved-tape matrix
 and the remaining authoritative delta (including dynamic qregs, minted tokens,
 parametrised qinplace and nonempty lproc forwarding) remain open under

@@ -31,6 +31,13 @@ Regenerate/check from the repository root, with the reference CLI built:
 python3 -I conformance/fixtures/accepted-k83-09/generate.py --check
 ```
 
+The eight schedule vectors in the same JSON cover valid support selectors, rejected
+`$step`/`$commit` action selectors, invalid own iteration/instance vectors, duplicate
+maximal entries on actual support (including a false control), and an empty support
+domain that cannot witness a tie. Six `F-k83-*` and eight `H-k83-*` cases exercise
+CLI admission. `conformance/tests/ref_k83.rs` independently checks the coordinate
+adapter and full basis matrices.
+
 The generator only derives canonical object identities through the
 published `hash`/`check` CLI. Coordinate expectations are independently
 written from K83, and its ref envelope pin is checked before generation.

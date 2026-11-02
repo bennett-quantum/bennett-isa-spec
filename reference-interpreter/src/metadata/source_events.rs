@@ -82,13 +82,37 @@ fn matches(entry: &Json, leaf: &Leaf, source: &SourceLocation) -> Result<bool> {
     )
 }
 impl Object {
+    /// K65 carrier selection is separate from emitted gate/lifetime events.
+    pub fn source_cleanup_recompute(&self, source: &SourceLocation) -> Result<bool> {
+        let carrier = Leaf {
+            invocation: Vec::new(),
+            ordinal: 0,
+            gate: String::new(),
+            wires: Vec::new(),
+            controls: Vec::new(),
+            angles: Vec::new(),
+            allocation: None,
+            event: None,
+            scratch: false,
+            source: Some(std::sync::Arc::new(source.clone())),
+        };
+        Ok(self
+            .select_source_event(&carrier, "cleanup")?
+            .is_some_and(|entry| {
+                entry
+                    .get("cleanup")
+                    .and_then(|c| c.get("realisation"))
+                    .and_then(Json::string)
+                    == Ok("recompute")
+            }))
+    }
     /// Select a decision on an actual source-derived event. This is the
     /// matching boundary; target realisation and charging are separate.
     pub fn resolve_source_leaf(&self, leaf: &Leaf, kind: &str) -> Result<Option<&Json>> {
-        let Some(schedule) = self.section("schedule") else {
+        if self.section("schedule").is_none() {
             return Ok(None);
-        };
-        let source = leaf.source.as_deref().ok_or_else(|| {
+        }
+        leaf.source.as_deref().ok_or_else(|| {
             Error::new("§11: generated operation lacks its source address".into())
         })?;
         let applicable = match kind {
@@ -101,6 +125,16 @@ impl Object {
         if !applicable {
             return Ok(None);
         }
+        self.select_source_event(leaf, kind)
+    }
+    fn select_source_event(&self, leaf: &Leaf, kind: &str) -> Result<Option<&Json>> {
+        let Some(schedule) = self.section("schedule") else {
+            return Ok(None);
+        };
+        let source = leaf
+            .source
+            .as_deref()
+            .ok_or_else(|| Error::new("§11: event lacks its source address".into()))?;
         let mut selected = None;
         let mut maxima = 0;
         for entry in schedule.get("entries")?.array()? {

@@ -56,6 +56,40 @@ fn subtract(mut a: Domain, b: &Domain) -> Vec<Domain> {
 }
 
 impl Object {
+    fn cleanup_carrier_point(&self, chain: &[Json]) -> Result<bool> {
+        let last = chain
+            .last()
+            .ok_or_else(|| Error::new("§11 K65: empty carrier path".into()))?;
+        let spelling = last.get("point")?.string()?;
+        if source_paths::support_point(spelling) {
+            return Ok(false);
+        }
+        let (block, ordinal) = spelling
+            .rsplit_once(':')
+            .ok_or_else(|| Error::new("§11 K65: carrier point".into()))?;
+        let point = self.point(
+            last.get("symbol")?.string()?,
+            block,
+            ordinal
+                .parse()
+                .map_err(|_| Error::new("§11 K65: point ordinal".into()))?,
+        )?;
+        let op = point.instruction.op.as_str();
+        if matches!(
+            op,
+            "qfree" | "qreturn" | "quncopy" | "qunload" | "lift.oracle_uncall"
+        ) {
+            return Ok(true);
+        }
+        if !matches!(op, "action_call" | "oracle_call" | "adj" | "ctl") {
+            return Ok(false);
+        }
+        let plan = self.source_cleanup_plan(point.function)?;
+        Ok(plan
+            .pairs
+            .iter()
+            .any(|pair| plan.rows[pair.carrier].instruction.line == point.instruction.line))
+    }
     /// Each point has its own generated operations (§11), including call/loop
     /// rows. Start at the shortest chains; a new oracle invocation can broaden
     /// their step domain, so has_uncovered_tie also visits those extensions.
@@ -347,12 +381,13 @@ impl Object {
         // lprocs without a call-depth, step, or loop expansion cap.
         let mut suffixes = std::collections::BTreeSet::new();
         while let Some(chain) = chains.pop() {
-            let Some((base, steps, bound_arguments)) =
+            let Some((mut base, steps, bound_arguments)) =
                 self.chain_domain(&chain, root_budget, arguments)?
             else {
                 continue;
             };
-            if !matches!(steps, InvocationSteps::Action)
+            if (self.isa_version == crate::IsaVersion::V09
+                || !matches!(steps, InvocationSteps::Action))
                 && !(self.isa_version == crate::IsaVersion::V09
                     && chain
                         .last()
@@ -375,10 +410,12 @@ impl Object {
                         .parse()
                         .map_err(|_| Error::new("§11: invalid point ordinal".into()))?,
                 )?;
-                let callee = if matches!(
-                    point.instruction.op.as_str(),
-                    "lift.call" | "lift.oracle_call" | "lift.oracle_uncall" | "lift.perm_call"
-                ) {
+                let callee = if (point.instruction.op != "lift.call"
+                    || self.isa_version != crate::IsaVersion::V09)
+                    && matches!(
+                        point.instruction.op.as_str(),
+                        "lift.call" | "lift.oracle_call" | "lift.oracle_uncall" | "lift.perm_call"
+                    ) {
                     Some(
                         point.instruction.operands[0]
                             .trim_start_matches('@')
@@ -407,6 +444,14 @@ impl Object {
                         }
                     }
                 }
+            }
+            if self.isa_version == crate::IsaVersion::V09 && a.get("kind")?.string()? == "cleanup" {
+                if !self.cleanup_carrier_point(&chain)? {
+                    continue;
+                }
+                *base
+                    .last_mut()
+                    .ok_or_else(|| Error::new("§11 K65: missing generated axis".into()))? = (0, 0);
             }
             let Some(ad) = self.entry_domain(a, &chain, &base)? else {
                 continue;

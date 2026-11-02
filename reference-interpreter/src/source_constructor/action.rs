@@ -25,6 +25,14 @@ struct Compiler<'a> {
     symbol: String,
     points: BTreeMap<String, SourcePoint>,
     locations: BTreeMap<usize, (String, usize)>,
+    compiled: BTreeMap<crate::validation::cleanup::Key, Compiled>,
+}
+#[derive(Clone)]
+struct Compiled {
+    nodes: Vec<Value>,
+    before: Env,
+    after: Env,
+    tag: String,
 }
 impl Env {
     fn wire(&self, name: &str) -> Result<Value> {
@@ -168,6 +176,7 @@ impl Compiler<'_> {
         let mut out = Vec::new();
         for i in seq {
             let start = out.len();
+            let before = env.clone();
             let a = &i.operands;
             let op = i.op.as_str();
             match op {
@@ -455,6 +464,17 @@ impl Compiler<'_> {
                 },
             );
             let nodes = out.split_off(start);
+            if !matches!(op, "qif" | "qloop") {
+                self.compiled.insert(
+                    (i.line, env.iteration.clone()),
+                    Compiled {
+                        nodes: nodes.clone(),
+                        before,
+                        after: env.clone(),
+                        tag: tag.clone(),
+                    },
+                );
+            }
             out.push(obj([
                 ("for", text(tag)),
                 ("from", Value::Num(0.0)),
@@ -513,6 +533,13 @@ fn source_adjoint(body: Vec<Value>, symbols: &mut [SourceSymbol]) -> Result<Vec<
                 return Err(Error::new("§11.1: source point body".into()));
             };
             m.insert("body".into(), array(source_adjoint(body, symbols)?));
+        } else if m.contains_key("source_cleanup") {
+            for key in ["reverse", "recompute"] {
+                let Value::Arr(body) = m.remove(key).expect("cleanup realisation body") else {
+                    return Err(Error::new("§11 K81: cleanup body".into()));
+                };
+                m.insert(key.into(), array(source_adjoint(body, symbols)?));
+            }
         } else if let Some(Value::Str(kind)) = m.get("invoke") {
             if matches!(kind.as_str(), "oracle_call" | "action_call") {
                 if kind == "action_call" {
@@ -561,6 +588,7 @@ pub(super) fn construct(
     actual_regions: &BTreeMap<String, Value>,
     adjoint: bool,
 ) -> Result<SourceBody> {
+    let plan = object.source_cleanup_plan(f)?;
     let hashes = object.identity()?.closure_hashes;
     let symbol = hashes[&f.name]
         .clone()
@@ -600,6 +628,7 @@ pub(super) fn construct(
         symbol: symbol.clone(),
         points: BTreeMap::new(),
         locations,
+        compiled: BTreeMap::new(),
     };
     let mut env = Env::default();
     for p in f.params.iter().flatten() {
@@ -649,6 +678,7 @@ pub(super) fn construct(
     if !env.predicates.is_empty() {
         return Err(Error::new("§11.1: unclosed source predicates".into()));
     }
+    body = cleanup::apply(&mut compiler, &plan, body)?;
     if adjoint {
         body = source_adjoint(body, &mut compiler.symbols)?;
     }
@@ -711,3 +741,4 @@ pub(super) fn construct(
         rows: Vec::new(),
     })
 }
+mod cleanup;

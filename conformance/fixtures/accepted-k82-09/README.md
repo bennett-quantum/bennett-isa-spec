@@ -22,9 +22,10 @@ CARGO_TARGET_DIR=.tmp/opus-isa-helpers/target cargo run -q --release --offline \
   conformance/fixtures/accepted-k82-09/k82.json spec/ref-0.9.json
 ```
 
-Reference result on 2026-11-01: 86/86 edge digests match and 14/16 cases pass. The two failures are expected until
-`b-isa-spec-b5b` lands: `callee-local-is-not-captured-by-an-unrelated-caller-name` and
-`live-declaration-binds-by-its-wire-actual-rule`.
+The reference now passes all 86 edge digests, all 54 interface sets and all 16 binding cases,
+including unrelated caller names and live declaration arguments. The gate includes
+`conformance/tests/ref_named_interface.rs`; the complete 2026-11-02 gate passed 127 conformance
+tests and 564 reference tests (five preexisting ignores). The catalog bytes and envelope are unchanged.
 
 These are finite witnesses: edge tuples use widths 1 to 4, and functional correctness of the circuits stays with the
 existing catalog evidence. The vector establishes binding and leaf identity only.
