@@ -1,14 +1,16 @@
 bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
 
 section symbols
-{"0":{"interface_hash":"0000000000000000000000000000000000000000000000000000000000000000","kind":"action","name":"root","signature":{"abi":"0.9","args":[],"bounds":[],"in":[1],"kind":"action","mem":[],"mut":[1],"tier":"q"}}}
+{"0":{"interface_hash":"8eb4012028bd0aa8b5ecccfd89b72f1ae46be842e4f421ec0502e04f656751b5","kind":"action","name":"root","signature":{"abi":"0.9","args":[],"bounds":[],"in":[1],"kind":"action","mem":[],"mut":[1],"tier":"q"}}}
 
 section functions
 action @root (t:wire mut) (x:wire in) () () ()
 ^entry():
 d = qalloc any 1
 cx x d
-z d
-z d
+s d
+s d
+sdg d
+sdg d
 cx x d
 qfree d

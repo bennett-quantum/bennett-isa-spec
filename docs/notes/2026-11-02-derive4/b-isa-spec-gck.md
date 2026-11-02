@@ -12,7 +12,7 @@ A cleanup transformation correctness defect, not a new source capability. North 
 
 ## Alternatives and witnesses
 
-Source: `d=qalloc any 1; cx x d; z d; z d; cx x d; qfree d`. Its exact unitary on x is I: the two Zs cancel before the final CX. Let C=`cx x d; z d`. Fresh C / XOR / C-adjoint clears d but leaves the original phase (-1)^x, hence Z on x. Basis values alone agree; input (|0>+|1>)/sqrt(2) distinguishes I from Z. [verify.py](verify.py) checks both full basis-column amplitudes using exact signs and a reference-interpreter superposition execution of the written source.
+The bead's schematic source is `d=qalloc any 1; cx x d; Z d; Z d; cx x d; qfree d`, where Z denotes diag(1,-1). **Literal `z` is not an ISA §4.4 opcode**: the first reference attempt rejected it. The admitted [diagonal-source.bisa](diagonal-source.bisa) expands the forward Z as `s d; s d` and its inverse as `sdg d; sdg d`. Its exact unitary on x is I. Let C=CX followed by S². Fresh C / XOR / C-adjoint clears d but leaves the original phase (-1)^x, hence Z on x. Basis values alone agree; a superposition distinguishes I from Z. [verify.py](verify.py) checks exact signed columns and the reference's forward/adjoint/reverse execution on `0.6|0>+0.8|1>`, with a spectator mutable wire zero. This normalization uses published gates and preserves the counterexample; it is not a parser change.
 
 | Alternative | Assessment |
 |---|---|
@@ -69,7 +69,7 @@ Disjoint operations are not absorbed, and operations changing a value
 seen by the next phase cannot be reordered across it.
 ```
 
-For the concrete witness the second Z remains at its original occurrence, cancels the first Z, and the final carrier recomputes only CX's value cleanup. With multiple interleaved phases, the intermediate carriers preserve the values each phase originally observes. A more general phase-factorization optimization remains possible under §5.7 after proving the exact unitary and binding its own expansion; it cannot be assumed from perm provenance alone.
+For the concrete witness the SDG² inverse remains at its original occurrences, cancels the first S², and the final carrier recomputes only CX's value cleanup. With multiple interleaved phases, the intermediate carriers preserve the values each phase originally observes. A more general phase-factorization optimization remains possible under §5.7 after proving the exact unitary and binding its own expansion; it cannot be assumed from perm provenance alone.
 
 ## Hashes, catalog and consumers
 
