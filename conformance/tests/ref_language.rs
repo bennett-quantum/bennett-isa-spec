@@ -382,6 +382,7 @@ fn source_leaf_budget_fails_explicitly_resets_and_leaves_plain_catalogs_unchange
             _: &BTreeMap<String, json::Json>,
             _: &BTreeMap<String, json::Json>,
             _: Option<&json::Json>,
+            _: Option<&bennett_isa_conformance::ref_language::SourceTokenContext>,
             _: bool,
         ) -> Result<SourceBody, String> {
             Ok(SourceBody {
@@ -442,6 +443,7 @@ fn raw_inverse_retains_the_complete_forward_source_tree_and_leaf_identities() {
             _: &BTreeMap<String, json::Json>,
             _: &BTreeMap<String, json::Json>,
             _: Option<&json::Json>,
+            _: Option<&bennett_isa_conformance::ref_language::SourceTokenContext>,
             _: bool,
         ) -> Result<SourceBody, String> {
             let point = SourcePoint {
@@ -462,6 +464,7 @@ fn raw_inverse_retains_the_complete_forward_source_tree_and_leaf_identities() {
                         name: "C".into(),
                         hash: child,
                         oracle_invocation: None,
+                        tokens: None,
                         adjoint: false,
                     }]
                 } else {

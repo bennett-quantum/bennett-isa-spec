@@ -495,10 +495,28 @@ impl Object {
                             reads.push(format!("{mem}[*]"));
                         }
                     }
+                    // Compare resolved identities only in the matching key. Source
+                    // operands, fixed parameter positions and hashes remain intact.
+                    let mut matching = ca.clone();
+                    let token_key = |name: &str| {
+                        s.token_identities.get(name).map_or_else(
+                            || name.to_string(), |id| format!("$token-identity/{id}"))
+                    };
+                    if !s.token_identities.is_empty() {
+                    if call.instruction.op == "oracle_call" {
+                        matching[1] = token_key(&ca[1]);
+                    }
+                    let group = if call.instruction.op == "oracle_call" { 4 } else { 3 };
+                    let actuals = list(&ca[mem_index + 1])?;
+                    matching[mem_index + 1] = format!("({})", actuals.iter()
+                        .zip(&callee.params[group])
+                        .map(|(name,p)| if p.ty == Type::Token { token_key(name) } else { name.clone() })
+                        .collect::<Vec<_>>().join(", "));
+                    }
                     let version = if call.instruction.op == "oracle_call" {
                         format!(
                             "oracle_call:{}:{:?}:{:?}",
-                            ca.join(" "),
+                            matching.join(" "),
                             s.read_snapshot(&reads)?,
                             s.effective_controls()?
                         )
@@ -507,7 +525,7 @@ impl Object {
                             "call_{}_{}:{}:{:?}:{:?}",
                             if other { "other" } else { "perm" },
                             if call.adjoint { "adj" } else { "fwd" },
-                            ca.join(" "),
+                            matching.join(" "),
                             s.read_snapshot(&reads)?,
                             s.effective_controls()?
                         )
@@ -1322,6 +1340,7 @@ struct Creation {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Discipline {
     recording: Option<cleanup::Recorder>,
+    token_identities: BTreeMap<String, u64>,
     types: BTreeMap<String, Type>,
     inputs: BTreeSet<String>,
     predicates: Vec<String>,
@@ -1349,6 +1368,7 @@ impl Discipline {
     fn new(f: &Function, types: BTreeMap<String, Type>) -> Self {
         Self {
             recording: None,
+            token_identities: BTreeMap::new(),
             types,
             inputs: f.params[1]
                 .iter()

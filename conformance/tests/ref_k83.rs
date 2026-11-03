@@ -106,12 +106,14 @@ fn k83_published_coordinates_reverse_without_renumbering_and_preserve_every_basi
                 }]
             };
             let mut invocations = vec![SourceInvocation {
+                tokens: None,
                 invocation: vec![0],
                 symbol: hash(root),
                 oracle: false,
             }];
             if !external {
                 invocations.push(SourceInvocation {
+                    tokens: None,
                     invocation: invocation.clone(),
                     symbol: hash(support),
                     oracle: false,

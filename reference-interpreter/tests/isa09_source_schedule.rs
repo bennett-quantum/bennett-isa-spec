@@ -153,11 +153,13 @@ fn source_leaf_matching_reads_the_oracle_level_selected_by_each_path() {
             ],
             invocations: vec![
                 SourceInvocation {
+                    tokens: None,
                     invocation: vec![0],
                     symbol: root.clone(),
                     oracle: true,
                 },
                 SourceInvocation {
+                    tokens: None,
                     invocation: vec![0, 1],
                     symbol: inner.clone(),
                     oracle: true,

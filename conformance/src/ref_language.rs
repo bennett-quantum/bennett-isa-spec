@@ -14,17 +14,27 @@ mod named_interface;
 pub const SOURCE_SCOPE_LIMIT: usize = 512;
 pub const DEFAULT_SOURCE_LEAF_LIMIT: usize = 1_000_000;
 pub const HOST_RESOURCE_LIMIT_PREFIX: &str = "HOST_RESOURCE_LIMIT: ";
+/// Opaque live identities supplied by the linked source builder, never catalog
+/// arguments or serialized token values. A nested invocation retains global
+/// identities and derives its own canonical equality partition from them.
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SourceTokenContext {
+    pub primary: Option<u64>,
+    pub arguments: BTreeMap<String,u64>,
+}
 /// Source context remains outside the closed catalog and positional arguments.
 #[derive(Clone, Debug)]
 pub struct SourceSymbol {
     pub name: String,
     pub hash: String,
     pub oracle_invocation: Option<Json>,
+    pub tokens: Option<std::sync::Arc<SourceTokenContext>>,
     pub adjoint: bool,
 }
 #[derive(Clone, Debug)]
 struct SourceCapture {
     oracle_invocation: Option<Json>,
+    tokens: Option<std::sync::Arc<SourceTokenContext>>,
     adjoint: bool,
 }
 #[derive(Clone)]
@@ -68,6 +78,7 @@ pub struct SourceStep {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SourceInvocation {
     pub invocation: Vec<usize>,
+    pub tokens: Option<std::sync::Arc<SourceTokenContext>>,
     pub symbol: String,
     pub oracle: bool,
 }
@@ -112,6 +123,7 @@ pub trait SourceFactory: std::fmt::Debug + Send + Sync {
         values: &BTreeMap<String, Json>,
         regions: &BTreeMap<String, Json>,
         oracle_invocation: Option<&Json>,
+        tokens: Option<&SourceTokenContext>,
         adjoint: bool,
     ) -> Result<SourceBody, String>;
 }
@@ -792,6 +804,7 @@ impl Expander {
                 symbol.name.clone(),
                 SourceCapture {
                     oracle_invocation: symbol.oracle_invocation.clone(),
+                    tokens: symbol.tokens.clone(),
                     adjoint: symbol.adjoint,
                 },
             );
@@ -1390,6 +1403,7 @@ impl Expander {
                         .invocation_source
                         .as_ref()
                         .and_then(|s| s.oracle_invocation.as_ref()),
+                    caller.invocation_source.as_ref().and_then(|s| s.tokens.as_deref()),
                     caller.invocation_source.as_ref().is_some_and(|s| s.adjoint),
                 )?;
                 validate_body_mode(a(&built.body)?, true)?;
@@ -1405,6 +1419,7 @@ impl Expander {
                 }));
                 c.source_invocations.push(SourceInvocation {
                     invocation: path.to_vec(),
+                    tokens: caller.invocation_source.as_ref().and_then(|s| s.tokens.clone()),
                     symbol: built.symbol.clone(),
                     oracle: built.oracle,
                 });
@@ -1424,6 +1439,7 @@ impl Expander {
                         symbol.name,
                         SourceCapture {
                             oracle_invocation: symbol.oracle_invocation,
+                            tokens: symbol.tokens,
                             adjoint: symbol.adjoint,
                         },
                     );

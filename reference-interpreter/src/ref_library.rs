@@ -14,6 +14,7 @@ pub use bennett_isa_conformance::{
 };
 
 pub const REF09_HASH: &str = "5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197";
+pub(crate) mod tokens;
 const CATALOG: &str = include_str!("../../spec/ref-0.9.json");
 
 /// Only the published complete library can satisfy a ref@0.9 binding. Private
@@ -86,6 +87,19 @@ impl Object {
         bundles: &[(&str, usize)],
         adjoint: bool,
     ) -> Result<Vec<Leaf>> {
+        self.expand_action_source_bound(name,args,bundles,adjoint,None)
+    }
+    /// Tuple-only token parameters require their canonical equality partition.
+    pub fn expand_action_source_with_token_aliases(
+        &self, name: &str, args: &[Value], bundles: &[(&str,usize)], adjoint: bool,
+        aliases: &[u64],
+    ) -> Result<Vec<Leaf>> {
+        self.expand_action_source_bound(name,args,bundles,adjoint,Some(aliases))
+    }
+    fn expand_action_source_bound(
+        &self, name: &str, args: &[Value], bundles: &[(&str,usize)], adjoint: bool,
+        aliases: Option<&[u64]>,
+    ) -> Result<Vec<Leaf>> {
         self.ensure_linked()?;
         self.check_hashes()?;
         let f = self
@@ -93,6 +107,7 @@ impl Object {
             .get(name)
             .filter(|f| matches!(f.kind.as_str(), "action" | "perm_action"))
             .ok_or_else(|| crate::Error::new("§11.1: source action is not defined".into()))?;
+        let tokens = tokens::SourceTokens::bind(self,f,args,None,aliases)?;
         let library = self.bound_ref_library()?;
         let identity = self.identity()?;
         let hash = identity.closure_hashes[&f.name]
@@ -116,7 +131,7 @@ impl Object {
             })
             .collect::<Result<Registry>>()?;
         let factory =
-            std::sync::Arc::new(crate::source_constructor::LinkedSource::new(self.clone())?);
+            std::sync::Arc::new(crate::source_constructor::LinkedSource::new(self.clone(),tokens.clone())?);
         let mut e = library
             .expander
             .with_registry(registry)
@@ -130,6 +145,7 @@ impl Object {
                 name: "$root".into(),
                 hash,
                 oracle_invocation: None,
+                tokens: Some(tokens.context),
                 adjoint,
             }],
         )
@@ -159,7 +175,8 @@ impl Object {
 /// A source-bound K77 channel, captured with its positional actual vector.
 /// Cloning/forwarding this value keeps its tuple; expansion has no ambient
 /// current-token state for a nested caller to overwrite. It intentionally
-/// stores no process-local token id and does not add a signature argument.
+/// keeps opaque identities in a separate source channel, never in the tuple
+/// JSON or signature arguments.
 #[derive(Clone, Debug)]
 pub struct OracleInvocation<'a> {
     object: &'a Object,
@@ -168,6 +185,7 @@ pub struct OracleInvocation<'a> {
     budget: crate::Budget,
     context: Value,
     arguments: Vec<Value>,
+    pub(crate) tokens: tokens::SourceTokens,
 }
 impl<'a> OracleInvocation<'a> {
     /// `source_budget` is resolved from the source tk (or explicit root
@@ -179,6 +197,19 @@ impl<'a> OracleInvocation<'a> {
         context: Option<&Value>,
         source_budget: crate::Budget,
         arguments: &[Value],
+    ) -> Result<Self> {
+        Self::capture_bound(object,name,context,source_budget,arguments,None,None)
+    }
+    pub fn capture_with_token_aliases(
+        object: &'a Object, name: &str, context: Option<&Value>,
+        source_budget: crate::Budget, arguments: &[Value], aliases: &[u64],
+    ) -> Result<Self> {
+        Self::capture_bound(object,name,context,source_budget,arguments,Some(aliases),None)
+    }
+    pub(crate) fn capture_bound(
+        object: &'a Object, name: &str, context: Option<&Value>,
+        source_budget: crate::Budget, arguments: &[Value], aliases: Option<&[u64]>,
+        resolved: Option<tokens::SourceTokens>,
     ) -> Result<Self> {
         let invalid = |e| crate::Error::new(format!("§11.1 K77: {e}"));
         if object.isa_version != IsaVersion::V09 {
@@ -233,6 +264,10 @@ impl<'a> OracleInvocation<'a> {
         let closure_hash = object.identity()?.closure_hashes[name]
             .clone()
             .ok_or_else(|| invalid("unresolved linked closure"))?;
+        let tokens = match resolved {
+            Some(tokens) => tokens,
+            None => tokens::SourceTokens::bind(object,function,arguments,Some(source_budget),aliases)?,
+        };
         Ok(Self {
             object,
             function,
@@ -240,6 +275,7 @@ impl<'a> OracleInvocation<'a> {
             budget: source_budget,
             context: context.clone(),
             arguments: arguments.to_vec(),
+            tokens,
         })
     }
     /// Construct and expand this checked linked source invocation. No supplied
@@ -285,7 +321,7 @@ impl<'a> OracleInvocation<'a> {
             })
             .collect::<Result<Registry>>()?;
         let factory = std::sync::Arc::new(crate::source_constructor::LinkedSource::new(
-            self.object.clone(),
+            self.object.clone(), self.tokens.clone(),
         )?);
         let mut expander = library
             .expander
@@ -305,6 +341,7 @@ impl<'a> OracleInvocation<'a> {
                     name: "$root".into(),
                     hash: self.closure_hash.clone(),
                     oracle_invocation: Some(self.context.clone()),
+                    tokens: Some(self.tokens.context.clone()),
                     adjoint: false,
                 }],
             )

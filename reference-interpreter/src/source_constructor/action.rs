@@ -18,6 +18,7 @@ struct Env {
 struct Compiler<'a> {
     object: &'a crate::Object,
     values: &'a BTreeMap<String, Value>,
+    tokens: &'a bennett_isa_conformance::ref_language::SourceTokenContext,
     declarations: Vec<(String, usize, String, String)>,
     symbols: Vec<SourceSymbol>,
     counter: usize,
@@ -133,10 +134,13 @@ impl Compiler<'_> {
         } else {
             None
         };
+        let tokens = crate::ref_library::tokens::forward(f,oracle.then_some(a[1].as_str()),
+            &crate::object::list(&a[if oracle {6} else {4}])?, &self.tokens.arguments)?;
         self.symbols.push(SourceSymbol {
             name: alias.clone(),
             hash,
             oracle_invocation: context,
+            tokens: Some(tokens),
             adjoint: normal.adjoint && !oracle,
         });
         let mut args = Vec::new();
@@ -586,9 +590,10 @@ pub(super) fn construct(
     f: &crate::Function,
     values: &BTreeMap<String, Value>,
     actual_regions: &BTreeMap<String, Value>,
+    tokens: &bennett_isa_conformance::ref_language::SourceTokenContext,
     adjoint: bool,
 ) -> Result<SourceBody> {
-    let plan = object.source_cleanup_plan(f)?;
+    let plan = object.source_cleanup_plan_with_tokens(f,&tokens.arguments)?;
     let hashes = object.identity()?.closure_hashes;
     let symbol = hashes[&f.name]
         .clone()
@@ -621,6 +626,7 @@ pub(super) fn construct(
     let mut compiler = Compiler {
         object,
         values,
+        tokens,
         declarations: Vec::new(),
         symbols: Vec::new(),
         counter: 0,

@@ -253,3 +253,45 @@ fn a_schedule_certificate_cannot_reuse_equal_params_under_another_partition() {
         "{error}"
     );
 }
+
+
+fn identity_pair_source() -> Object {
+    let action = r#"{"abi":"0.9","args":["token","token"],"bounds":[],"in":[1],"kind":"perm_action","mem":[],"mut":[1,4],"tier":"q"}"#;
+    let oracle = r#"{"abi":"0.9","args":[],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#;
+    support::rehash(&support::object(&[
+        ("pair",action,"perm_action @pair (t:wire mut, f:wire[4] mut) (x:wire in) () (a:token, b:token) ()\n^entry():\noracle_call @id a (x) t f () ()\noracle_call @id b (x) t f () ()"),
+        ("id",oracle,"oracle @id (x:wire in) (t:wire) (f:wire[4]) () ()\n^entry():\nlift.retval x")
+    ],"{}", "").replace("=0.8","=0.9"))
+}
+fn pair_schedule(source: &Object, aliases: &str, entries: &[Json]) -> String {
+    let closure = source.identity().unwrap().closure_hashes["pair"].clone().unwrap();
+    let params = bennett_isa_ref::sha256_hex(br#"[["1","0","0","0"],["1","0","0","0"]]"#);
+    let schedule = support::json(&format!(r#"{{"bindings":{{"budget":[0,0,0,0],"closure_hash":"{closure}","epsilon":0,"inherited_controls":0,"params_hash":"{params}","region":"pair","scheduler":{{"name":"k91","version":"1"}},"target_hash":"{}","token_aliases":{aliases},"variant":"forward"}},"entries":{}}}"#, "0".repeat(64),Json::Array(entries.to_vec()).canonical()));
+    format!("{}\nsection schedule\n{}\n",source.text,schedule.canonical())
+}
+fn pair_cleanup(source: &Object) -> Json {
+    let symbol = &source.identity().unwrap().interface_hashes["pair"];
+    support::json(&format!(r#"{{"cleanup":{{"realisation":"recompute"}},"generated":0,"kind":"cleanup","path":[{{"instance":[],"iteration":[],"point":"entry:1","symbol":"{symbol}"}}],"phase":"*","step":"*"}}"#))
+}
+#[test]
+fn equal_identity_has_the_published_carrier_but_equal_tuples_alone_do_not() {
+    let source=identity_pair_source();
+    let entry=pair_cleanup(&source);
+    let entries=[entry.clone(),entry];
+    // A tie exists exactly on a real K65 carrier. Neither call's unitary
+    // truth table nor equality of the two tuples determines this partition.
+    for (aliases, carrier) in [("[0,0]",true),("[0,1]",false)] {
+        let result=Object::parse(&pair_schedule(&source,aliases,&entries));
+        assert_eq!(result.is_err(),carrier,"{aliases}: {result:?}");
+        if carrier { assert!(result.unwrap_err().to_string().contains("multiple maximal")); }
+    }
+}
+
+#[test]
+fn tuple_only_source_token_arguments_require_an_identity_binding() {
+    let source = identity_pair_source();
+    let args = bennett_isa_conformance::json::parse(r#"["t","f","x",["1","0","0","0"],["1","0","0","0"]]"#).unwrap();
+    let result = source.expand_action_source("pair",args.as_arr().unwrap(),&[("t",1),("f",4),("x",1)],false);
+    assert!(result.is_err(),"source adapter admitted an unspecified partition");
+    assert!(result.unwrap_err().to_string().contains("K91"));
+}

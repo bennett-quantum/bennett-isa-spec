@@ -84,11 +84,58 @@ impl Object {
         if !matches!(op, "action_call" | "oracle_call" | "adj" | "ctl") {
             return Ok(false);
         }
-        let plan = self.source_cleanup_plan(point.function)?;
+        let plan = self.source_cleanup_plan_with_tokens(point.function, &self.schedule_token_arguments(chain)?)?;
         Ok(plan
             .pairs
             .iter()
             .any(|pair| plan.rows[pair.carrier].instruction.line == point.instruction.line))
+    }
+    /// Resolve token identities from the root partition through semantic calls
+    /// and positional lifted-procedure bindings. Local label numbers never
+    /// become a new namespace at a nested call.
+    fn schedule_token_arguments(&self, chain: &[Json]) -> Result<std::collections::BTreeMap<String,u64>> {
+        use std::collections::BTreeMap;
+        let schedule = self.section("schedule").ok_or_else(|| Error::new("§11 K91: absent schedule".into()))?;
+        let bindings = schedule.get("bindings")?;
+        let mut scope = &self.functions[bindings.get("region")?.string()?.trim_start_matches('@')];
+        let labels = bindings.object()?.get("token_aliases")
+            .map(|v| v.array()?.iter().map(|v| u64::try_from(v.uint()?).map_err(|_| Error::new("§11 K91: alias exceeds host".into()))).collect::<Result<Vec<_>>>())
+            .transpose()?.unwrap_or_default();
+        let mut labels = labels.into_iter().skip(usize::from(scope.kind == "oracle"));
+        let mut bound = scope.params.iter().flatten().map(|p| {
+            let id = if p.ty == crate::Type::Token { labels.next() } else { None };
+            (p.name.clone(), id)
+        }).collect::<BTreeMap<_,_>>();
+        for (index,element) in chain.iter().enumerate() {
+            let (block, ordinal) = element.get("point")?.string()?.rsplit_once(':')
+                .ok_or_else(|| Error::new("§11 K91: expected instruction point".into()))?;
+            let point = self.point(element.get("symbol")?.string()?,block,ordinal.parse()
+                .map_err(|_| Error::new("§11 K91: invalid point".into()))?)?;
+            let local = if scope.kind == "oracle" && point.function.name != scope.name {
+                let program = crate::oracle::Program::new(self,&scope.name)?;
+                let instance = element.object()?.get("instance").filter(|v| !wildcard(v))
+                    .map(|v| v.array()?.iter().map(|v| usize::try_from(v.uint()?).map_err(|_| Error::new("§11 K91: instance exceeds host".into()))).collect::<Result<Vec<_>>>()).transpose()?;
+                let f = program.rows.iter().map(|(f,_)| f).find(|f|
+                    program.source_name(f) == point.function.name && instance.as_deref().is_none_or(|key| program.instance_key(f) == key))
+                    .ok_or_else(|| Error::new("§11 K91: unresolved lifted token context".into()))?;
+                program.arguments(f,&bound)?
+            } else { bound.clone() };
+            if index + 1 == chain.len() {
+                return Ok(local.into_iter().filter_map(|(n,id)| id.map(|id| (n,id))).collect());
+            }
+            let instruction = point.instruction;
+            let call = if matches!(instruction.op.as_str(),"lift.oracle_call"|"lift.oracle_uncall"|"lift.perm_call") {
+                instruction.clone()
+            } else { normalize_call(instruction)?.instruction };
+            let oracle = matches!(call.op.as_str(),"oracle_call"|"lift.oracle_call"|"lift.oracle_uncall");
+            scope = &self.functions[call.operands[0].trim_start_matches('@')];
+            let names = crate::object::list(&call.operands[if oracle {6} else {4}])?;
+            bound = scope.params[if oracle {4} else {3}].iter().zip(names).map(|(p,n)| {
+                local.get(&n).copied().map(|id| (p.name.clone(),id))
+                    .ok_or_else(|| Error::new(format!("§11 K91: missing source binding {n}")))
+            }).collect::<Result<_>>()?;
+        }
+        Ok(BTreeMap::new())
     }
     /// Each point has its own generated operations (§11), including call/loop
     /// rows. Start at the shortest chains; a new oracle invocation can broaden

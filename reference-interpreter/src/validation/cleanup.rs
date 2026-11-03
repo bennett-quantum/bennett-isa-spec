@@ -68,6 +68,11 @@ pub(crate) struct Plan {
 }
 impl Object {
     pub(crate) fn source_cleanup_plan(&self, f: &Function) -> Result<Plan> {
+        self.source_cleanup_plan_with_tokens(f, &BTreeMap::new())
+    }
+    pub(crate) fn source_cleanup_plan_with_tokens(
+        &self, f: &Function, tokens: &BTreeMap<String,u64>,
+    ) -> Result<Plan> {
         let types = f
             .params
             .iter()
@@ -76,6 +81,7 @@ impl Object {
             .map(|p| (p.name.clone(), p.ty.clone()))
             .collect();
         let mut state = Discipline::new(f, types);
+        state.token_identities = tokens.clone();
         for i in region_declarations(f) {
             self.declare_region(i, &mut state)?;
         }
