@@ -443,12 +443,27 @@ impl Object {
                 );
             }
             let primary = context.and_then(|c| c.primary.as_ref());
-            let r = self.run_oracle_vectors_bound(&f.name, &input, budget,primary,None)?;
+            let r = self.run_oracle_vectors_bound(
+                &f.name,
+                &input,
+                budget,
+                primary,
+                None,
+                context.map_or(0, |c| c.controls.len()),
+            )?;
             if context.is_some() {
                 // The sequential result alone does not witness clean workspace.
                 // Check the independent reversible machine and the entire
                 // successful/failed padded prefix, including uncomputation.
-                let mut machine = crate::OracleVectorMachine::new_bound(self, &f.name, &input, budget,primary,None)?;
+                let mut machine = crate::OracleVectorMachine::new_bound(
+                    self,
+                    &f.name,
+                    &input,
+                    budget,
+                    primary,
+                    None,
+                    context.map_or(0, |c| c.controls.len()),
+                )?;
                 let entry = machine.snapshot();
                 for _ in 0..budget.steps {
                     machine.forward_step()?;

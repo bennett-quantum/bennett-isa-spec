@@ -157,18 +157,28 @@ For CC/R entries `--budget B[,heap,stack,depth]`'s first component is
 execution fuel (CC/R has no ISA step budget; exhaustion is a §3.4
 diagnostic, default 1,000,000) and the rest are token defaults.
 
-ISA 0.9 CC/R token arguments additionally require `--token-aliases '[0,0]'`
+ISA 0.9 tuple-only token arguments require `--token-aliases '[0,0]'`
 for one shared identity, or `'[0,1]'` for distinct identities with the same
-tuple. List token parameters only, in signature order; labels start at zero
-and introduce each new identity without gaps. Equal labels require equal
-tuples. The interpreter rejects a missing or inconsistent partition before
-entry. Process-local token IDs are never written to the effect tape.
+tuple. CC/R entries and actions list token parameters in signature order.
+Oracles prepend their separate primary token. Labels start at zero and
+introduce each new identity without gaps; equal labels require equal tuples.
+The option applies to Q run/reverse/step-check and CC/R run/reverse/replay.
+Missing or inconsistent bindings reject before execution. Process-local IDs
+are never written to metadata, JSON results or the effect tape.
+
 In Rust, `Object::budget_token` constructs a validated host handle; cloning
-that handle preserves its identity. `ClassicalMachine::new_with_token_aliases`
-and `with_token_aliases` bind tuple-only arguments explicitly. Ordinary
-constructors accept actual `ClassicalValue::DeviceToken` handles directly.
-Source, schedule, certificate and estimation integration remains tracked by
-`b-isa-spec-8ui`; this launch support does not close that broader K91 work.
+it preserves identity. Classical constructors accept actual `DeviceToken`
+handles or explicit partitions through `new_with_token_aliases` and
+`with_token_aliases`. Oracle run methods and both oracle machine types have
+`with_token_aliases` variants for tuples and `with_token` variants for actual
+primary handles. `execute_action_with_token_aliases` binds tuple action
+arguments. Source builders use `expand_action_source_with_token_aliases` or
+`OracleInvocation::capture_with_token_aliases`; token-free calls retain the
+ordinary APIs. Captures keep identities in a separate source context while
+K24/K77 values retain their tuple encoding. Schedule dispatch compares the
+full resolved invocation, including the partition. Inverse-pair, loader,
+estimation and remaining conformance integration stay tracked by
+`b-isa-spec-8ui`; complete K91 support is not yet claimed.
 
 `run-cc <object> <entry> [options]` runs a CC or R entry on the
 `ClassicalMachine` and prints the complete run. Output: `entry`, `status`

@@ -1,0 +1,30 @@
+{
+  "id": "C-k91-three-tokens-000",
+  "suite": "C",
+  "spec": "ISA0.9 §§5.3,5.4,7.4,11,12.3 K91",
+  "derivation": "The oracle prepends the primary token. These are all five consistent partitions of three equal tuples; identity returns x in one row.",
+  "object": "../../../fixtures/accepted-k91-09/token-aliases.bisa",
+  "command": [
+    "run-oracle",
+    "{object}",
+    "context",
+    "--input",
+    "1",
+    "--budget",
+    "1,0,0,0",
+    "--arg",
+    "token:1,0,0,0",
+    "--arg",
+    "token:1,0,0,0",
+    "--token-aliases",
+    "[0,0,0]"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "code": 0,
+      "payload": 1,
+      "steps": 1
+    }
+  }
+}

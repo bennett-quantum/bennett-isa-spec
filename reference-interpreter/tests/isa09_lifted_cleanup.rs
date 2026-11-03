@@ -73,9 +73,18 @@ fn k65_lifted_intrinsic_cleanup_recomputes_the_delivery_in_fresh_targets() {
                     args: vec![Argument::Token(Budget::steps(1))],
                     ..Default::default()
                 };
-                let result = o.run_oracle_with_token_aliases("o", &input, Budget::steps(3), &[0,1]).unwrap();
+                let result = o
+                    .run_oracle_with_token_aliases("o", &input, Budget::steps(3), &[0, 1])
+                    .unwrap();
                 assert_eq!((result.payload, result.code), (x as u128, 0));
-                let mut literal = OracleMachine::new_with_token_aliases(&o, "o", &input, Budget::steps(3), &[0,1]).unwrap();
+                let mut literal = OracleMachine::new_with_token_aliases(
+                    &o,
+                    "o",
+                    &input,
+                    Budget::steps(3),
+                    &[0, 1],
+                )
+                .unwrap();
                 let before = literal.snapshot();
                 for _ in 0..3 {
                     literal.forward_step().unwrap();

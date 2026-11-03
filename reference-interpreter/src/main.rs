@@ -6,7 +6,7 @@ use bennett_isa_ref::{
 };
 use std::collections::VecDeque;
 
-const USAGE:&str="bennett-isa-ref check <object>\nbennett-isa-ref hash <object>\nbennett-isa-ref run-oracle <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref step-check <object> <oracle> (--exhaustive [--max-bits N] | --suite | --samples N) [--seed a,b,c,d] [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value]\nbennett-isa-ref run-cc <object> <entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--tape-out file] [--replay-tape file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex]\nbennett-isa-ref reverse <object> <entry> [run-cc options] [--steps N]\nbennett-isa-ref reverse <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--steps N] [--mem name=hex] [--arg value]\nbennett-isa-ref reverse <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]>] [--adjoint]\nbennett-isa-ref run-action <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]> | --arg value...] [--adjoint]\nbennett-isa-ref run-program <object> <cc-entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--tape-out file] [--replay-tape file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex] [--reverse] [--target file]";
+const USAGE:&str="bennett-isa-ref check <object>\nbennett-isa-ref hash <object>\nbennett-isa-ref run-oracle <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value] [--token-aliases '[...]']\nbennett-isa-ref step-check <object> <oracle> (--exhaustive [--max-bits N] | --suite | --samples N) [--seed a,b,c,d] [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value] [--token-aliases '[...]']\nbennett-isa-ref run-cc <object> <entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--tape-out file] [--replay-tape file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex]\nbennett-isa-ref reverse <object> <entry> [run-cc options] [--steps N]\nbennett-isa-ref reverse <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--steps N] [--mem name=hex] [--arg value] [--token-aliases '[...]']\nbennett-isa-ref reverse <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]>] [--adjoint]\nbennett-isa-ref run-action <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]> | --arg value...] [--adjoint]\nbennett-isa-ref run-program <object> <cc-entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--tape-out file] [--replay-tape file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex] [--reverse] [--target file]";
 fn fail(message: impl std::fmt::Display) -> Error {
     Error::new(message.to_string())
 }
@@ -354,7 +354,7 @@ fn parse_cc_options(
                 if !once.insert(option) {
                     return Err(earg("--token-aliases given twice"));
                 }
-                set_token_aliases(&mut options.token_aliases,value)?;
+                set_token_aliases(&mut options.token_aliases, value)?;
             }
             "--args" | "--input" => {
                 if args_seen {
@@ -983,31 +983,70 @@ fn run_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> {
     }
     Ok(output)
 }
-fn set_token_aliases(slot: &mut Option<Vec<u64>>,value: &str) -> Result<()> {
-    if slot.is_some() { return Err(earg("--token-aliases given twice")); }
+fn set_token_aliases(slot: &mut Option<Vec<u64>>, value: &str) -> Result<()> {
+    if slot.is_some() {
+        return Err(earg("--token-aliases given twice"));
+    }
     let parsed = Json::parse(value).map_err(|e| e.context("§10 K91 E_ARG"))?;
-    *slot = Some(parsed.array().map_err(|e| earg(e.to_string()))?.iter().map(|v| {
-        if !matches!(v,Json::Number(_)) { return Err(earg("token_aliases labels must be nonnegative integers")); }
-        u64::try_from(v.uint().map_err(|e| earg(e.to_string()))?).map_err(|_| earg("token_aliases label exceeds u64"))
-    }).collect::<Result<_>>()?);
+    *slot = Some(
+        parsed
+            .array()
+            .map_err(|e| earg(e.to_string()))?
+            .iter()
+            .map(|v| {
+                if !matches!(v, Json::Number(_)) {
+                    return Err(earg("token_aliases labels must be nonnegative integers"));
+                }
+                u64::try_from(v.uint().map_err(|e| earg(e.to_string()))?)
+                    .map_err(|_| earg("token_aliases label exceeds u64"))
+            })
+            .collect::<Result<_>>()?,
+    );
     Ok(())
 }
-fn run_oracle_request(program: &Object,name: &str,input: &OracleVectorInput,budget: Budget,aliases: Option<&[u64]>) -> Result<bennett_isa_ref::OracleVectorOutcome> {
+fn run_oracle_request(
+    program: &Object,
+    name: &str,
+    input: &OracleVectorInput,
+    budget: Budget,
+    aliases: Option<&[u64]>,
+) -> Result<bennett_isa_ref::OracleVectorOutcome> {
     match aliases {
-        Some(labels) => program.run_oracle_vectors_with_token_aliases(name,input,budget,labels),
-        None => program.run_oracle_vectors(name,input,budget),
+        Some(labels) => program.run_oracle_vectors_with_token_aliases(name, input, budget, labels),
+        None => program.run_oracle_vectors(name, input, budget),
     }
 }
-fn oracle_machine<'a>(program: &'a Object,name: &str,input: &OracleVectorInput,budget: Budget,aliases: Option<&[u64]>) -> Result<OracleVectorMachine<'a>> {
+fn oracle_machine<'a>(
+    program: &'a Object,
+    name: &str,
+    input: &OracleVectorInput,
+    budget: Budget,
+    aliases: Option<&[u64]>,
+) -> Result<OracleVectorMachine<'a>> {
     match aliases {
-        Some(labels) => OracleVectorMachine::new_with_token_aliases(program,name,input,budget,labels),
-        None => OracleVectorMachine::new(program,name,input,budget),
+        Some(labels) => {
+            OracleVectorMachine::new_with_token_aliases(program, name, input, budget, labels)
+        }
+        None => OracleVectorMachine::new(program, name, input, budget),
     }
 }
-fn action_request(program: &Object,name: &str,run: &mut ActionRun,adjoint: bool,aliases: Option<&[u64]>) -> Result<()> {
+fn action_request(
+    program: &Object,
+    name: &str,
+    run: &mut ActionRun,
+    adjoint: bool,
+    aliases: Option<&[u64]>,
+) -> Result<()> {
     match aliases {
-        Some(labels) => program.execute_action_with_token_aliases(name,&mut run.state,&run.bindings,adjoint,&[],labels),
-        None => program.execute_action(name,&mut run.state,&run.bindings,adjoint,&[]),
+        Some(labels) => program.execute_action_with_token_aliases(
+            name,
+            &mut run.state,
+            &run.bindings,
+            adjoint,
+            &[],
+            labels,
+        ),
+        None => program.execute_action(name, &mut run.state, &run.bindings, adjoint, &[]),
     }
 }
 /// Options for executing one Q action (`run-action`, and `reverse` on an
@@ -1061,7 +1100,7 @@ fn parse_action_options(args: &[String], start: usize) -> Result<ActionOptions> 
             .ok_or_else(|| fail(format!("missing value for {option}")))?;
         pos += 1;
         match option {
-            "--token-aliases" => set_token_aliases(&mut options.token_aliases,value)?,
+            "--token-aliases" => set_token_aliases(&mut options.token_aliases, value)?,
             "--mut" => {
                 if options.muts.is_some() {
                     return Err(fail("--mut given twice"));
@@ -1555,7 +1594,7 @@ fn parse_oracle_options(
             .ok_or_else(|| fail(format!("missing value for {option}")))?;
         pos += 1;
         match option {
-            "--token-aliases" => set_token_aliases(&mut token_aliases,value)?,
+            "--token-aliases" => set_token_aliases(&mut token_aliases, value)?,
             "--input" => {
                 if input_seen {
                     return Err(fail("--input given twice"));
@@ -1644,7 +1683,13 @@ fn reverse_oracle(program: &Object, name: &str, options: OracleOptions) -> Resul
             limits.steps
         )));
     }
-    let mut machine = oracle_machine(program, name, &options.input, limits, options.token_aliases.as_deref())?;
+    let mut machine = oracle_machine(
+        program,
+        name,
+        &options.input,
+        limits,
+        options.token_aliases.as_deref(),
+    )?;
     let entry = machine.snapshot();
     for _ in 0..prefix {
         machine.forward_step()?;
@@ -1711,9 +1756,21 @@ fn reverse_action(program: &Object, name: &str, options: ActionOptions) -> Resul
         .ok_or_else(|| fail(format!("§5.3: unknown action @{name}")))?;
     let mut run = build_action_state(program, f, &options)?;
     let entry_state = run.state.clone();
-    action_request(program,name,&mut run,options.adjoint,options.token_aliases.as_deref())?;
+    action_request(
+        program,
+        name,
+        &mut run,
+        options.adjoint,
+        options.token_aliases.as_deref(),
+    )?;
     let forward_state = action_state_json(&run)?;
-    action_request(program,name,&mut run,!options.adjoint,options.token_aliases.as_deref())?;
+    action_request(
+        program,
+        name,
+        &mut run,
+        !options.adjoint,
+        options.token_aliases.as_deref(),
+    )?;
     let state = action_state_json(&run)?;
     let equals = run.state == entry_state;
     Ok(object([
@@ -1771,7 +1828,13 @@ fn run_action(program: &Object, name: &str, options: ActionOptions) -> Result<Js
         .filter(|f| matches!(f.kind.as_str(), "action" | "perm_action"))
         .ok_or_else(|| fail(format!("§5.3: unknown action @{name}")))?;
     let mut run = build_action_state(program, f, &options)?;
-    action_request(program,name,&mut run,options.adjoint,options.token_aliases.as_deref())?;
+    action_request(
+        program,
+        name,
+        &mut run,
+        options.adjoint,
+        options.token_aliases.as_deref(),
+    )?;
     let state = action_state_json(&run)?;
     let mem = object(run.regions.iter().map(|(region, cells)| {
         (
@@ -2070,7 +2133,7 @@ fn run() -> Result<()> {
             .ok_or_else(|| fail(format!("missing value for {option}")))?;
         pos += 1;
         match option.as_str() {
-            "--token-aliases" => set_token_aliases(&mut token_aliases,value)?,
+            "--token-aliases" => set_token_aliases(&mut token_aliases, value)?,
             "--input" => {
                 let values = if value.is_empty() {
                     Vec::new()
@@ -2171,7 +2234,13 @@ fn run() -> Result<()> {
             args: input.args,
             regions: input.regions,
         };
-        let r = run_oracle_request(&program,name,&wide_input,limits,token_aliases.as_deref())?;
+        let r = run_oracle_request(
+            &program,
+            name,
+            &wide_input,
+            limits,
+            token_aliases.as_deref(),
+        )?;
         println!(
             "{}",
             object([
@@ -2249,8 +2318,20 @@ fn run() -> Result<()> {
             .map(BitVector::to_decimal)
             .collect::<Vec<_>>()
             .join(",");
-        let expected = run_oracle_request(&program,name,&vector_input,limits,token_aliases.as_deref())?;
-        let mut machine = oracle_machine(&program,name,&vector_input,limits,token_aliases.as_deref())?;
+        let expected = run_oracle_request(
+            &program,
+            name,
+            &vector_input,
+            limits,
+            token_aliases.as_deref(),
+        )?;
+        let mut machine = oracle_machine(
+            &program,
+            name,
+            &vector_input,
+            limits,
+            token_aliases.as_deref(),
+        )?;
         let before = machine.snapshot();
         for _ in 0..limits.steps {
             machine.forward_step()?;

@@ -1,0 +1,26 @@
+{
+  "id": "C-k91-token-free-oracle",
+  "suite": "C",
+  "spec": "ISA0.9 §§5.3,5.4,7.4,11,12.3 K91",
+  "derivation": "A token-free oracle has exactly one primary identity slot, [0].",
+  "object": "../../../fixtures/accepted-k91-09/token-aliases.bisa",
+  "command": [
+    "run-oracle",
+    "{object}",
+    "identity",
+    "--input",
+    "1",
+    "--budget",
+    "1,0,0,0",
+    "--token-aliases",
+    "[0]"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "payload": 1,
+      "code": 0,
+      "steps": 1
+    }
+  }
+}

@@ -151,8 +151,14 @@ impl Object {
             return err("§12.1 K13", "invocation argument count mismatch");
         }
         let budget = budget(invocation.get("budget")?)?;
-        let aliases = self.validate_invocation09(invocation,f)?;
-        let resolved = self.resolve_invocation_tokens(f,&args,(f.kind == "oracle").then_some(budget),None,Some(&aliases))?;
+        let aliases = self.validate_invocation09(invocation, f)?;
+        let resolved = self.resolve_invocation_tokens(
+            f,
+            &args,
+            (f.kind == "oracle").then_some(budget),
+            None,
+            Some(&aliases),
+        )?;
         Ok(Invocation {
             args: resolved.arguments,
             primary: resolved.primary,

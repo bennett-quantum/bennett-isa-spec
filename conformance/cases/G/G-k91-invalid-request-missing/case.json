@@ -1,0 +1,23 @@
+{
+  "id": "G-k91-invalid-request-missing",
+  "suite": "G",
+  "spec": "ISA0.9 §§5.3,5.4,7.4,11,12.3 K91",
+  "derivation": "A tuple-only request must supply an arity-correct canonical partition; equal labels require equal tuples before entry.",
+  "object": "../../../fixtures/accepted-k91-09/token-aliases.bisa",
+  "command": [
+    "run-cc",
+    "{object}",
+    "compare",
+    "--arg",
+    "token:1,0,0,0",
+    "--arg",
+    "token:1,0,0,0"
+  ],
+  "expect": {
+    "exit": 1,
+    "stdout_empty": true,
+    "stderr_contains": [
+      "E_ARG"
+    ]
+  }
+}

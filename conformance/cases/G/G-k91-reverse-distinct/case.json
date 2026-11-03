@@ -1,0 +1,25 @@
+{
+  "id": "G-k91-reverse-distinct",
+  "suite": "G",
+  "spec": "ISA0.9 §§5.3,5.4,7.4,11,12.3 K91",
+  "derivation": "Reverse the full successful or failed call prefix to the complete entry state.",
+  "object": "../../../fixtures/accepted-k91-09/token-aliases.bisa",
+  "command": [
+    "reverse",
+    "{object}",
+    "compare",
+    "--arg",
+    "token:1,0,0,0",
+    "--arg",
+    "token:1,0,0,0",
+    "--token-aliases",
+    "[0,1]"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "equals_entry": true,
+      "fault": 4
+    }
+  }
+}

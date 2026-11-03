@@ -1,0 +1,18 @@
+{
+  "id": "F-k91-invalid-gap",
+  "suite": "F",
+  "spec": "ISA0.9 §§5.3,5.4,7.4,11,12.3 K91",
+  "derivation": "Only the named binding differs from the same standalone source; canonical equality classes and equal-label tuple consistency are mandatory.",
+  "object": "../../../fixtures/accepted-k91-09/invalid-gap.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 1,
+    "stdout_empty": true,
+    "stderr_contains": [
+      "K91"
+    ]
+  }
+}

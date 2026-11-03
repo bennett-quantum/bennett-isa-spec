@@ -1116,8 +1116,13 @@ impl<'a> ClassicalMachine<'a> {
             bindings.borrowed.push(wires);
         }
         let primary = if oracle {
-            match self.read(&a[1])? { ClassicalValue::DeviceToken(t) => Some(t), _ => None }
-        } else { None };
+            match self.read(&a[1])? {
+                ClassicalValue::DeviceToken(t) => Some(t),
+                _ => None,
+            }
+        } else {
+            None
+        };
         Ok((
             RegionRecord {
                 name: name.into(),

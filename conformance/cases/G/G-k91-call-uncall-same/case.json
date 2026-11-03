@@ -1,0 +1,28 @@
+{
+  "id": "G-k91-call-uncall-same",
+  "suite": "G",
+  "spec": "ISA0.9 §§5.3,5.4,7.4,11,12.3 K91",
+  "derivation": "call is step1, sink ret step2, uncall step3, root ret step4. One actual identity matches the segment; two equal-tuple identities mismatch at step3/fault4.",
+  "object": "../../../fixtures/accepted-k91-09/token-aliases.bisa",
+  "command": [
+    "run-cc",
+    "{object}",
+    "compare",
+    "--arg",
+    "token:1,0,0,0",
+    "--arg",
+    "token:1,0,0,0",
+    "--token-aliases",
+    "[0,0]"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "status": "COMPLETED",
+      "fault": null,
+      "steps": 4,
+      "results": [],
+      "effect_tape_length": 0
+    }
+  }
+}

@@ -461,156 +461,348 @@ fn source_tuple_adapters_reject_malformed_bindings_before_construction() {
 
 #[test]
 fn a_token_free_oracle_uses_defaults_for_a_different_primary_budget() {
-    use bennett_isa_ref::{Budget,OracleInput,OracleMachine};
-    let source=oracle_source(false);
-    let raw=scheduled(&source,Some("[0]"));
-    let (body,raw)=raw.split_once("section schedule\n").unwrap();
-    let mut schedule=Json::parse(raw.trim()).unwrap();
-    fields(fields(&mut schedule).get_mut("bindings").unwrap()).insert("budget".into(),support::json("[2,0,0,0]"));
-    let symbol=&source.identity().unwrap().interface_hashes["id"];
-    let entry=support::json(&format!(r#"{{"gate":{{"epsilon_share":0,"realisation":"native"}},"generated":"*","kind":"gate","path":[{{"instance":[],"iteration":[],"point":"entry:0","symbol":"{symbol}"}}],"phase":"*","step":3}}"#));
-    fields(&mut schedule).insert("entries".into(),Json::Array(vec![entry.clone(),entry]));
-    let object=Object::parse(&format!("{body}section schedule\n{}\n",schedule.canonical())).unwrap();
+    use bennett_isa_ref::{Budget, OracleInput, OracleMachine};
+    let source = oracle_source(false);
+    let raw = scheduled(&source, Some("[0]"));
+    let (body, raw) = raw.split_once("section schedule\n").unwrap();
+    let mut schedule = Json::parse(raw.trim()).unwrap();
+    fields(fields(&mut schedule).get_mut("bindings").unwrap())
+        .insert("budget".into(), support::json("[2,0,0,0]"));
+    let symbol = &source.identity().unwrap().interface_hashes["id"];
+    let entry = support::json(&format!(
+        r#"{{"gate":{{"epsilon_share":0,"realisation":"native"}},"generated":"*","kind":"gate","path":[{{"instance":[],"iteration":[],"point":"entry:0","symbol":"{symbol}"}}],"phase":"*","step":3}}"#
+    ));
+    fields(&mut schedule).insert("entries".into(), Json::Array(vec![entry.clone(), entry]));
+    let object = Object::parse(&format!(
+        "{body}section schedule\n{}\n",
+        schedule.canonical()
+    ))
+    .unwrap();
     for x in 0..2 {
-        let input=OracleInput::bits(&[x]);
-        assert_eq!(object.run_oracle("id",&input,Budget::steps(3)).unwrap().payload,x);
-        let mut machine=OracleMachine::new(&object,"id",&input,Budget::steps(3)).unwrap();
-        let before=machine.snapshot();
-        for _ in 0..3 { machine.forward_step().unwrap(); }
-        assert_eq!(machine.outcome().unwrap().payload,x);
-        for _ in 0..3 { machine.inverse_step().unwrap(); }
-        assert_eq!(machine.snapshot(),before);
+        let input = OracleInput::bits(&[x]);
+        assert_eq!(
+            object
+                .run_oracle("id", &input, Budget::steps(3))
+                .unwrap()
+                .payload,
+            x
+        );
+        let mut machine = OracleMachine::new(&object, "id", &input, Budget::steps(3)).unwrap();
+        let before = machine.snapshot();
+        for _ in 0..3 {
+            machine.forward_step().unwrap();
+        }
+        assert_eq!(machine.outcome().unwrap().payload, x);
+        for _ in 0..3 {
+            machine.inverse_step().unwrap();
+        }
+        assert_eq!(machine.snapshot(), before);
     }
 }
 
 #[test]
 fn tuple_only_native_oracle_arguments_require_an_identity_binding() {
-    use bennett_isa_ref::{Argument,Budget,OracleInput,OracleMachine};
-    let object=oracle_source(true);
-    let mut input=OracleInput::bits(&[1]);
+    use bennett_isa_ref::{Argument, Budget, OracleInput, OracleMachine};
+    let object = oracle_source(true);
+    let mut input = OracleInput::bits(&[1]);
     input.args.push(Argument::Token(Budget::steps(1)));
-    let result=object.run_oracle("id",&input,Budget::steps(1));
-    assert!(result.is_err(),"native tuple adapter admitted unspecified primary/argument equality");
+    let result = object.run_oracle("id", &input, Budget::steps(1));
+    assert!(
+        result.is_err(),
+        "native tuple adapter admitted unspecified primary/argument equality"
+    );
     assert!(result.unwrap_err().to_string().contains("K91"));
-    assert!(OracleMachine::new(&object,"id",&input,Budget::steps(1)).is_err());
+    assert!(OracleMachine::new(&object, "id", &input, Budget::steps(1)).is_err());
 }
 
 #[test]
 fn native_oracle_partitions_bind_the_primary_and_preserve_actual_handles() {
-    use bennett_isa_ref::{Argument,Budget,OracleInput,OracleMachine};
-    let object=oracle_source(true);
-    for aliases in [&[0,0][..],&[0,1][..]] {
+    use bennett_isa_ref::{Argument, Budget, OracleInput, OracleMachine};
+    let object = oracle_source(true);
+    for aliases in [&[0, 0][..], &[0, 1][..]] {
         for x in 0..2 {
-            let mut input=OracleInput::bits(&[x]);
+            let mut input = OracleInput::bits(&[x]);
             input.args.push(Argument::Token(Budget::steps(1)));
-            assert_eq!(object.run_oracle_with_token_aliases("id",&input,Budget::steps(1),aliases).unwrap().payload,x);
-            let mut machine=OracleMachine::new_with_token_aliases(&object,"id",&input,Budget::steps(1),aliases).unwrap();
-            let before=machine.snapshot();
+            assert_eq!(
+                object
+                    .run_oracle_with_token_aliases("id", &input, Budget::steps(1), aliases)
+                    .unwrap()
+                    .payload,
+                x
+            );
+            let mut machine = OracleMachine::new_with_token_aliases(
+                &object,
+                "id",
+                &input,
+                Budget::steps(1),
+                aliases,
+            )
+            .unwrap();
+            let before = machine.snapshot();
             machine.forward_step().unwrap();
-            assert_eq!(machine.outcome().unwrap().payload,x);
+            assert_eq!(machine.outcome().unwrap().payload, x);
             machine.inverse_step().unwrap();
-            assert_eq!(machine.snapshot(),before);
+            assert_eq!(machine.snapshot(), before);
         }
     }
-    let primary=object.budget_token("id",Budget::steps(1)).unwrap();
-    let distinct=object.budget_token("id",Budget::steps(1)).unwrap();
-    for token in [&primary,&distinct] {
-        let mut input=OracleInput::bits(&[1]);
+    let primary = object.budget_token("id", Budget::steps(1)).unwrap();
+    let distinct = object.budget_token("id", Budget::steps(1)).unwrap();
+    for token in [&primary, &distinct] {
+        let mut input = OracleInput::bits(&[1]);
         input.args.push(Argument::DeviceToken(token.clone()));
-        assert_eq!(object.run_oracle_with_token("id",&input,&primary).unwrap().payload,1);
-        assert!(object.run_oracle_with_token_aliases("id",&input,Budget::steps(1),&[0,0]).is_ok(),"an unspecified primary can bind to the supplied handle");
+        assert_eq!(
+            object
+                .run_oracle_with_token("id", &input, &primary)
+                .unwrap()
+                .payload,
+            1
+        );
+        assert!(
+            object
+                .run_oracle_with_token_aliases("id", &input, Budget::steps(1), &[0, 0])
+                .is_ok(),
+            "an unspecified primary can bind to the supplied handle"
+        );
     }
-    for labels in [vec![1,1],vec![0,2],vec![],vec![0]] {
-        let mut input=OracleInput::bits(&[1]);
+    for labels in [vec![1, 1], vec![0, 2], vec![], vec![0]] {
+        let mut input = OracleInput::bits(&[1]);
         input.args.push(Argument::Token(Budget::steps(1)));
-        assert!(object.run_oracle_with_token_aliases("id",&input,Budget::steps(1),&labels).is_err());
+        assert!(object
+            .run_oracle_with_token_aliases("id", &input, Budget::steps(1), &labels)
+            .is_err());
     }
-    let mut unequal=OracleInput::bits(&[1]);
+    let mut unequal = OracleInput::bits(&[1]);
     unequal.args.push(Argument::Token(Budget::steps(2)));
-    assert!(object.run_oracle_with_token_aliases("id",&unequal,Budget::steps(1),&[0,0]).is_err());
+    assert!(object
+        .run_oracle_with_token_aliases("id", &unequal, Budget::steps(1), &[0, 0])
+        .is_err());
 }
 
 fn scheduled_nested_oracle() -> Object {
-    let outer=r#"{"abi":"0.9","args":["token"],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#;
-    let inner=r#"{"abi":"0.9","args":[],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#;
+    let outer = r#"{"abi":"0.9","args":["token"],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#;
+    let inner =
+        r#"{"abi":"0.9","args":[],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#;
     let source=support::rehash(&support::object(&[
         ("outer",outer,"oracle @outer (x:wire in) (t:wire) (f:wire[4]) () (a:token)\nregs { r:reg[1], fr:reg[4] }\n^entry():\nlift.oracle_call @inner a (x) r fr () ()\nlift.retval r"),
         ("inner",inner,"oracle @inner (x:wire in) (t:wire) (f:wire[4]) () ()\n^entry():\nlift.retval x")
     ],"{}", "").replace("=0.8","=0.9"));
-    let id=source.identity().unwrap();
-    let root=id.closure_hashes["outer"].as_ref().unwrap();
-    let child=&id.interface_hashes["inner"];
-    let params=bennett_isa_ref::sha256_hex(br#"[["3","0","0","0"]]"#);
-    let entry=support::json(&format!(r#"{{"gate":{{"epsilon_share":0,"realisation":"native"}},"generated":"*","kind":"gate","path":[{{"call_index":0,"instance":[],"iteration":[],"point":"entry:0","symbol":"{root}"}},{{"instance":[],"iteration":[],"point":"entry:0","symbol":"{child}"}}],"phase":"*","step":3}}"#));
-    let schedule=support::json(&format!(r#"{{"bindings":{{"budget":[3,0,0,0],"closure_hash":"{root}","epsilon":0,"inherited_controls":0,"params_hash":"{params}","region":"outer","scheduler":{{"name":"k91","version":"1"}},"target_hash":"{}","token_aliases":[0,0],"variant":"forward"}},"entries":{}}}"#, "0".repeat(64),Json::Array(vec![entry.clone(),entry]).canonical()));
-    Object::parse(&format!("{}\nsection schedule\n{}\n",source.text,schedule.canonical())).unwrap()
+    let id = source.identity().unwrap();
+    let root = id.closure_hashes["outer"].as_ref().unwrap();
+    let child = &id.interface_hashes["inner"];
+    let params = bennett_isa_ref::sha256_hex(br#"[["3","0","0","0"]]"#);
+    let entry = support::json(&format!(
+        r#"{{"gate":{{"epsilon_share":0,"realisation":"native"}},"generated":"*","kind":"gate","path":[{{"call_index":0,"instance":[],"iteration":[],"point":"entry:0","symbol":"{root}"}},{{"instance":[],"iteration":[],"point":"entry:0","symbol":"{child}"}}],"phase":"*","step":3}}"#
+    ));
+    let schedule = support::json(&format!(
+        r#"{{"bindings":{{"budget":[3,0,0,0],"closure_hash":"{root}","epsilon":0,"inherited_controls":0,"params_hash":"{params}","region":"outer","scheduler":{{"name":"k91","version":"1"}},"target_hash":"{}","token_aliases":[0,0],"variant":"forward"}},"entries":{}}}"#,
+        "0".repeat(64),
+        Json::Array(vec![entry.clone(), entry]).canonical()
+    ));
+    Object::parse(&format!(
+        "{}\nsection schedule\n{}\n",
+        source.text,
+        schedule.canonical()
+    ))
+    .unwrap()
 }
 #[test]
 fn native_schedule_dispatch_compares_the_actual_primary_argument_partition() {
-    use bennett_isa_ref::{Argument,Budget,OracleInput,OracleMachine};
-    let object=scheduled_nested_oracle();
+    use bennett_isa_ref::{Argument, Budget, OracleInput, OracleMachine};
+    let object = scheduled_nested_oracle();
     for x in 0..2 {
-        let mut input=OracleInput::bits(&[x]);
+        let mut input = OracleInput::bits(&[x]);
         input.args.push(Argument::Token(Budget::steps(3)));
-        let error=object.run_oracle_with_token_aliases("outer",&input,Budget::steps(3),&[0,0]).unwrap_err();
+        let error = object
+            .run_oracle_with_token_aliases("outer", &input, Budget::steps(3), &[0, 0])
+            .unwrap_err();
         assert!(error.to_string().contains("multiple maximal"));
-        assert!(OracleMachine::new_with_token_aliases(&object,"outer",&input,Budget::steps(3),&[0,0]).is_err());
-        assert_eq!(object.run_oracle_with_token_aliases("outer",&input,Budget::steps(3),&[0,1]).unwrap().payload,x);
-        let mut machine=OracleMachine::new_with_token_aliases(&object,"outer",&input,Budget::steps(3),&[0,1]).unwrap();
-        let before=machine.snapshot();
-        for _ in 0..3 { machine.forward_step().unwrap(); }
-        assert_eq!(machine.outcome().unwrap().payload,x);
-        for _ in 0..3 { machine.inverse_step().unwrap(); }
-        assert_eq!(machine.snapshot(),before);
+        assert!(OracleMachine::new_with_token_aliases(
+            &object,
+            "outer",
+            &input,
+            Budget::steps(3),
+            &[0, 0]
+        )
+        .is_err());
+        assert_eq!(
+            object
+                .run_oracle_with_token_aliases("outer", &input, Budget::steps(3), &[0, 1])
+                .unwrap()
+                .payload,
+            x
+        );
+        let mut machine = OracleMachine::new_with_token_aliases(
+            &object,
+            "outer",
+            &input,
+            Budget::steps(3),
+            &[0, 1],
+        )
+        .unwrap();
+        let before = machine.snapshot();
+        for _ in 0..3 {
+            machine.forward_step().unwrap();
+        }
+        assert_eq!(machine.outcome().unwrap().payload, x);
+        for _ in 0..3 {
+            machine.inverse_step().unwrap();
+        }
+        assert_eq!(machine.snapshot(), before);
     }
-    let primary=object.budget_token("outer",Budget::steps(3)).unwrap();
-    let distinct=object.budget_token("inner",Budget::steps(3)).unwrap();
-    let mut input=OracleInput::bits(&[1]);
+    let primary = object.budget_token("outer", Budget::steps(3)).unwrap();
+    let distinct = object.budget_token("inner", Budget::steps(3)).unwrap();
+    let mut input = OracleInput::bits(&[1]);
     input.args.push(Argument::DeviceToken(primary.clone()));
-    assert!(object.run_oracle_with_token("outer",&input,&primary).is_err());
-    input.args[0]=Argument::DeviceToken(distinct);
-    assert_eq!(object.run_oracle_with_token("outer",&input,&primary).unwrap().payload,1);
+    assert!(object
+        .run_oracle_with_token("outer", &input, &primary)
+        .is_err());
+    input.args[0] = Argument::DeviceToken(distinct);
+    assert_eq!(
+        object
+            .run_oracle_with_token("outer", &input, &primary)
+            .unwrap()
+            .payload,
+        1
+    );
 }
 
 #[test]
 fn public_cli_q_invocations_bind_aliases_for_run_reverse_and_step_check() {
-    use std::{path::PathBuf,process::Command};
-    let dir=PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".tmp");
+    use std::{path::PathBuf, process::Command};
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".tmp");
     std::fs::create_dir_all(&dir).unwrap();
-    let path=dir.join("k91-native-cli.bisa");
-    std::fs::write(&path,oracle_source(true).text).unwrap();
-    for aliases in ["[0,0]","[0,1]"] {
-        for command in ["run-oracle","reverse","step-check"] {
-            let mut cmd=Command::new(env!("CARGO_BIN_EXE_bennett-isa-ref"));
-            cmd.arg(command).arg(&path).arg("id").args(["--budget","1,0,0,0","--arg","token:1,0,0,0","--token-aliases",aliases]);
-            if command=="step-check" { cmd.args(["--exhaustive","--max-bits","1"]); }
-            else { cmd.args(["--input","1"]); }
-            let output=cmd.output().unwrap();
-            assert!(output.status.success(),"{command}/{aliases}: {}",String::from_utf8_lossy(&output.stderr));
-            let json=Json::parse(std::str::from_utf8(&output.stdout).unwrap().trim()).unwrap();
-            if command=="run-oracle" { assert_eq!(json.get("payload").unwrap().uint().unwrap(),1); }
-            if command=="reverse" { assert_eq!(json.get("equals_entry").unwrap(),&Json::Bool(true)); }
+    let path = dir.join("k91-native-cli.bisa");
+    std::fs::write(&path, oracle_source(true).text).unwrap();
+    for aliases in ["[0,0]", "[0,1]"] {
+        for command in ["run-oracle", "reverse", "step-check"] {
+            let mut cmd = Command::new(env!("CARGO_BIN_EXE_bennett-isa-ref"));
+            cmd.arg(command).arg(&path).arg("id").args([
+                "--budget",
+                "1,0,0,0",
+                "--arg",
+                "token:1,0,0,0",
+                "--token-aliases",
+                aliases,
+            ]);
+            if command == "step-check" {
+                cmd.args(["--exhaustive", "--max-bits", "1"]);
+            } else {
+                cmd.args(["--input", "1"]);
+            }
+            let output = cmd.output().unwrap();
+            assert!(
+                output.status.success(),
+                "{command}/{aliases}: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let json = Json::parse(std::str::from_utf8(&output.stdout).unwrap().trim()).unwrap();
+            if command == "run-oracle" {
+                assert_eq!(json.get("payload").unwrap().uint().unwrap(), 1);
+            }
+            if command == "reverse" {
+                assert_eq!(json.get("equals_entry").unwrap(), &Json::Bool(true));
+            }
         }
     }
-    for aliases in [None,Some("[1,1]"),Some("[0,2]"),Some("[0]"),Some("[-1,0]")] {
-        let mut cmd=Command::new(env!("CARGO_BIN_EXE_bennett-isa-ref"));
-        cmd.arg("run-oracle").arg(&path).arg("id").args(["--input","1","--budget","1,0,0,0","--arg","token:1,0,0,0"]);
-        if let Some(labels)=aliases { cmd.args(["--token-aliases",labels]); }
-        let output=cmd.output().unwrap();
-        assert_eq!(output.status.code(),Some(1));
+    for aliases in [
+        None,
+        Some("[1,1]"),
+        Some("[0,2]"),
+        Some("[0]"),
+        Some("[-1,0]"),
+    ] {
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_bennett-isa-ref"));
+        cmd.arg("run-oracle").arg(&path).arg("id").args([
+            "--input",
+            "1",
+            "--budget",
+            "1,0,0,0",
+            "--arg",
+            "token:1,0,0,0",
+        ]);
+        if let Some(labels) = aliases {
+            cmd.args(["--token-aliases", labels]);
+        }
+        let output = cmd.output().unwrap();
+        assert_eq!(output.status.code(), Some(1));
         assert!(output.stdout.is_empty());
-        assert!(String::from_utf8_lossy(&output.stderr).contains("K91"));
+        assert!(String::from_utf8_lossy(&output.stderr).contains("E_ARG"));
     }
-    std::fs::write(&path,identity_pair_source().text).unwrap();
-    for aliases in ["[0,0]","[0,1]"] {
-        for command in ["run-action","reverse"] {
-            let output=Command::new(env!("CARGO_BIN_EXE_bennett-isa-ref"))
-                .arg(command).arg(&path).arg("pair")
-                .args(["--mut","1,7","--in","1","--arg","token:1,0,0,0","--arg","token:1,0,0,0","--token-aliases",aliases])
-                .output().unwrap();
-            assert!(output.status.success(),"{command}/{aliases}: {}",String::from_utf8_lossy(&output.stderr));
-            let json=Json::parse(std::str::from_utf8(&output.stdout).unwrap().trim()).unwrap();
-            if command=="reverse" { assert_eq!(json.get("equals_entry").unwrap(),&Json::Bool(true)); }
+    std::fs::write(&path, identity_pair_source().text).unwrap();
+    for aliases in ["[0,0]", "[0,1]"] {
+        for command in ["run-action", "reverse"] {
+            let output = Command::new(env!("CARGO_BIN_EXE_bennett-isa-ref"))
+                .arg(command)
+                .arg(&path)
+                .arg("pair")
+                .args([
+                    "--mut",
+                    "1,7",
+                    "--in",
+                    "1",
+                    "--arg",
+                    "token:1,0,0,0",
+                    "--arg",
+                    "token:1,0,0,0",
+                    "--token-aliases",
+                    aliases,
+                ])
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{command}/{aliases}: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let json = Json::parse(std::str::from_utf8(&output.stdout).unwrap().trim()).unwrap();
+            if command == "reverse" {
+                assert_eq!(json.get("equals_entry").unwrap(), &Json::Bool(true));
+            }
         }
+    }
+}
+
+#[test]
+fn controlled_native_oracles_match_the_actual_inherited_control_count() {
+    use bennett_isa_ref::{Argument, Budget, QuantumBindings, QuantumState};
+    let source = scheduled_nested_oracle();
+    let (body, schedule) = source.text.split_once("section schedule\n").unwrap();
+    let mut symbols = source.section("symbols").unwrap().clone();
+    fields(&mut symbols).insert("2".into(),support::json(r#"{"interface_hash":"0000000000000000000000000000000000000000000000000000000000000000","kind":"perm_action","name":"wrap","signature":{"abi":"0.9","args":["token","token"],"bounds":[],"in":[1,1],"kind":"perm_action","mem":[],"mut":[1,4],"tier":"q"}}"#));
+    let mut lines = body.lines().map(str::to_string).collect::<Vec<_>>();
+    let index = lines.iter().position(|s| s == "section symbols").unwrap() + 1;
+    lines[index] = symbols.canonical();
+    let text=format!("{}\nperm_action @wrap (t:wire mut, f:wire[4] mut) (x:wire in, c:wire in) () (p:token, a:token) ()\n^entry():\nctl c oracle_call @outer p (x) t f () (a)\n\nsection schedule\n{schedule}",lines.join("\n").trim_end());
+    let object = support::rehash(&text);
+    for bits in 0..128u128 {
+        let mut state = QuantumState::new();
+        let wires = state.allocate(7).unwrap();
+        for (i, w) in wires.iter().enumerate() {
+            if bits >> i & 1 != 0 {
+                state.gate("x", &[*w], None, &[]).unwrap();
+            }
+        }
+        let mut binding = QuantumBindings::default();
+        binding.bundles.insert("t".into(), vec![wires[0]]);
+        binding.bundles.insert("f".into(), wires[1..5].to_vec());
+        binding.bundles.insert("x".into(), vec![wires[5]]);
+        binding.bundles.insert("c".into(), vec![wires[6]]);
+        for n in ["p", "a"] {
+            binding
+                .args
+                .insert(n.into(), Argument::Token(Budget::steps(3)));
+        }
+        let entry = state.clone();
+        object
+            .execute_action_with_token_aliases("wrap", &mut state, &binding, false, &[], &[0, 0])
+            .unwrap();
+        assert_eq!(
+            state.read_basis(&wires).unwrap(),
+            bits ^ ((bits >> 5 & 1) & (bits >> 6 & 1))
+        );
+        object
+            .execute_action_with_token_aliases("wrap", &mut state, &binding, true, &[], &[0, 0])
+            .unwrap();
+        assert_eq!(state, entry);
     }
 }

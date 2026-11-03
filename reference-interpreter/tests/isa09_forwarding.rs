@@ -40,10 +40,18 @@ fn published_example10_forwards_every_input_argument_and_cell_without_extra_char
             for d in 0..=255 {
                 let input = input(x, a, d, 6);
                 let want = ((x + a + u128::from(d & 3)) & 3) ^ 1;
-                let out = o.run_oracle_with_token_aliases("through", &input, budget(8, 8, 1), &[0,1]).unwrap();
+                let out = o
+                    .run_oracle_with_token_aliases("through", &input, budget(8, 8, 1), &[0, 1])
+                    .unwrap();
                 assert_eq!((out.payload, out.code), (want, 0), "x={x} a={a} d={d}");
-                let mut machine =
-                    OracleMachine::new_with_token_aliases(&o, "through", &input, budget(8, 8, 1), &[0,1]).unwrap();
+                let mut machine = OracleMachine::new_with_token_aliases(
+                    &o,
+                    "through",
+                    &input,
+                    budget(8, 8, 1),
+                    &[0, 1],
+                )
+                .unwrap();
                 let entry = machine.snapshot();
                 for _ in 0..8 {
                     machine.forward_step().unwrap();
@@ -67,9 +75,12 @@ fn forwarded_nested_faults_and_outer_boundaries_reverse_the_complete_prefix() {
         (budget(5, 8, 1), 5, 9),
     ] {
         let input = input(3, 2, 255, nested);
-        let out = o.run_oracle_with_token_aliases("through", &input, outer, &[0,1]).unwrap();
+        let out = o
+            .run_oracle_with_token_aliases("through", &input, outer, &[0, 1])
+            .unwrap();
         assert_eq!((out.payload, out.code), (0, code));
-        let mut machine = OracleMachine::new_with_token_aliases(&o, "through", &input, outer, &[0,1]).unwrap();
+        let mut machine =
+            OracleMachine::new_with_token_aliases(&o, "through", &input, outer, &[0, 1]).unwrap();
         let entry = machine.snapshot();
         for _ in 0..outer.steps {
             machine.forward_step().unwrap();
@@ -238,9 +249,12 @@ fn coherent_paths_keep_two_lproc_instances_even_when_entry_token_values_are_equa
             } else {
                 u128::from(right == 0)
             };
-            let out = o.run_oracle_with_token_aliases("o", &input, b, &[0,1,2]).unwrap();
+            let out = o
+                .run_oracle_with_token_aliases("o", &input, b, &[0, 1, 2])
+                .unwrap();
             assert_eq!((out.payload, out.code), (expected, 0));
-            let mut machine = OracleMachine::new_with_token_aliases(&o, "o", &input, b, &[0,1,2]).unwrap();
+            let mut machine =
+                OracleMachine::new_with_token_aliases(&o, "o", &input, b, &[0, 1, 2]).unwrap();
             let entry = machine.snapshot();
             for _ in 0..b.steps {
                 machine.forward_step().unwrap();
@@ -274,9 +288,12 @@ fn recursive_forwarding_closes_over_two_permuted_binding_keys() {
             ..Default::default()
         };
         let expected = x ^ 1;
-        let out = o.run_oracle_with_token_aliases("o", &input, b, &[0,1,2]).unwrap();
+        let out = o
+            .run_oracle_with_token_aliases("o", &input, b, &[0, 1, 2])
+            .unwrap();
         assert_eq!((out.payload, out.code), (expected, 0));
-        let mut machine = OracleMachine::new_with_token_aliases(&o, "o", &input, b, &[0,1,2]).unwrap();
+        let mut machine =
+            OracleMachine::new_with_token_aliases(&o, "o", &input, b, &[0, 1, 2]).unwrap();
         let entry = machine.snapshot();
         for _ in 0..b.steps {
             machine.forward_step().unwrap();

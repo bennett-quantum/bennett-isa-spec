@@ -321,6 +321,7 @@ pub struct OracleVectorMachine<'a> {
     object: &'a Object,
     arguments: BTreeMap<String, Argument>,
     budget: Budget,
+    inherited_controls: usize,
     program: Program<'a>,
     widths: DerivedWidths,
     state: BasisVectorConfiguration,
@@ -350,24 +351,51 @@ impl<'a> OracleVectorMachine<'a> {
         input: &OracleVectorInput,
         budget: Budget,
     ) -> Result<Self> {
-        Self::new_bound(object,name,input,budget,None,None)
+        Self::new_bound(object, name, input, budget, None, None, 0)
     }
     pub fn new_with_token_aliases(
-        object: &'a Object,name: &str,input: &OracleVectorInput,budget: Budget,aliases: &[u64],
-    ) -> Result<Self> { Self::new_bound(object,name,input,budget,None,Some(aliases)) }
+        object: &'a Object,
+        name: &str,
+        input: &OracleVectorInput,
+        budget: Budget,
+        aliases: &[u64],
+    ) -> Result<Self> {
+        Self::new_bound(object, name, input, budget, None, Some(aliases), 0)
+    }
     pub fn new_with_token(
-        object: &'a Object,name: &str,input: &OracleVectorInput,primary: &crate::BudgetToken,
-    ) -> Result<Self> { Self::new_bound(object,name,input,primary.tuple(),Some(primary),None) }
+        object: &'a Object,
+        name: &str,
+        input: &OracleVectorInput,
+        primary: &crate::BudgetToken,
+    ) -> Result<Self> {
+        Self::new_bound(object, name, input, primary.tuple(), Some(primary), None, 0)
+    }
     pub(crate) fn new_bound(
-        object: &'a Object,name: &str,input: &OracleVectorInput,budget: Budget,
-        primary: Option<&crate::BudgetToken>,aliases: Option<&[u64]>,
+        object: &'a Object,
+        name: &str,
+        input: &OracleVectorInput,
+        budget: Budget,
+        primary: Option<&crate::BudgetToken>,
+        aliases: Option<&[u64]>,
+        inherited_controls: usize,
     ) -> Result<Self> {
         object.validate_budget(budget)?;
         let root = object.declaration(name)?;
-        let resolved = (object.isa_version == crate::IsaVersion::V09).then(||
-            object.resolve_invocation_tokens(&root,&input.args,Some(budget),primary,aliases)).transpose()?;
-        let args = resolved.as_ref().map_or(input.args.as_slice(),|v| v.arguments.as_slice());
-        object.check_schedule_matches_for_bound_run(name,budget,args,resolved.as_ref().map_or(&[],|v| &v.aliases),0)?;
+        let resolved = (object.isa_version == crate::IsaVersion::V09)
+            .then(|| {
+                object.resolve_invocation_tokens(&root, &input.args, Some(budget), primary, aliases)
+            })
+            .transpose()?;
+        let args = resolved
+            .as_ref()
+            .map_or(input.args.as_slice(), |v| v.arguments.as_slice());
+        object.check_schedule_matches_for_bound_run(
+            name,
+            budget,
+            args,
+            resolved.as_ref().map_or(&[], |v| &v.aliases),
+            inherited_controls,
+        )?;
         let program = Program::new(object, name)?;
         let widths = DerivedWidths::from_program(object, &program, budget)?;
         let root = &object.functions[name];
@@ -451,6 +479,7 @@ impl<'a> OracleVectorMachine<'a> {
             object,
             arguments,
             budget,
+            inherited_controls,
             program,
             widths,
             state,
@@ -1203,8 +1232,22 @@ impl<'a> OracleVectorMachine<'a> {
         }
         // The nested invocation is itself compute / commit / prefix reversal,
         // executed as a reversible machine (§5.2).
-        let primary = arguments.get(&a[1]).and_then(|a| if let Argument::DeviceToken(t) = a {Some(t)} else {None});
-        let mut child = Self::new_bound(self.object, &callee.name, &input, budget,primary,None)?;
+        let primary = arguments.get(&a[1]).and_then(|a| {
+            if let Argument::DeviceToken(t) = a {
+                Some(t)
+            } else {
+                None
+            }
+        });
+        let mut child = Self::new_bound(
+            self.object,
+            &callee.name,
+            &input,
+            budget,
+            primary,
+            None,
+            self.inherited_controls,
+        )?;
         let entry = child.snapshot();
         for _ in 0..budget.steps {
             child.forward_step()?;
@@ -1290,17 +1333,32 @@ impl<'a> OracleMachine<'a> {
         input: &OracleInput,
         budget: Budget,
     ) -> Result<Self> {
-        Self::new_bound(object,name,input,budget,None,None)
+        Self::new_bound(object, name, input, budget, None, None)
     }
     pub fn new_with_token_aliases(
-        object: &'a Object,name: &str,input: &OracleInput,budget: Budget,aliases: &[u64],
-    ) -> Result<Self> { Self::new_bound(object,name,input,budget,None,Some(aliases)) }
+        object: &'a Object,
+        name: &str,
+        input: &OracleInput,
+        budget: Budget,
+        aliases: &[u64],
+    ) -> Result<Self> {
+        Self::new_bound(object, name, input, budget, None, Some(aliases))
+    }
     pub fn new_with_token(
-        object: &'a Object,name: &str,input: &OracleInput,primary: &crate::BudgetToken,
-    ) -> Result<Self> { Self::new_bound(object,name,input,primary.tuple(),Some(primary),None) }
+        object: &'a Object,
+        name: &str,
+        input: &OracleInput,
+        primary: &crate::BudgetToken,
+    ) -> Result<Self> {
+        Self::new_bound(object, name, input, primary.tuple(), Some(primary), None)
+    }
     fn new_bound(
-        object: &'a Object,name: &str,input: &OracleInput,budget: Budget,
-        primary: Option<&crate::BudgetToken>,aliases: Option<&[u64]>,
+        object: &'a Object,
+        name: &str,
+        input: &OracleInput,
+        budget: Budget,
+        primary: Option<&crate::BudgetToken>,
+        aliases: Option<&[u64]>,
     ) -> Result<Self> {
         let f = object
             .functions
@@ -1317,7 +1375,7 @@ impl<'a> OracleMachine<'a> {
         }
         let input = OracleVectorInput::from_input(object, name, input)?;
         Ok(Self(OracleVectorMachine::new_bound(
-            object, name, &input, budget,primary,aliases,
+            object, name, &input, budget, primary, aliases, 0,
         )?))
     }
     pub fn snapshot(&self) -> BasisConfiguration {

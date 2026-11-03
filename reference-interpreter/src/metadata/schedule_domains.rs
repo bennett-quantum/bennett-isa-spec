@@ -684,13 +684,26 @@ impl Object {
     ) -> Result<()> {
         let aliases = if self.isa_version == crate::IsaVersion::V09 {
             let f = self.declaration(region)?;
-            self.resolve_invocation_tokens(&f,args,(f.kind == "oracle").then_some(budget),None,None)?.aliases
-        } else { Vec::new() };
-        self.check_schedule_matches_for_bound_run(region,budget,args,&aliases,0)
+            self.resolve_invocation_tokens(
+                &f,
+                args,
+                (f.kind == "oracle").then_some(budget),
+                None,
+                None,
+            )?
+            .aliases
+        } else {
+            Vec::new()
+        };
+        self.check_schedule_matches_for_bound_run(region, budget, args, &aliases, 0)
     }
     pub(crate) fn check_schedule_matches_for_bound_run(
-        &self, region: &str, budget: crate::Budget, args: &[crate::Argument],
-        aliases: &[u64], inherited_controls: usize,
+        &self,
+        region: &str,
+        budget: crate::Budget,
+        args: &[crate::Argument],
+        aliases: &[u64],
+        inherited_controls: usize,
     ) -> Result<()> {
         let Some(schedule) = self.section("schedule") else {
             return Ok(());
@@ -707,16 +720,51 @@ impl Object {
         let function = &self.functions[region];
         if self.isa_version == crate::IsaVersion::V09 {
             let bindings = schedule.get("bindings")?;
-            let expected_aliases = bindings.object()?.get("token_aliases").map(|a|
-                a.array()?.iter().map(|v| u64::try_from(v.uint()?).map_err(|_| Error::new("§11 K91: alias exceeds host".into()))).collect::<Result<Vec<_>>>())
-                .transpose()?.unwrap_or_else(|| if function.kind == "oracle" {vec![0]} else {vec![]});
-            let actual_budget = [u128::from(budget.steps),budget.heap,budget.stack,budget.depth];
-            if bindings.get("closure_hash")?.string()? != self.identity()?.closure_hashes[region].as_deref().unwrap_or("")
+            let expected_aliases = bindings
+                .object()?
+                .get("token_aliases")
+                .map(|a| {
+                    a.array()?
+                        .iter()
+                        .map(|v| {
+                            u64::try_from(v.uint()?)
+                                .map_err(|_| Error::new("§11 K91: alias exceeds host".into()))
+                        })
+                        .collect::<Result<Vec<_>>>()
+                })
+                .transpose()?
+                .unwrap_or_else(|| {
+                    if function.kind == "oracle" {
+                        vec![0]
+                    } else {
+                        vec![]
+                    }
+                });
+            let actual_budget = [
+                u128::from(budget.steps),
+                budget.heap,
+                budget.stack,
+                budget.depth,
+            ];
+            if bindings.get("closure_hash")?.string()?
+                != self.identity()?.closure_hashes[region]
+                    .as_deref()
+                    .unwrap_or("")
                 || bindings.get("variant")?.string()? != "forward"
                 || bindings.get("inherited_controls")?.uint()? != inherited_controls as u128
-                || bindings.get("budget")?.array()?.iter().map(Json::uint).collect::<Result<Vec<_>>>()? != actual_budget
-                || bindings.get("params_hash")?.string()? != crate::sha256_hex(crate::tokens::typed_arguments(args).canonical().as_bytes())
-                || expected_aliases != aliases {
+                || bindings
+                    .get("budget")?
+                    .array()?
+                    .iter()
+                    .map(Json::uint)
+                    .collect::<Result<Vec<_>>>()?
+                    != actual_budget
+                || bindings.get("params_hash")?.string()?
+                    != crate::sha256_hex(
+                        crate::tokens::typed_arguments(args).canonical().as_bytes(),
+                    )
+                || expected_aliases != aliases
+            {
                 return Ok(()); // §11 defaults, no decisions from another binding.
             }
         }

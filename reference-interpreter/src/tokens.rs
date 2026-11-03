@@ -288,16 +288,18 @@ impl Object {
         aliases: Option<&[u64]>,
     ) -> Result<ResolvedTokens> {
         use crate::Argument;
-        let params = &f.params[if f.kind == "oracle" {4} else {3}];
+        let params = &f.params[if f.kind == "oracle" { 4 } else { 3 }];
         if params.len() != args.len() {
-            return err("§5.4 K91","E_ARG: invocation argument count differs");
+            return err("§5.4 K91", "E_ARG: invocation argument count differs");
         }
-        for (p,a) in params.iter().zip(args) { crate::oracle::check_argument(self,&p.ty,a)?; }
+        for (p, a) in params.iter().zip(args) {
+            crate::oracle::check_argument(self, &p.ty, a)?;
+        }
         let mut tuples = Vec::new();
         let mut known = Vec::new();
         if let Some(b) = budget {
             if primary.is_some_and(|t| t.tuple() != b) {
-                return err("§5.4 K91","E_ARG: primary token and budget disagree");
+                return err("§5.4 K91", "E_ARG: primary token and budget disagree");
             }
             tuples.push(b);
             known.push(primary.cloned());
@@ -305,12 +307,20 @@ impl Object {
         for a in args {
             if let Some(b) = a.token_budget() {
                 tuples.push(b);
-                known.push(if let Argument::DeviceToken(t) = a {Some(t.clone())} else {None});
+                known.push(if let Argument::DeviceToken(t) = a {
+                    Some(t.clone())
+                } else {
+                    None
+                });
             }
         }
-        for b in &tuples { self.validate_budget(*b)?; }
+        for b in &tuples {
+            self.validate_budget(*b)?;
+        }
         for t in known.iter().flatten() {
-            if !t.for_program(self) { return err("§5.4 K91","E_ARG: foreign token identity"); }
+            if !t.for_program(self) {
+                return err("§5.4 K91", "E_ARG: foreign token identity");
+            }
         }
         let labels = if let Some(labels) = aliases {
             labels.to_vec()
@@ -318,52 +328,83 @@ impl Object {
             (0..tuples.len() as u64).collect()
         } else {
             if known.iter().any(Option::is_none) {
-                return err("§5.4 K91","E_ARG: tuple-only invocation tokens require token_aliases");
+                return err(
+                    "§5.4 K91",
+                    "E_ARG: tuple-only invocation tokens require token_aliases",
+                );
             }
             let mut seen = BTreeMap::new();
-            known.iter().map(|t| {
-                let next = seen.len() as u64;
-                *seen.entry(t.as_ref().unwrap().id()).or_insert(next)
-            }).collect()
+            known
+                .iter()
+                .map(|t| {
+                    let next = seen.len() as u64;
+                    *seen.entry(t.as_ref().unwrap().id()).or_insert(next)
+                })
+                .collect()
         };
-        validate_aliases(&labels,&tuples)?;
-        let mut bound = BTreeMap::<u64,BudgetToken>::new();
+        validate_aliases(&labels, &tuples)?;
+        let mut bound = BTreeMap::<u64, BudgetToken>::new();
         let mut identities = BTreeMap::new();
-        for (label,t) in labels.iter().zip(&known) {
+        for (label, t) in labels.iter().zip(&known) {
             if let Some(t) = t {
                 if bound.get(label).is_some_and(|prior| prior != t)
-                    || identities.get(&t.id()).is_some_and(|prior| prior != label) {
-                    return err("§5.4 K91","E_ARG: partition differs from actual token identities");
+                    || identities.get(&t.id()).is_some_and(|prior| prior != label)
+                {
+                    return err(
+                        "§5.4 K91",
+                        "E_ARG: partition differs from actual token identities",
+                    );
                 }
-                bound.insert(*label,t.clone());
-                identities.insert(t.id(),*label);
+                bound.insert(*label, t.clone());
+                identities.insert(t.id(), *label);
             }
         }
-        for (label,b) in labels.iter().zip(&tuples) {
+        for (label, b) in labels.iter().zip(&tuples) {
             if !bound.contains_key(label) {
-                bound.insert(*label,self.token_for(if f.kind == "oracle" {&f.name} else {""},*b,None)?);
+                bound.insert(
+                    *label,
+                    self.token_for(if f.kind == "oracle" { &f.name } else { "" }, *b, None)?,
+                );
             }
         }
         let mut slots = labels.iter();
         let primary = budget.map(|_| bound[slots.next().unwrap()].clone());
-        let arguments = args.iter().map(|a| {
-            if a.token_budget().is_some() { Argument::DeviceToken(bound[slots.next().unwrap()].clone()) }
-            else { a.clone() }
-        }).collect();
-        Ok(ResolvedTokens { primary,arguments,aliases:labels })
+        let arguments = args
+            .iter()
+            .map(|a| {
+                if a.token_budget().is_some() {
+                    Argument::DeviceToken(bound[slots.next().unwrap()].clone())
+                } else {
+                    a.clone()
+                }
+            })
+            .collect();
+        Ok(ResolvedTokens {
+            primary,
+            arguments,
+            aliases: labels,
+        })
     }
 }
 
 pub(crate) fn typed_arguments(args: &[crate::Argument]) -> crate::json::Json {
-    use crate::{Argument,json::Json};
-    Json::Array(args.iter().map(|a| match a {
-        Argument::Bits(n) => Json::String(n.to_string()),
-        Argument::Float(v) => Json::String(format!("0x{:016x}",v.to_bits())),
-        Argument::Token(b) => tuple_json(*b),
-        Argument::DeviceToken(t) => tuple_json(t.tuple()),
-    }).collect())
+    use crate::{json::Json, Argument};
+    Json::Array(
+        args.iter()
+            .map(|a| match a {
+                Argument::Bits(n) => Json::String(n.to_string()),
+                Argument::Float(v) => Json::String(format!("0x{:016x}", v.to_bits())),
+                Argument::Token(b) => tuple_json(*b),
+                Argument::DeviceToken(t) => tuple_json(t.tuple()),
+            })
+            .collect(),
+    )
 }
 fn tuple_json(b: Budget) -> crate::json::Json {
     use crate::json::Json;
-    Json::Array([u128::from(b.steps),b.heap,b.stack,b.depth].map(|n| Json::String(n.to_string())).to_vec())
+    Json::Array(
+        [u128::from(b.steps), b.heap, b.stack, b.depth]
+            .map(|n| Json::String(n.to_string()))
+            .to_vec(),
+    )
 }
