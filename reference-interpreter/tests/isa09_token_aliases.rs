@@ -202,3 +202,54 @@ fn schedule_alias_slots_prepend_primary_only_for_oracles() {
     let error = Object::parse(&scheduled(&source, None)).unwrap_err();
     assert!(error.to_string().contains("K91"));
 }
+
+#[test]
+fn a_schedule_certificate_cannot_reuse_equal_params_under_another_partition() {
+    let original = certificate_object(Some("[0,0]"), 1);
+    let object = Object::parse(&original).unwrap();
+    let (source, raw) = original.split_once("section certificate\n").unwrap();
+    let mut certificate = Json::parse(raw.trim()).unwrap();
+    let binding = certificate.get("bindings").unwrap();
+    let hash = binding.get("closure_hash").unwrap().string().unwrap();
+    let params = bennett_isa_ref::sha256_hex(
+        binding
+            .get("invocation")
+            .unwrap()
+            .get("args")
+            .unwrap()
+            .canonical()
+            .as_bytes(),
+    );
+    let schedule = support::json(&format!(
+        r#"{{"bindings":{{"budget":[0,0,0,0],"closure_hash":"{hash}","epsilon":0,"inherited_controls":0,"params_hash":"{params}","region":"flip","scheduler":{{"name":"k91","version":"1"}},"target_hash":"{}","token_aliases":[0,0],"variant":"forward"}},"entries":[]}}"#,
+        "0".repeat(64)
+    ));
+    fields(fields(&mut certificate).get_mut("bindings").unwrap()).insert(
+        "schedule_hash".into(),
+        Json::String(bennett_isa_ref::sha256_hex(schedule.canonical().as_bytes())),
+    );
+    let render = |c: &Json| {
+        format!(
+            "{}\n\nsection schedule\n{}\n\nsection certificate\n{}\n",
+            source.trim_end(),
+            schedule.canonical(),
+            c.canonical()
+        )
+    };
+    let scheduled = Object::parse(&render(&certificate)).unwrap();
+    assert_eq!(
+        scheduled.identity().unwrap().object_hash,
+        object.identity().unwrap().object_hash
+    );
+    let invocation = fields(fields(&mut certificate).get_mut("bindings").unwrap())
+        .get_mut("invocation")
+        .unwrap();
+    fields(invocation).insert("token_aliases".into(), support::json("[0,1]"));
+    let error = Object::parse(&render(&certificate)).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("invocation and schedule token_aliases differ"),
+        "{error}"
+    );
+}

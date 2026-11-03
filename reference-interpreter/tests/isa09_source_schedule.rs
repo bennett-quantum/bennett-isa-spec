@@ -29,7 +29,7 @@ fn scheduled_args(
     let params = bennett_isa_ref::sha256_hex(args.as_bytes());
     let entries = Json::Array(entries.to_vec()).canonical();
     let schedule = support::json(&format!(
-        r#"{{"bindings":{{"budget":[{steps},0,5,1],"closure_hash":"{hash}","epsilon":0,"inherited_controls":0,"params_hash":"{params}","region":"o","scheduler":{{"name":"source-coordinate","version":"1"}},"target_hash":"{}","variant":"forward"}},"entries":{entries}}}"#,
+        r#"{{"bindings":{{"budget":[{steps},0,5,1],"closure_hash":"{hash}","epsilon":0,"inherited_controls":0,"params_hash":"{params}","token_aliases":[0,1,2],"region":"o","scheduler":{{"name":"source-coordinate","version":"1"}},"target_hash":"{}","variant":"forward"}},"entries":{entries}}}"#,
         "0".repeat(64)
     ));
     Object::parse(&format!(

@@ -14,7 +14,7 @@ fn k65_lifted_intrinsic_cleanup_recomputes_the_delivery_in_fresh_targets() {
     let closure = id.closure_hashes["o"].as_ref().unwrap();
     let params = bennett_isa_ref::sha256_hex(br#"[["1","0","0","0"]]"#);
     let schedule = format!(
-        r#"{{"bindings":{{"budget":[3,0,0,0],"closure_hash":"{closure}","epsilon":0,"inherited_controls":0,"params_hash":"{params}","region":"o","scheduler":{{"name":"lifted-cleanup","version":"1"}},"target_hash":"{}","variant":"forward"}},"entries":[{{"cleanup":{{"realisation":"recompute"}},"generated":0,"kind":"cleanup","path":[{{"instance":[],"iteration":[],"point":"entry:1","symbol":"{h}"}}],"phase":"*","step":2}}]}}"#,
+        r#"{{"bindings":{{"budget":[3,0,0,0],"closure_hash":"{closure}","epsilon":0,"inherited_controls":0,"params_hash":"{params}","region":"o","scheduler":{{"name":"lifted-cleanup","version":"1"}},"target_hash":"{}","token_aliases":[0,1],"variant":"forward"}},"entries":[{{"cleanup":{{"realisation":"recompute"}},"generated":0,"kind":"cleanup","path":[{{"instance":[],"iteration":[],"point":"entry:1","symbol":"{h}"}}],"phase":"*","step":2}}]}}"#,
         "0".repeat(64)
     );
     let o = Object::parse(&format!("{}\nsection schedule\n{schedule}\n", o.text)).unwrap();
