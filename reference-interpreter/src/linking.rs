@@ -8,6 +8,7 @@ impl Object {
             .first()
             .ok_or_else(|| Error::new("§9.3: no objects to link".into()))?;
         let mut result = Self {
+            tokens: std::sync::Arc::new(crate::tokens::TokenNamespace::new()),
             register_ids: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(1)),
             isa_version: first.isa_version,
             text: String::new(),

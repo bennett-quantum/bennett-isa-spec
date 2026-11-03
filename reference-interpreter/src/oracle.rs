@@ -37,6 +37,16 @@ pub enum Argument {
     Bits(u128),
     Float(f64),
     Token(Budget),
+    DeviceToken(crate::BudgetToken),
+}
+impl Argument {
+    pub fn token_budget(&self) -> Option<Budget> {
+        match self {
+            Self::Token(b) => Some(*b),
+            Self::DeviceToken(t) => Some(t.tuple()),
+            _ => None,
+        }
+    }
 }
 /// Small-integer convenience form of an oracle input. Each value must fit its
 /// declared bundle; wider interfaces use `OracleVectorInput` directly.
@@ -443,13 +453,14 @@ impl Activation {
     }
 }
 fn token(arguments: &BTreeMap<String, Argument>, n: &str) -> Result<Budget> {
-    match arguments.get(n) {
-        Some(Argument::Token(b)) => Ok(*b),
-        _ => err(
-            "§4.2",
-            format!("tk operand {n} is not a token argument of the oracle"),
-        ),
-    }
+    arguments
+        .get(n)
+        .and_then(Argument::token_budget)
+        .ok_or_else(|| {
+            Error::new(format!(
+                "§4.2: tk operand {n} is not a token argument of the oracle"
+            ))
+        })
 }
 /// Bytes of a mapped interface region passed by name to a nested region call.
 pub(crate) fn region_bytes(memory: &Memory, n: &str, address_width: u64) -> Result<Vec<u8>> {
@@ -861,6 +872,11 @@ pub(crate) fn check_argument(object: &Object, ty: &Type, v: &Argument) -> Result
             Ok(())
         }
         (Type::Token, Argument::Token(b)) => object.validate_budget(*b),
+        (Type::Token, Argument::DeviceToken(t))
+            if object.isa_version == crate::IsaVersion::V09 && t.for_program(object) =>
+        {
+            object.validate_budget(t.tuple())
+        }
         _ => err(
             "§3.3",
             format!("classical argument does not have type {}", ty.text()),

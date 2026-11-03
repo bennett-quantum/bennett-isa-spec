@@ -206,14 +206,13 @@ impl Object {
                         "lift.oracle_call" | "lift.oracle_uncall" | "oracle_call"
                     );
                     if oracle {
-                        steps = InvocationSteps::Nested(arguments.as_ref().and_then(|a| {
-                            match a.get(&call.operands[1]) {
-                                Some(crate::Argument::Token(budget)) => {
-                                    Some(u128::from(budget.steps))
-                                }
-                                _ => None,
-                            }
-                        }));
+                        steps = InvocationSteps::Nested(
+                            arguments
+                                .as_ref()
+                                .and_then(|a| a.get(&call.operands[1]))
+                                .and_then(crate::Argument::token_budget)
+                                .map(|b| u128::from(b.steps)),
+                        );
                     }
                     if steps.upper() == Some(0) {
                         return Ok(None);

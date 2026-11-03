@@ -434,6 +434,7 @@ impl IsaVersion {
 
 #[derive(Clone, Debug)]
 pub struct Object {
+    pub(crate) tokens: std::sync::Arc<crate::tokens::TokenNamespace>,
     /// Runtime names belong to this loaded program, across runs and reversal.
     /// This allocator is deliberately outside object identity and history.
     pub(crate) register_ids: std::sync::Arc<std::sync::atomic::AtomicU64>,
@@ -802,6 +803,7 @@ impl Object {
         }
         let ptr_width = ptr_width as u16;
         let mut obj = Object {
+            tokens: std::sync::Arc::new(crate::tokens::TokenNamespace::new()),
             register_ids: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(1)),
             isa_version,
             text: text.into(),

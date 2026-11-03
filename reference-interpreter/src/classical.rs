@@ -18,9 +18,17 @@ pub enum ClassicalValue {
     Ptr(u128),
     F64(u64),
     Token(Budget),
+    DeviceToken(crate::BudgetToken),
     Qreg(u64),
 }
 impl ClassicalValue {
+    pub fn token_budget(&self) -> Option<Budget> {
+        match self {
+            Self::Token(b) => Some(*b),
+            Self::DeviceToken(t) => Some(t.tuple()),
+            _ => None,
+        }
+    }
     pub fn int(width: u16, value: u128) -> Result<Self> {
         if !(1..=128).contains(&width) || value & !mask(width) != 0 {
             return err("§3.3", "classical value does not fit integer width");
@@ -42,6 +50,7 @@ impl ClassicalValue {
     }
     fn matches(&self, t: &Type, ptr: u16, version: crate::IsaVersion) -> bool {
         match (self, t) {
+            (Self::DeviceToken(_), Type::Token) => version == crate::IsaVersion::V09,
             (Self::Int(w, v), Type::Int(n)) => w == n && *v & !mask(*w) == 0,
             (Self::Ptr(v), Type::Ptr) => *v & !mask(ptr) == 0,
             (Self::F64(v), Type::F64) => {
@@ -84,6 +93,7 @@ struct Devices {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClassicalSnapshot {
+    valid_tokens: std::collections::BTreeSet<u64>,
     instances: crate::instances::Instances,
     memory: Memory,
     devices: Devices,
@@ -271,11 +281,15 @@ impl ClassicalSnapshot {
                 self.quantum.quantum_state().wire_count()
             ));
         }
+        if self.valid_tokens != other.valid_tokens {
+            return Some("valid device-token identities differ".into());
+        }
         None
     }
 }
 #[derive(Clone, Debug)]
 struct Undo {
+    minted_token: Option<u64>,
     control: Vec<Activation>,
     next_id: u64,
     definitions: Vec<Key>,
@@ -363,6 +377,7 @@ pub struct HostExchange {
     pub reply: Retained<u8>,
 }
 pub struct ClassicalMachine<'a> {
+    run_id: u64,
     object: &'a Object,
     state: ClassicalSnapshot,
     history: Vec<HistoryFrame>,
@@ -381,7 +396,12 @@ impl<'a> ClassicalMachine<'a> {
         args: &[ClassicalValue],
         entropy: &[u8],
     ) -> Result<Self> {
-        Self::construct(object, entry, args, entropy, QuantumRegisters::new(), &[])
+        Self::construct(object, entry, args, entropy, QuantumRegisters::new(), &[],None)
+    }
+    pub fn new_with_token_aliases(
+        object: &'a Object, entry: &str, args: &[ClassicalValue], aliases: &[u64], entropy: &[u8],
+    ) -> Result<Self> {
+        Self::construct(object,entry,args,entropy,QuantumRegisters::new(),&[],Some(aliases))
     }
     fn construct(
         object: &'a Object,
@@ -390,6 +410,7 @@ impl<'a> ClassicalMachine<'a> {
         entropy: &[u8],
         mut registers: QuantumRegisters,
         globals: &[(String, Vec<u8>)],
+        aliases:Option<&[u64]>,
     ) -> Result<Self> {
         object.ensure_linked()?;
         let f = object
@@ -405,6 +426,18 @@ impl<'a> ClassicalMachine<'a> {
         {
             return err("§10", "classical entry argument type/count mismatch");
         }
+        let run_id = if object.isa_version == crate::IsaVersion::V09 {
+            object.tokens.run()?
+        } else {
+            0
+        };
+        let bound = if object.isa_version == crate::IsaVersion::V09 {
+            std::borrow::Cow::Owned(object.bind_entry_tokens(args,aliases,run_id)?)
+        } else {
+            if aliases.is_some() { return err("§10 K91", "E_ARG: token_aliases requires ISA 0.9"); }
+            std::borrow::Cow::Borrowed(args)
+        };
+        let args = bound.as_ref();
         for (p, a) in f.params[0].iter().zip(args) {
             if object.isa_version == crate::IsaVersion::V09 {
                 if let ClassicalValue::Qreg(id) = a {
@@ -489,6 +522,7 @@ impl<'a> ClassicalMachine<'a> {
             }
         }
         let state = ClassicalSnapshot {
+            valid_tokens: Default::default(),
             instances,
             memory,
             devices,
@@ -507,6 +541,7 @@ impl<'a> ClassicalMachine<'a> {
             quantum: registers,
         };
         Ok(Self {
+            run_id,
             object,
             state: state.clone(),
             history: Vec::new(),
@@ -525,7 +560,7 @@ impl<'a> ClassicalMachine<'a> {
         entropy: &[u8],
         registers: QuantumRegisters,
     ) -> Result<Self> {
-        Self::construct(object, entry, args, entropy, registers, &[])
+        Self::construct(object, entry, args, entropy, registers, &[],None)
     }
     /// Like `with_quantum_registers`, with §7.1 global images seeded by the
     /// caller (name, exact bytes) as part of the entry state.
@@ -537,7 +572,14 @@ impl<'a> ClassicalMachine<'a> {
         registers: QuantumRegisters,
         globals: &[(String, Vec<u8>)],
     ) -> Result<Self> {
-        Self::construct(object, entry, args, entropy, registers, globals)
+        Self::construct(object, entry, args, entropy, registers, globals,None)
+    }
+    /// Alias-aware 0.9 launch with caller-provided registers and global bytes.
+    pub fn with_token_aliases(
+        object: &'a Object, entry: &str, args: &[ClassicalValue], entropy: &[u8],
+        registers: QuantumRegisters, globals: &[(String,Vec<u8>)], aliases: &[u64],
+    ) -> Result<Self> {
+        Self::construct(object,entry,args,entropy,registers,globals,Some(aliases))
     }
     pub fn quantum_registers(&self) -> &QuantumRegisters {
         &self.state.quantum
@@ -885,6 +927,14 @@ impl<'a> ClassicalMachine<'a> {
         let oracle = call.instruction.op == "oracle_call";
         let (groups, memory, args, budget) = if oracle {
             let token = match self.read(&a[1])? {
+                ClassicalValue::DeviceToken(token) => {
+                    if !token.valid(self.object, self.run_id, &self.state.valid_tokens) {
+                        return Err(trap(Error::new(
+                            "§5.4: revoked or foreign budget token".into(),
+                        )));
+                    }
+                    token.tuple()
+                }
                 ClassicalValue::Token(b) => b,
                 _ => return err("§3.3", "oracle_call needs a budget token"),
             };
@@ -999,6 +1049,14 @@ impl<'a> ClassicalMachine<'a> {
                 ClassicalValue::Int(_, v) | ClassicalValue::Ptr(v) => Argument::Bits(v),
                 ClassicalValue::F64(bits) => Argument::Float(f64::from_bits(bits)),
                 ClassicalValue::Token(b) => Argument::Token(b),
+                ClassicalValue::DeviceToken(token) => {
+                    if !token.valid(self.object, self.run_id, &self.state.valid_tokens) {
+                        return Err(trap(Error::new(
+                            "§5.4: revoked or foreign token argument".into(),
+                        )));
+                    }
+                    Argument::DeviceToken(token)
+                }
                 _ => return err("§3.3", "qreg is not a classical region argument"),
             };
             bindings.args.insert(p.name.clone(), arg);
@@ -1100,6 +1158,11 @@ impl<'a> ClassicalMachine<'a> {
         Ok(())
     }
     fn undo_record(&mut self, undo: Undo) -> Result<()> {
+        if let Some(id) = undo.minted_token {
+            if !self.state.valid_tokens.remove(&id) {
+                return err("§7.4 K3", "mint frame has no live token to revoke");
+            }
+        }
         if !undo.bytes.is_empty() {
             self.state
                 .memory
@@ -1365,6 +1428,7 @@ impl<'a> ClassicalMachine<'a> {
         let op = i.op.as_str();
         let a = &i.operands;
         let mut undo = Undo {
+            minted_token: None,
             control: self.state.control.clone(),
             next_id: self.state.next_id,
             definitions: Vec::new(),
@@ -1477,6 +1541,23 @@ impl<'a> ClassicalMachine<'a> {
                 }
             } else {
                 match op {
+                    "budget.mint" if object.isa_version == crate::IsaVersion::V09 => {
+                        let tuple = Budget {
+                            steps: self.bits(&a[1])? as u64,
+                            heap: self.bits(&a[2])?,
+                            stack: self.bits(&a[3])?,
+                            depth: self.bits(&a[4])?,
+                        };
+                        let token = object
+                            .token_for(a[0].trim_start_matches('@'), tuple, Some(self.run_id))
+                            .map_err(trap)?;
+                        let id = token.id();
+                        if !self.state.valid_tokens.insert(id) {
+                            return err("§5.4 K3", "fresh token identity was already live");
+                        }
+                        undo.minted_token = Some(id);
+                        output = Some(ClassicalValue::DeviceToken(token));
+                    }
                     "select" => {
                         output =
                             Some(self.read(if self.bits(&a[0])? != 0 { &a[1] } else { &a[2] })?)
@@ -1901,6 +1982,7 @@ impl Clone for ClassicalValue {
             Self::Ptr(v) => Self::Ptr(*v),
             Self::F64(v) => Self::F64(*v),
             Self::Token(v) => Self::Token(*v),
+            Self::DeviceToken(v) => Self::DeviceToken(v.clone()),
             Self::Qreg(v) => Self::Qreg(*v),
         }
     }

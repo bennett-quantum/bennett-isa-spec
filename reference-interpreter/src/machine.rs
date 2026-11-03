@@ -1158,7 +1158,7 @@ impl<'a> OracleVectorMachine<'a> {
         let a = &i.operands;
         let callee = &self.object.functions[a[0].trim_start_matches('@')];
         let arguments = self.program.arguments(f, &self.arguments)?;
-        let Some(Argument::Token(budget)) = arguments.get(&a[1]).cloned() else {
+        let Some(budget) = arguments.get(&a[1]).and_then(Argument::token_budget) else {
             return err("§4.2", "tk must be a token argument of the calling oracle");
         };
         let mut input = OracleVectorInput {

@@ -163,6 +163,7 @@ fn value_json(v: &ClassicalValue) -> Result<Json> {
             ("type".into(), string("f64")),
             ("value".into(), float_json(f64::from_bits(*bits))?),
         ]),
+        ClassicalValue::DeviceToken(token) => value_json(&ClassicalValue::Token(token.tuple()))?,
         ClassicalValue::Token(b) => object([
             ("type".into(), string("token")),
             (
@@ -877,14 +878,15 @@ fn classical_entry<'a>(program: &'a Object, name: &str) -> Result<&'a Function> 
 fn budgets_json(args: &[ClassicalValue]) -> Json {
     Json::Array(
         args.iter()
-            .filter_map(|a| match a {
-                ClassicalValue::Token(b) => Some(object([
-                    ("depth".into(), number(b.depth)),
-                    ("heap".into(), number(b.heap)),
-                    ("stack".into(), number(b.stack)),
-                    ("steps".into(), number(b.steps as u128)),
-                ])),
-                _ => None,
+            .filter_map(|a| {
+                a.token_budget().map(|b| {
+                    object([
+                        ("depth".into(), number(b.depth)),
+                        ("heap".into(), number(b.heap)),
+                        ("stack".into(), number(b.stack)),
+                        ("steps".into(), number(b.steps as u128)),
+                    ])
+                })
             })
             .collect(),
     )

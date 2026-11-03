@@ -963,6 +963,19 @@ impl Object {
             result = Some(t);
         } else {
             match op {
+                "budget.mint" if self.isa_version == crate::IsaVersion::V09 => {
+                    arity(5, 1)?;
+                    let oracle = a[0]
+                        .strip_prefix('@')
+                        .ok_or_else(|| Error::new("§4.8: budget.mint requires @oracle".into()))?;
+                    if self.declaration(oracle)?.kind != "oracle"
+                        || a[1..].iter().map(|n| rd(n)).collect::<Result<Vec<_>>>()?
+                            != vec![Type::Int(64); 4]
+                    {
+                        return err("§3.3", "budget.mint requires oracle and four i64 operands");
+                    }
+                    result = Some(Type::Token);
+                }
                 "select" => {
                     arity(3, 1)?;
                     if rd(&a[0])? != Type::Int(1) {

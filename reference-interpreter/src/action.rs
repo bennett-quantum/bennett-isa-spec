@@ -664,13 +664,7 @@ impl Object {
                             .bindings
                             .args
                             .get(&ca[1])
-                            .and_then(|v| {
-                                if let Argument::Token(b) = v {
-                                    Some(*b)
-                                } else {
-                                    None
-                                }
-                            })
+                            .and_then(Argument::token_budget)
                             .ok_or_else(|| Error::new("§4.7: missing oracle token".into()))?;
                         let ins = list(&ca[2])?
                             .iter()
@@ -746,13 +740,7 @@ impl Object {
                         .bindings
                         .args
                         .get(&a[2])
-                        .and_then(|v| {
-                            if let Argument::Token(b) = v {
-                                Some(*b)
-                            } else {
-                                None
-                            }
-                        })
+                        .and_then(Argument::token_budget)
                         .ok_or_else(|| Error::new("§4.5: qinplace token".into()))?;
                     let gf = &self.functions[g.trim_start_matches('@')];
                     let gif = &self.functions[gi.trim_start_matches('@')];
