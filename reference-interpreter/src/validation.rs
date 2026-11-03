@@ -499,19 +499,33 @@ impl Object {
                     // operands, fixed parameter positions and hashes remain intact.
                     let mut matching = ca.clone();
                     let token_key = |name: &str| {
-                        s.token_identities.get(name).map_or_else(
-                            || name.to_string(), |id| format!("$token-identity/{id}"))
+                        s.token_identities
+                            .get(name)
+                            .map_or_else(|| name.to_string(), |id| format!("$token-identity/{id}"))
                     };
                     if !s.token_identities.is_empty() {
-                    if call.instruction.op == "oracle_call" {
-                        matching[1] = token_key(&ca[1]);
-                    }
-                    let group = if call.instruction.op == "oracle_call" { 4 } else { 3 };
-                    let actuals = list(&ca[mem_index + 1])?;
-                    matching[mem_index + 1] = format!("({})", actuals.iter()
-                        .zip(&callee.params[group])
-                        .map(|(name,p)| if p.ty == Type::Token { token_key(name) } else { name.clone() })
-                        .collect::<Vec<_>>().join(", "));
+                        if call.instruction.op == "oracle_call" {
+                            matching[1] = token_key(&ca[1]);
+                        }
+                        let group = if call.instruction.op == "oracle_call" {
+                            4
+                        } else {
+                            3
+                        };
+                        let actuals = list(&ca[mem_index + 1])?;
+                        matching[mem_index + 1] = format!(
+                            "({})",
+                            actuals
+                                .iter()
+                                .zip(&callee.params[group])
+                                .map(|(name, p)| if p.ty == Type::Token {
+                                    token_key(name)
+                                } else {
+                                    name.clone()
+                                })
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        );
                     }
                     let version = if call.instruction.op == "oracle_call" {
                         format!(

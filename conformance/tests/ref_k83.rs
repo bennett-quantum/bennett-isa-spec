@@ -106,6 +106,7 @@ fn k83_published_coordinates_reverse_without_renumbering_and_preserve_every_basi
                 }]
             };
             let mut invocations = vec![SourceInvocation {
+                binding: None,
                 tokens: None,
                 invocation: vec![0],
                 symbol: hash(root),
@@ -113,6 +114,7 @@ fn k83_published_coordinates_reverse_without_renumbering_and_preserve_every_basi
             }];
             if !external {
                 invocations.push(SourceInvocation {
+                    binding: None,
                     tokens: None,
                     invocation: invocation.clone(),
                     symbol: hash(support),

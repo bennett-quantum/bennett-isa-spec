@@ -294,9 +294,15 @@ pub(crate) fn oracle(
         })
         .map(|(p, v)| (p.name.clone(), v.clone()))
         .collect::<BTreeMap<_, _>>();
-    let root_identities = root.params[4].iter().map(|p|
-        (p.name.clone(),call.tokens.context.arguments.get(&p.name).copied()))
-        .collect::<BTreeMap<_,_>>();
+    let root_identities = root.params[4]
+        .iter()
+        .map(|p| {
+            (
+                p.name.clone(),
+                call.tokens.context.arguments.get(&p.name).copied(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
     for param in &root.params[0] {
         names.insert((root.name.clone(), param.name.clone()), param.name.clone());
     }
@@ -546,11 +552,17 @@ pub(crate) fn oracle(
                     } else {
                         None
                     };
-                    let identities = program.arguments(f,&root_identities)?.into_iter()
-                        .filter_map(|(n,id)| id.map(|id| (n,id))).collect();
-                    let tokens = crate::ref_library::tokens::forward(callee,
+                    let identities = program
+                        .arguments(f, &root_identities)?
+                        .into_iter()
+                        .filter_map(|(n, id)| id.map(|id| (n, id)))
+                        .collect();
+                    let tokens = crate::ref_library::tokens::forward(
+                        callee,
                         oracle.then_some(a[1].as_str()),
-                        &crate::object::list(&a[if oracle {6} else {4}])?, &identities)?;
+                        &crate::object::list(&a[if oracle { 6 } else { 4 }])?,
+                        &identities,
+                    )?;
                     symbols.push(bennett_isa_conformance::ref_language::SourceSymbol {
                         name: alias.clone(),
                         hash: closure_hashes[&callee.name].clone().ok_or_else(|| {
@@ -1124,6 +1136,7 @@ pub(crate) fn oracle(
         ])];
     }
     Ok(bennett_isa_conformance::ref_language::SourceBody {
+        binding: Some(call.tokens.binding(root, &root_fixed, Some(budget))?),
         body: array(body),
         symbol: source_symbol,
         oracle: true,
@@ -1163,14 +1176,21 @@ pub(crate) struct LinkedSource {
     tokens: crate::ref_library::tokens::SourceTokens,
 }
 impl LinkedSource {
-    pub fn new(object: crate::Object, tokens: crate::ref_library::tokens::SourceTokens) -> Result<Self> {
+    pub fn new(
+        object: crate::Object,
+        tokens: crate::ref_library::tokens::SourceTokens,
+    ) -> Result<Self> {
         let names = object
             .identity()?
             .closure_hashes
             .into_iter()
             .filter_map(|(n, h)| h.map(|h| (h, n)))
             .collect();
-        Ok(Self { object, names, tokens })
+        Ok(Self {
+            object,
+            names,
+            tokens,
+        })
     }
 }
 impl bennett_isa_conformance::ref_language::SourceFactory for LinkedSource {
@@ -1198,8 +1218,13 @@ impl bennett_isa_conformance::ref_language::SourceFactory for LinkedSource {
                 .ok_or_else(|| Error::new("§11.1: closure is not in linked source".into()))?;
             let f = &self.object.functions[name];
             if f.kind != "oracle" {
-                let tokens = self.tokens.resolve(&self.object,f,values,None,identities)?;
-                return action::construct(&self.object, f, values, regions, &tokens.context, adjoint);
+                let tokens = self
+                    .tokens
+                    .resolve(&self.object, f, values, None, identities)?;
+                let mut body =
+                    action::construct(&self.object, f, values, regions, &tokens.context, adjoint)?;
+                body.binding = Some(tokens.binding(f, values, None)?);
+                return Ok(body);
             }
             let context =
                 context.ok_or_else(|| Error::new("§11.1 K77: missing oracle_invocation".into()))?;
@@ -1246,8 +1271,18 @@ impl bennett_isa_conformance::ref_language::SourceFactory for LinkedSource {
                     }
                 })
                 .collect::<Result<Vec<_>>>()?;
-            let tokens = self.tokens.resolve(&self.object,f,values,Some(budget),identities)?;
-            let call = OracleInvocation::capture_bound(&self.object, name, Some(context), budget, &args,None,Some(tokens))?;
+            let tokens = self
+                .tokens
+                .resolve(&self.object, f, values, Some(budget), identities)?;
+            let call = OracleInvocation::capture_bound(
+                &self.object,
+                name,
+                Some(context),
+                budget,
+                &args,
+                None,
+                Some(tokens),
+            )?;
             oracle(&call)
         };
         build().map_err(|e| {

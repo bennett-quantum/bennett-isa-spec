@@ -386,6 +386,7 @@ fn source_leaf_budget_fails_explicitly_resets_and_leaves_plain_catalogs_unchange
             _: bool,
         ) -> Result<SourceBody, String> {
             Ok(SourceBody {
+                binding: None,
                 body: self.0.clone(),
                 symbols: vec![],
                 symbol: hash.into(),
@@ -455,6 +456,7 @@ fn raw_inverse_retains_the_complete_forward_source_tree_and_leaf_identities() {
             let child = "c".repeat(64);
             let nested = hash != child;
             Ok(SourceBody {
+                binding: None,
                 symbol: hash.into(),
                 oracle: true,
                 points: BTreeMap::from([("$source-point/entry:0".into(), point)]),

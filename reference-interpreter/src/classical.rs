@@ -309,6 +309,7 @@ struct RegionRecord {
     name: String,
     bindings: QuantumBindings,
     budget: Option<Budget>,
+    primary: Option<crate::BudgetToken>,
     adjoint: bool,
     controls: Vec<u64>,
     wire_next: u64,
@@ -1114,11 +1115,15 @@ impl<'a> ClassicalMachine<'a> {
             }
             bindings.borrowed.push(wires);
         }
+        let primary = if oracle {
+            match self.read(&a[1])? { ClassicalValue::DeviceToken(t) => Some(t), _ => None }
+        } else { None };
         Ok((
             RegionRecord {
                 name: name.into(),
                 bindings,
                 budget,
+                primary,
                 adjoint: call.adjoint,
                 controls,
                 wire_next: self.state.quantum.state.next_wire_id(),
@@ -1149,6 +1154,7 @@ impl<'a> ClassicalMachine<'a> {
                 &record.bindings.regions,
                 &args,
                 budget,
+                record.primary.as_ref(),
                 &record
                     .controls
                     .iter()

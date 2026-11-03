@@ -40,10 +40,10 @@ fn published_example10_forwards_every_input_argument_and_cell_without_extra_char
             for d in 0..=255 {
                 let input = input(x, a, d, 6);
                 let want = ((x + a + u128::from(d & 3)) & 3) ^ 1;
-                let out = o.run_oracle("through", &input, budget(8, 8, 1)).unwrap();
+                let out = o.run_oracle_with_token_aliases("through", &input, budget(8, 8, 1), &[0,1]).unwrap();
                 assert_eq!((out.payload, out.code), (want, 0), "x={x} a={a} d={d}");
                 let mut machine =
-                    OracleMachine::new(&o, "through", &input, budget(8, 8, 1)).unwrap();
+                    OracleMachine::new_with_token_aliases(&o, "through", &input, budget(8, 8, 1), &[0,1]).unwrap();
                 let entry = machine.snapshot();
                 for _ in 0..8 {
                     machine.forward_step().unwrap();
@@ -67,9 +67,9 @@ fn forwarded_nested_faults_and_outer_boundaries_reverse_the_complete_prefix() {
         (budget(5, 8, 1), 5, 9),
     ] {
         let input = input(3, 2, 255, nested);
-        let out = o.run_oracle("through", &input, outer).unwrap();
+        let out = o.run_oracle_with_token_aliases("through", &input, outer, &[0,1]).unwrap();
         assert_eq!((out.payload, out.code), (0, code));
-        let mut machine = OracleMachine::new(&o, "through", &input, outer).unwrap();
+        let mut machine = OracleMachine::new_with_token_aliases(&o, "through", &input, outer, &[0,1]).unwrap();
         let entry = machine.snapshot();
         for _ in 0..outer.steps {
             machine.forward_step().unwrap();
@@ -91,12 +91,13 @@ fn source_constructor_binds_lproc_tokens_values_and_region_cells_per_instance() 
     let o = compact_source_object();
     let args=json::parse(r#"["x","t","f",{"address":0,"cell":8,"role":"in","origin":"interface:db","cells":"db"},["2","0","0","0"],"1"]"#).unwrap();
     let context = json::parse(r#"{"token":["6","0","7","1"]}"#).unwrap();
-    let call = OracleInvocation::capture(
+    let call = OracleInvocation::capture_with_token_aliases(
         &o,
         "through",
         Some(&context),
         budget(6, 7, 1),
         args.as_arr().unwrap(),
+        &[0, 1],
     )
     .unwrap();
     let leaves = call
@@ -123,6 +124,18 @@ fn source_constructor_binds_lproc_tokens_values_and_region_cells_per_instance() 
             .iter()
             .any(|e| e.point.symbol == hash && e.point.instance == [0, 1, 0]))
     ));
+    for leaf in &leaves {
+        let source = leaf.source.as_ref().unwrap();
+        let root = source.invocations[0].tokens.as_ref().unwrap();
+        if let Some(child) = source.invocations.get(1) {
+            assert_eq!(
+                child.tokens.as_ref().unwrap().primary,
+                root.arguments.values().next().copied(),
+                "lifted fixed binding retains the root token identity"
+            );
+            assert_eq!(child.binding.as_ref().unwrap().token_aliases, [0]);
+        }
+    }
     let m = Machine::compile(
         &permutation(&leaves).unwrap(),
         &[("x", 1), ("t", 1), ("f", 4), ("db", 8)],
@@ -178,12 +191,13 @@ fn source_forwarding_large_materialisation_reports_host_capacity_before_exhausti
     let o = source_object(32);
     let args=json::parse(r#"["x","t","f",{"address":0,"cell":8,"role":"in","origin":"interface:db","cells":"db"},["6","0","0","0"],"2"]"#).unwrap();
     let context = json::parse(r#"{"token":["8","0","8","1"]}"#).unwrap();
-    let call = OracleInvocation::capture(
+    let call = OracleInvocation::capture_with_token_aliases(
         &o,
         "through",
         Some(&context),
         budget(8, 8, 1),
         args.as_arr().unwrap(),
+        &[0, 1],
     )
     .unwrap();
     let error = call
@@ -224,9 +238,9 @@ fn coherent_paths_keep_two_lproc_instances_even_when_entry_token_values_are_equa
             } else {
                 u128::from(right == 0)
             };
-            let out = o.run_oracle("o", &input, b).unwrap();
+            let out = o.run_oracle_with_token_aliases("o", &input, b, &[0,1,2]).unwrap();
             assert_eq!((out.payload, out.code), (expected, 0));
-            let mut machine = OracleMachine::new(&o, "o", &input, b).unwrap();
+            let mut machine = OracleMachine::new_with_token_aliases(&o, "o", &input, b, &[0,1,2]).unwrap();
             let entry = machine.snapshot();
             for _ in 0..b.steps {
                 machine.forward_step().unwrap();
@@ -260,9 +274,9 @@ fn recursive_forwarding_closes_over_two_permuted_binding_keys() {
             ..Default::default()
         };
         let expected = x ^ 1;
-        let out = o.run_oracle("o", &input, b).unwrap();
+        let out = o.run_oracle_with_token_aliases("o", &input, b, &[0,1,2]).unwrap();
         assert_eq!((out.payload, out.code), (expected, 0));
-        let mut machine = OracleMachine::new(&o, "o", &input, b).unwrap();
+        let mut machine = OracleMachine::new_with_token_aliases(&o, "o", &input, b, &[0,1,2]).unwrap();
         let entry = machine.snapshot();
         for _ in 0..b.steps {
             machine.forward_step().unwrap();
@@ -282,12 +296,13 @@ fn source_expansion_host_stack_limit_is_explicit_and_not_an_isa_fault() {
     let o = object();
     let args=json::parse(r#"["x","t","f",{"address":0,"cell":8,"role":"in","origin":"interface:db","cells":"db"},["6","0","0","0"],"2"]"#).unwrap();
     let context = json::parse(r#"{"token":["600","0","8","1"]}"#).unwrap();
-    let call = OracleInvocation::capture(
+    let call = OracleInvocation::capture_with_token_aliases(
         &o,
         "through",
         Some(&context),
         budget(600, 8, 1),
         args.as_arr().unwrap(),
+        &[0, 1],
     )
     .unwrap();
     let error = call

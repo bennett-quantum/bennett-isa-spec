@@ -134,8 +134,12 @@ impl Compiler<'_> {
         } else {
             None
         };
-        let tokens = crate::ref_library::tokens::forward(f,oracle.then_some(a[1].as_str()),
-            &crate::object::list(&a[if oracle {6} else {4}])?, &self.tokens.arguments)?;
+        let tokens = crate::ref_library::tokens::forward(
+            f,
+            oracle.then_some(a[1].as_str()),
+            &crate::object::list(&a[if oracle { 6 } else { 4 }])?,
+            &self.tokens.arguments,
+        )?;
         self.symbols.push(SourceSymbol {
             name: alias.clone(),
             hash,
@@ -593,7 +597,7 @@ pub(super) fn construct(
     tokens: &bennett_isa_conformance::ref_language::SourceTokenContext,
     adjoint: bool,
 ) -> Result<SourceBody> {
-    let plan = object.source_cleanup_plan_with_tokens(f,&tokens.arguments)?;
+    let plan = object.source_cleanup_plan_with_tokens(f, &tokens.arguments)?;
     let hashes = object.identity()?.closure_hashes;
     let symbol = hashes[&f.name]
         .clone()
@@ -739,6 +743,7 @@ pub(super) fn construct(
         ])];
     }
     Ok(SourceBody {
+        binding: None, // The linked factory supplies the complete invocation.
         body: array(body),
         symbols: compiler.symbols,
         symbol,

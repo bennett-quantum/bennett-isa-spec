@@ -203,6 +203,14 @@ impl Object {
             &controls.iter().map(|w| (*w, true)).collect::<Vec<_>>(),
         )
     }
+    pub fn execute_action_with_token_aliases(
+        &self,name: &str,q: &mut QuantumState,bindings: &QuantumBindings,
+        adjoint: bool,controls: &[Wire],aliases: &[u64],
+    ) -> Result<()> {
+        self.ensure_linked()?;
+        self.action_internal_bound(name,q,bindings,adjoint,
+            &controls.iter().map(|w| (*w,true)).collect::<Vec<_>>(),Some(aliases))
+    }
     fn action_internal(
         &self,
         name: &str,
@@ -211,12 +219,30 @@ impl Object {
         adjoint: bool,
         controls: &[(Wire, bool)],
     ) -> Result<()> {
+        self.action_internal_bound(name,q,bindings,adjoint,controls,None)
+    }
+    fn action_internal_bound(
+        &self,name: &str,q: &mut QuantumState,bindings: &QuantumBindings,
+        adjoint: bool,controls: &[(Wire,bool)],aliases: Option<&[u64]>,
+    ) -> Result<()> {
         let entry_next_wire = q.next_wire_id();
         let f = self
             .functions
             .get(name)
             .filter(|f| matches!(f.kind.as_str(), "action" | "perm_action"))
             .ok_or_else(|| Error::new(format!("§5.3: unknown action @{name}")))?;
+        let resolved = if self.isa_version == crate::IsaVersion::V09 {
+            let args = f.params[3].iter().map(|p| bindings.args.get(&p.name).cloned()
+                .ok_or_else(|| Error::new(format!("§5.1: missing action argument {}",p.name))))
+                .collect::<Result<Vec<_>>>()?;
+            Some(self.resolve_invocation_tokens(f,&args,None,None,aliases)?)
+        } else { None };
+        let bound_bindings = if let Some(resolved) = &resolved {
+            let mut bound = bindings.clone();
+            bound.args = f.params[3].iter().zip(&resolved.arguments).map(|(p,a)| (p.name.clone(),a.clone())).collect();
+            std::borrow::Cow::Owned(bound)
+        } else { std::borrow::Cow::Borrowed(bindings) };
+        let bindings = bound_bindings.as_ref();
         let mut used = BTreeSet::new();
         for p in f.params[0].iter().chain(&f.params[1]) {
             let w = bindings
@@ -268,7 +294,7 @@ impl Object {
                 .iter()
                 .map(|p| bindings.args[&p.name].clone())
                 .collect::<Vec<_>>();
-            self.check_schedule_matches_for_run(name, crate::Budget::steps(0), &arguments)?;
+            self.check_schedule_matches_for_bound_run(name, crate::Budget::steps(0), &arguments,resolved.as_ref().map_or(&[],|v| &v.aliases), controls.len())?;
         }
         let mut env = Environment {
             bindings: bindings.clone(),
@@ -694,7 +720,8 @@ impl Object {
                             })
                             .collect::<Result<Vec<_>>>()?;
                         self.oracle_quantum(
-                            callee, q, &ins, &target, &fault, &regions, &args, token, &c,
+                            callee, q, &ins, &target, &fault, &regions, &args, token,
+                            e.bindings.args.get(&ca[1]).and_then(|a| if let Argument::DeviceToken(t)=a {Some(t)} else {None}), &c,
                         )?;
                     } else {
                         let mut binding = QuantumBindings {
@@ -760,6 +787,7 @@ impl Object {
                         &BTreeMap::new(),
                         &[],
                         token,
+                        e.bindings.args.get(&a[2]).and_then(|a| if let Argument::DeviceToken(t)=a {Some(t)} else {None}),
                         &context,
                     )?;
                     bundle_exchange(q, &x, &t, &context)?;
@@ -772,6 +800,7 @@ impl Object {
                         &BTreeMap::new(),
                         &[],
                         token,
+                        e.bindings.args.get(&a[2]).and_then(|a| if let Argument::DeviceToken(t)=a {Some(t)} else {None}),
                         &context,
                     )?;
                     q.release(&t)?;
@@ -843,6 +872,7 @@ impl Object {
         regions: &BTreeMap<String, QuantumRegion>,
         args: &[Argument],
         budget: crate::Budget,
+        primary: Option<&crate::BudgetToken>,
         controls: &[(Wire, bool)],
     ) -> Result<()> {
         let input_positions = ins
@@ -909,7 +939,7 @@ impl Object {
                     .collect::<Result<_>>()?;
                 input.regions.insert(n.clone(), bytes);
             }
-            let mut machine = crate::OracleVectorMachine::new(self, &callee.name, &input, budget)?;
+            let mut machine = crate::OracleVectorMachine::new_bound(self, &callee.name, &input, budget,primary,None)?;
             let entry = machine.snapshot();
             for _ in 0..budget.steps {
                 machine.forward_step()?;

@@ -242,11 +242,12 @@ fn parsed_two_token_source_action_captures_arguments_bodies_templates_and_nested
             json::parse(r#"["t","f","x",["2","0","0","0"],["3","0","0","0"],["99","0","0","0"]]"#)
                 .unwrap();
         let leaves = object
-            .expand_action_source(
+            .expand_action_source_with_token_aliases(
                 "a",
                 args.as_arr().unwrap(),
                 &[("x", 8), ("t", 8), ("f", 4)],
                 false,
+                &[0, 1, 2],
             )
             .unwrap();
         assert!(leaves.iter().all(|leaf| leaf.source.is_some()), "{route}");

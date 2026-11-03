@@ -153,12 +153,14 @@ fn source_leaf_matching_reads_the_oracle_level_selected_by_each_path() {
             ],
             invocations: vec![
                 SourceInvocation {
+                    binding: None,
                     tokens: None,
                     invocation: vec![0],
                     symbol: root.clone(),
                     oracle: true,
                 },
                 SourceInvocation {
+                    binding: None,
                     tokens: None,
                     invocation: vec![0, 1],
                     symbol: inner.clone(),
@@ -227,7 +229,7 @@ fn real_source_instances_share_the_oracle_level_and_match_distinct_selectors() {
     let bound = scheduled(&o, &[a.clone(), b.clone()], 1).unwrap();
     let arguments = json::parse(r#"["x","t","f",["1","0","0","0"],["1","0","0","0"]]"#).unwrap();
     let context = json::parse(r#"{"token":["1","0","5","1"]}"#).unwrap();
-    let capture = OracleInvocation::capture(
+    let capture = OracleInvocation::capture_with_token_aliases(
         &bound,
         "o",
         Some(&context),
@@ -238,6 +240,7 @@ fn real_source_instances_share_the_oracle_level_and_match_distinct_selectors() {
             depth: 1,
         },
         arguments.as_arr().unwrap(),
+        &[0, 1, 2],
     )
     .unwrap();
     let leaves = capture

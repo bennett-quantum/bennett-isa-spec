@@ -254,44 +254,363 @@ fn a_schedule_certificate_cannot_reuse_equal_params_under_another_partition() {
     );
 }
 
-
 fn identity_pair_source() -> Object {
     let action = r#"{"abi":"0.9","args":["token","token"],"bounds":[],"in":[1],"kind":"perm_action","mem":[],"mut":[1,4],"tier":"q"}"#;
-    let oracle = r#"{"abi":"0.9","args":[],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#;
+    let oracle =
+        r#"{"abi":"0.9","args":[],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#;
     support::rehash(&support::object(&[
         ("pair",action,"perm_action @pair (t:wire mut, f:wire[4] mut) (x:wire in) () (a:token, b:token) ()\n^entry():\noracle_call @id a (x) t f () ()\noracle_call @id b (x) t f () ()"),
         ("id",oracle,"oracle @id (x:wire in) (t:wire) (f:wire[4]) () ()\n^entry():\nlift.retval x")
-    ],"{}", "").replace("=0.8","=0.9"))
+    ],"{}", "").replace("=0.8","=0.9").replace("ptr_width=32","ptr_width=2"))
 }
 fn pair_schedule(source: &Object, aliases: &str, entries: &[Json]) -> String {
-    let closure = source.identity().unwrap().closure_hashes["pair"].clone().unwrap();
+    let closure = source.identity().unwrap().closure_hashes["pair"]
+        .clone()
+        .unwrap();
     let params = bennett_isa_ref::sha256_hex(br#"[["1","0","0","0"],["1","0","0","0"]]"#);
-    let schedule = support::json(&format!(r#"{{"bindings":{{"budget":[0,0,0,0],"closure_hash":"{closure}","epsilon":0,"inherited_controls":0,"params_hash":"{params}","region":"pair","scheduler":{{"name":"k91","version":"1"}},"target_hash":"{}","token_aliases":{aliases},"variant":"forward"}},"entries":{}}}"#, "0".repeat(64),Json::Array(entries.to_vec()).canonical()));
-    format!("{}\nsection schedule\n{}\n",source.text,schedule.canonical())
+    let schedule = support::json(&format!(
+        r#"{{"bindings":{{"budget":[0,0,0,0],"closure_hash":"{closure}","epsilon":0,"inherited_controls":0,"params_hash":"{params}","region":"pair","scheduler":{{"name":"k91","version":"1"}},"target_hash":"{}","token_aliases":{aliases},"variant":"forward"}},"entries":{}}}"#,
+        "0".repeat(64),
+        Json::Array(entries.to_vec()).canonical()
+    ));
+    format!(
+        "{}\nsection schedule\n{}\n",
+        source.text,
+        schedule.canonical()
+    )
 }
 fn pair_cleanup(source: &Object) -> Json {
     let symbol = &source.identity().unwrap().interface_hashes["pair"];
-    support::json(&format!(r#"{{"cleanup":{{"realisation":"recompute"}},"generated":0,"kind":"cleanup","path":[{{"instance":[],"iteration":[],"point":"entry:1","symbol":"{symbol}"}}],"phase":"*","step":"*"}}"#))
+    support::json(&format!(
+        r#"{{"cleanup":{{"realisation":"recompute"}},"generated":0,"kind":"cleanup","path":[{{"instance":[],"iteration":[],"point":"entry:1","symbol":"{symbol}"}}],"phase":"*","step":"*"}}"#
+    ))
 }
 #[test]
 fn equal_identity_has_the_published_carrier_but_equal_tuples_alone_do_not() {
-    let source=identity_pair_source();
-    let entry=pair_cleanup(&source);
-    let entries=[entry.clone(),entry];
+    let source = identity_pair_source();
+    let entry = pair_cleanup(&source);
+    let entries = [entry.clone(), entry];
     // A tie exists exactly on a real K65 carrier. Neither call's unitary
     // truth table nor equality of the two tuples determines this partition.
-    for (aliases, carrier) in [("[0,0]",true),("[0,1]",false)] {
-        let result=Object::parse(&pair_schedule(&source,aliases,&entries));
-        assert_eq!(result.is_err(),carrier,"{aliases}: {result:?}");
-        if carrier { assert!(result.unwrap_err().to_string().contains("multiple maximal")); }
+    for (aliases, carrier) in [("[0,0]", true), ("[0,1]", false)] {
+        let result = Object::parse(&pair_schedule(&source, aliases, &entries));
+        assert_eq!(result.is_err(), carrier, "{aliases}: {result:?}");
+        if carrier {
+            assert!(result.unwrap_err().to_string().contains("multiple maximal"));
+        }
     }
 }
 
 #[test]
 fn tuple_only_source_token_arguments_require_an_identity_binding() {
     let source = identity_pair_source();
-    let args = bennett_isa_conformance::json::parse(r#"["t","f","x",["1","0","0","0"],["1","0","0","0"]]"#).unwrap();
-    let result = source.expand_action_source("pair",args.as_arr().unwrap(),&[("t",1),("f",4),("x",1)],false);
-    assert!(result.is_err(),"source adapter admitted an unspecified partition");
+    let args = bennett_isa_conformance::json::parse(
+        r#"["t","f","x",["1","0","0","0"],["1","0","0","0"]]"#,
+    )
+    .unwrap();
+    let result = source.expand_action_source(
+        "pair",
+        args.as_arr().unwrap(),
+        &[("t", 1), ("f", 4), ("x", 1)],
+        false,
+    );
+    assert!(
+        result.is_err(),
+        "source adapter admitted an unspecified partition"
+    );
     assert!(result.unwrap_err().to_string().contains("K91"));
+}
+
+fn expand_pair(
+    source: &Object,
+    aliases: &[u64],
+    adjoint: bool,
+) -> Vec<bennett_isa_conformance::ref_language::Leaf> {
+    let args = bennett_isa_conformance::json::parse(
+        r#"["t","f","x",["1","0","0","0"],["1","0","0","0"]]"#,
+    )
+    .unwrap();
+    source
+        .expand_action_source_with_token_aliases(
+            "pair",
+            args.as_arr().unwrap(),
+            &[("t", 1), ("f", 4), ("x", 1)],
+            adjoint,
+            aliases,
+        )
+        .unwrap()
+}
+#[test]
+fn source_cleanup_decisions_require_the_actual_root_partition() {
+    let source = identity_pair_source();
+    let entry = pair_cleanup(&source);
+    let default = expand_pair(&source, &[0, 0], false);
+    let wrong = Object::parse(&pair_schedule(&source, "[0,1]", &[entry.clone()])).unwrap();
+    let leaves = expand_pair(&wrong, &[0, 0], false);
+    assert_eq!(
+        leaves.len(),
+        default.len(),
+        "a different partition uses defaults"
+    );
+    let matched = Object::parse(&pair_schedule(&source, "[0,0]", &[entry])).unwrap();
+    let leaves = expand_pair(&matched, &[0, 0], false);
+    assert!(
+        leaves.len() > default.len(),
+        "same identity selects real recomputation"
+    );
+}
+
+#[test]
+fn source_captures_keep_identity_and_restore_all_sixty_four_basis_tuples() {
+    use bennett_isa_conformance::{
+        ref_catalog::Machine,
+        ref_language::{invert_trace, permutation},
+    };
+    let source = identity_pair_source();
+    for (labels, partition) in [("[0,0]", vec![0, 0]), ("[0,1]", vec![0, 1])] {
+        let scheduled =
+            Object::parse(&pair_schedule(&source, labels, &[pair_cleanup(&source)])).unwrap();
+        for adjoint in [false, true] {
+            let leaves = expand_pair(&scheduled, &partition, adjoint);
+            for leaf in &leaves {
+                let location = leaf.source.as_ref().unwrap();
+                let root = &location.invocations[0];
+                let tokens = root.tokens.as_ref().unwrap();
+                assert!(
+                    tokens.primary.is_none(),
+                    "an action has no primary identity"
+                );
+                assert_eq!(
+                    tokens.arguments["a"] == tokens.arguments["b"],
+                    partition[0] == partition[1]
+                );
+                assert_eq!(root.binding.as_ref().unwrap().token_aliases, partition);
+                if let Some(child) = location.invocations.get(1) {
+                    assert_eq!(child.binding.as_ref().unwrap().token_aliases, [0]);
+                    let token = child.tokens.as_ref().unwrap().primary.unwrap();
+                    assert!(tokens.arguments.values().any(|id| *id == token));
+                }
+            }
+            let mut inverse = leaves.clone();
+            invert_trace(&mut inverse).unwrap();
+            for (a, b) in inverse.iter().zip(leaves.iter().rev()) {
+                assert_eq!(a.source, b.source);
+            }
+            let bundles = [("x", 1), ("t", 1), ("f", 4)];
+            let machine = Machine::compile(&permutation(&leaves).unwrap(), &bundles).unwrap();
+            let inv = Machine::compile(&permutation(&inverse).unwrap(), &bundles).unwrap();
+            for m in [&machine, &inv] {
+                let mut state = m.packed_state();
+                for lane in 0..64 {
+                    m.set_lane(&mut state, "x", (lane & 1) as u64, lane);
+                    m.set_lane(&mut state, "t", ((lane >> 1) & 1) as u64, lane);
+                    m.set_lane(&mut state, "f", (lane >> 2) as u64, lane);
+                }
+                let entry = state.clone();
+                m.run_packed(&mut state, u64::MAX, false).unwrap();
+                assert_eq!(
+                    state, entry,
+                    "{labels}, adjoint={adjoint}: complete identity"
+                );
+                m.run_packed(&mut state, u64::MAX, true).unwrap();
+                assert_eq!(state, entry);
+            }
+        }
+    }
+}
+
+#[test]
+fn source_tuple_adapters_reject_malformed_bindings_before_construction() {
+    let source = identity_pair_source();
+    for token in [
+        r#"[]"#,
+        r#"["1","0","0"]"#,
+        r#"[1,"0","0","0"]"#,
+        r#"["01","0","0","0"]"#,
+    ] {
+        let args = bennett_isa_conformance::json::parse(&format!(
+            r#"["t","f","x",{token},["1","0","0","0"]]"#
+        ))
+        .unwrap();
+        assert!(source
+            .expand_action_source_with_token_aliases(
+                "pair",
+                args.as_arr().unwrap(),
+                &[("t", 1), ("f", 4), ("x", 1)],
+                false,
+                &[0, 0]
+            )
+            .is_err());
+    }
+    let args = bennett_isa_conformance::json::parse(
+        r#"["t","f","x",["1","0","0","0"],["1","0","0","0"]]"#,
+    )
+    .unwrap();
+    for labels in [vec![1, 1], vec![0, 2], vec![0], vec![]] {
+        assert!(source
+            .expand_action_source_with_token_aliases(
+                "pair",
+                args.as_arr().unwrap(),
+                &[("t", 1), ("f", 4), ("x", 1)],
+                false,
+                &labels
+            )
+            .is_err());
+    }
+}
+
+#[test]
+fn a_token_free_oracle_uses_defaults_for_a_different_primary_budget() {
+    use bennett_isa_ref::{Budget,OracleInput,OracleMachine};
+    let source=oracle_source(false);
+    let raw=scheduled(&source,Some("[0]"));
+    let (body,raw)=raw.split_once("section schedule\n").unwrap();
+    let mut schedule=Json::parse(raw.trim()).unwrap();
+    fields(fields(&mut schedule).get_mut("bindings").unwrap()).insert("budget".into(),support::json("[2,0,0,0]"));
+    let symbol=&source.identity().unwrap().interface_hashes["id"];
+    let entry=support::json(&format!(r#"{{"gate":{{"epsilon_share":0,"realisation":"native"}},"generated":"*","kind":"gate","path":[{{"instance":[],"iteration":[],"point":"entry:0","symbol":"{symbol}"}}],"phase":"*","step":3}}"#));
+    fields(&mut schedule).insert("entries".into(),Json::Array(vec![entry.clone(),entry]));
+    let object=Object::parse(&format!("{body}section schedule\n{}\n",schedule.canonical())).unwrap();
+    for x in 0..2 {
+        let input=OracleInput::bits(&[x]);
+        assert_eq!(object.run_oracle("id",&input,Budget::steps(3)).unwrap().payload,x);
+        let mut machine=OracleMachine::new(&object,"id",&input,Budget::steps(3)).unwrap();
+        let before=machine.snapshot();
+        for _ in 0..3 { machine.forward_step().unwrap(); }
+        assert_eq!(machine.outcome().unwrap().payload,x);
+        for _ in 0..3 { machine.inverse_step().unwrap(); }
+        assert_eq!(machine.snapshot(),before);
+    }
+}
+
+#[test]
+fn tuple_only_native_oracle_arguments_require_an_identity_binding() {
+    use bennett_isa_ref::{Argument,Budget,OracleInput,OracleMachine};
+    let object=oracle_source(true);
+    let mut input=OracleInput::bits(&[1]);
+    input.args.push(Argument::Token(Budget::steps(1)));
+    let result=object.run_oracle("id",&input,Budget::steps(1));
+    assert!(result.is_err(),"native tuple adapter admitted unspecified primary/argument equality");
+    assert!(result.unwrap_err().to_string().contains("K91"));
+    assert!(OracleMachine::new(&object,"id",&input,Budget::steps(1)).is_err());
+}
+
+#[test]
+fn native_oracle_partitions_bind_the_primary_and_preserve_actual_handles() {
+    use bennett_isa_ref::{Argument,Budget,OracleInput,OracleMachine};
+    let object=oracle_source(true);
+    for aliases in [&[0,0][..],&[0,1][..]] {
+        for x in 0..2 {
+            let mut input=OracleInput::bits(&[x]);
+            input.args.push(Argument::Token(Budget::steps(1)));
+            assert_eq!(object.run_oracle_with_token_aliases("id",&input,Budget::steps(1),aliases).unwrap().payload,x);
+            let mut machine=OracleMachine::new_with_token_aliases(&object,"id",&input,Budget::steps(1),aliases).unwrap();
+            let before=machine.snapshot();
+            machine.forward_step().unwrap();
+            assert_eq!(machine.outcome().unwrap().payload,x);
+            machine.inverse_step().unwrap();
+            assert_eq!(machine.snapshot(),before);
+        }
+    }
+    let primary=object.budget_token("id",Budget::steps(1)).unwrap();
+    let distinct=object.budget_token("id",Budget::steps(1)).unwrap();
+    for token in [&primary,&distinct] {
+        let mut input=OracleInput::bits(&[1]);
+        input.args.push(Argument::DeviceToken(token.clone()));
+        assert_eq!(object.run_oracle_with_token("id",&input,&primary).unwrap().payload,1);
+        assert!(object.run_oracle_with_token_aliases("id",&input,Budget::steps(1),&[0,0]).is_ok(),"an unspecified primary can bind to the supplied handle");
+    }
+    for labels in [vec![1,1],vec![0,2],vec![],vec![0]] {
+        let mut input=OracleInput::bits(&[1]);
+        input.args.push(Argument::Token(Budget::steps(1)));
+        assert!(object.run_oracle_with_token_aliases("id",&input,Budget::steps(1),&labels).is_err());
+    }
+    let mut unequal=OracleInput::bits(&[1]);
+    unequal.args.push(Argument::Token(Budget::steps(2)));
+    assert!(object.run_oracle_with_token_aliases("id",&unequal,Budget::steps(1),&[0,0]).is_err());
+}
+
+fn scheduled_nested_oracle() -> Object {
+    let outer=r#"{"abi":"0.9","args":["token"],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#;
+    let inner=r#"{"abi":"0.9","args":[],"fault":4,"in":[1],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#;
+    let source=support::rehash(&support::object(&[
+        ("outer",outer,"oracle @outer (x:wire in) (t:wire) (f:wire[4]) () (a:token)\nregs { r:reg[1], fr:reg[4] }\n^entry():\nlift.oracle_call @inner a (x) r fr () ()\nlift.retval r"),
+        ("inner",inner,"oracle @inner (x:wire in) (t:wire) (f:wire[4]) () ()\n^entry():\nlift.retval x")
+    ],"{}", "").replace("=0.8","=0.9"));
+    let id=source.identity().unwrap();
+    let root=id.closure_hashes["outer"].as_ref().unwrap();
+    let child=&id.interface_hashes["inner"];
+    let params=bennett_isa_ref::sha256_hex(br#"[["3","0","0","0"]]"#);
+    let entry=support::json(&format!(r#"{{"gate":{{"epsilon_share":0,"realisation":"native"}},"generated":"*","kind":"gate","path":[{{"call_index":0,"instance":[],"iteration":[],"point":"entry:0","symbol":"{root}"}},{{"instance":[],"iteration":[],"point":"entry:0","symbol":"{child}"}}],"phase":"*","step":3}}"#));
+    let schedule=support::json(&format!(r#"{{"bindings":{{"budget":[3,0,0,0],"closure_hash":"{root}","epsilon":0,"inherited_controls":0,"params_hash":"{params}","region":"outer","scheduler":{{"name":"k91","version":"1"}},"target_hash":"{}","token_aliases":[0,0],"variant":"forward"}},"entries":{}}}"#, "0".repeat(64),Json::Array(vec![entry.clone(),entry]).canonical()));
+    Object::parse(&format!("{}\nsection schedule\n{}\n",source.text,schedule.canonical())).unwrap()
+}
+#[test]
+fn native_schedule_dispatch_compares_the_actual_primary_argument_partition() {
+    use bennett_isa_ref::{Argument,Budget,OracleInput,OracleMachine};
+    let object=scheduled_nested_oracle();
+    for x in 0..2 {
+        let mut input=OracleInput::bits(&[x]);
+        input.args.push(Argument::Token(Budget::steps(3)));
+        let error=object.run_oracle_with_token_aliases("outer",&input,Budget::steps(3),&[0,0]).unwrap_err();
+        assert!(error.to_string().contains("multiple maximal"));
+        assert!(OracleMachine::new_with_token_aliases(&object,"outer",&input,Budget::steps(3),&[0,0]).is_err());
+        assert_eq!(object.run_oracle_with_token_aliases("outer",&input,Budget::steps(3),&[0,1]).unwrap().payload,x);
+        let mut machine=OracleMachine::new_with_token_aliases(&object,"outer",&input,Budget::steps(3),&[0,1]).unwrap();
+        let before=machine.snapshot();
+        for _ in 0..3 { machine.forward_step().unwrap(); }
+        assert_eq!(machine.outcome().unwrap().payload,x);
+        for _ in 0..3 { machine.inverse_step().unwrap(); }
+        assert_eq!(machine.snapshot(),before);
+    }
+    let primary=object.budget_token("outer",Budget::steps(3)).unwrap();
+    let distinct=object.budget_token("inner",Budget::steps(3)).unwrap();
+    let mut input=OracleInput::bits(&[1]);
+    input.args.push(Argument::DeviceToken(primary.clone()));
+    assert!(object.run_oracle_with_token("outer",&input,&primary).is_err());
+    input.args[0]=Argument::DeviceToken(distinct);
+    assert_eq!(object.run_oracle_with_token("outer",&input,&primary).unwrap().payload,1);
+}
+
+#[test]
+fn public_cli_q_invocations_bind_aliases_for_run_reverse_and_step_check() {
+    use std::{path::PathBuf,process::Command};
+    let dir=PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".tmp");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path=dir.join("k91-native-cli.bisa");
+    std::fs::write(&path,oracle_source(true).text).unwrap();
+    for aliases in ["[0,0]","[0,1]"] {
+        for command in ["run-oracle","reverse","step-check"] {
+            let mut cmd=Command::new(env!("CARGO_BIN_EXE_bennett-isa-ref"));
+            cmd.arg(command).arg(&path).arg("id").args(["--budget","1,0,0,0","--arg","token:1,0,0,0","--token-aliases",aliases]);
+            if command=="step-check" { cmd.args(["--exhaustive","--max-bits","1"]); }
+            else { cmd.args(["--input","1"]); }
+            let output=cmd.output().unwrap();
+            assert!(output.status.success(),"{command}/{aliases}: {}",String::from_utf8_lossy(&output.stderr));
+            let json=Json::parse(std::str::from_utf8(&output.stdout).unwrap().trim()).unwrap();
+            if command=="run-oracle" { assert_eq!(json.get("payload").unwrap().uint().unwrap(),1); }
+            if command=="reverse" { assert_eq!(json.get("equals_entry").unwrap(),&Json::Bool(true)); }
+        }
+    }
+    for aliases in [None,Some("[1,1]"),Some("[0,2]"),Some("[0]"),Some("[-1,0]")] {
+        let mut cmd=Command::new(env!("CARGO_BIN_EXE_bennett-isa-ref"));
+        cmd.arg("run-oracle").arg(&path).arg("id").args(["--input","1","--budget","1,0,0,0","--arg","token:1,0,0,0"]);
+        if let Some(labels)=aliases { cmd.args(["--token-aliases",labels]); }
+        let output=cmd.output().unwrap();
+        assert_eq!(output.status.code(),Some(1));
+        assert!(output.stdout.is_empty());
+        assert!(String::from_utf8_lossy(&output.stderr).contains("K91"));
+    }
+    std::fs::write(&path,identity_pair_source().text).unwrap();
+    for aliases in ["[0,0]","[0,1]"] {
+        for command in ["run-action","reverse"] {
+            let output=Command::new(env!("CARGO_BIN_EXE_bennett-isa-ref"))
+                .arg(command).arg(&path).arg("pair")
+                .args(["--mut","1,7","--in","1","--arg","token:1,0,0,0","--arg","token:1,0,0,0","--token-aliases",aliases])
+                .output().unwrap();
+            assert!(output.status.success(),"{command}/{aliases}: {}",String::from_utf8_lossy(&output.stderr));
+            let json=Json::parse(std::str::from_utf8(&output.stdout).unwrap().trim()).unwrap();
+            if command=="reverse" { assert_eq!(json.get("equals_entry").unwrap(),&Json::Bool(true)); }
+        }
+    }
 }

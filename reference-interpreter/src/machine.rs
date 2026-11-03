@@ -350,12 +350,28 @@ impl<'a> OracleVectorMachine<'a> {
         input: &OracleVectorInput,
         budget: Budget,
     ) -> Result<Self> {
+        Self::new_bound(object,name,input,budget,None,None)
+    }
+    pub fn new_with_token_aliases(
+        object: &'a Object,name: &str,input: &OracleVectorInput,budget: Budget,aliases: &[u64],
+    ) -> Result<Self> { Self::new_bound(object,name,input,budget,None,Some(aliases)) }
+    pub fn new_with_token(
+        object: &'a Object,name: &str,input: &OracleVectorInput,primary: &crate::BudgetToken,
+    ) -> Result<Self> { Self::new_bound(object,name,input,primary.tuple(),Some(primary),None) }
+    pub(crate) fn new_bound(
+        object: &'a Object,name: &str,input: &OracleVectorInput,budget: Budget,
+        primary: Option<&crate::BudgetToken>,aliases: Option<&[u64]>,
+    ) -> Result<Self> {
         object.validate_budget(budget)?;
-        object.check_schedule_matches_for_run(name, budget, &input.args)?;
+        let root = object.declaration(name)?;
+        let resolved = (object.isa_version == crate::IsaVersion::V09).then(||
+            object.resolve_invocation_tokens(&root,&input.args,Some(budget),primary,aliases)).transpose()?;
+        let args = resolved.as_ref().map_or(input.args.as_slice(),|v| v.arguments.as_slice());
+        object.check_schedule_matches_for_bound_run(name,budget,args,resolved.as_ref().map_or(&[],|v| &v.aliases),0)?;
         let program = Program::new(object, name)?;
         let widths = DerivedWidths::from_program(object, &program, budget)?;
         let root = &object.functions[name];
-        if root.params[0].len() != input.ins.len() || root.params[4].len() != input.args.len() {
+        if root.params[0].len() != input.ins.len() || root.params[4].len() != args.len() {
             return err("§5.1", "machine interface argument count mismatch");
         }
         let mut locations = BTreeMap::new();
@@ -375,7 +391,7 @@ impl<'a> OracleVectorMachine<'a> {
             }
             locations.insert((name.into(), p.name.clone()), v.clone());
         }
-        let arguments = object.bind_arguments(root, &input.args)?;
+        let arguments = object.bind_arguments(root, args)?;
         let mut pseudo_seen = std::collections::BTreeSet::new();
         for (f, _) in &program.rows {
             if !pseudo_seen.insert(f.name.clone()) {
@@ -1187,7 +1203,8 @@ impl<'a> OracleVectorMachine<'a> {
         }
         // The nested invocation is itself compute / commit / prefix reversal,
         // executed as a reversible machine (§5.2).
-        let mut child = Self::new(self.object, &callee.name, &input, budget)?;
+        let primary = arguments.get(&a[1]).and_then(|a| if let Argument::DeviceToken(t) = a {Some(t)} else {None});
+        let mut child = Self::new_bound(self.object, &callee.name, &input, budget,primary,None)?;
         let entry = child.snapshot();
         for _ in 0..budget.steps {
             child.forward_step()?;
@@ -1273,6 +1290,18 @@ impl<'a> OracleMachine<'a> {
         input: &OracleInput,
         budget: Budget,
     ) -> Result<Self> {
+        Self::new_bound(object,name,input,budget,None,None)
+    }
+    pub fn new_with_token_aliases(
+        object: &'a Object,name: &str,input: &OracleInput,budget: Budget,aliases: &[u64],
+    ) -> Result<Self> { Self::new_bound(object,name,input,budget,None,Some(aliases)) }
+    pub fn new_with_token(
+        object: &'a Object,name: &str,input: &OracleInput,primary: &crate::BudgetToken,
+    ) -> Result<Self> { Self::new_bound(object,name,input,primary.tuple(),Some(primary),None) }
+    fn new_bound(
+        object: &'a Object,name: &str,input: &OracleInput,budget: Budget,
+        primary: Option<&crate::BudgetToken>,aliases: Option<&[u64]>,
+    ) -> Result<Self> {
         let f = object
             .functions
             .get(name)
@@ -1287,8 +1316,8 @@ impl<'a> OracleMachine<'a> {
             );
         }
         let input = OracleVectorInput::from_input(object, name, input)?;
-        Ok(Self(OracleVectorMachine::new(
-            object, name, &input, budget,
+        Ok(Self(OracleVectorMachine::new_bound(
+            object, name, &input, budget,primary,aliases,
         )?))
     }
     pub fn snapshot(&self) -> BasisConfiguration {

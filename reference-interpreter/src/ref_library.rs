@@ -87,17 +87,25 @@ impl Object {
         bundles: &[(&str, usize)],
         adjoint: bool,
     ) -> Result<Vec<Leaf>> {
-        self.expand_action_source_bound(name,args,bundles,adjoint,None)
+        self.expand_action_source_bound(name, args, bundles, adjoint, None)
     }
     /// Tuple-only token parameters require their canonical equality partition.
     pub fn expand_action_source_with_token_aliases(
-        &self, name: &str, args: &[Value], bundles: &[(&str,usize)], adjoint: bool,
+        &self,
+        name: &str,
+        args: &[Value],
+        bundles: &[(&str, usize)],
+        adjoint: bool,
         aliases: &[u64],
     ) -> Result<Vec<Leaf>> {
-        self.expand_action_source_bound(name,args,bundles,adjoint,Some(aliases))
+        self.expand_action_source_bound(name, args, bundles, adjoint, Some(aliases))
     }
     fn expand_action_source_bound(
-        &self, name: &str, args: &[Value], bundles: &[(&str,usize)], adjoint: bool,
+        &self,
+        name: &str,
+        args: &[Value],
+        bundles: &[(&str, usize)],
+        adjoint: bool,
         aliases: Option<&[u64]>,
     ) -> Result<Vec<Leaf>> {
         self.ensure_linked()?;
@@ -107,7 +115,7 @@ impl Object {
             .get(name)
             .filter(|f| matches!(f.kind.as_str(), "action" | "perm_action"))
             .ok_or_else(|| crate::Error::new("§11.1: source action is not defined".into()))?;
-        let tokens = tokens::SourceTokens::bind(self,f,args,None,aliases)?;
+        let tokens = tokens::SourceTokens::bind(self, f, args, None, aliases)?;
         let library = self.bound_ref_library()?;
         let identity = self.identity()?;
         let hash = identity.closure_hashes[&f.name]
@@ -130,8 +138,10 @@ impl Object {
                 ))
             })
             .collect::<Result<Registry>>()?;
-        let factory =
-            std::sync::Arc::new(crate::source_constructor::LinkedSource::new(self.clone(),tokens.clone())?);
+        let factory = std::sync::Arc::new(crate::source_constructor::LinkedSource::new(
+            self.clone(),
+            tokens.clone(),
+        )?);
         let mut e = library
             .expander
             .with_registry(registry)
@@ -198,17 +208,33 @@ impl<'a> OracleInvocation<'a> {
         source_budget: crate::Budget,
         arguments: &[Value],
     ) -> Result<Self> {
-        Self::capture_bound(object,name,context,source_budget,arguments,None,None)
+        Self::capture_bound(object, name, context, source_budget, arguments, None, None)
     }
     pub fn capture_with_token_aliases(
-        object: &'a Object, name: &str, context: Option<&Value>,
-        source_budget: crate::Budget, arguments: &[Value], aliases: &[u64],
+        object: &'a Object,
+        name: &str,
+        context: Option<&Value>,
+        source_budget: crate::Budget,
+        arguments: &[Value],
+        aliases: &[u64],
     ) -> Result<Self> {
-        Self::capture_bound(object,name,context,source_budget,arguments,Some(aliases),None)
+        Self::capture_bound(
+            object,
+            name,
+            context,
+            source_budget,
+            arguments,
+            Some(aliases),
+            None,
+        )
     }
     pub(crate) fn capture_bound(
-        object: &'a Object, name: &str, context: Option<&Value>,
-        source_budget: crate::Budget, arguments: &[Value], aliases: Option<&[u64]>,
+        object: &'a Object,
+        name: &str,
+        context: Option<&Value>,
+        source_budget: crate::Budget,
+        arguments: &[Value],
+        aliases: Option<&[u64]>,
         resolved: Option<tokens::SourceTokens>,
     ) -> Result<Self> {
         let invalid = |e| crate::Error::new(format!("§11.1 K77: {e}"));
@@ -266,7 +292,13 @@ impl<'a> OracleInvocation<'a> {
             .ok_or_else(|| invalid("unresolved linked closure"))?;
         let tokens = match resolved {
             Some(tokens) => tokens,
-            None => tokens::SourceTokens::bind(object,function,arguments,Some(source_budget),aliases)?,
+            None => tokens::SourceTokens::bind(
+                object,
+                function,
+                arguments,
+                Some(source_budget),
+                aliases,
+            )?,
         };
         Ok(Self {
             object,
@@ -321,7 +353,8 @@ impl<'a> OracleInvocation<'a> {
             })
             .collect::<Result<Registry>>()?;
         let factory = std::sync::Arc::new(crate::source_constructor::LinkedSource::new(
-            self.object.clone(), self.tokens.clone(),
+            self.object.clone(),
+            self.tokens.clone(),
         )?);
         let mut expander = library
             .expander

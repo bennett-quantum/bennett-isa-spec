@@ -20,7 +20,7 @@ pub const HOST_RESOURCE_LIMIT_PREFIX: &str = "HOST_RESOURCE_LIMIT: ";
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SourceTokenContext {
     pub primary: Option<u64>,
-    pub arguments: BTreeMap<String,u64>,
+    pub arguments: BTreeMap<String, u64>,
 }
 /// Source context remains outside the closed catalog and positional arguments.
 #[derive(Clone, Debug)]
@@ -74,9 +74,20 @@ pub struct SourceStep {
     pub step: usize,
     pub reverse: bool,
 }
+/// Resolved invocation for schedule dispatch. IDs remain in SourceTokenContext;
+/// hashes and canonical local labels here contain no process-local handles.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SourceBinding {
+    pub budget: [u128; 4],
+    pub params_hash: String,
+    pub token_aliases: Vec<u64>,
+    pub inherited_controls: usize,
+    pub variant: String,
+}
 /// Semantic invocation ancestry, including oracle support outside any step.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SourceInvocation {
+    pub binding: Option<SourceBinding>,
     pub invocation: Vec<usize>,
     pub tokens: Option<std::sync::Arc<SourceTokenContext>>,
     pub symbol: String,
@@ -91,6 +102,7 @@ pub struct SourceLocation {
 }
 #[derive(Clone, Debug)]
 pub struct SourceBody {
+    pub binding: Option<SourceBinding>,
     pub body: Json,
     pub symbols: Vec<SourceSymbol>,
     pub symbol: String,
@@ -1403,7 +1415,10 @@ impl Expander {
                         .invocation_source
                         .as_ref()
                         .and_then(|s| s.oracle_invocation.as_ref()),
-                    caller.invocation_source.as_ref().and_then(|s| s.tokens.as_deref()),
+                    caller
+                        .invocation_source
+                        .as_ref()
+                        .and_then(|s| s.tokens.as_deref()),
                     caller.invocation_source.as_ref().is_some_and(|s| s.adjoint),
                 )?;
                 validate_body_mode(a(&built.body)?, true)?;
@@ -1417,9 +1432,17 @@ impl Expander {
                     rows: built.rows,
                     raw_reverse: rev,
                 }));
+                let binding = built.binding.map(|mut binding| {
+                    binding.inherited_controls = c.controls.len();
+                    binding
+                });
                 c.source_invocations.push(SourceInvocation {
+                    binding,
                     invocation: path.to_vec(),
-                    tokens: caller.invocation_source.as_ref().and_then(|s| s.tokens.clone()),
+                    tokens: caller
+                        .invocation_source
+                        .as_ref()
+                        .and_then(|s| s.tokens.clone()),
                     symbol: built.symbol.clone(),
                     oracle: built.oracle,
                 });

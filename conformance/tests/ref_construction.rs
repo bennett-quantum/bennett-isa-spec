@@ -148,6 +148,7 @@ fn whole_source_constructor_inverse_retains_support_row_and_step_identities() {
             _: &BTreeMap<String, Json>,
             _: &BTreeMap<String, Json>,
             _: Option<&Json>,
+            _: Option<&bennett_isa_conformance::ref_language::SourceTokenContext>,
             _: bool,
         ) -> Result<SourceBody, String> {
             let names = [
@@ -176,6 +177,7 @@ fn whole_source_constructor_inverse_retains_support_row_and_step_identities() {
                 ));
             }
             Ok(SourceBody {
+                binding: None,
                 body,
                 symbols: vec![],
                 symbol: hash.into(),

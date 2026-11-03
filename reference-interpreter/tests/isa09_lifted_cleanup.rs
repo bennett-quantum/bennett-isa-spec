@@ -20,12 +20,13 @@ fn k65_lifted_intrinsic_cleanup_recomputes_the_delivery_in_fresh_targets() {
     let o = Object::parse(&format!("{}\nsection schedule\n{schedule}\n", o.text)).unwrap();
     let args = json::parse(r#"["x","t","f",["1","0","0","0"]]"#).unwrap();
     let context = json::parse(r#"{"token":["3","0","0","0"]}"#).unwrap();
-    let call = OracleInvocation::capture(
+    let call = OracleInvocation::capture_with_token_aliases(
         &o,
         "o",
         Some(&context),
         Budget::steps(3),
         args.as_arr().unwrap(),
+        &[0, 1],
     )
     .unwrap();
     let leaves = call
@@ -72,9 +73,9 @@ fn k65_lifted_intrinsic_cleanup_recomputes_the_delivery_in_fresh_targets() {
                     args: vec![Argument::Token(Budget::steps(1))],
                     ..Default::default()
                 };
-                let result = o.run_oracle("o", &input, Budget::steps(3)).unwrap();
+                let result = o.run_oracle_with_token_aliases("o", &input, Budget::steps(3), &[0,1]).unwrap();
                 assert_eq!((result.payload, result.code), (x as u128, 0));
-                let mut literal = OracleMachine::new(&o, "o", &input, Budget::steps(3)).unwrap();
+                let mut literal = OracleMachine::new_with_token_aliases(&o, "o", &input, Budget::steps(3), &[0,1]).unwrap();
                 let before = literal.snapshot();
                 for _ in 0..3 {
                     literal.forward_step().unwrap();

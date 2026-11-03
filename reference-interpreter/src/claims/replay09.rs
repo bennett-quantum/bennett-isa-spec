@@ -5,6 +5,7 @@ use crate::Argument;
 #[derive(Clone)]
 pub(super) struct Invocation {
     pub args: Vec<Argument>,
+    pub primary: Option<crate::BudgetToken>,
     pub controls: Vec<BitVector>,
     pub adjoint: bool,
     budget: Budget,
@@ -149,11 +150,15 @@ impl Object {
         if args.len() != f.params[group].len() {
             return err("§12.1 K13", "invocation argument count mismatch");
         }
+        let budget = budget(invocation.get("budget")?)?;
+        let aliases = self.validate_invocation09(invocation,f)?;
+        let resolved = self.resolve_invocation_tokens(f,&args,(f.kind == "oracle").then_some(budget),None,Some(&aliases))?;
         Ok(Invocation {
-            args,
+            args: resolved.arguments,
+            primary: resolved.primary,
             controls: Vec::new(),
             adjoint,
-            budget: budget(invocation.get("budget")?)?,
+            budget,
         })
     }
 

@@ -531,11 +531,41 @@ impl Object {
         input: &OracleVectorInput,
         budget: Budget,
     ) -> Result<OracleVectorOutcome> {
+        self.run_oracle_vectors_bound(name,input,budget,None,None)
+    }
+    pub fn run_oracle_with_token_aliases(
+        &self,name: &str,input: &OracleInput,budget: Budget,aliases: &[u64],
+    ) -> Result<OracleOutcome> {
+        self.run_oracle_vectors_bound(name,&OracleVectorInput::from_input(self,name,input)?,budget,None,Some(aliases))?.narrow()
+    }
+    pub fn run_oracle_vectors_with_token_aliases(
+        &self,name: &str,input: &OracleVectorInput,budget: Budget,aliases: &[u64],
+    ) -> Result<OracleVectorOutcome> {
+        self.run_oracle_vectors_bound(name,input,budget,None,Some(aliases))
+    }
+    pub fn run_oracle_with_token(
+        &self,name: &str,input: &OracleInput,primary: &crate::BudgetToken,
+    ) -> Result<OracleOutcome> {
+        self.run_oracle_vectors_with_token(name,&OracleVectorInput::from_input(self,name,input)?,primary)?.narrow()
+    }
+    pub fn run_oracle_vectors_with_token(
+        &self,name: &str,input: &OracleVectorInput,primary: &crate::BudgetToken,
+    ) -> Result<OracleVectorOutcome> {
+        self.run_oracle_vectors_bound(name,input,primary.tuple(),Some(primary),None)
+    }
+    pub(crate) fn run_oracle_vectors_bound(
+        &self,name: &str,input: &OracleVectorInput,budget: Budget,
+        primary: Option<&crate::BudgetToken>,aliases: Option<&[u64]>,
+    ) -> Result<OracleVectorOutcome> {
         self.validate_budget(budget)?;
-        self.check_schedule_matches_for_run(name, budget, &input.args)?;
+        let root = self.declaration(name)?;
+        let resolved = (self.isa_version == crate::IsaVersion::V09).then(||
+            self.resolve_invocation_tokens(&root,&input.args,Some(budget),primary,aliases)).transpose()?;
+        let args = resolved.as_ref().map_or(input.args.as_slice(),|v| v.arguments.as_slice());
+        self.check_schedule_matches_for_bound_run(name,budget,args,resolved.as_ref().map_or(&[],|v| &v.aliases),0)?;
         let program = Program::new(self, name)?;
         let root = &self.functions[name];
-        if input.ins.len() != root.params[0].len() || input.args.len() != root.params[4].len() {
+        if input.ins.len() != root.params[0].len() || args.len() != root.params[4].len() {
             return err("§5.1", "oracle interface argument count mismatch");
         }
         let mut activation = Activation::new(root, self.ptr_width)?;
@@ -545,8 +575,8 @@ impl Object {
             }
             activation.values.insert(p.name.clone(), v.clone());
         }
-        let arguments = self.bind_arguments(root, &input.args)?;
-        for (p, v) in root.params[4].iter().zip(&input.args) {
+        let arguments = self.bind_arguments(root, args)?;
+        for (p, v) in root.params[4].iter().zip(args) {
             if let Some(bits) = argument_bits(self, &p.ty, v)? {
                 activation.values.insert(p.name.clone(), bits);
             }
@@ -777,7 +807,8 @@ impl Object {
                             child.args.push(self.forward_argument(&row_arguments, &n)?);
                         }
                         // The matched inverse is the identical permutation (§4.2, §5.5).
-                        let r = self.run_oracle_vectors(&callee.name, &child, tk)?;
+                        let primary = row_arguments.get(&a[1]).and_then(|a| if let Argument::DeviceToken(t) = a {Some(t)} else {None});
+                        let r = self.run_oracle_vectors_bound(&callee.name, &child, tk,primary,None)?;
                         let tgt = rd(&a[3])?.binary("xor", &r.payload)?;
                         let fr = rd(&a[4])?.binary("xor", &r.code)?;
                         activation.write(f, &a[3], tgt, self.ptr_width)?;

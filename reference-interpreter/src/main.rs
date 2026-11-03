@@ -354,23 +354,7 @@ fn parse_cc_options(
                 if !once.insert(option) {
                     return Err(earg("--token-aliases given twice"));
                 }
-                let parsed = Json::parse(value).map_err(|e| e.context("§10 K91 E_ARG"))?;
-                options.token_aliases = Some(
-                    parsed
-                        .array()
-                        .map_err(|e| earg(e.to_string()))?
-                        .iter()
-                        .map(|v| {
-                            if !matches!(v, Json::Number(_)) {
-                                return Err(earg(
-                                    "token_aliases labels must be nonnegative integers",
-                                ));
-                            }
-                            u64::try_from(v.uint().map_err(|e| earg(e.to_string()))?)
-                                .map_err(|_| earg("token_aliases label exceeds u64"))
-                        })
-                        .collect::<Result<Vec<_>>>()?,
-                );
+                set_token_aliases(&mut options.token_aliases,value)?;
             }
             "--args" | "--input" => {
                 if args_seen {
@@ -999,12 +983,40 @@ fn run_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> {
     }
     Ok(output)
 }
+fn set_token_aliases(slot: &mut Option<Vec<u64>>,value: &str) -> Result<()> {
+    if slot.is_some() { return Err(earg("--token-aliases given twice")); }
+    let parsed = Json::parse(value).map_err(|e| e.context("§10 K91 E_ARG"))?;
+    *slot = Some(parsed.array().map_err(|e| earg(e.to_string()))?.iter().map(|v| {
+        if !matches!(v,Json::Number(_)) { return Err(earg("token_aliases labels must be nonnegative integers")); }
+        u64::try_from(v.uint().map_err(|e| earg(e.to_string()))?).map_err(|_| earg("token_aliases label exceeds u64"))
+    }).collect::<Result<_>>()?);
+    Ok(())
+}
+fn run_oracle_request(program: &Object,name: &str,input: &OracleVectorInput,budget: Budget,aliases: Option<&[u64]>) -> Result<bennett_isa_ref::OracleVectorOutcome> {
+    match aliases {
+        Some(labels) => program.run_oracle_vectors_with_token_aliases(name,input,budget,labels),
+        None => program.run_oracle_vectors(name,input,budget),
+    }
+}
+fn oracle_machine<'a>(program: &'a Object,name: &str,input: &OracleVectorInput,budget: Budget,aliases: Option<&[u64]>) -> Result<OracleVectorMachine<'a>> {
+    match aliases {
+        Some(labels) => OracleVectorMachine::new_with_token_aliases(program,name,input,budget,labels),
+        None => OracleVectorMachine::new(program,name,input,budget),
+    }
+}
+fn action_request(program: &Object,name: &str,run: &mut ActionRun,adjoint: bool,aliases: Option<&[u64]>) -> Result<()> {
+    match aliases {
+        Some(labels) => program.execute_action_with_token_aliases(name,&mut run.state,&run.bindings,adjoint,&[],labels),
+        None => program.execute_action(name,&mut run.state,&run.bindings,adjoint,&[]),
+    }
+}
 /// Options for executing one Q action (`run-action`, and `reverse` on an
 /// action). The interface bit order for `--basis`, `--state` and the output
 /// state is: mut bundles then in bundles in declared order, then mem
 /// regions in declared order with cells in order; within any bundle or
 /// cell wire 0 comes first (bundles are little-endian, §14.2).
 struct ActionOptions {
+    token_aliases: Option<Vec<u64>>,
     muts: Option<Vec<String>>,
     ins: Option<Vec<String>>,
     basis: Option<String>,
@@ -1015,6 +1027,7 @@ struct ActionOptions {
 }
 fn parse_action_options(args: &[String], start: usize) -> Result<ActionOptions> {
     let mut options = ActionOptions {
+        token_aliases: None,
         muts: None,
         ins: None,
         basis: None,
@@ -1048,6 +1061,7 @@ fn parse_action_options(args: &[String], start: usize) -> Result<ActionOptions> 
             .ok_or_else(|| fail(format!("missing value for {option}")))?;
         pos += 1;
         match option {
+            "--token-aliases" => set_token_aliases(&mut options.token_aliases,value)?,
             "--mut" => {
                 if options.muts.is_some() {
                     return Err(fail("--mut given twice"));
@@ -1509,6 +1523,7 @@ fn reverse_cc(program: &Object, name: &str, options: CcOptions) -> Result<Json> 
 }
 /// The run-oracle-shaped options for `reverse` on an oracle.
 struct OracleOptions {
+    token_aliases: Option<Vec<u64>>,
     input: OracleVectorInput,
     limits: Budget,
     steps: Option<u64>,
@@ -1530,6 +1545,7 @@ fn parse_oracle_options(
     let mut regions: std::collections::BTreeMap<String, Vec<u8>> = Default::default();
     let mut arguments: Vec<Argument> = Vec::new();
     let mut steps = None;
+    let mut token_aliases = None;
     let mut pos = start;
     while pos < args.len() {
         let option = args[pos].as_str();
@@ -1539,6 +1555,7 @@ fn parse_oracle_options(
             .ok_or_else(|| fail(format!("missing value for {option}")))?;
         pos += 1;
         match option {
+            "--token-aliases" => set_token_aliases(&mut token_aliases,value)?,
             "--input" => {
                 if input_seen {
                     return Err(fail("--input given twice"));
@@ -1608,6 +1625,7 @@ fn parse_oracle_options(
         }
     }
     Ok(OracleOptions {
+        token_aliases,
         input: OracleVectorInput {
             ins: vectors,
             args: arguments,
@@ -1626,7 +1644,7 @@ fn reverse_oracle(program: &Object, name: &str, options: OracleOptions) -> Resul
             limits.steps
         )));
     }
-    let mut machine = OracleVectorMachine::new(program, name, &options.input, limits)?;
+    let mut machine = oracle_machine(program, name, &options.input, limits, options.token_aliases.as_deref())?;
     let entry = machine.snapshot();
     for _ in 0..prefix {
         machine.forward_step()?;
@@ -1693,9 +1711,9 @@ fn reverse_action(program: &Object, name: &str, options: ActionOptions) -> Resul
         .ok_or_else(|| fail(format!("§5.3: unknown action @{name}")))?;
     let mut run = build_action_state(program, f, &options)?;
     let entry_state = run.state.clone();
-    program.execute_action(name, &mut run.state, &run.bindings, options.adjoint, &[])?;
+    action_request(program,name,&mut run,options.adjoint,options.token_aliases.as_deref())?;
     let forward_state = action_state_json(&run)?;
-    program.execute_action(name, &mut run.state, &run.bindings, !options.adjoint, &[])?;
+    action_request(program,name,&mut run,!options.adjoint,options.token_aliases.as_deref())?;
     let state = action_state_json(&run)?;
     let equals = run.state == entry_state;
     Ok(object([
@@ -1753,7 +1771,7 @@ fn run_action(program: &Object, name: &str, options: ActionOptions) -> Result<Js
         .filter(|f| matches!(f.kind.as_str(), "action" | "perm_action"))
         .ok_or_else(|| fail(format!("§5.3: unknown action @{name}")))?;
     let mut run = build_action_state(program, f, &options)?;
-    program.execute_action(name, &mut run.state, &run.bindings, options.adjoint, &[])?;
+    action_request(program,name,&mut run,options.adjoint,options.token_aliases.as_deref())?;
     let state = action_state_json(&run)?;
     let mem = object(run.regions.iter().map(|(region, cells)| {
         (
@@ -2028,6 +2046,7 @@ fn run() -> Result<()> {
     } else {
         1_000_000
     })?;
+    let mut token_aliases = None;
     let mut exhaustive = false;
     let mut suite = false;
     let mut samples: Option<u128> = None;
@@ -2051,6 +2070,7 @@ fn run() -> Result<()> {
             .ok_or_else(|| fail(format!("missing value for {option}")))?;
         pos += 1;
         match option.as_str() {
+            "--token-aliases" => set_token_aliases(&mut token_aliases,value)?,
             "--input" => {
                 let values = if value.is_empty() {
                     Vec::new()
@@ -2151,7 +2171,7 @@ fn run() -> Result<()> {
             args: input.args,
             regions: input.regions,
         };
-        let r = program.run_oracle_vectors(name, &wide_input, limits)?;
+        let r = run_oracle_request(&program,name,&wide_input,limits,token_aliases.as_deref())?;
         println!(
             "{}",
             object([
@@ -2229,8 +2249,8 @@ fn run() -> Result<()> {
             .map(BitVector::to_decimal)
             .collect::<Vec<_>>()
             .join(",");
-        let expected = program.run_oracle_vectors(name, &vector_input, limits)?;
-        let mut machine = OracleVectorMachine::new(&program, name, &vector_input, limits)?;
+        let expected = run_oracle_request(&program,name,&vector_input,limits,token_aliases.as_deref())?;
+        let mut machine = oracle_machine(&program,name,&vector_input,limits,token_aliases.as_deref())?;
         let before = machine.snapshot();
         for _ in 0..limits.steps {
             machine.forward_step()?;

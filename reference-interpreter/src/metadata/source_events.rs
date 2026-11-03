@@ -135,6 +135,41 @@ impl Object {
             .source
             .as_deref()
             .ok_or_else(|| Error::new("§11: event lacks its source address".into()))?;
+        if let Some(root) = source.invocations.first() {
+            if let Some(binding) = &root.binding {
+                let expected = schedule.get("bindings")?;
+                let labels = expected
+                    .object()?
+                    .get("token_aliases")
+                    .map(|a| {
+                        a.array()?
+                            .iter()
+                            .map(|n| {
+                                u64::try_from(n.uint()?)
+                                    .map_err(|_| Error::new("§11 K91: alias exceeds host".into()))
+                            })
+                            .collect::<Result<Vec<_>>>()
+                    })
+                    .transpose()?
+                    .unwrap_or_else(|| if root.oracle { vec![0] } else { vec![] });
+                if expected.get("closure_hash")?.string()? != root.symbol
+                    || expected.get("params_hash")?.string()? != binding.params_hash
+                    || expected.get("variant")?.string()? != binding.variant
+                    || expected.get("inherited_controls")?.uint()?
+                        != binding.inherited_controls as u128
+                    || expected
+                        .get("budget")?
+                        .array()?
+                        .iter()
+                        .map(Json::uint)
+                        .collect::<Result<Vec<_>>>()?
+                        != binding.budget
+                    || labels != binding.token_aliases
+                {
+                    return Ok(None); // §11 defaults for a different invocation.
+                }
+            }
+        }
         let mut selected = None;
         let mut maxima = 0;
         for entry in schedule.get("entries")?.array()? {
