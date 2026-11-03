@@ -40,11 +40,13 @@ impl ClassicalValue {
             _ => err("§3.3", "value has no integer width"),
         }
     }
-    fn matches(&self, t: &Type, ptr: u16) -> bool {
+    fn matches(&self, t: &Type, ptr: u16, version: crate::IsaVersion) -> bool {
         match (self, t) {
             (Self::Int(w, v), Type::Int(n)) => w == n && *v & !mask(*w) == 0,
             (Self::Ptr(v), Type::Ptr) => *v & !mask(ptr) == 0,
-            (Self::F64(v), Type::F64) => f64::from_bits(*v).is_finite(),
+            (Self::F64(v), Type::F64) => {
+                version == crate::IsaVersion::V09 || f64::from_bits(*v).is_finite()
+            }
             (Self::Token(_), Type::Token) | (Self::Qreg(_), Type::Qreg(_) | Type::DynamicQreg) => {
                 true
             }
@@ -386,7 +388,7 @@ impl<'a> ClassicalMachine<'a> {
         entry: &str,
         args: &[ClassicalValue],
         entropy: &[u8],
-        registers: QuantumRegisters,
+        mut registers: QuantumRegisters,
         globals: &[(String, Vec<u8>)],
     ) -> Result<Self> {
         object.ensure_linked()?;
@@ -399,16 +401,39 @@ impl<'a> ClassicalMachine<'a> {
             || args
                 .iter()
                 .zip(&f.params[0])
-                .any(|(a, p)| !a.matches(&p.ty, object.ptr_width))
+                .any(|(a, p)| !a.matches(&p.ty, object.ptr_width, object.isa_version))
         {
             return err("§10", "classical entry argument type/count mismatch");
         }
         for (p, a) in f.params[0].iter().zip(args) {
+            if object.isa_version == crate::IsaVersion::V09 {
+                if let ClassicalValue::Qreg(id) = a {
+                    let width = registers.width(*id)?;
+                    if matches!(p.ty,Type::Qreg(n) if n!=width) {
+                        return err("§10", "E_ARG: qreg argument width differs");
+                    }
+                }
+            }
             if let (Type::Qreg(n), ClassicalValue::Qreg(id)) = (&p.ty, a) {
                 if registers.bundle(*id)?.len() as u64 != *n {
                     return err("§10", "E_ARG: qreg argument width differs");
                 }
             }
+        }
+        if object.isa_version == crate::IsaVersion::V09 {
+            let mut ids = std::collections::BTreeSet::new();
+            let mut wires = std::collections::BTreeSet::new();
+            for value in args {
+                if let ClassicalValue::Qreg(id) = value {
+                    if !ids.insert(*id) || registers.bundle(*id)?.iter().any(|w| !wires.insert(*w))
+                    {
+                        return err("§10", "E_ARG: launch register arguments overlap");
+                    }
+                }
+            }
+        }
+        if object.isa_version == crate::IsaVersion::V09 {
+            registers.runtime_ids(object.register_ids.clone());
         }
         let mut instances = crate::instances::Instances::default();
         for (p, v) in f.params[0].iter().zip(args) {
@@ -847,6 +872,11 @@ impl<'a> ClassicalMachine<'a> {
             let id = self.qreg(&control)?;
             let wires = self.state.quantum.bundle(id)?;
             if wires.len() != 1 {
+                if self.object.isa_version == crate::IsaVersion::V09 {
+                    return Err(trap(Error::new(
+                        "§3.3: runtime control width differs from one".into(),
+                    )));
+                }
                 return err("§3.3", "ctl requires qreg[1]");
             }
             controls.push(wires[0]);
@@ -895,6 +925,13 @@ impl<'a> ClassicalMachine<'a> {
             for (p, n) in callee.params[group].iter().zip(names) {
                 let id = self.qreg(&n)?;
                 let wires = self.state.quantum.bundle(id)?.to_vec();
+                if self.object.isa_version == crate::IsaVersion::V09
+                    && wires.len() != p.ty.bits(self.object.ptr_width)?
+                {
+                    return Err(trap(Error::new(
+                        "§3.3: runtime qreg slot width differs".into(),
+                    )));
+                }
                 bind_wires(&wires)?;
                 bindings.bundles.insert(p.name.clone(), wires);
                 if !ids.contains(&id) {
@@ -911,6 +948,11 @@ impl<'a> ClassicalMachine<'a> {
             if crate::oracle::power_of_two(a as u128).and_then(|cells| cells.checked_mul(w as u128))
                 != Some(wires.len() as u128)
             {
+                if self.object.isa_version == crate::IsaVersion::V09 {
+                    return Err(trap(Error::new(
+                        "§3.3: runtime register does not fill region dimensions".into(),
+                    )));
+                }
                 return err("§3.3", "qreg does not fill region dimensions");
             }
             bind_wires(wires)?;

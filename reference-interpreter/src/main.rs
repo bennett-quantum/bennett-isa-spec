@@ -512,12 +512,16 @@ fn classical_args(
                 program.validate_budget(token)?;
                 ClassicalValue::Token(token)
             }
-            Type::Qreg(n) => {
+            Type::Qreg(_) | Type::DynamicQreg => {
                 let bits = raw
                     .strip_prefix("qreg:")
                     .ok_or_else(|| earg(format!("qreg argument must be qreg:<bits>, got {raw}")))?;
-                let n = usize::try_from(n)
-                    .map_err(|_| earg(format!("qreg width {n} exceeds host storage")))?;
+                let n = if let Type::Qreg(n) = p.ty {
+                    usize::try_from(n)
+                        .map_err(|_| earg(format!("qreg width {n} exceeds host storage")))?
+                } else {
+                    bits.len()
+                };
                 if bits.len() != n || !bits.bytes().all(|b| matches!(b, b'0' | b'1')) {
                     return Err(earg(format!(
                         "qreg argument needs exactly {n} bit characters, got {raw}"

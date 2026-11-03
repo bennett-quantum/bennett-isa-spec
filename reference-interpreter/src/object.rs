@@ -434,6 +434,9 @@ impl IsaVersion {
 
 #[derive(Clone, Debug)]
 pub struct Object {
+    /// Runtime names belong to this loaded program, across runs and reversal.
+    /// This allocator is deliberately outside object identity and history.
+    pub(crate) register_ids: std::sync::Arc<std::sync::atomic::AtomicU64>,
     pub isa_version: IsaVersion,
     pub text: String,
     pub ptr_width: u16,
@@ -799,6 +802,7 @@ impl Object {
         }
         let ptr_width = ptr_width as u16;
         let mut obj = Object {
+            register_ids: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(1)),
             isa_version,
             text: text.into(),
             ptr_width,
@@ -1761,6 +1765,9 @@ pub(crate) fn mask(width: u16) -> u128 {
     }
 }
 fn validate_header(f: &Function, version: IsaVersion) -> Result<()> {
+    if version == IsaVersion::V08 && f.params.iter().flatten().any(|p| p.ty == Type::DynamicQreg) {
+        return err("§3.3", "qreg[*] requires ISA 0.9");
+    }
     let empty = |indices: &[usize]| -> Result<()> {
         if indices.iter().any(|i| !f.params[*i].is_empty()) {
             err("§16.2", "nonempty reserved parameter list")
@@ -1885,8 +1892,13 @@ fn validate_header(f: &Function, version: IsaVersion) -> Result<()> {
                 all(&f.params[group], |t| {
                     matches!(
                         t,
-                        Type::Int(_) | Type::Ptr | Type::F64 | Type::Token | Type::Qreg(_)
-                    ) || (version == IsaVersion::V09 && matches!(t, Type::DynamicQreg))
+                        Type::Int(_)
+                            | Type::Ptr
+                            | Type::F64
+                            | Type::Token
+                            | Type::Qreg(_)
+                            | Type::DynamicQreg
+                    )
                 })?;
             }
             if !f.regs.is_empty() || !f.bounds.is_empty() {

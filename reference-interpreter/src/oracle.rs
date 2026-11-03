@@ -331,9 +331,10 @@ impl Memory {
         Ok(base)
     }
     /// The lift.free row of §4.2: flag = no i < atop with base_i = p, live and
-    /// unpinned; otherwise live_i ^= match_i for EVERY i < atop with base_i = p
-    /// (SPEC-QUESTIONS 16). Returns false when the row faults.
-    pub fn lifted_free(&mut self, p: u128) -> bool {
+    /// unpinned; otherwise toggle matching entries. ISA 0.8 includes pinned
+    /// same-base entries (SPEC-QUESTIONS 16); 0.9 E17.13 excludes them.
+    /// Returns false when the row faults.
+    pub fn lifted_free(&mut self, p: u128, version: crate::IsaVersion) -> bool {
         if !self
             .allocations
             .iter()
@@ -342,7 +343,7 @@ impl Memory {
             return false;
         }
         for e in &mut self.allocations {
-            if e.base == p {
+            if e.base == p && (version == crate::IsaVersion::V08 || !e.pinned) {
                 e.live ^= true;
             }
         }
@@ -670,7 +671,7 @@ impl Object {
                     }
                     "lift.free" => {
                         let p = rd(&a[0])?.to_u128()?;
-                        if !memory.lifted_free(p) {
+                        if !memory.lifted_free(p, self.isa_version) {
                             fault!(code(7)?);
                         }
                     }

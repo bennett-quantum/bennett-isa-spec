@@ -1,6 +1,10 @@
 //! CC quantum-register ownership and the reversible handle transitions of §3.3.
 use crate::{err, quantum::Wire, Error, QuantumState, Result};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Status {
@@ -15,11 +19,19 @@ struct Handle {
     status: Status,
     parent: Option<u64>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct QuantumRegisters {
     pub(crate) state: QuantumState,
     handles: BTreeMap<u64, Handle>,
     next: u64,
+    runtime_ids: Option<Arc<AtomicU64>>,
+}
+impl PartialEq for QuantumRegisters {
+    fn eq(&self, other: &Self) -> bool {
+        // The ever-used id namespace is not reversible machine state. A
+        // snapshot owns exact quantum/ledger state and its historical cursor.
+        self.state == other.state && self.handles == other.handles && self.next == other.next
+    }
 }
 impl Default for QuantumRegisters {
     fn default() -> Self {
@@ -46,6 +58,22 @@ impl QuantumRegisters {
             state: QuantumState::new(),
             handles: BTreeMap::new(),
             next: 1,
+            runtime_ids: None,
+        }
+    }
+    pub(crate) fn runtime_ids(&mut self, ids: Arc<AtomicU64>) {
+        ids.fetch_max(self.next, Ordering::Relaxed);
+        self.runtime_ids = Some(ids);
+    }
+    fn fresh_id(&self) -> Result<u64> {
+        if let Some(ids) = &self.runtime_ids {
+            ids.try_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+                .map_err(|_| crate::resource_error("§3.3", "qreg id namespace exhausted"))
+        } else {
+            self.next
+                .checked_add(1)
+                .ok_or_else(|| crate::resource_error("§3.3", "qreg id exhausted"))?;
+            Ok(self.next)
         }
     }
     pub fn quantum_state(&self) -> &QuantumState {
@@ -123,11 +151,11 @@ impl QuantumRegisters {
     }
     fn create(
         &mut self,
+        id: u64,
         wires: Vec<Wire>,
         classes: Vec<String>,
         parent: Option<u64>,
     ) -> Result<u64> {
-        let id = self.next;
         let next = id
             .checked_add(1)
             .ok_or_else(|| Error::new("§3.3: qreg identity overflow".into()))?;
@@ -157,15 +185,13 @@ impl QuantumRegisters {
         n: usize,
         class: &str,
     ) -> Result<(u64, RegisterUndo)> {
-        self.next
-            .checked_add(1)
-            .ok_or_else(|| crate::resource_error("§3.3", "qreg id exhausted"))?;
         let mut classes = crate::reserved(n, "§3.3", "qreg class vector")?;
         classes.resize(n, class.into());
-        let mut undo = self.record(&[self.next]);
+        let id = self.fresh_id()?;
+        let mut undo = self.record(&[id]);
         let wires = self.state.allocate(n)?;
         undo.kernel = KernelUndo::Allocation(wires.clone());
-        let id = self.create(wires, classes, None)?;
+        let id = self.create(id, wires, classes, None)?;
         Ok((id, undo))
     }
     pub fn free(&mut self, id: u64) -> Result<()> {
@@ -201,9 +227,10 @@ impl QuantumRegisters {
         wires.extend_from_slice(&h.wires[lo..end]);
         let mut classes = crate::reserved(len, "§3.3", "qreg slice class vector")?;
         classes.extend_from_slice(&h.classes[lo..end]);
-        let undo = self.record(&[id, self.next]);
+        let view_id = self.fresh_id()?;
+        let undo = self.record(&[id, view_id]);
         self.set_status(id, Status::Viewed)?;
-        let view = self.create(wires, classes, Some(id))?;
+        let view = self.create(view_id, wires, classes, Some(id))?;
         Ok((view, undo))
     }
     pub fn concat(&mut self, a: u64, b: u64) -> Result<u64> {
@@ -227,10 +254,11 @@ impl QuantumRegisters {
         let mut classes = crate::reserved(count, "§3.3", "qreg concat class vector")?;
         classes.extend_from_slice(&self.handles[&a].classes);
         classes.extend_from_slice(&self.handles[&b].classes);
-        let undo = self.record(&[a, b, self.next]);
+        let joined = self.fresh_id()?;
+        let undo = self.record(&[a, b, joined]);
         self.set_status(a, Status::Consumed)?;
         self.set_status(b, Status::Consumed)?;
-        let id = self.create(wires, classes, None)?;
+        let id = self.create(joined, wires, classes, None)?;
         Ok((id, undo))
     }
     pub fn complete_call(&mut self, ids: &[u64]) -> Result<()> {

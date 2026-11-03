@@ -950,11 +950,14 @@ impl<'a> OracleVectorMachine<'a> {
     fn direct(&mut self, f: &Function, i: &Instruction, inverse: bool) -> Result<()> {
         match i.op.as_str() {
             "lift.free" => {
-                // live_i ^= match_i for every i < atop with base_i = p (§4.2).
+                // E17.13 excludes pinned matches in09. Retain the08 map;
+                // applying the same selected toggles is the exact inverse.
                 let p = number(&self.read(f, &i.operands[0])?)?;
                 let atop = self.live_entries()?.len();
                 for e in &mut self.state.memory.allocations[..atop] {
-                    if e.base == p {
+                    if e.base == p
+                        && (self.object.isa_version == crate::IsaVersion::V08 || !e.pinned)
+                    {
                         e.live ^= true;
                     }
                 }

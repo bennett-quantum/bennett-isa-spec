@@ -62,6 +62,9 @@ impl Object {
             }
             "qreg.concat" => {
                 arity(2, 1)?;
+                if a[0] == a[1] {
+                    return err("§3.3", "concat repeats the same register operand name");
+                }
                 match (handle(&a[0])?, handle(&a[1])?) {
                     (Type::Qreg(n), Type::Qreg(m)) => {
                         Some(Type::Qreg(n.checked_add(m).ok_or_else(|| {

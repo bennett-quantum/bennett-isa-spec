@@ -12,7 +12,7 @@ impl ClassicalMachine<'_> {
             .map_err(|_| crate::resource_error("§3.3", "qreg width/index exceeds usize"))
     }
     pub(super) fn register_transfer09(&self, value: &ClassicalValue, ty: &Type) -> Result<()> {
-        if !value.matches(ty, self.object.ptr_width) {
+        if !value.matches(ty, self.object.ptr_width, self.object.isa_version) {
             return Err(trap(Error::new("§3.3: transfer value type differs".into())));
         }
         if let ClassicalValue::Qreg(id) = value {
@@ -42,7 +42,7 @@ impl ClassicalMachine<'_> {
                 let (id, record) = match allocation {
                     Ok(value) => value,
                     Err(error) if error.kind() == crate::ErrorKind::HostResource => {
-                        *fault = Some(3);
+                        *fault = Some(2);
                         return Ok(());
                     }
                     Err(error) => return Err(trap(error)),
