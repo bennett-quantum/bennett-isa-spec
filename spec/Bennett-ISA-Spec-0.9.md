@@ -27,6 +27,33 @@ bennett-4ht re-check `accept-4ht-recheck-2026-11-02` rounds 1–2, codex seat; m
 **Contract checker-diagnostics: accepted** (2026-11-02; council run `contract-checker-diagnostics-2026-11-02`
 round 1, sol and codex seats, 0 blocking; bennett-4ht re-check `accept-4ht-recheck-2026-11-02` round 1, codex seat;
 muse seat accept in `accept-muse-batch-2026-11-02`). K84 is accepted; K1–K84 are accepted in total.
+**Contract xv4: accepted** (council `contract-xv4-2026-11-02` round 2; Muse
+`accept-muse-batch2-2026-11-02` round 1; in-version 0.9 K, maintainer D2 2026-11-03). K85 is accepted; K1–K85 are accepted in total.
+
+**Contract checker-native-model: accepted** (council `contract-checker-native-model-2026-11-02` round 2; Muse
+`accept-muse-batch2-2026-11-02` round 1; in-version 0.9 K, maintainer D2 2026-11-03). K86 is accepted; K1–K86 are accepted in total.
+
+**Contract checker-resource-contexts: accepted** (council `contract-checker-resource-contexts-2026-11-02` rounds 1–2; Muse
+`accept-muse-batch2-2026-11-02` round 1; in-version 0.9 K, maintainer D2 2026-11-03). K87 is accepted; K1–K87 are accepted in total.
+
+**Contract 4ta: accepted** (council `pass2-4ta-2026-11-02` round 2; Muse
+`accept-muse-batch2-2026-11-02` round 1; in-version 0.9 K, maintainer D2 2026-11-03). K88 is accepted; K1–K88 are accepted in total.
+
+**Contract 7s0: accepted** (council `pass2-7s0-2026-11-02` round 2; Muse
+`accept-muse-batch2-2026-11-02` round 1; in-version 0.9 K, maintainer D2 2026-11-03). K89 is accepted; K1–K89 are accepted in total.
+
+**Contract v2v: accepted** (council `pass2-v2v-2026-11-02` round 2; Muse
+`accept-muse-batch2-2026-11-02` round 1; in-version 0.9 K, maintainer D2 2026-11-03). K90 is accepted; K1–K90 are accepted in total.
+
+**Contract ysw: accepted** (council `pass2-ysw-2026-11-02` round 2; Muse
+`accept-muse-batch2-2026-11-02` round 1; in-version 0.9 K, maintainer D2 2026-11-03). K91 is accepted; K1–K91 are accepted in total.
+
+**Contract 2qc: accepted** (council `derive3-2qc-2026-11-02` round 1; Muse
+`accept-muse-batch2-2026-11-02` round 1; in-version 0.9 K, maintainer D2 2026-11-03). K92 is accepted; K1–K92 are accepted in total.
+
+**Contract sqr: accepted** (council `derive3-sqr-2026-11-02` round 1; Muse
+`accept-muse-batch2-2026-11-02` round 1; in-version 0.9 K, maintainer D2 2026-11-03). K93 is accepted; K1–K93 are accepted in total.
+
 §0 lists every change from 0.8.
 Implementation is expected to expose frictions; revisions go back
 through the council. Founding text of
@@ -218,6 +245,15 @@ north star §3.1 requires).
 | K82 | §11.1, §15 | **NAMED-INTERFACE-RECIPES**. A recipe whose formals are all bare integer names, or none, reads its remaining wires by name from the invoking scope; every other recipe and every template is closed. No catalog byte or hash changes. Witness: bind.value.add(2,x,y,z) expands value.add over x,y,z; a typed recipe reading q, or a site with no q bound, rejects. | b-isa-spec-g2q; bennett-sched-enz; pass XIII; round 10 | S | – |
 | K83 | §4.6, §11, §15 | **ACTION-REGION-SUPPORT**. Action-local qregion construction/release have reserved root support addresses, including zero-trip declarations; no leaf changes. | b-isa-spec-z4c; council contract-z4c-2026-11-02 | S | – |
 | K84 | §12.3 | **CHECKER-DIAGNOSTIC-CODES**. Checker diagnostic codes not mandated elsewhere are implementation-defined, scoped by checker name and version; a checker SHOULD document them and report the failed obligation and certificate location. Spelling never alters a verdict, executor status or fault code; E_SCHEDULE_INFEASIBLE and K55 diagnostics stay mandated. No byte or hash changes. Witness: a table claim without `expected` rejects (K13) and a domain repeating a resolved component rejects (K72) under any documented local code. | b-isa-spec-0n5; council contract-checker-diagnostics-2026-11-02 | E | – |
+| K85 | §12.1–§12.3, §§9–10 | **XV4**. Fixed classical in-region images and exclusive proof/proof_relative_to_image/evidence outcomes; full D and sampled-evidence rules remain. S1: deterministic resolved-slot report order, reduced-input numerical/channel maps, transitive device closure/native comparison, fixed-cell enumeration. Certificate bytes and checker reports change; executable source/interface/closure/object identities, target/schedule and ref catalog bytes/hashes stay unchanged. | xv4; council contract-xv4-2026-11-02 round 2; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | – |
+| K86 | §8.3, §§9–10, §12.3 | **CHECKER-NATIVE-MODEL**. Evaluated-epsilon model requirements and phase-bearing unitary native models with independent reconstruction. S1: adjoint-product Kraus normalization, explicit expression/operand_map encoding, control permutation, model fixture and zero-capable eps caption; the base-model fragment leaves operand_map to its complete resolved binding. Model bytes change target_hash and dependent schedule_hash/certificate bindings; unchanged source/interface/closure/object and ref catalog identities. Narrow reading: operand_map explicitly serializes the existing required permutation; eps binds only in positive contexts. | checker-native-model; council contract-checker-native-model-2026-11-02 round 2; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | +target/model bytes |
+| K87 | §12.3, §§9–10 | **CHECKER-RESOURCE-CONTEXTS**. Exact complete resource_contexts with canonical first projection, independent root accounting and 34-digit upward displays even without estimate. Round-1 codex RC-1 resolved; S1: child timing/footprints, singleton validation, qunpred c, explicit decimal spelling, bound fixture requests. Certificate/report bytes change; source/interface/closure/object, target, schedule and ref catalog bytes/identities stay unchanged. | checker-resource-contexts; council contract-checker-resource-contexts-2026-11-02 rounds 1–2; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | – |
+| K88 | §3.2–§3.3, §7.4, §9.4, §10, §12.3 | **4TA**. Ordered per-wire register class vectors, reversible heterogeneous concat/slice and canonical B5 slot fragments preserve one source slot. S1: all ledger references, atomic class/placement preflight, failed-view reversal, upgraded readers and zero-width runtime vectors binding no slot. Certificate bytes change; unchanged source/signature/closure/object, target, schedule, ref recipes/ordinals/catalog identities. | 4ta; council pass2-4ta-2026-11-02 round 2; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | – |
+| K89 | §12.1–§12.3 | **7S0**. Selected maximal borrow_frame relations, workspace entry components and entry_products express existing K76/K78 D_F without changing it; union-rank sampling and B-fiber checks fix coverage. S1: K69 positional inherited controls, evidence versus requested-proof rejection, causal-stack/seed witnesses and Cartesian sampler cross-reference. Certificate bytes change; source/closure/object, target/schedule leaves, K78 and ref catalog identities stay unchanged. | 7s0; council pass2-7s0-2026-11-02 round 2; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | – |
+| K90 | §12.3 | **V2V**. Exclusive uniform frame or complete canonical frame_contexts, validated against each resolved invocation and its allocation/lifetime metadata. S1: pair/two-root/singleton fixtures, truthful legacy migration and checked scope uniformity. Certificate bytes change; no callee clone, source/interface/closure/object, target/schedule, call edge or ref catalog identity change. Narrow reading: future fault-context arrays are not presumed; existing published context obligations stand. | v2v; council pass2-v2v-2026-11-02 round 2; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | – |
+| K91 | §5.4, §7.4, §10.1, §11, §12.3 | **YSW**. Canonical token_aliases equality partitions preserve actual identities through calls, source builders and reversal; only oracle invocations prepend a primary token. S1: universal partition encoding, schedule matching/history, identity-call carrier and self-adjoint wording. Additive launch/sched token_aliases/1 feature with explicit loader negotiation, preserving legacy symbols; legacy token-argument requests need an alias binding. Alias-bearing schedule/certificate hashes change; args/params_hash, source/interface/closure/object and ref catalog identities stay fixed under unchanged envelopes. Narrow choice: versioned ABI feature rather than a header-version bump. | ysw; council pass2-ysw-2026-11-02 round 2; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | +schedule/certificate bytes |
+| K92 | §4.5, §12.3 | **2QC**. QINPLACE-CHECKER-COVERAGE: owner-local exact pair presence and all reached bound transitive contexts, explicit unestablished applicability outcome, executor pre-effect coverage retained. S1: correct insertion before CLAIM-BINDING, literal reference-Q traversal including disabled predicates/zero-trip distinction and nested fixture. Compatibility: incorrect executable packets now reject or remain incomplete; correcting missing entries changes certificate bytes/digests. No executor/source/interface/closure/object, target/schedule, expansion or ref catalog identity changes. Narrow reading: owner-local requirements follow existing §4.5 and this K only; held 0jq is not presumed. | 2qc; council derive3-2qc-2026-11-02 round 1; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | – |
+| K93 | §3.3, §4.4, §11.1, §15 | **SQR**. MCX-BUNDLE-CONTROLS: ordered bundle expansion, wire distinctness, flattened k and scalar target. S1: mixed-list order/arity, phase-sensitive external-reference witness, wire[1] target and active-predicate count. Route taken: in-version 0.9 K by maintainer D2 explicitly naming sqr (Muse sqr-S1); witness object/interface/closure hashes unchanged. Existing ref recipes/catalog bytes stay unchanged; wrong-arity adapter leaf hashes, schedules and cached execution/validation require regeneration and certificates rechecking. | sqr; council derive3-sqr-2026-11-02 round 1; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | – |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -241,6 +277,8 @@ already applied. These decisions are recorded in the maintainer memo,
 Ratification section, 2026-10-30. Q12 keeps the §16.3 draft example
 hashes computed by the 0.9 precheck; independently checked target/frame witness hashes
 are published in §8.3 and §9.4.
+
+**Decided in-version repairs (2026-11-03, maintainer D2).** The council-accepted xv4, checker-native-model, checker-resource-contexts, 4ta, 7s0, v2v, ysw, 2qc and sqr repairs are authorised as K85–K93 within ISA 0.9. Their rows record the compatibility and identity effects of this explicit in-version authorisation; the semantic envelope remains 0.9. Source and catalog identities stay fixed where disclosed, while changed target/schedule/certificate bytes and affected execution caches require the stated regeneration or rechecking.
 
 ### 0.3 Group 3: optional efficiency semantics (deferred)
 
@@ -363,7 +401,7 @@ host requests (§4.1), which an R history cannot reverse.
 | Component | Tier | Contents |
 |---|---|---|
 | classical environment | CC, R | dynamic SSA instances (§7.4), block parameters, activation stack, **quantum-register handles** (`qreg[n]`, `qreg[*]`, §3.3), tokens (§5.4) |
-| register and token ledgers | CC, R | every register's id, class, width and state (§3.3); every device-minted token's tuple and validity (§5.4) |
+| register and token ledgers | CC, R | every register's id, ordered class vector, width and state (§3.3); every device-minted token's tuple and validity (§5.4) |
 | classical memory | CC, R | byte-addressed, little-endian, sparse; allocation table (§7.1) |
 | effect tape, entropy tape | R | §7.3 |
 | run history | CC, R | one frame per executed instruction (§7.4) |
@@ -446,10 +484,36 @@ width of the containing oracle or, in an lproc, of every oracle whose
 lproc closure contains it (checked at load and again at link; an lproc
 in no oracle's closure is checked when linked into one). The equal-width and widening/narrowing constraints above apply to lifted rows on their location and pseudo-location bit-vectors as specified in §4.2; the CC/R iN and ptr operand-type restrictions do not retype lifted locations. The destinations of one `lift.parmov` are pairwise distinct.
 
-**Quantum registers in CC and R.** A **register** is n device-resident
-wires of one class with a nonzero 64-bit **id**, recorded in the
-program's **register ledger** with its class, width and state:
-**live**, **viewed** (one slice of it is live) or **consumed**.
+**Quantum registers in CC and R (K88).**
+
+A register denotes an ordered vector of n device-resident wires with a
+resolved target class for each wire. The register ledger records that
+class vector, width, nonzero id and live/viewed/consumed state. A single
+class is shorthand for a homogeneous vector. qreg.new cls n and
+bennett_qreg_new allocate n wires of cls and remain homogeneous requests.
+qreg.concat accepts differing operand classes and concatenates their
+wire and class vectors in operand order, with no movement, copy,
+measurement or reallocation. Its existing distinct/live/non-view
+preconditions and consumption/new-id transitions remain unchanged.
+qreg.slice selects the corresponding wire/class subsequences, with its
+existing view ownership and one-call consumption rule. A slice never
+relabels a wire. Zero-width runtime registers have empty vectors.
+Ledger frames retain enough information to restore the complete class
+vectors, wire ordering, identities and handle states. In particular free
+records/restores the vector along with the same id/width and cleanliness
+status; concat reversal restores both operands and their prior vectors;
+slice reversal restores the parent/view states. New-frame reversal keeps
+its existing cleanliness/exclusivity hypothesis.
+Binding a CC/R register to a region slot requires its ordered class
+vector to equal that slot's selected, expanded §9.4 class vector, and,
+with topology, its actual vertices to equal the inherited placement.
+Check this with the existing width/disjointness preflight before any
+effect or view consumption. Class vectors introduce no new alias or
+storage-sharing permission, nor permission to relabel or move a wire.
+
+A zero-width register binds no interface slot; its empty vector is used only by concat/slice/ledger rules.
+At a CC/R call, failure of register-to-selected-frame class-vector or inherited-placement equality produces FAULT_UB_TRAP before any effect or view consumption.
+
 `qreg[n]` is the type of a register whose width n is fixed statically;
 `qreg[*]` the type of a register whose width is known only at run time
 (an unsigned 64-bit n ≥ 0). A `qreg[n]` value may be used wherever a
@@ -472,22 +536,22 @@ another register while the program is loaded. **Handle transitions:**
 | `w = qreg.width q` | q live, not a view | w: `i64`, the width; no state change |
 | `id = qreg.id q` | q live, not a view | id: `i64`, the bits of q's id; no state change |
 | `q = qreg.from_id id` | `id` is the id of a register of the program that is live, not a view, and not owned by another run that is not CLOSED (§10) | q: `qreg[*]`, an alias of that register; no ledger state change; the run now owns the register (§10), which reversal does not undo (ownership ends when the run is CLOSED) |
-| region call (§4.7) with q as operand | q live (a view included); its width equals the slot's (§3.3 binding); the wire sets filling distinct wire/region slots are pairwise disjoint, and an explicit control is disjoint from targets and consumed/produced operands (read-only input overlap remains allowed), else CC trap / R fault FAULT_UB_TRAP before any effect, including any view consumption. [deps: ISA-3.3-P4, ISA-4.7, ISA-4.9] | q unchanged. [deps: ISA-4.7] |
+| region call (§4.7) with q as operand | q live (a view included); its width equals the slot's (§3.3 binding) and its ordered class vector equals the selected §9.4 slot vector (with topology, its actual vertices equal the inherited placement); the wire sets filling distinct wire/region slots are pairwise disjoint, and an explicit control is disjoint from targets and consumed/produced operands (read-only input overlap remains allowed), else CC trap / R fault FAULT_UB_TRAP before any effect, including any view consumption. [deps: ISA-3.3-P4, ISA-4.7, ISA-4.9] | q unchanged. [deps: ISA-4.7] |
 | `r = measure q` / `r = measure.iN q` | q live, not a view; the form `measure.iN` (1 ≤ N ≤ 128) for a `qreg[*]`, whose width MUST be N (checked before measuring); for a `qreg[n]` either `measure` or `measure.iN` with N = n (checked statically) | q consumed, its wires released; r: `in` / `iN` |
 | reversal of a `qreg.*` frame (§7.4, §10) | – | the ledger state before that frame (below). A `measure` frame is **never reversed**: a segment containing one cannot be uncalled (§7.4) and a run containing one is not reversible (§10) |
 
 **Ledger frames and their reversal** (§7.4). A `qreg.new` frame records
-the id, class and width; its reversal releases that register without a
+the id, ordered class vector and width; its reversal releases that register without a
 test: every later frame touching it has been undone first (LIFO) and the
 run owns it exclusively (§10), so under T4's exactness hypothesis it is
 clean, and otherwise its residual, within the declared bounds of the
 undone realisations (§12.3), is discarded with it.
-A `qreg.free` frame records the id, class, width and whether its
+A `qreg.free` frame records the id, ordered class vector, width and whether its
 cleanliness was verified; its reversal re-creates the register clean and
-live with the same id, class and width (every alias sees it live
+live with the same id, ordered class vector and width (every alias sees it live
 again). A `qreg.slice` frame records the parent id, lo and len, a
 `qreg.concat` frame the two operand ids and the new id; their reversal
-restores the exact prior states and wire order without moving, copying
+restores the exact prior states, ordered class vectors and wire order without moving, copying
 or measuring a wire. `qreg.width`, `qreg.id` and `qreg.from_id` change
 no ledger state and their frames are pure (§7.4); if an `uncall` later
 removes the register an alias refers to, every use of the alias traps.
@@ -985,7 +1049,31 @@ explicit §6.4 cleanup of the value occupying that wire.
 
 Forms: `x a`, `cx c t`, `ccx c1 c2 t`, `mcx (c_1..c_k) t`, `swap a b`,
 `h a`, `s a`, `sdg a`, `t a`, `tdg a`, `cz a b`, `rx θ a`, `ry θ a`, `rz θ
-a`; all controlled on the active predicate. **Realisation**: permutation
+a`; all controlled on the active predicate.
+
+**MCX bundle controls (K93).**
+
+Each NAME entry of an mcx control list may denote wire or wire[N].
+It contributes every wire of that bundle, in increasing bit index;
+concatenate entries in written list order. The k in mcx(k) is the
+number of resulting control wires, not the number of list entries.
+The target denotes exactly one wire (a scalar name or indexed operand).
+Apply §3.3's pairwise distinctness to the resulting control wires and
+target before execution; overlapping or repeated entries reject as
+ill-formed, never deduplicate them to repair an operand list. Existing
+effective predicate-context rules still apply. The empty list has
+zero explicit controls and applies X under the active predicate.
+Flattening determines resolved primitive operands, gate cost and
+realisation arity, but does not rewrite source identity or source points.
+
+A bare target name may denote wire or wire[1]; an indexed target must denote one live wire.
+k counts explicit flattened controls only; effective controls add per §3.5.
+
+For c:wire[2], mcx (c) p has the same gate semantics as
+ccx c[0] c[1] p: it changes p exactly for c=3, not c=1 or c=2.
+mcx (c, c) p and a target c[0] with controls (c) are ill-formed.
+
+**Realisation**: permutation
 status is a property of the realised unitary at the gate boundary;
 conformant iff equal to the specified unitary exactly including global
 phase (ε = 0) or within declared ε in operator norm. **Oracles and
@@ -1299,7 +1387,7 @@ constructible from an integer. A region call given a token that is not
 valid is a CC trap / R fault `FAULT_UB_TRAP` before any effect (a launch
 argument: `E_ARG`). A minted tuple binds its invocation exactly as a
 host-minted one does (§11, §12): an invocation whose closure hash,
-variant, inherited controls, tuple and `params_hash` equal the
+variant, inherited controls, tuple, `params_hash` and `token_aliases` equal the
 `bindings` of the object's schedule executes that schedule; any other
 invocation executes under the §11 defaults; a consumer MUST NOT apply a
 schedule bound to another tuple, nor substitute another tuple. In
@@ -1687,9 +1775,9 @@ until reversal; a name denotes its most recent instance. Frames:
 | `uncall` | the reversed segment's id (skipped by whole-run reversal, below) |
 | `effect` | tape index plus the device-specific record of §7.3; reversal also removes its effect-tape entry |
 | `hostcall` | payload bytes and reply bytes |
-| `qreg.*`, `measure` | the ledger record of §3.3 (ids, class, widths, prior states, whether a free's cleanliness was verified) and the measured bits |
+| `qreg.*`, `measure` | the ledger record of §3.3 (ids, ordered class vectors, widths, prior states, whether a free's cleanliness was verified) and the measured bits |
 | `budget.mint` | the token and its tuple; reversal revokes the token |
-| `oracle_call` / `action_call` | (region hash, variant, inherited control count, classical args with every token's tuple, register ids): reversed by re-application / adjoint, exactly once, by this frame |
+| `oracle_call` / `action_call` | (region hash, variant, inherited control count, classical args with every token's tuple and resolved identity mapping, register ids): reversed by re-application / adjoint, exactly once, by this frame; reversal reuses the resolved token identities |
 | fault record (a failing instruction, `trap`, `fault`) | cause code (§4.9) and program point; terminal. Reversal (§10) removes the record; the failing instruction had no other effect, so the state is then the state before it |
 
 **Logical history.** Frames and dynamic instances specify the
@@ -1845,7 +1933,7 @@ charge.
   "classes": { "<cls>": { "qubit_second": n, "dirty_rate": n, "capacity": n | "unbounded" } },
   "topology"?: { "vertices": [ { "class": "<cls>" }, … ], "edges": [ [u, v], … ] },
   "gates":   [ { "op": "<gate>", "classes": ["<cls>"|"*", …], "controls": {"min": n, "max": n | "unbounded"},
-                 "params": ["theta"]?, "epsilon": expr, "cost": { "<resource>": expr, "time": expr } }, … ],
+                 "params": ["theta"]?, "epsilon": expr, "cost": { "<resource>": expr, "time": expr }, "realisation_model"?: <bennett.native-model/1> }, … ],
   "schemes": [ { "name": "<name>", "realises": { "op": "<gate>", "controls": {"min": n, "max": n | "unbounded"}, "params": ["theta"]? },
                  "ancillae": { "count": expr, "state": "clean" | "dirty", "class": "<cls>" },
                  "template": [ { "gate": "<op>", "wires": [ "c[<expr>]" | "t" | "t2" | "a[<expr>]", … ], "params": [expr]?,
@@ -1904,6 +1992,140 @@ horizontal and vertical neighbors. A CX on vertices 0 and 1 is
 realisable; on 0 and 3 it is infeasible under §17 item 15. The canonical
 UTF-8 bytes above exclude the code-fence LF.
 Target SHA-256: `960cee71e88da141cc6c2b13cab3f28fce1d50c006e67446aadb592e2bfd0882`.
+
+**Native realisation models (K86).**
+
+Optional `realisation_model` uses initial format `bennett.native-model/1`.
+
+Resolve the matched entry's k, c, requested eps and parameter bindings
+using §8.1 before determining model requirements. At each resolved
+context, if achieved epsilon evaluates exactly to zero, an omitted model
+denotes precisely the §4.4 opcode, including global phase and the exact
+controlled form. Positive evaluated epsilon requires a versioned
+realisation_model to discharge independent realised-operation
+verification. A model-complete target supplies one for every admitted
+context where its epsilon can be positive. Expression syntax alone
+neither requires nor exempts a model.
+
+Any supplied model MUST agree with the exact §4.4 operation in every
+zero-epsilon context and satisfy the advertised operator-norm bound
+otherwise. Zero-valued expressions independent of eps retain §17 item 9's
+exact matching convention. Existing legality rules for eps-dependent
+expressions, log2inv_eps, eps_decade and target matching remain unchanged;
+this does not make an otherwise illegal zero-epsilon expression legal.
+
+Every native realisation model MUST identify a phase-bearing logical
+unitary U for each resolved parameter/control context. Native epsilon
+bounds ||U-V||op for the corresponding phase-fixed ideal §4.4 operation V.
+Normalization and model identity alone do not establish accuracy, an
+inverse, or phase-free permutation status.
+
+The native model kind is unitary. Matrix, Kraus or instrument data may
+be used as a representation only when their reduced logical map is
+rho -> U rho U-dagger, and the phase-bearing U is supplied as part of
+the same model. Kraus/instrument data alone are insufficient. Check
+complete-positivity/trace preservation when applicable and equivalence
+to the bound U on every matrix unit (or a checked symbolic proof of that
+identity), as well as U-dagger U=I. Thus a CPTP map that mixes a pure
+logical state is not a conformant native-unitary gate model under §4.4.
+
+For every admitted total control count the model identifies the actual
+controlled unitary, including phase relative to disabled branches.
+Exact controlled-U construction is allowed when explicitly bound as
+that actual implementation. Arbitrarily controlling a Kraus list does
+not define it. Instrument/environment conventions, when present, must
+reduce to the bound logical unitary in that control context.
+
+Channel claims compare induced channels; they do not replace the
+phase-bearing unitary, change epsilon to diamond error, or discharge
+§12.3's required numerical claim for controlled unitary variants.
+General logical measurement retains its existing CC/other published
+mechanisms; stochastic hardware failures remain separate target-model
+work. This repair makes no new nonunitary-native admission rule.
+
+realisation_model has {version,kind,arity,basis,parameter_bindings,
+control_models,data,operand_map}. Its canonical target bytes enter target_hash.
+After resolution, arity and basis determine the complete ordered logical
+operand bits. Explicit control models give the full context matrix;
+a controlled_U rule instead gives a base matrix and constructs identity
+on disabled branches and that matrix on the all-enabled branch, retaining
+its global phase. In that form arity/basis describe the base matrix and
+control_models adds the resolved c control wires. All matrix dimensions
+must match the resolved basis. No environment is silently counted as an
+extra logical input or discarded from a claimed unitary interface.
+
+parameter_bindings uses the same resolved k, c and eps as cost/error
+matching and the exact angle binding (§3.1 and §11.1 K20). A finite
+binary64 theta denotes exactly that binary rational, not a rounded
+source decimal. An explicit operand-to-wire permutation maps the entry's
+own-controls-then-effective-controls order (§8.3) to §12.1's allocation
+basis, inherited controls first. Both data and control models use this
+map; wrong parameter, order, dimensions or context bindings reject.
+
+Complex matrix entries are [real,imaginary] exact expressions over
+rational constants, i, pi, sqrt, exp, sin and cos with finite expression
+trees; rational constants are [numerator,positive_denominator] canonical
+decimal-string pairs in reduced form. Expression nodes are
+{op,args}; variables name only the declared parameter/context bindings.
+Data may additionally supply closed rational interval enclosures of an
+identified exact operation, with independently checkable enclosure and
+unitarity certificates. An unverified box alone is not an operation.
+
+The checker independently constructs U from the exact model in each
+invocation context, checks its normalization/control/accuracy obligations,
+and applies §12.1's interval numerical/channel procedures to requested
+claims. Inconclusive interval tests do not pass. The advertised epsilon
+remains a separate matching/error obligation, never the operator's
+definition. An absent approximate model never licenses ideal self-comparison.
+
+Variables use {var:name}; constants pi and i use {op:name,args:[]}; function applications use {op:name,args:[...]}; rational leaves use the published reduced decimal-string pair.
+operand_map[j] gives model operand j's allocation-basis position; the own-control/inherited-control swap example encodes [1,0,2].
+For cx with own control a and inherited control q, controlled_U uses base basis [t] and c=2; entry order [a,q,t] maps to checker order [q,a,t].
+
+
+For X, a concrete base model is below. This base-model fragment leaves the context-specific operand_map to the complete resolved model binding; it is not a complete target or bound schedule. Its rational/imaginary pairs are
+exact; changing the two real off-diagonal numerators from "1" to "-1"
+produces the −X model. `controlled_U` binds its actual controlled
+implementation for every admitted c, not just equality of uncontrolled
+channels. For non-parametric X, k=0, and eps is the requested share when
+bound; a zero-epsilon context needs no eps-dependent model expression.
+
+eps is bound only in contexts whose evaluated epsilon is positive; this zero-capable example therefore lists k and c only.
+
+```json
+{
+  "version":"bennett.native-model/1",
+  "kind":"unitary",
+  "arity":1,
+  "basis":["t"],
+  "parameter_bindings":{"k":"k","c":"c"},
+  "control_models":{"kind":"controlled_U","controls":"c","disabled":"identity"},
+  "data":{"matrix":[
+    [[["0","1"],["0","1"]],[["1","1"],["0","1"]]],
+    [[["1","1"],["0","1"]],[["0","1"],["0","1"]]]
+  ]}
+}
+```
+
+Model-format version 1's default evaluation is exact expressions plus
+§12.1 interval enclosure, without any dimensional cap. Larger matrices
+may be generated symbolically from the same bindings rather than fully
+materialized; finite host checking limits yield unchecked obligations,
+not smaller supported algorithm domains.
+
+Legacy targets without required models keep parse/execution compatibility.
+At zero evaluated epsilon use the exact-opcode convention. At positive
+epsilon, missing-model reporting leaves only the affected independent
+numerical/channel obligations unchecked; it cannot yield a checked
+executable certificate covering them. Unknown versions receive
+unsupported-model reporting, never a guessed operation. A supplied model
+that contradicts a zero-epsilon contract rejects that target claim.
+
+**Native model witnesses (K86).** The channel with Kraus operators K0=X/sqrt(2), K1=ZX/sqrt(2) satisfies K0†K0 + K1†K1 = I, but maps |+><+| to I/2 and is not a logical unitary. Two Kraus operators both X/sqrt(2), with phase-bearing U=X and its actual controlled model bound, can represent Ad_X.
+
+At c=1 the model reconstructs diag(I2,X); adding model bytes changes target_hash and the dependent schedule_hash, while unchanged source-object bytes retain their §9.2 identities.
+
+Closed-schema target readers MUST be upgraded for realisation_model; missing or unsupported models follow the reporting rules above and MUST NOT be silently substituted by ideal operations.
 
 ### 8.4 Space budget
 
@@ -2067,6 +2289,8 @@ prefixes; this is an encoding argument, not a claim of SHA-256 injectivity. [dep
 
 ### 9.3 Linking
 
+For mixed native/device containers, the selected device-object/root inventory, image preparation, native-model, resource, frame, borrow-proof and token-alias bindings follow §12.3's mixed fat-object scope and attachment rules (K85–K91). The native container does not replace the selected ISA object identity.
+
 Imports resolve by name + signature (mismatch: link error; pinned hash:
 equality required); resolved closure hashes are recorded in the linked
 certificate. Equal-closure-hash duplicates deduplicate; unequal under one
@@ -2095,7 +2319,7 @@ exactly the shown fields; `live_ranges` is optional. Unknown fields at
 any depth are errors under §9.1.
 
 ```
-  { "slots": [ { "id": "<slot identity>", "role": "in"|"tgt"|"fault"|"mut"|"mem_in"|"mem_mut", "class": "<cls>", "width": expr }, … ],
+  { "slots": [ { "id", "role", "width", "class" } | { "id", "role", "width", "fragments": [ { "offset", "width", "class" }, … ] }, … ],
     "scratch": [ { "id": "<frame identity>", "class": "<cls>", "state": "clean"|"dirty", "width": expr }, … ],
     "history": [ { "id": "<frame identity>", "class": "<cls>", "width": expr }, … ],
     "borrow": [ { "id": "<frame identity>", "class": "<cls>", "width": expr }, … ],
@@ -2137,6 +2361,65 @@ invocation's generated leaf order (including step/phase/path expansion,
 across uses; every use of shared storage MUST be listed and intervals
 of the same frame MUST be pairwise disjoint. An omitted list gives no shared-storage permission.
 
+**Per-bit slot classes (K88).**
+
+The slots record production is:
+
+```text
+{id, role, width, class} |
+{id, role, width, fragments:[{offset, width, class}, ...]}
+```
+
+Each source slot still has exactly one record, its original id and role,
+and its complete signature width. Exactly one of class and fragments
+is present. class abbreviates one fragment at offset 0 covering width.
+For the fragmented form, fragment offsets and widths are nonnegative
+and positive integers respectively, using §9.1 integer encodings.
+Fragments are in increasing offset order, start at 0, meet without gaps
+or overlap, and end at the instantiated slot width. Each class is a
+resolved declared target class. Adjacent equal-class fragments must be
+merged; use the class form when there is only one fragment.
+
+Flatten bundle bits LSB first, or region cells in address order and
+each cell LSB first, exactly as for the existing slot. A fragment names
+the class of that half-open bit interval; it is not a new source slot,
+allocation, lifetime, alias or permission to share storage. Repeated
+slot ids, wrong roles/widths, gaps, overlaps or out-of-range fragments
+reject. Slot widths retain §8.1's c-only expression rules; fragment
+widths/offsets describe the resolved fixed signature width.
+
+With topology, every bit's fragment class must equal the class of its
+§11 vertex; vertices and simultaneous live uses remain disjoint. A
+callee's fragments must equal the inherited operand-class vector. In
+the absence of topology, they bind that resolved vector without naming
+vertices. Capacity, occupancy and peak accounting use each bit's actual
+class, and charge no wire twice. Existing homogeneous records and
+scratch/history/borrow/ancilla schemas retain their meanings.
+
+In a mixed fat object, B5 descriptors cover device-region invocations
+in the embedded or linked ISA objects, bound to their object, closure,
+schedule and invocation identities. Native host functions and process
+state require no ISA frame slots or certificate records. A native host
+may launch a device CC entry under §10; that entry may concatenate
+homogeneous A and B registers under §3.3 and bind their ordered class
+vector to one source slot. The fragments describe that binding without
+splitting its signature. Native main, argv/envp and host-only libc stay
+outside the device-frame inventory. This rule supplies no new container
+or general host-memory launch ABI.
+
+Updated consumers accept both B5 alternatives; producers require support for this repair before emitting fragments and must never substitute a false homogeneous record for an unsupported heterogeneous vector.
+Closed-schema certificate readers require the K88 class/fragments alternative upgrade.
+
+**Fragmented-slot witness (K88).** A device CC wrapper allocates a=qreg.new A 1 and b=qreg.new B 1, then t=qreg.concat a b. Its two-bit split action applies x t[0] and x t[1]. One descriptor is:
+
+```json
+{"slots":[{"id":"mut:0","role":"mut","width":2,"fragments":[{"offset":0,"width":1,"class":"A"},{"offset":1,"width":1,"class":"B"}]}],"scratch":[],"history":[],"borrow":[],"ancillae":[]}
+```
+
+Accept for the A/B witness; changing the second offset to 2 rejects for incomplete and out-of-range coverage. Outputs for t=0,1,2,3 are 3,2,1,0. Inverse execution restores the original wires, ordered class vectors, ids and live/consumed states. With sequential unit-time X leaves and unit class rates, time=2, peak[A]=peak[B]=1 and qubit_second[A]=qubit_second[B]=2.
+
+After v = qreg.slice t 1 1 on t with classes [A,B], binding v to a selected width-one A slot faults with FAULT_UB_TRAP (4) before effects or view consumption; t remains viewed and v remains live. Reversing the fault and slice restores the pre-slice ledger state.
+
 **FRAME witness**
 
 ```json
@@ -2152,6 +2435,10 @@ bytes exclude the code-fence LF.
 Frame SHA-256: `f314eeef24a5a65a9c72f91e062aa3c83556358eaca166e689571700a72083ff`.
 
 ## 10. Launch ABI (launch 0.9)
+
+Register allocation through `bennett_qreg_new` remains a homogeneous request; §3.3 defines the ordered class vector, concat/slice bindings and complete ledger reversal (K88).
+
+The selected device object/root, fixed-image preparation, target models, resource/frame contexts, borrow proofs and token-alias launch bindings follow §12.3 (K85–K91). In particular its token_aliases mixed-object rule applies at this launch boundary; the general native-container/ordinary-pointer launch contract remains the explicit boundary work named there.
 
 **Model.** A run executes a device CC entry; the host passes classical
 arguments, register ids and the entropy tape, receives classical
@@ -2283,6 +2570,12 @@ void           bennett_tape_free(bennett_tape_iter_t*);
 bennett_status bennett_estimate_run(bennett_program_t*, const char* region, bennett_token,
                                     const char* variant, uint32_t inherited_controls,
                                     const uint8_t* params_jcs, size_t params_len, bennett_estimate_t** out);
+
+bennett_status bennett_estimate_run_with_token_aliases(
+    bennett_program_t*, const char* region, bennett_token,
+    const char* variant, uint32_t inherited_controls,
+    const uint8_t* params_jcs, size_t params_len,
+    const uint8_t* aliases_jcs, size_t aliases_len, bennett_estimate_t** out);
 size_t         bennett_estimate_nresources(const bennett_estimate_t*);
 bennett_status bennett_estimate_get(const bennett_estimate_t*, size_t i, const char** name, const char** value_decimal);
 const uint8_t* bennett_estimate_certificate(const bennett_estimate_t*, size_t* len);   void bennett_estimate_free(bennett_estimate_t*);
@@ -2294,6 +2587,22 @@ const uint8_t* bennett_coverage_jcs(const bennett_coverage_t*, size_t* len);   v
 
 **LAUNCH-ESTIMATE** (K12; b-isa-spec-c15, from bennett-vm-hsd).
 The 0.9 request carries the complete resolved parameter vector.
+
+**Token-alias ABI feature (K91).**
+
+Both `bennett_estimate_run_with_token_aliases` and `bennett_sched_request_set_token_aliases` copy and validate the JCS array. Keep the old ABI callable; with no
+token args infer [0] for an oracle and [] for an action/perm_action.
+A legacy request with token arguments and no alias binding returns E_ARG;
+the additive alias-aware function admits every consistent partition and
+provides exact estimates of each resolved request. A bound over partitions
+is not a K12 exact result. This request diagnostic does not make any valid
+program or alias pattern illegal, and does not replace implementing the
+full alias-aware capability. Publish
+the extension under an explicit launch/sched ABI revision or feature
+contract, including loader capability negotiation; do not change the
+published C argument layout/symbol meaning silently.
+
+The additive symbols and binding rules above define the launch/sched 0.9 feature `token_aliases/1`. Loader capability negotiation establishes support for both additive symbols and the token_aliases metadata contract before issuing an alias-aware request; symbol availability alone does not authorize silently dropping the partition. This feature retains the existing C argument layouts and symbol meanings.
 
 **Resolved request.** `bennett_estimate_run` MUST copy and
 validate `params_jcs`, the JCS array of **all** classical arguments in
@@ -2418,6 +2727,9 @@ bennett_status bennett_sched_request_set_budget(bennett_sched_request_t*, uint64
 bennett_status bennett_sched_request_set_params(bennett_sched_request_t*, const uint8_t* params_jcs, size_t);
 bennett_status bennett_sched_request_set_accuracy(bennett_sched_request_t*, const char* epsilon_decimal);
 bennett_status bennett_sched_request_set_capacity(bennett_sched_request_t*, const char* cls, uint64_t peak_qubits);
+bennett_status bennett_sched_request_set_token_aliases(
+    bennett_sched_request_t*, const uint8_t* aliases_jcs, size_t aliases_len);
+
 void           bennett_sched_request_free(bennett_sched_request_t*);
 bennett_status bennett_sched_schedule(const bennett_sched_request_t*, bennett_sched_response_t** out);
 typedef enum { BENNETT_SCHED_OK, BENNETT_SCHED_INFEASIBLE, BENNETT_SCHED_UNSUPPORTED } bennett_sched_outcome;
@@ -2452,7 +2764,7 @@ support points and optional instance/call-occurrence selectors. [deps: ISA-11-P2
 
 ```
   { "bindings": { "closure_hash", "target_hash", "region", "variant", "inherited_controls", "budget": [B,heap,stack,depth],
-                  "params_hash", "epsilon", "expansion": { "name", "version", "hash" }, "scheduler": { "name", "version" } },
+                  "params_hash", "token_aliases": [nonnegative integer, …], "epsilon", "expansion": { "name", "version", "hash" }, "scheduler": { "name", "version" } },
     "interface_vertices"?: [ [v, …], … ],
     "entries": [ { "path": [ { "symbol": hex, "point": "<block>:<ordinal>" | "$construct" | "$step" | "$commit" | "$release", "iteration": [n, …] | "*",
                               "instance"?: [n, …] | "*", "call_index"?: n | "*" }, … ],
@@ -3524,6 +3836,17 @@ Witness envelope SHA-256: `299510fd67cc626fdcbcc10adcd40730f9af294ba596d86fb25fd
 | `numerical` | `{ "subject": { "closure_hash", "variant", "inherited_controls", "schedule_hash" }, "metric": "operator_norm", "precision_bits": n, "bound": decimal }` | **checker-computed, for every invocation context of the subject** (below): build the realised unitary U of that invocation (the region's realisation under the root schedule at that path, with its resolved classical arguments, budget, epsilon shares and cleanup choices, and `inherited_controls` control wires prepended) and the reference unitary V (the region's §5.3 semantics with the same arguments, controlled on the same wires) at the subject's signature widths in interval arithmetic at `precision_bits` (basis order = allocation order, controls first), form interval enclosures of `V†U − I` entrywise, derive the operator-norm bound as the Frobenius-norm upper bound in interval arithmetic, and verify it is ≤ `bound`; the claim holds iff it holds for every context |
 | `channel` | `{ "subject": as above, "metric": "diamond", "precision_bits", "bound", "dual": [ { "Y": interval Hermitian matrix, "mu": decimal } … ] }` | for every invocation context of the subject, in enumeration order, verify its dual witness for the **diamond-norm SDP** below in interval arithmetic and `mu` ≤ `bound` (one witness per context; too few witnesses: reject) |
 
+**Selected borrow-frame claims (K89).** The exhaustive and sampled productions additionally admit:
+
+```text
+expected:"borrow_frame",
+borrow_frame:{lifetime:k,first:<resolved source occurrence>,
+              last:<resolved source occurrence>,
+              context_key?:<fully resolved §12.1 invocation key>}
+```
+
+The tensor-factor test in §12.2 defines `expected:"borrow_frame"` without an expected-output table. Other K13 relations and before/after tuples retain their meanings.
+
 **CLAIM-REPLAY** (K13; b-isa-spec-9uy, from bennett-vm-clw).
 Sampled observations remain evidence under the following replay contract.
 
@@ -3672,6 +3995,17 @@ it names the realisation the claim is about. K13 also requires it for
 `expected: "oracle"`; standalone reference relations use the explicit
 invocation binding instead.
 
+For fixed image I, write J_I for the image-preparation isometry including
+prescribed clean workspace. The permutation assertion is `V J_I = P J_I`,
+also after tensoring with identity on an arbitrary external reference.
+When a process claim is needed, compare
+`E_real ∘ Ad_J_I` and `E_ref ∘ Ad_J_I` with the complete output interface.
+Controlled-unitary comparison retains a phase-sensitive bound on
+`||U J_I − V J_I||`; equal uncontrolled channels alone cannot discharge it.
+Numerical/channel acceptance procedures remain those of §12.1.
+
+For conditional numerical claims, apply the interval Frobenius-bound procedure to (U−V)J_I. For conditional channel claims, form the Choi matrix of (E_real−E_ref) composed with Ad_J_I, using the reduced input dimension and complete output dimension; retain the existing rigorous interval and invocation-context checks.
+
 **Sampling.** For each domain component with range size R = hi − lo + 1,
 assemble m = ⌈⌈log₂ R⌉/64⌉ consecutive generator words (least-significant
 word first) into an integer, reduce modulo 2^⌈log₂ R⌉, reject and redraw
@@ -3760,20 +4094,134 @@ exchange the values compared. [deps: ISA-9.4-P2, ISA-12.1-P7.S4, ISA-12.1-P8]
 
 ### 12.2 Domains
 
-`"domain": { "bundles": [ { "name", "width", "lo", "hi" } ], "borrowed": [ same ], "regions": [ { "name", "cells": "all" | [ { "index", "lo", "hi" } ] } ], "args"?: [ same as bundles ] }`,
+`"domain": { "fixed_regions"?: [ { "name", "A", "W", "image", "sha256" } ], "bundles": [ { "name", "width", "lo", "hi" } ], "borrowed": [ same ], "regions": [ { "name", "cells": "all" | [ { "index", "lo", "hi" } ] } ], "args"?: [ same as bundles ] }`,
 bounds inclusive, enumeration order as listed, last component fastest.
 `args` (inverse-pair claims only) ranges over classical arguments other
 than tokens (whose tuples the entry's `arg_tokens` fixes, §12.3), each
 read as an unsigned integer of its width (`ptr`: ptr_width; `f64`: 64,
 its bits).
-A `proof` label requires the domain to equal D; otherwise the claim is
-`evidence` with the covered fraction.
+Successful claim classification follows the exclusive rules below (K85).
 For a borrow-frame obligation, use D_F of §5.6; a region claim over D
 does not by itself establish the frame claim. For example, with c
 allocated at zero, the single frame `CX(c,b)` over {c=0} × {b=0,1}
 is identity on b. The interleaved prefix `CX a c; CX x c; CX a c;
 CX x c` clears c only by polynomial algebra; §5.6 instead admits both
 c values at entry, so the same single-CX frame fails its obligation.
+
+**Borrow-frame domains and replay (K89).**
+
+K69/K70 resolves bundles and regions to interface components, with positional prepended inherited controls, and borrowed entries to lifetime positions; none selects allocated local frame-entry wires. For `expected:"borrow_frame"` only, domains additionally admit:
+
+```text
+workspace:[{allocation:<resolved allocation occurrence>,offset:n,
+            width:n,lo:n,hi:n}, ...]
+```
+
+For a non-Cartesian D_F, additionally permit
+`domain:{entry_products:[<product-domain>,...]}` instead of one product;
+each product has the existing component fields plus `workspace` above.
+
+A borrow_frame claim identifies the checked borrowed lifetime k in
+K69/K70 allocation order and the exact maximal §5.6 frame realisation
+being checked. Source occurrences include the full
+invocation chain, fixed instance and source-loop iteration; oracle
+step/phase are included where applicable. They are source coordinates,
+not target-scheme leaf ordinals. The first/last points must equal the
+frame determined by §5.6, not a selected subinterval. A schedule-bound
+claim MUST carry context_key, equal to the fully resolved §12.1 subject
+invocation key ([] at the device root); first and last belong to that
+invocation. A standalone claim MUST carry the complete K13 invocation
+binding for all classical arguments and budget components. Missing or
+conflicting bindings reject before replay.
+
+workspace components resolve to allocated local wires live at frame
+entry, including flattened local-region storage, excluding interface
+and borrowed wires. allocation is the source/expansion allocation
+occurrence with its current lifetime, never a reusable storage address.
+Offsets/widths select nonempty disjoint intervals within that allocation.
+All components use K71's exact width/range checks. In a product enumerate
+bundles, borrowed, regions and then workspace in their listed order, last
+component fastest; region cells retain §12.2 ordering. This order is also
+the component order for Cartesian sampled borrow_frame domains.
+The checker computes D_F by K76/K78, including its normative
+union over repeated visits, never from the claimed constants. Correspond
+local identities by their source lifetime and bit position across visits.
+entry_products denotes the union of its product domains: list products
+in normative visit order, enumerate each by §12.2, and skip complete
+entry tuples already enumerated. It cannot be combined with top-level
+product fields. To discharge the frame obligation this union must equal
+the normative D_F, with every interface and
+borrowed component full and independent and every local entry component
+explicitly covered. A strict subset is evidence only. An omitted local
+component is fixed at zero for replay and cannot silently supply full
+coverage of an unknown component.
+
+For sampled borrow_frame claims using entry_products, form the ordered,
+deduplicated enumeration E above and let N=|E|. Each primary draw uses
+§12.1's existing rejection sampler on one synthetic integer component
+[0,N-1], then selects E[rank], with replacement. Consume no product-choice
+or per-component words in addition to that rank draw; N=1 consumes no
+words. This rule is exact even when a host must report K75 rather than
+materialise E. It does not cap N.
+
+For every primary draw (from a product or entry_products), fix its
+non-B entry values and replay the entire B fiber of the claimed domain.
+Check B restoration, exact +1 phase and identical complete non-B outputs
+across the fiber. Auxiliary B replays consume no generator words and are
+not additional primary draws. A changed B value or phase rejects even
+before other fiber comparisons. A missing B value cannot discharge the
+full-frame obligation. Record exactly sampler.count primary draws and
+coverage = number of distinct primary complete tuples / |D_F|; auxiliary
+fiber replays do not increase that count or fraction. Overlapping products
+never count the same complete tuple twice. Sampled success is always
+evidence, including coverage 1; requesting proof rejects.
+
+Replay the selected realised permutation frame from each exhaustive entry element.
+Record every surviving output and check all internal release obligations.
+Locals surviving this frame need not be zero at its boundary: they are
+complete non-B outputs. Region-exit cleanup remains mandatory.
+For fixed non-B entry values, varying B over all its values must leave
+B unchanged and produce the same complete non-B output, with exact +1
+basis phase. This establishes P' tensor I_B on span(D_F); an oracle
+relation, output projection or same-input self-comparison does not.
+Non-permutation frames cannot discharge this T3 relation.
+
+An exhaustive successful complete-domain claim receives proof for that
+selected frame realisation; sampled claims remain evidence and cannot discharge it.
+verification.borrow_frames must resolve to covering proofs for every
+required maximal frame and every visit/context, or to an applicable
+existing structural/library proof. Each selected realisation must pass
+on the complete normative D_F, not only on the entry states reachable
+at that one visit. A checker may share one verified relation between
+visits only after checking equality of their realised frame operation,
+wire correspondence and complete required domain. Different schedules
+or effective controls are not presumed to supply that equality.
+
+Word consumption per component follows §12.1's rejection sampler over each component range in the order bundles, borrowed, regions, workspace; only entry_products uses the single union-rank draw.
+
+Missing B values or narrowed interface ranges prevent proof, but an otherwise successful exhaustive slice receives evidence unless proof was requested.
+Closed-schema certificate readers require the K89 borrow_frame/workspace/entry_products upgrade.
+
+**Borrow-frame witnesses (K89).** Allocate clean c, borrow b, execute cx c b, return b and free c. With lifetime 0, first=last=entry:2, workspace allocation entry:0, offset 0, width 1, lo=hi=0, full one-bit borrowed range and scheduled root context_key=[], entries (c,b)=(0,0),(0,1) both remain unchanged with exact +1 phase, yielding proof and coverage 1. Restricting B to {0} instead yields exhaustive count 1, coverage 1/2 and evidence; requesting label:"proof" rejects.
+
+Starting with c=0 and a,x unknown, cx a c; mcx (a) c establishes c=0, whereas cx a c; cx x c; cx a c; cx x c leaves c unknown under K76/K78. The subsequent CX(c,b) frame receives proof in the first case and rejects in the second.
+
+
+Use E=[(0,0,0),(0,0,1),(1,1,0),(1,1,1)] in (c,d,b) order.
+For xoshiro256** seed `["0","288230376151711744","0","0"]`, first word
+is 90. For seed `["1","72057594037927936","0","0"]`, the first two
+words are 9223372036854775826 and 9223372036854781586. Either seed's
+first union rank is 2. CX(c,b) maps selected (1,1,0) to (1,1,1), so the
+claim rejects. A product-first reading would select product 0 and could
+succeed on its B fiber; that reading is now explicitly excluded.
+
+An overlap vector uses products {c=0,d∈{0,1}} and {c∈{0,1},d=0}, with
+full one-bit B. Its deduplicated E has six tuples rather than eight.
+One successful primary draw has coverage 1/6, even after replaying its
+entire B fiber. The two-CX frame in the earlier union witness succeeds
+on all four tuples of its complete D_F.
+
+For CX(c,b); CX(d,b), either listed seed with count=1 yields evidence, primary count 1, distinct primary count 1 and coverage 1/4; replaying the second B value does not increase coverage.
 
 **Component resolution (K69/K70).** These component-domain rules apply
 to table/program/oracle relations; K4 inverse-pair claims retain their
@@ -3820,30 +4268,70 @@ and its covered fraction is exactly n/|D|, with |D| the product of the
 full component range sizes (prepended inherited controls included).
 [deps: ISA-5.2-P4, ISA-5.3-P1, ISA-12.1-P8, ISA-12.2-P1]
 
-**Coverage and verdicts (K69/K74).** For exhaustive and sampled claims,
-`proof` and `evidence` are checker-assigned outcomes recorded in the
-checker report against the region closure hash and zero-based `claims`
-array index, with the bound invocation or invocation context key where
-applicable; they are not producer assertions in the certificate.
-[deps: ISA-1.2-P4, ISA-12.1-P7, ISA-12.1-P11, ISA-12.3-P1, ISA-12.3-P3]
-An exhaustive table/program/oracle claim receives `proof` iff every
-obligation of §12.1 succeeds on every element and its domain equals D
-component by
-component: every interface bundle, every interface region cell, every
-borrowed position and every prepended inherited control occurs exactly
-once with its full range. [deps: ISA-12.1-P1, ISA-12.1-P7, ISA-12.1-P8, ISA-5.2-P4, ISA-5.3-P1, ISA-14.3-P3]
-This equality is decided over resolved identities and ranges, never
-sets of names; an explicit full-range list of every cell covers exactly
-the same region domain as `cells: "all"`. [deps: ISA-3.3-P19, ISA-12.2-P1, ISA-12.1-P8]
-Successful exhaustive checks on a strict slice receive `evidence` with
-n replayed elements and n/|D|; successful sampled checks receive
-`evidence` with exactly `count` replayed draws and K13's distinct-draw
-fraction, even if it is 1. [deps: ISA-12.1-P1, ISA-12.1-P2, ISA-12.1-P8.S9, ISA-12.1-P8.S10, ISA-12.2-P1]
-A supplied `label` of `proof` or `evidence` is only a request: the
-checker MUST compute the outcome independently and reject a requested
-`proof` when a completed check yields only `evidence`. [deps: ISA-1.2-P4, ISA-12.1-P7.S6, ISA-12.2-P1]
-Neither an evidence label nor a requested label discharges an obligation
-requiring proof over D. [deps: ISA-5.6-P2, ISA-14.3-P3, ISA-12.3]
+**Coverage and verdicts (K69/K74/K85).**
+
+A domain MAY contain fixed_regions:[{name,A,W,image,sha256}]. An absent
+field is an empty list. name resolves by the existing component rules to
+an in-role interface region, with precisely the subject's A and W.
+Each resolved fixed region occurs exactly once and MUST NOT also occur
+in domain.regions. A mut-role region cannot be fixed by this mechanism.
+
+image is exactly ceil(2^A*W/8) raw bytes encoded as lowercase hexadecimal;
+unused high bits in the final byte MUST be zero. Cell i consists of bits
+[iW,(i+1)W) in the little-endian byte image. sha256 is SHA-256 of the raw
+bytes, not the hexadecimal text. The checker hashes independently and
+uses those cells on every replay. Fixed cells participate in domain
+validity and tuple/output checks, but each contributes one choice to n.
+The full unrestricted |D| remains unchanged. This metadata introduces no
+operation for inspecting unknown coherent state.
+
+After every §12.1 replay obligation succeeds, an exhaustive
+table/program/oracle claim receives exactly one outcome, in this order:
+(1) proof iff its domain equals unrestricted D component by component;
+(2) otherwise proof_relative_to_image iff fixed_regions is nonempty,
+    every image binding is valid, every fixed region is accounted for,
+    and every remaining component occurs exactly once with its full
+    range (all interface bundles/cells, borrowed positions and prepended
+    inherited controls included);
+(3) otherwise evidence.
+Successful sampled claims always receive evidence, including when their
+distinct draws cover the whole domain. Malformed domains, stale hashes
+and mismatches reject, rather than receiving any successful verdict.
+Omission-at-zero remains a strict slice unless the original component
+is thereby genuinely at its full range under the existing rules.
+
+Coverage remains exact n/|D| against unrestricted D, with distinct-draw
+coverage for sampling. The checker report identifies closure_hash,
+claims-array index, invocation/context key, and ordered resolved
+(region identity,A,W,image hash) bindings. A supplied label is a request,
+not a producer assertion. Requested proof rejects unless the computed
+outcome is proof; requested proof_relative_to_image rejects unless the
+computed outcome is proof_relative_to_image. An evidence request may
+accompany a stronger independently computed outcome, as before.
+
+K75's host-limit handling remains: unchecked (host limit) discharges no
+proof obligation and does not invalidate a legal domain or shrink it.
+
+A proof_relative_to_image theorem is conditional on the stated image.
+Using it to discharge an executable invocation additionally requires
+checked preparation/binding establishing that this in-region contains
+exactly those classical bytes and is factorised from other systems at
+entry, and that its exit image is restored. Establish preparation from
+declared bytes and logical preparation operations, never inspection of
+unknown coherent data. Without that preparation evidence the theorem
+remains conditional and does not discharge the invocation.
+
+This verdict cannot discharge an unrestricted borrow-frame, inverse-pair
+or other full-D obligation, and cannot be reused for another image,
+invocation, target realisation or schedule by discarding its bindings.
+All §12.1 exact +1 basis-phase, full-tuple, clean-workspace and
+external-reference obligations remain in force. A basis table cannot
+prove a non-permutation realisation; its numerical/channel obligations
+are unchanged. Target matching, resource accounting and error
+composition are not relaxed by conditional correctness.
+
+Resolved fixed-region bindings are reported in subject interface-region signature order using mem slot identities.
+Fixed regions do not add an enumeration component; remaining components enumerate in their existing §12.2 order, and tuple region arrays keep interface order with the fixed cells filled in.
 
 **Host limits (K75).** Domain widths, region address width A, cell-list
 lengths and sampler `count` have no ISA-imposed upper cap; a checker
@@ -3855,7 +4343,7 @@ required replay/coverage data, it MUST terminate normally and record
 **unchecked (host limit)** for that claim in the same report, citing
 §12.2 and the quantity or operation that exceeded the host limit.
 [deps: ISA-12.1-P1, ISA-12.1-P2, ISA-12.1-P8, ISA-12.2-P1]
-That outcome is distinct from rejection and from either label, supplies
+That outcome is distinct from rejection and from any successful label, supplies
 no evidence count or covered fraction for the claim, and discharges no
 obligation of §5.6, T3 or §12.3, including when a producer requested a
 label. [deps: ISA-1.2-P4, ISA-5.6-P2, ISA-14.3-P3, ISA-12.3]
@@ -3901,7 +4389,7 @@ an action region[63,1] with `cells: "all"` and `count: 1` remains legal but has
 ```
   versions; bindings { object_hash, interface_hash, closure_hash (required), reference_program_hash, dialect_mapping_version, target_hash, schedule_hash?, invocation? (K13) }
   producer { name, version, materialisation { llvm_version, pipeline, normaliser_version } }
-  regions { <closure_hash>: { kind, signature, bounds, estimate? (K12), frame (required typed-record descriptor, §9.4), resources { name: decimal }, gates_used { gate: { count, scheme?, epsilon? } },
+  regions { <closure_hash>: { kind, signature, bounds, estimate? (K12), frame?: <§9.4 descriptor>, frame_contexts?: [{context_key:<§12.1 key>, frame:<§9.4 descriptor>}], resources { encoded_row_name: canonical_decimal_string }, resource_contexts?:[{context_key,resources,gates_used,estimate?}], gates_used { gate: { count, scheme?, epsilon? } },
             claims: [ <claim> … ], verification: { oracle: i, borrow_frames: [i], inverse_pairs: [ { g, ginv, claim: i, budget: [B,heap,stack,depth], arg_tokens?: { "<arg>": [B,heap,stack,depth] } } ], unitary: [i], channel: [i],
                                                    fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
             cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },
@@ -3910,8 +4398,318 @@ an action region[63,1] with `cells: "all"` and `count: 1` remains legal but has
   composition { multiplicities: { "<hash>:<variant>:<inherited_controls>": n (from the realised schedule) }, epsilon_total: { "diamond": v }, method: "sum_over_multiplicities" }
 ```
 
+**Mixed fat-object scope (§§9–10, §12.3; K88).**
+
+A mixed fat object retains an ordinary native host binary and embeds ISA
+objects for marked device modules and their linked device closures (North
+Star §§2, 3.3, 4.4). ISA §§9.1–9.3 identify each device object and selected
+root; §12.3 certificates, owner records and reports cover that closure,
+with a separate binding/context set per device root and [] relative to
+that root (§12.1). Native entry, argv/envp and host-only libc need no ISA
+region, frame or certificate record; native comparison binds the selected
+materialised closure, not the whole host. Today §10 launches a device CC
+entry with copied arguments/entropy; §5.4 budgets bind device invocations,
+§3.3/§10 handles belong to a loaded program/run, and §7.3/§10 tapes cover
+device R effects. These require explicit container-to-object/root/certificate
+association, host-entry-to-device-entry bindings, budget/handle lifetime
+negotiation and tape/run association in a versioned mixed-launch contract.
+ISA §7.1 defines device memory but §10 defines no general host-memory-by-reference
+launch ABI: that contract must add address/layout mapping, range/liveness,
+aliasing, ownership/synchronisation, writeback and reversal rules, preserving
+dialect §§6.6, 8.5, 19.4–19.5. Until published, these are explicit
+bennett-4ht boundary obligations, not grounds to require whole-binary
+lowering or omit mixed execution.
+
+**Fixed-image mixed-object binding (K85; §§9–10).**
+
+A native binary may carry VM objects only for marked
+modules. The host launch manifest selects a VM entry and records the
+classical image preparation/copy into its in-region, with resolved shape
+and raw-byte hash. The certificate inventory is that entry's selected VM
+closure and reached contexts, not the whole native executable. Image
+preparation may come from host database construction or a declared
+snapshot. Host bytes are bound to device cells using the declared packing,
+not host pointer identity. Unmarked main, argv/envp, libc and unrelated
+code remain native. The native comparison invokes the corresponding
+materialized marked entry over the same image and varying domain; it
+need not treat the entire binary as the oracle. Runtime shims and build
+configuration are recorded as required by the North Star.
+
+VM objects contain the selected marked entries and their required transitive device closures. Code outside those closures remains native; shared callees may have both host and device variants. Native comparison uses the materialised entry and its entire materialised callee closure with the North Star §3.2 runtimes and arithmetic libraries.
+
+**Native-model mixed-object binding (K86; §§9–10).**
+
+A mixed binary's native host runs main, argv/envp,
+unmarked libc and ordinary code. Only marked modules are VM objects;
+the launch manifest selects their exported entries. A native gate model
+belongs to the target used for that VM closure and its reached native
+leaves, not to the host machine instructions of the whole binary.
+Certificate inventory and phase/control reconstruction cover that selected
+closure's invocations. Each VM schedule pins the target/model hash even
+when several modules share the target. Host qreg handles and angle values
+are marshalled through the published launch bindings, not reinterpreted
+as model basis indices. A native comparison uses the corresponding
+materialized marked host entry and captured inputs; it does not require
+every host instruction to have a quantum gate model.
+
+The selected VM closure includes transitive callees of marked entries, whether or not those callees contain markers; native comparison materializes that same callee closure with the prescribed runtime and arithmetic libraries.
+
+**Resource contexts and canonical displays (K87).**
+
+For exactly one invocation context, resources and gates_used report its
+§8.2 scheduled event accounting. resource_contexts may be omitted; if
+present it MUST have exactly one matching record. The root context_key
+is []. A standalone verified resource report binds one invocation and
+an effective §11 schedule, including an explicit empty-entries schedule
+when defaults supply all decisions. A schedule-free reference claim
+retains K13's reference-only meaning and is not target-resource evidence.
+
+For more than one invocation context, resource_contexts MUST contain
+exactly one record for every §12.1 context, in increasing bytewise order
+of the JCS encodings of their complete keys. Include default-covered and
+predicated-off invocations. Full identity includes resolved source
+point, loop indices, fixed-binding instance, forward semantic-call
+occurrence and oracle step/phase where applicable, not just variant and
+inherited-control count. Resolve each context's own args, token budgets,
+placements, cleanup, epsilon shares, schedule/default decisions, native
+leaves and wire intervals. Recompute every declared resource and gate
+count from that context. gates_used counts native leaves after scheme
+expansion, each once, with existing scheme/error attribution unchanged.
+
+For compatibility, unkeyed resources/gates_used/estimate MUST be the
+first canonical context's projection. An optional estimate's presence
+and value agree with that projection. The projection discharges only
+that context. Missing, duplicate, reordered, foreign or mismatched
+context records, or a conflicting projection, reject the requested
+report. A singleton array, when present, follows the same validation.
+
+Whether or not estimate is present, accounting uses exact nonnegative
+rational arithmetic. Each resources value is a canonical decimal string
+using §10.1's 34-significant-digit upward encoding. For q>0, find integer
+e with 10^e <= q < 10^(e+1), then display
+ceil(q / 10^(e-33)) * 10^(e-33). Zero is "0". Spelling is ASCII digits with an optional decimal point; no exponent, no plus sign, no leading integer zeros except the value "0" itself, no trailing fractional zeros, no negative zero.
+
+The checker compares the producer's canonical string with the canonical
+encoding of its independently recomputed exact rational value, not the
+numeric displayed decimal with that exact rational. Noncanonical strings
+or differing encodings reject. Resource-row keys and class qualification
+retain §8.2/§10.1's vector and escaping requirements; no scalar sum
+replaces a required per-class row. Capacity, matching, objectives and
+resource calculations continue to use exact rationals. Never add rounded
+child displays to compute an exact parent value.
+
+When estimate is present, precision_digits is 34 and its reduced
+exact_resources fractions MUST also equal the recomputed values, with
+nonnegative numerator and positive denominator decimal strings and zero
+as 0/1. K12's existing mandatory-estimate cases and complete class rows
+remain mandatory. Optional estimate here does not weaken K12. Omitting
+estimate elsewhere does not mean a decimal must be an exact rational
+representation; it is the defined upper display enclosure.
+
+The root counts its realised event list once, including semantic callee
+leaves. Child reports are independently checkable subtree/footprint views,
+not extra costs added to the root. Measure child timing relative to that
+invocation's entry, preserving internal delays in the effective schedule.
+Restrict caller-owned interface and inherited-control lifetimes to that
+invocation interval when displaying the child view. This neither
+transfers ownership nor creates an additional charge to the root.
+Within each view apply §8.2 dirty-borrow replacement: the borrower replaces
+the owner's charge for that wire during the borrowed interval. There is
+no second aggregation by summing child peak/time maps. Error-bound
+multiplicities retain their existing separate composition rule.
+
+For a non-K12 resource report, omission of estimate remains valid when displays match recomputed encodings; K12 estimate certificates still require estimate.
+
+Closed-schema certificate readers require the K87 resource_contexts and canonical-display upgrade; legacy repeated-context flat reports require recomputation rather than an inferred max or sum.
+
+**Resource-context witness (K87).** Let flip(t) have body x t, and let a root keep mutable t and in-role c live throughout:
+
+```text
+action_call @flip (t) () () ()
+qpred c
+action_call @flip (t) () () ()
+qunpred c
+```
+
+The call keys name entry:0 and entry:2, with iteration=[], instance=[] and call_index=0. Under a native X with time and occupancy rates 1 in class fast, uncontrolled and controlled children have (time, occupancy, peak) (1,1,1) and (1,2,2); root values are (2,4,2), and X counts are 1,1,2. The second child occupies root time [1,2) but reports invocation-local time 1. A zero control value does not remove any charge.
+
+For native duration 1/3, child times display as "0.3333333333333333333333333333333334" and root time as "0.6666666666666666666666666666666667"; root occupancy 4/3 displays as "1.333333333333333333333333333333334". These apply with or without optional estimate; when present, exact_resources.time for a child is {"numerator":"1","denominator":"3"}. Summing rounded child displays rejects. One wire live over [0,2), borrowed over [0,1), at owner rate 1 and dirty rate 1/4 has occupancy 5/4, not 9/4.
+
+**Resource-report mixed-object binding (K87; §§9–10).**
+
+A native host binary can embed VM objects only for
+marked modules. A launch manifest selects an exported VM entry and its
+schedule/target; that selected VM invocation is the resource-report root,
+with context_key=[]. Its certificate inventory covers its VM closure and
+all generated invocation contexts, not every native entry or libc routine.
+Unmarked host main, argv/envp and ordinary host work remain native. A host
+shim supplies the bound handles, args, images and budgets before launch.
+Only costs within the bound VM realisation, including effects/transfers
+actually represented by that contract, enter its vector. Separately
+reported host/launch overhead must have an explicit scope and is not
+silently claimed as included. Native comparison selects the corresponding
+materialized marked entry; resource reporting does not require a whole
+native-binary schedule or VM certificate.
+
+**Borrow-frame mixed-object binding (K89; §§9–10).**
+
+In a mixed fat object, borrow_frame claims attach to the device-region
+certificate records of the identified embedded or linked ISA object and
+launched device-root closure. Source occurrences, allocation lifetimes
+and invocation contexts resolve within that closure. Required frames of
+the complete device closure remain covered, including default-covered
+calls. Native main and unmarked host-only code require no ISA region or
+borrow-proof inventory. The selected device launch determines the root
+and invocation; it does not make the native binary an ISA object.
+
+**Invocation-context frame descriptors (K90).**
+
+```text
+frame?: <§9.4 descriptor>,
+frame_contexts?: [{context_key:<§12.1 key>, frame:<§9.4 descriptor>}]
+```
+
+Each scheduled region record contains exactly one of frame and
+frame_contexts. frame is a descriptor valid for every reached invocation
+of that region in the bound root realisation, after instantiating c for
+each invocation. It may be used only if all its concrete classes and
+resolved non-c-dependent widths describe every invocation truthfully.
+frame_contexts contains exactly one record for each reached invocation,
+in increasing bytewise order of the JCS encoding of context_key. The
+key is exactly §12.1's fully resolved invocation chain; no wildcard,
+variant/control-only key, omitted default-covered call or repeated key
+is admitted. Every supplied frame_contexts array is validated, including a single-context
+array. Coverage includes predicated-off and default-covered realised calls;
+frame selection never inspects the quantum predicate value. The root invocation has key []. Resolve its variant,
+controls, arguments, budget, placements and expansion choices from the
+bound invocation tree, never from record order or a guessed root budget.
+
+Select the context's descriptor before substituting c and check its
+slots, classes, widths, allocation identities and lifetimes against
+that invocation. Inherited controls remain caller-owned and separate
+from callee slots. Distinct contexts have distinct dynamic frame
+identities even when their static descriptor id strings agree. Identical
+descriptor bytes do not authorize shared physical storage; §9.4's
+live-range and disjointness rules remain required. A uniform descriptor must also have valid allocation order, scheme identities
+and live ranges in every covered invocation. A standalone reference
+record uses frame for its explicitly bound invocation or a descriptor
+proved uniform over its declared invocation scope.
+
+Uniformity is established by checking the descriptor against every invocation in the declared scope's resolved tree, or by a parameter-uniform argument over that scope; an unchecked uniformity assertion is not a valid frame.
+
+`frame_contexts` and `resource_contexts` cover the same reached context set when applicable. Other context-indexed obligations retain their own published rules.
+Truthful legacy uniform frames retain their encoding and undergo all-context validation. Producers regenerate nonuniform certificates; consumers must not discard frame_contexts or substitute its first descriptor for the complete array.
+Closed-schema certificate readers require the K90 frame/frame_contexts alternative upgrade.
+
+
+In a mixed fat object, frame and frame_contexts describe the linked
+ISA regions in the certificate's bound device-root realisation. Each
+device root has its own object/root bindings and complete context set;
+[] denotes that device root, never the native executable entry. Native
+host functions, process argv/envp and host-only libc need no frame
+records. Shared linked closures retain separate root-relative contexts.
+A host may reach the device through §10's device CC entry; the general
+mixed-container launch shim remains the explicit boundary work described
+in the shared scope statement. Native comparison binds the corresponding
+materialised device region and callee closure under its recorded configuration.
+
+**Frame-context witnesses (K90).** Pair(t,u) calls flip(t), then flip(u), where flip is X. For H_pair=b98f9111e8533f00a8e5ac195e1b335678d14efcabb653d754d9999e21297c16, keys have symbol H_pair, iteration=[], instance=[], call_index=0 and respectively point entry:0 and entry:1. Entry:0 selects {slots:[{id:"mut:0",role:"mut",class:"A",width:1}],scratch:[],history:[],borrow:[],ancillae:[]}; entry:1 has the same five arrays with class B.
+
+The correct ordered array accepts; swapped classes, reversed array order, duplicate keys and omission of either default-covered call reject. For inputs (0,0),(0,1),(1,0),(1,1), outputs are (1,1),(1,0),(0,1),(0,0), and inverse restores each input. With unit durations/rates, time=2, qubit_second[A]=qubit_second[B]=2 and peak_qubits[A]=peak_qubits[B]=1.
+
+Each root has its own [] context; a descriptor from another root is validated against the receiving root's bindings and placements. With a shared flip placed in A under root A and B under root B, copying the A descriptor into B's certificate rejects.
+A homogeneous two-call realization accepts one uniform frame; a single-context frame_contexts array is also fully validated.
+
+**Token equality bindings (K91).**
+
+A resolved invocation carries a canonical token equality partition.
+For an oracle invocation list its separate invocation token first, then
+token-typed args in signature order. For an action, perm_action or CC/R
+entry list only token-typed parameters in signature order: §4.7 action_call
+has no separate invocation token. Budget fields do not create identities.
+The separate token accepted by the estimation ABI supplies the budget,
+but contributes an identity slot only for an oracle subject.
+Equal labels denote one valid token identity and require equal tuples;
+unequal labels denote distinct identities even when tuples agree.
+Labels are assigned by first occurrence, starting at 0, without gaps.
+An empty token list has []. A token-free oracle has [0]; a token-free
+action/perm_action/CC/R entry has []. An action with a,b uses [0,0] for
+one shared token identity and [0,1] for two distinct identities.
+No process-local handle is serialized. params_hash remains SHA-256 of
+the typed args array alone. Full invocation/schedule/cache matching
+additionally compares token_aliases; params_hash alone is insufficient.
+
+Executors derive this partition from actual live handles. Tuple-only
+requests with token arguments must explicitly supply the partition;
+malformed labels, wrong arity or tuple-inconsistent equality are E_ARG
+before producing an estimate or performing an effect. Every consistent
+partition is admitted. Source forwarding, lexical captures, lproc fixed
+bindings and adjoint/inverse traversal preserve resolved identities.
+A successful mint creates a fresh identity attached to that dynamic
+defining occurrence; it is not reconstructed by tuple interning.
+Nested contexts retain the identity mapping and canonicalize their own
+ordered partition from it; equal local label numbers in two contexts
+do not by themselves denote one global token.
+
+This source-binding identity context is explicit metadata outside the
+closed catalog JSON and its positional value arguments. K24's token
+values and K77's exactly-one-field oracle_invocation token channel keep
+their tuple encoding. Builders and captures additionally preserve the
+identity context so source matching is not performed on tuple equality.
+
+Claims used in an identity-dependent context bind its partition too.
+Parameter-uniform structural proofs quantify over every consistent
+partition as well as every argument vector/budget. Inverse-pair entries
+bind the primary/argument token partition when relevant; coverage must
+preserve it and all its tuple-equality constraints alongside the existing
+primary-budget inequality and exact arg_tokens tests. A proof for one
+partition cannot be reused for another merely because params_hash agrees.
+
+A parameter-uniform structural claim uses invocation:{args:"all",budget:"all",token_aliases:"all"}; token_aliases:"all" quantifies over every partition consistent with each quantified argument vector and budget. Concrete invocations use canonical arrays.
+Schedule/certificate-only changes preserve object_hash under unchanged header/source bytes; changing any header version requires recomputing object_hash and downstream bindings.
+Closed-schema certificate and schedule readers require the K91 token_aliases upgrade.
+
+
+In a mixed fat object, token_aliases binds invocations of the loaded
+marked device ISA object and linked device closure. Execution derives
+partitions from that program's valid live token handles and preserves
+equality through device calls; tuple-based estimate/schedule requests
+supply equality partitions explicitly. Serialization contains equality
+classes, never host pointers or process-local handle ids. Alias-bearing
+schedules and certificates bind that device object/root and invocation.
+Native entry points, argv/envp and host-only libc need no device-alias
+entries. The future mixed launch shim negotiates the alias-binding ABI
+feature; §10 alone does not specify that shim or container interface.
+
+**Action and inverse-pair witnesses (K91).**
+
+The published token-free flip action's action_call has no token operand:
+execution, estimates and replay all derive []. An action with token
+parameters a,b has [0,0] for a=b or [0,1] for distinct equal-tuple tokens.
+A CC sink wrapper has the same ordering. Only an oracle with primary T0
+and token arguments a,b can use [0,1,1] versus [0,1,2].
+
+For a Q witness use a memoryless identity oracle (`lift.retval x`) and an
+action containing two consecutive oracle_call occurrences on the same
+wires, with token arguments a then b. Both calls compose to identity.
+The action's partition [0,0] permits the K81 matched pair and its K65
+carrier at the second call; [0,1] supplies no such carrier. Each oracle
+call's own context prepends its actual a or b token. No hypothetical
+primary action token is introduced. A mint reversed and minted again at
+the same tuple creates a new identity; it does not revive the revoked one.
+
+An inverse-pair entry at primary budget (2,0,0,0), arg_tokens=(2,0,0,0)
+and partition [0,0] does not cover primary (3,0,0,0) with that unchanged
+argument tuple: [0,0] becomes tuple-inconsistent; [0,1] changes the
+certified equality partition. The original componentwise budget condition
+alone is insufficient when equal-token constraints also apply.
+
+oracle_call is its own §5.3 adjoint, so the second occurrence is a matched inverse of the first exactly when token identities (not merely tuples) agree, per §5.3's matched-pair definition.
+
+For oracle_call @identity a (x) t f () () followed by oracle_call @identity b (x) t f () (), both at tuple (1,0,0,0), both action partitions preserve the complete input tuple; [0,0] produces a sole matched-call K65 carrier at entry:1/generated:0, while [0,1] produces none. Replay of a certificate bound to the other partition rejects despite identical params_hash.
+
 **Invocation binding (K13).** An invocation is
-`{ args: [value, …], budget: [B,heap,stack,depth] }`, with every value
+`{ args: [value, …], budget: [B,heap,stack,depth], token_aliases: [nonnegative integer, …] }`, with every value
 resolved before replay and all four budget components explicit even
 when zero. `args` is in signature order: `iN` and `ptr` values are
 canonical **unsigned decimal strings** of exactly that bit-vector
@@ -3934,7 +4732,7 @@ budget. K4 inverse-pair claims instead bind the entry's budget,
 `arg_tokens` and quantified `args` domain as already specified; this
 rule does not replace that quantification by one chosen argument.
 A parameter-uniform structural claim MAY instead bind
-`invocation: { args: "all", budget: "all" }`: its checker MUST discharge
+`invocation: { args: "all", budget: "all", token_aliases: "all" }`: its checker MUST discharge
 the rule's side conditions for every well-typed argument vector and
 valid budget, not by replaying a chosen instance. Thus generic library
 and adjoint/translation proofs retain their universal scope.
@@ -3950,6 +4748,59 @@ it actually covers. Reference table/program/structural claims need no
 schedule; they prove only their reference relation, not a target
 realisation. Scheduled/numerical/channel claims retain the expansion
 library gate and all existing context and composition obligations.
+
+**Qinplace checker coverage (K92).**
+
+Qinplace coverage checking. For every qinplace source site in a supplied
+region record, the checker MUST require an inverse_pairs entry in that
+owner region's record for the exact pair of resolved g/ginv closure
+hashes, in either orientation, and MUST reject a missing pair or invalid
+referenced claim. Resolve imported owner records and library claims by
+§9.3; indices name claims in their owner record, never in an outer caller.
+
+When a root invocation is bound by bindings.invocation (or by a
+standalone claim whose subject is that root), the checker MUST apply
+§4.5's complete
+covering test at every reached qinplace site in that invocation and its
+transitive invocation contexts, rejecting any uncovered site. With a
+schedule, use §12.1's complete realised invocation tree, including
+default-covered calls, iterations and source-adjoint/control contexts;
+without a schedule, use the bound reference invocation tree. Resolve
+the site's tk and args from that context, not the root's tuple reused
+for all callees. A disabled coherent predicate does not remove an
+entered instruction's obligation. Entry claims must be established by
+their specified exhaustive or linked-library rule; sampled agreement
+does not cover. Do not treat two private generated oracle calls as new
+owners of the containing source site's entry.
+
+A standalone record with an entry but no resolvable invocation may
+retain its established standalone claims. The checker MUST report its
+qinplace applicability as unestablished and MUST NOT conclude executable
+acceptance from it. Universal applicability may instead be established
+by a checked parameter-uniform argument covering every admitted call.
+If a required invocation, linked body or context cannot be resolved or
+checked, report that obligation unestablished; an implementation work
+limit is not proof of absence or applicability. Malformed bindings and
+missing required pairs still reject. No successful verdict may imply
+that an unestablished obligation was discharged.
+
+These checks do not remove the executor's §4.5 pre-effect trap/fault
+requirement. A verified result may be reused only for the closure,
+entry proof and invocation/domain it actually covers; closure equality
+alone does not establish applicability at another token/args binding.
+
+Without a schedule, derive the reference invocation tree from the literal constructions of §§3.6, 4.5–4.7 and 5.2–5.3, retaining predicated calls regardless of predicate value and omitting dynamic visits inside zero-trip qloops.
+Without a schedule, derive entered contexts from the bound reference Q construction (§§3.6, 4.6 and 5.2), retaining coherently disabled calls; do not derive coverage solely from a basis-input interpreter trace.
+
+Unestablished qinplace applicability is recorded in the checker report as the obligation outcome "unestablished" for that region record, alongside proof/evidence/unchecked outcomes. This is an obligation outcome, not a successful claim label.
+
+**Qinplace coverage witnesses (K92).** In §16.3 example 7, addya owns the qinplace G/GINV entry with minimum [3,0,0,0] and a in 0..3. The exact closure pair in either orientation covers tk=[3,0,0,0],a=1 and tk=[9,0,0,0],a=1; tk=[2,0,0,0] or a=3 with a-domain 0..2 rejects applicability. An absent/wrong owner-local pair rejects.
+
+For outer→inner→qinplace, minimum [3,0,0,0] and inner actual tokens 3 then 2 yield covered/uncovered and overall rejection; 3 then 3 establishes both contexts' coverage. Outer budget 9 does not change either result. Default-covered and source-adjoint forms retain these results. An outer-only entry cannot replace inner's entry, and forwarded token k=[4,0,0,0] does not match arg_tokens.k=[3,0,0,0] regardless of the primary budget.
+
+A qloop 0 body requires static pair inventory but has no applicability visits; a reached qinplace under a zero coherent control still requires applicability. A valid standalone structural claim with unresolved applicability retains its established claims and reports that obligation unestablished.
+
+**Qinplace mixed-object coverage (K92).** Coverage begins at each selected embedded device root, context [], and uses its linked owner records. Two native calls to that root can bind different tk/args; neither inherits coverage merely from the other's certificate. Native main, host-only libc and other device roots need no artificial region inventory. The container-to-root association, launch budget/handle negotiation and tape/run association remain the boundary obligations in the mixed fat-object scope statement above. These checks apply to device invocations without requiring whole-binary lowering.
 
 **CLAIM-BINDING witness**
 
@@ -4105,6 +4956,19 @@ inverse traversal (0/1 for the two calls within one source-row expansion;
 separate source points each start at 0). Reject absent, malformed or
 source-inconsistent records before concrete expansion. This vector tests
 the existing K77 binding rule; it adds no catalog argument or binding rule.
+
+**MCX operand and phase witnesses (K93; suites C/F/T6).**
+
+For s:wire, b:wire[2], t:wire, mcx (s, b) t resolves to [s,b[0],b[1],t], with k=3 and four gate operands. It maps (s,b,t) to (s,b,t XOR (s AND [b=3])) with phase +1 on all 16 basis inputs.
+mcx (b, s) t resolves to [b[0],b[1],s,t]; it has the same unitary and K78 primitive identity as mcx (s, b) t, while retaining its distinct canonical source bytes.
+
+For a:wire[2], s:wire and an active predicate r disjoint from these operands, mcx (s, a) t has own controls [s,a[0],a[1]], k=3 and total control count c=4; its target toggles exactly when r=s=1 and a=3. Check the expanded operand order as well as the truth table.
+
+For the action swap p q; mcx (c) p with c:wire[2], the complete map is (p,q,c) -> (q XOR [c=3],p,c); its adjoint applies MCX before SWAP. For p=q=0, the action maps (|0,0,0,0⟩+|0,0,3,1⟩)/√2 to (|0,0,0,0⟩+|1,0,3,1⟩)/√2, in tuple order (p,q,c,R), preserving both displayed amplitudes. Check the complete basis columns with amplitude +1.
+
+The written bundle operand remains in source envelopes. The witness object hash db3d3f92a79077074901449d83532f1a0d82ef1621bd833adb7ad14d1aedd467 and action closure e38d5da64f9a0ae89a66243bcbe5a321cb807a5bbabf83952b63d3465dfab346 stay unchanged under this in-version repair; they identify bytes. Schedules that counted one control must be regenerated and certificates rechecked; unchanged source hashes do not validate old execution caches. Source adapters supply all flattened controls and k to the existing resolved-wire ref recipes; those recipe bytes and their catalog hash stay unchanged. Changed adapter leaves require regenerated leaf hashes and affected schedules.
+
+Flatten within each marked device module's actual wire bindings; wires and certificate domains do not include native host code. Gate arity and budgets belong to that device invocation. Shared device helpers may be linked under several roots without making native main or host-only libc certificate regions. No launch, opaque-handle or tape format changes follow from this operand rule. The mixed fat-object scope statement's container/root and mixed-launch boundary additions remain required.
 
 ## 16. Canonical textual form (normative)
 
