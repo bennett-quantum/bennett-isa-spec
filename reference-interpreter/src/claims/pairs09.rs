@@ -272,11 +272,10 @@ impl Object {
                 ));
             }
             for row in enumerate(&domain)? {
-                let mut input = OracleVectorInput::default();
-                input.ins = p.g.params[0]
-                    .iter()
-                    .map(|p| BitVector::zero(p.ty.bits(self.ptr_width)?))
-                    .collect::<Result<_>>()?;
+                let mut input = OracleVectorInput {
+                    ins: p.g.params[0].iter().map(|p| BitVector::zero(p.ty.bits(self.ptr_width)?)).collect::<Result<_>>()?,
+                    ..Default::default()
+                };
                 for param in &p.g.params[3] {
                     let Type::Region(a, _) = param.ty else {
                         return err("§12.2 K4", "expected region");

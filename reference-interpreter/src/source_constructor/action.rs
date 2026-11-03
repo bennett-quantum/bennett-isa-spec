@@ -362,56 +362,7 @@ impl Compiler<'_> {
                         env.wires.remove(&a[2]);
                     }
                 }
-                "qinplace" => {
-                    let g = &self.object.functions[a[0].trim_start_matches('@')];
-                    let n = env.width(&a[3])?;
-                    let fault = g.params[2][0].ty.bits(self.object.ptr_width)?;
-                    let t = self.declare(n, "any", "clean");
-                    let f = self.declare(fault, "any", "clean");
-                    out.extend([obj([("acquire", text(&t))]), obj([("acquire", text(&f))])]);
-                    env.wires.insert(t.clone(), (t.clone(), n));
-                    env.wires.insert(f.clone(), (f.clone(), fault));
-                    let extra = if a.len() > 4 {
-                        crate::object::list(&a[4])?
-                    } else {
-                        Vec::new()
-                    };
-                    let mut inputs = vec![a[3].clone()];
-                    inputs.extend(extra);
-                    let mut call = i.clone();
-                    call.op = "oracle_call".into();
-                    call.operands = vec![
-                        a[0].clone(),
-                        a[2].clone(),
-                        format!("({})", inputs.join(", ")),
-                        t.clone(),
-                        f.clone(),
-                        if a.len() > 5 {
-                            a[5].clone()
-                        } else {
-                            "()".into()
-                        },
-                        if a.len() > 6 {
-                            a[6].clone()
-                        } else {
-                            "()".into()
-                        },
-                    ];
-                    call.lhs.clear();
-                    out.extend(self.call(&call, env)?);
-                    let body = (0..n)
-                        .map(|b| Ok(gate("swap", [env.indexed(&a[3], b)?, bit(&t, b)])))
-                        .collect::<Result<Vec<_>>>()?;
-                    out.extend(controlled(env, body));
-                    call.operands[0] = a[1].clone();
-                    out.extend(self.call(&call, env)?);
-                    out.extend([
-                        obj([("relinquish", text(&t))]),
-                        obj([("relinquish", text(&f))]),
-                    ]);
-                    env.wires.remove(&t);
-                    env.wires.remove(&f);
-                }
+                "qinplace" => out.extend(self.qinplace(i,env)?),
                 "oracle_call" | "action_call" | "ctl" | "adj" => out.extend(self.call(i, env)?),
                 _ => {
                     let mut node = if matches!(op, "rx" | "ry" | "rz") {
@@ -563,6 +514,12 @@ fn source_adjoint(body: Vec<Value>, symbols: &mut [SourceSymbol]) -> Result<Vec<
                         .ok_or_else(|| Error::new("§11.1: source call binding".into()))?;
                     symbol.adjoint = !symbol.adjoint;
                 }
+            } else if kind == "qinplace" {
+                let Some(Value::Arr(args)) = m.get_mut("args") else {
+                    return Err(Error::new("§11 K62: qinplace actuals".into()));
+                };
+                if args.len()!=6 {return Err(Error::new("§11 K62: qinplace adapter arity".into()));}
+                args.swap(3,4);
             } else if kind == "qloop" {
                 let Some(Value::Arr(args)) = m.get_mut("args") else {
                     return Err(Error::new("§11.1: loop body".into()));
@@ -753,3 +710,4 @@ pub(super) fn construct(
     })
 }
 mod cleanup;
+mod qinplace;

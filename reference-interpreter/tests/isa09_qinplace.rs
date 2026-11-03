@@ -274,3 +274,28 @@ fn uncovered_pair_rejects_before_the_earliest_effect_of_the_region() {
         }
     }
 }
+
+
+#[test]
+fn source_qinplace_adjoints_preserve_instruction_allocation_and_release_order() {
+    use bennett_isa_conformance::{json,ref_catalog::Machine,ref_language::permutation};
+    let object=Object::parse(&inverse_certificate()).unwrap();
+    let root=object.identity().unwrap().closure_hashes["addya"].clone().unwrap();
+    let args=json::parse(r#"["x","y",["3","0","0","0"],"1"]"#).unwrap();
+    for adjoint in [false,true] {
+        let leaves=object.expand_action_source_with_token_aliases("addya",args.as_arr().unwrap(),&[("x",2),("y",2)],adjoint,&[0]).unwrap();
+        let own=leaves.iter().filter(|l| l.source.as_ref().is_some_and(|s| s.terminal.symbol==root)).collect::<Vec<_>>();
+        let allocation=own.iter().filter(|l| l.gate=="alloc").map(|l| l.allocation.as_ref().unwrap().1).collect::<Vec<_>>();
+        let release=own.iter().filter(|l| l.gate=="release").map(|l| l.allocation.as_ref().unwrap().1).collect::<Vec<_>>();
+        assert_eq!(allocation,[2,4],"adjoint={adjoint}");
+        assert_eq!(release,[2,4],"adjoint={adjoint}");
+        let machine=Machine::compile(&permutation(&leaves).unwrap(),&[("x",2),("y",2)]).unwrap();
+        for x in 0..4 {for y in 0..4 {
+            let mut state=machine.state();machine.set(&mut state,"x",x);machine.set(&mut state,"y",y);let before=state.clone();
+            machine.run(&mut state,true,false).unwrap();
+            assert_eq!(machine.get(&state,"x"),if adjoint {(x+8-y-1)&3}else{(x+y+1)&3});
+            assert_eq!(machine.get(&state,"y"),y);
+            machine.run(&mut state,true,true).unwrap();assert_eq!(state,before);
+        }}
+    }
+}
