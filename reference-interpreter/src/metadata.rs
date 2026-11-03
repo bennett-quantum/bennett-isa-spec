@@ -265,6 +265,31 @@ impl Object {
             nonnegative(b.get("epsilon")?)?;
             let budget = b.get("budget")?.array()?;
             let values = budget.iter().map(Json::uint).collect::<Result<Vec<_>>>()?;
+            if self.isa_version == crate::IsaVersion::V09 {
+                let group = if f.kind == "oracle" { 4 } else { 3 };
+                let count = f.params[group]
+                    .iter()
+                    .filter(|p| p.ty == crate::Type::Token)
+                    .count();
+                let mut tuples = Vec::new();
+                if f.kind == "oracle" {
+                    tuples.push(Some(crate::Budget {
+                        steps: u64::try_from(values[0])
+                            .map_err(|_| Error::new("§11: step budget exceeds u64".into()))?,
+                        heap: values[1],
+                        stack: values[2],
+                        depth: values[3],
+                    }));
+                }
+                // Parameter tuples are resolved by the bound invocation, not
+                // recoverable from a params_hash at unbound admission.
+                tuples.extend(std::iter::repeat_n(None, count));
+                crate::tokens::alias_binding(
+                    b.object()?.get("token_aliases"),
+                    &tuples,
+                    count == 0,
+                )?;
+            }
             if f.kind == "oracle" {
                 self.validate_budget(crate::Budget {
                     steps: u64::try_from(values[0])

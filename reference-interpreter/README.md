@@ -157,6 +157,19 @@ For CC/R entries `--budget B[,heap,stack,depth]`'s first component is
 execution fuel (CC/R has no ISA step budget; exhaustion is a §3.4
 diagnostic, default 1,000,000) and the rest are token defaults.
 
+ISA 0.9 CC/R token arguments additionally require `--token-aliases '[0,0]'`
+for one shared identity, or `'[0,1]'` for distinct identities with the same
+tuple. List token parameters only, in signature order; labels start at zero
+and introduce each new identity without gaps. Equal labels require equal
+tuples. The interpreter rejects a missing or inconsistent partition before
+entry. Process-local token IDs are never written to the effect tape.
+In Rust, `Object::budget_token` constructs a validated host handle; cloning
+that handle preserves its identity. `ClassicalMachine::new_with_token_aliases`
+and `with_token_aliases` bind tuple-only arguments explicitly. Ordinary
+constructors accept actual `ClassicalValue::DeviceToken` handles directly.
+Source, schedule, certificate and estimation integration remains tracked by
+`b-isa-spec-8ui`; this launch support does not close that broader K91 work.
+
 `run-cc <object> <entry> [options]` runs a CC or R entry on the
 `ClassicalMachine` and prints the complete run. Output: `entry`, `status`
 (`COMPLETED` or `FAILED`), `steps`, `budgets` (one per `token:` argument, as

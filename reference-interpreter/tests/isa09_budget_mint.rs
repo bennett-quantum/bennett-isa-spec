@@ -243,9 +243,165 @@ fn observer_rollback_discards_token_validity_and_retry_mints_a_new_identity() {
 
 #[test]
 fn legacy_tuple_only_09_launch_needs_a_partition() {
-    let object = extended(&[("tokens",r#"{"abi":"0.8","kind":"r","params":["token","token"],"results":[],"tier":"r"}"#,
-        "fn r @tokens (a:token, b:token) () () () ()\n^entry():\nret")]);
-    let args = [ClassicalValue::Token(Budget::steps(1)),ClassicalValue::Token(Budget::steps(1))];
-    let error = ClassicalMachine::new(&object,"tokens",&args,&[]).err().expect("tuple-only09 request must supply token_aliases");
+    let object = extended(&[(
+        "tokens",
+        r#"{"abi":"0.8","kind":"r","params":["token","token"],"results":[],"tier":"r"}"#,
+        "fn r @tokens (a:token, b:token) () () () ()\n^entry():\nret",
+    )]);
+    let args = [
+        ClassicalValue::Token(Budget::steps(1)),
+        ClassicalValue::Token(Budget::steps(1)),
+    ];
+    let error = ClassicalMachine::new(&object, "tokens", &args, &[])
+        .err()
+        .expect("tuple-only09 request must supply token_aliases");
     assert!(error.to_string().contains("E_ARG"));
+}
+
+#[test]
+fn alias_aware_launch_admits_every_consistent_partition_and_preserves_identity() {
+    let object = extended(&[("tokens",r#"{"abi":"0.8","kind":"r","params":["token","token","token"],"results":["token","token","token"],"tier":"r"}"#,
+        "fn r @tokens (a:token, b:token, c:token) (x:token, y:token, z:token) () () ()\n^entry():\nret a b c")]);
+    let args = [
+        ClassicalValue::Token(Budget::steps(1)),
+        ClassicalValue::Token(Budget::steps(1)),
+        ClassicalValue::Token(Budget::steps(1)),
+    ];
+    for labels in [[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1], [0, 1, 2]] {
+        let mut machine =
+            ClassicalMachine::new_with_token_aliases(&object, "tokens", &args, &labels, &[])
+                .unwrap();
+        let before = machine.snapshot();
+        let result = machine.run(10).unwrap();
+        assert_eq!(result.fault, None);
+        for i in 0..3 {
+            for j in 0..3 {
+                assert_eq!(result.values[i] == result.values[j], labels[i] == labels[j]);
+            }
+        }
+        machine.reverse().unwrap();
+        assert_eq!(machine.snapshot(), before);
+    }
+    for labels in [&[][..], &[1, 1, 1], &[0, 2, 2], &[0, 0], &[0, 0, 0, 0]] {
+        let error = ClassicalMachine::new_with_token_aliases(&object, "tokens", &args, labels, &[])
+            .err()
+            .expect("malformed labels");
+        assert!(error.to_string().contains("E_ARG"));
+    }
+    let mixed = [
+        ClassicalValue::Token(Budget::steps(1)),
+        ClassicalValue::Token(Budget::steps(2)),
+        ClassicalValue::Token(Budget::steps(1)),
+    ];
+    assert!(
+        ClassicalMachine::new_with_token_aliases(&object, "tokens", &mixed, &[0, 0, 1], &[])
+            .is_err()
+    );
+    assert!(
+        ClassicalMachine::new_with_token_aliases(&object, "tokens", &mixed, &[0, 1, 0], &[])
+            .is_ok()
+    );
+    let handle = object.budget_token("id", Budget::steps(1)).unwrap();
+    let known = [
+        ClassicalValue::DeviceToken(handle.clone()),
+        ClassicalValue::DeviceToken(handle.clone()),
+        ClassicalValue::DeviceToken(handle),
+    ];
+    assert!(
+        ClassicalMachine::new_with_token_aliases(&object, "tokens", &known, &[0, 1, 2], &[])
+            .is_err()
+    );
+    assert!(ClassicalMachine::new(&object, "tokens", &known, &[]).is_ok());
+}
+
+#[test]
+fn legacy_08_tuple_token_launch_keeps_its_behavior() {
+    let raw = support::object(
+        &[(
+            "tokens",
+            r#"{"abi":"0.8","kind":"r","params":["token"],"results":["token"],"tier":"r"}"#,
+            "fn r @tokens (a:token) (b:token) () () ()\n^entry():\nret a",
+        )],
+        "{}",
+        "",
+    );
+    let object = support::rehash(&raw);
+    let args = [ClassicalValue::Token(Budget::steps(1))];
+    let mut machine = ClassicalMachine::new(&object, "tokens", &args, &[]).unwrap();
+    assert_eq!(machine.run(10).unwrap().values, args);
+    machine.reverse().unwrap();
+}
+
+#[test]
+fn public_cli_alias_requests_execute_reverse_and_replay_without_serializing_ids() {
+    use bennett_isa_ref::json::Json;
+    let object = extended(&[
+        ("pass",r#"{"abi":"0.8","kind":"r","params":["token"],"results":["i1"],"tier":"r"}"#,
+         "fn r @pass (tk:token) (r:i1) () () ()\n^entry():\nr = const.i1 1\nret r"),
+        ("compare",r#"{"abi":"0.8","kind":"cc","params":["token","token"],"results":[],"tier":"cc"}"#,
+         "fn cc @compare (a:token, b:token) () () () ()\n^entry():\nr = call @pass a\nuncall @pass (b) (r)\nret")]);
+    let directory =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".tmp/isa09-token-alias-cli");
+    std::fs::create_dir_all(&directory).unwrap();
+    let path = directory.join("object.bisa");
+    let tape = directory.join("tape.json");
+    std::fs::write(&path, &object.text).unwrap();
+    let run = |command: &str, aliases: Option<&str>, extra: &[&str]| {
+        let mut process = std::process::Command::new(env!("CARGO_BIN_EXE_bennett-isa-ref"));
+        process.args([
+            command,
+            path.to_str().unwrap(),
+            "compare",
+            "--arg",
+            "token:1,0,0,0",
+            "--arg",
+            "token:1,0,0,0",
+        ]);
+        if let Some(aliases) = aliases {
+            process.args(["--token-aliases", aliases]);
+        }
+        process.args(extra).output().unwrap()
+    };
+    for (labels, fault) in [("[0,0]", Json::Null), ("[0,1]", Json::Number("4".into()))] {
+        let output = run(
+            "run-cc",
+            Some(labels),
+            &["--tape-out", tape.to_str().unwrap()],
+        );
+        assert!(output.status.success(), "{output:?}");
+        let value = Json::parse(std::str::from_utf8(&output.stdout).unwrap()).unwrap();
+        assert_eq!(value.get("fault").unwrap(), &fault);
+        assert_eq!(std::fs::read_to_string(&tape).unwrap(), "[]\n");
+        let output = run(
+            "run-program",
+            Some(labels),
+            &["--reverse", "--replay-tape", tape.to_str().unwrap()],
+        );
+        assert!(output.status.success(), "{output:?}");
+        let value = Json::parse(std::str::from_utf8(&output.stdout).unwrap()).unwrap();
+        assert_eq!(value.get("fault").unwrap(), &fault);
+        assert_eq!(value.get("equals_entry").unwrap(), &Json::Bool(true));
+        let output = run("reverse", Some(labels), &[]);
+        assert!(output.status.success(), "{output:?}");
+        let value = Json::parse(std::str::from_utf8(&output.stdout).unwrap()).unwrap();
+        assert_eq!(value.get("equals_entry").unwrap(), &Json::Bool(true));
+    }
+    std::fs::write(&tape, "preserve\n").unwrap();
+    for aliases in [
+        None,
+        Some("[1,1]"),
+        Some("[0,2]"),
+        Some("[-1,0]"),
+        Some("[0]"),
+        Some("[\"0\",\"0\"]"),
+    ] {
+        let output = run("run-cc", aliases, &["--tape-out", tape.to_str().unwrap()]);
+        assert_eq!(output.status.code(), Some(1), "{output:?}");
+        assert!(output.stdout.is_empty());
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains("E_ARG"),
+            "{output:?}"
+        );
+        assert_eq!(std::fs::read_to_string(&tape).unwrap(), "preserve\n");
+    }
 }

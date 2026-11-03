@@ -346,7 +346,7 @@ fn table09(c: &Json, f: &Function) -> Result<()> {
     Ok(())
 }
 
-fn invocation_budget(value: &Json) -> Result<crate::Budget> {
+pub(crate) fn invocation_budget(value: &Json) -> Result<crate::Budget> {
     let v = value.array()?;
     let n = v
         .iter()
@@ -478,7 +478,7 @@ fn subject(value: &Json) -> Result<()> {
     Ok(())
 }
 impl Object {
-    fn validate_invocation09(&self, v: &Json, f: &Function) -> Result<()> {
+    pub(crate) fn validate_invocation09(&self, v: &Json, f: &Function) -> Result<Vec<u64>> {
         crate::metadata_schema::validate_for(self.isa_version, "invocation09", v)?;
         self.validate_budget(invocation_budget(v.get("budget")?)?)?;
         let args = v.get("args")?.array()?;
@@ -497,7 +497,7 @@ impl Object {
         if args.len() != params.len() {
             return err("§12.3 K13", "invocation argument count mismatch");
         }
-        for (a, p) in args.iter().zip(params) {
+        for (a, p) in args.iter().zip(&params) {
             match p.ty {
                 Type::Int(w) => {
                     crate::metadata_schema::validate_for(
@@ -530,7 +530,22 @@ impl Object {
                 _ => unreachable!(),
             }
         }
-        Ok(())
+        let mut tokens = Vec::new();
+        if f.kind == "oracle" {
+            tokens.push(Some(invocation_budget(v.get("budget")?)?));
+        }
+        let mut argument_tokens = 0;
+        for (a, p) in args.iter().zip(&params) {
+            if p.ty == Type::Token {
+                tokens.push(Some(invocation_budget(a)?));
+                argument_tokens += 1;
+            }
+        }
+        crate::tokens::alias_binding(
+            v.object()?.get("token_aliases"),
+            &tokens,
+            argument_tokens == 0,
+        )
     }
     pub(crate) fn validate_certificate_details(&self, c: &Json) -> Result<()> {
         crate::metadata_schema::validate_for(self.isa_version, "certificate", c)?;
@@ -577,7 +592,7 @@ impl Object {
                     return err("§12.3 K13", "scheduled certificate requires invocation");
                 }
                 if let Some(v) = invocation {
-                    self.validate_invocation09(v, root_function)?;
+                    let invocation_aliases = self.validate_invocation09(v, root_function)?;
                     if let Some(schedule) = self.section("schedule") {
                         let sb = schedule.get("bindings")?;
                         let values = v.get("budget")?.array()?;
@@ -590,6 +605,23 @@ impl Object {
                             != sb.get("params_hash")?.string()?
                         {
                             return err("§12.3 K13", "invocation params hash mismatch");
+                        }
+                        let implicit = if root_function.kind == "oracle" {
+                            invocation_aliases.len() == 1
+                        } else {
+                            invocation_aliases.is_empty()
+                        };
+                        let tuples = vec![None; invocation_aliases.len()];
+                        let schedule_aliases = crate::tokens::alias_binding(
+                            sb.object()?.get("token_aliases"),
+                            &tuples,
+                            implicit,
+                        )?;
+                        if invocation_aliases != schedule_aliases {
+                            return err(
+                                "§12.3 K91",
+                                "invocation and schedule token_aliases differ",
+                            );
                         }
                     }
                 }
@@ -711,6 +743,13 @@ impl Object {
             if let Some(v) = c.object()?.get("invocation") {
                 if v.get("args")? != &Json::String("all".into()) {
                     self.validate_invocation09(v, f)?;
+                } else if f.params.iter().flatten().any(|p| p.ty == Type::Token)
+                    && v.object()?.get("token_aliases") != Some(&Json::String("all".into()))
+                {
+                    return err(
+                        "§12.3 K91",
+                        "uniform token arguments require token_aliases:all",
+                    );
                 }
             } else if subject_schedule.is_none()
                 && !inverse_pair

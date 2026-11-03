@@ -220,6 +220,7 @@ pub static TABLE: &[Entry] = &[
 // equivalent; recursion carries the object's version rather than widening it.
 #[rustfmt::skip]
 static TABLE09: &[Entry] = &[
+    entry!("schedule_bindings", "§11/§12.3 K91", obj!("closure_hash":"hash","target_hash":"hash","region":"text","variant":"text","inherited_controls":"uint","budget":"budget","params_hash":"hash","token_aliases?":"token_aliases09","epsilon":"decimal","scheduler":"named_version","expansion?":"expansion")),
     entry!("schedule", "§11 K14", obj!("bindings":"schedule_bindings","entries":"schedule_entries","interface_vertices?":"vertex_lists09")),
     entry!("vertex_lists09", "§11 K14", Array("uints")),
     entry!("path_element", "§11 K63", obj!("symbol":"hash","point":"text","iteration":"iteration","instance?":"iteration","call_index?":"selector")),
@@ -230,7 +231,7 @@ static TABLE09: &[Entry] = &[
     entry!("fixed_regions09", "§12.2 K85", Array("fixed_region09")),
     entry!("fixed_region09", "§12.2 K85", obj!("name":"text","A":"uint","W":"uint","image":"string","sha256":"hash")),
     entry!("label", "§12.2 K85", Enum(&["proof","proof_relative_to_image","evidence"])),
-    entry!("inverse_pair", "§12.3 K4", obj!("g":"hash","ginv":"hash","claim":"uint","budget":"budget","arg_tokens?":"arg_tokens09")),
+    entry!("inverse_pair", "§12.3 K4/K91", obj!("g":"hash","ginv":"hash","claim":"uint","budget":"budget","arg_tokens?":"arg_tokens09","token_aliases?":"token_aliases09")),
     entry!("arg_tokens09", "§12.3 K4", Map("text","budget")),
     entry!("region", "§12.3 K12", obj!("kind":"kind","signature":"signature","bounds":"uints","estimate?":"estimate09","frame":"frame","resources":"resources","gates_used":"gates_used","claims":"claims","verification":"verification","cleanup":"cleanup","error":"errors","definedness_assumptions":"texts")),
     entry!("estimate09", "§12.3 K12", obj!("precision_digits":"uint","exact_resources":"exact_resources09")),
@@ -252,9 +253,10 @@ static TABLE09: &[Entry] = &[
     entry!("budget09", "§12.3 K13", Tuple(&["canonical_decimal09","canonical_decimal09","canonical_decimal09","canonical_decimal09"])),
     entry!("value09", "§12.3 K13", Union(&["string","budget09"])),
     entry!("values09", "§12.3 K13", Array("value09")),
-    entry!("invocation09", "§12.3 K13", obj!("args":"values09","budget":"budget09")),
+    entry!("invocation09", "§12.3 K13/K91", obj!("args":"values09","budget":"budget09","token_aliases?":"token_aliases09")),
+    entry!("token_aliases09", "§12.3 K91", Array("uint")),
     entry!("all09", "§12.3 K13", Enum(&["all"])),
-    entry!("uniform09", "§12.3 K13", obj!("args":"all09","budget":"all09")),
+    entry!("uniform09", "§12.3 K13/K91", obj!("args":"all09","budget":"all09","token_aliases?":"all09")),
     entry!("claim_invocation09", "§12.3 K13", Union(&["invocation09","uniform09"])),
     entry!("reference_subject09", "§12.1 K13", obj!("closure_hash":"hash","variant":"text","inherited_controls":"uint","schedule_hash?":"hash")),
     entry!("exhaustive", "§12.1 K13", obj!("kind":"exhaustive_kind","domain":"domain","expected":"expected","label?":"label","subject":"reference_subject09","invocation?":"invocation09")),

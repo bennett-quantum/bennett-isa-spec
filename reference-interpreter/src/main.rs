@@ -287,6 +287,7 @@ fn earg(message: impl std::fmt::Display) -> Error {
 /// Options shared by the CC/R entry commands (`run-cc`, `reverse`,
 /// `run-program`); command-specific options are rejected for the others.
 struct CcOptions {
+    token_aliases: Option<Vec<u64>>,
     args: Vec<String>,
     entropy: Vec<u8>,
     replies: Option<String>,
@@ -308,6 +309,7 @@ fn parse_cc_options(
 ) -> Result<CcOptions> {
     let mut limits = program.default_budget(1_000_000)?;
     let mut options = CcOptions {
+        token_aliases: None,
         args: Vec::new(),
         entropy: Vec::new(),
         replies: None,
@@ -348,6 +350,28 @@ fn parse_cc_options(
             .ok_or_else(|| fail(format!("missing value for {option}")))?;
         pos += 1;
         match option {
+            "--token-aliases" => {
+                if !once.insert(option) {
+                    return Err(earg("--token-aliases given twice"));
+                }
+                let parsed = Json::parse(value).map_err(|e| e.context("§10 K91 E_ARG"))?;
+                options.token_aliases = Some(
+                    parsed
+                        .array()
+                        .map_err(|e| earg(e.to_string()))?
+                        .iter()
+                        .map(|v| {
+                            if !matches!(v, Json::Number(_)) {
+                                return Err(earg(
+                                    "token_aliases labels must be nonnegative integers",
+                                ));
+                            }
+                            u64::try_from(v.uint().map_err(|e| earg(e.to_string()))?)
+                                .map_err(|_| earg("token_aliases label exceeds u64"))
+                        })
+                        .collect::<Result<Vec<_>>>()?,
+                );
+            }
             "--args" | "--input" => {
                 if args_seen {
                     return Err(fail(
@@ -899,14 +923,26 @@ fn classical_machine<'a>(
     let entry = classical_entry(program, name)?;
     let (args, registers) = classical_args(program, entry, &options.args, options.token_defaults)?;
     let budgets = budgets_json(&args);
-    let mut machine = ClassicalMachine::with_quantum_registers_and_globals(
-        program,
-        name,
-        &args,
-        &options.entropy,
-        registers,
-        &options.mem,
-    )?;
+    let mut machine = if let Some(aliases) = &options.token_aliases {
+        ClassicalMachine::with_token_aliases(
+            program,
+            name,
+            &args,
+            &options.entropy,
+            registers,
+            &options.mem,
+            aliases,
+        )?
+    } else {
+        ClassicalMachine::with_quantum_registers_and_globals(
+            program,
+            name,
+            &args,
+            &options.entropy,
+            registers,
+            &options.mem,
+        )?
+    };
     for draw in &options.draws {
         machine.push_measurement_draw(*draw)?;
     }
@@ -1773,19 +1809,7 @@ fn run_program(program: &Object, name: &str, options: CcOptions) -> Result<Json>
             f.kind
         )));
     }
-    let (args, registers) = classical_args(program, f, &options.args, options.token_defaults)?;
-    let budgets = budgets_json(&args);
-    let mut machine = ClassicalMachine::with_quantum_registers_and_globals(
-        program,
-        name,
-        &args,
-        &options.entropy,
-        registers,
-        &options.mem,
-    )?;
-    for draw in &options.draws {
-        machine.push_measurement_draw(*draw)?;
-    }
+    let (mut machine, budgets) = classical_machine(program, name, &options)?;
     let entry = machine.snapshot();
     let entry_digest = machine.memory_digest()?;
     let mut replies = load_replies(options.replies.as_deref())?;

@@ -72,56 +72,94 @@ impl BudgetToken {
 }
 impl Object {
     pub(crate) fn bind_entry_tokens(
-        &self, args: &[ClassicalValue], aliases: Option<&[u64]>, run: u64,
+        &self,
+        args: &[ClassicalValue],
+        aliases: Option<&[u64]>,
+        run: u64,
     ) -> Result<Vec<ClassicalValue>> {
-        let tokens = args.iter().filter(|v| v.token_budget().is_some()).collect::<Vec<_>>();
+        let tokens = args
+            .iter()
+            .filter(|v| v.token_budget().is_some())
+            .collect::<Vec<_>>();
         for value in &tokens {
-            self.validate_budget(value.token_budget().unwrap()).map_err(|e| e.context("§10 E_ARG"))?;
+            self.validate_budget(value.token_budget().unwrap())
+                .map_err(|e| e.context("§10 E_ARG"))?;
             if let ClassicalValue::DeviceToken(token) = value {
-                if !token.valid(self,run,&Default::default()) {
+                if !token.valid(self, run, &Default::default()) {
                     return err("§10", "E_ARG: token is invalid for this program/run");
                 }
             }
         }
         let derived;
-        let aliases = if let Some(aliases) = aliases { aliases } else {
-            if tokens.iter().any(|v| matches!(v,ClassicalValue::Token(_))) {
-                return err("§10 K91", "E_ARG: tuple-only token arguments require token_aliases");
+        let aliases = if let Some(aliases) = aliases {
+            aliases
+        } else {
+            if tokens.iter().any(|v| matches!(v, ClassicalValue::Token(_))) {
+                return err(
+                    "§10 K91",
+                    "E_ARG: tuple-only token arguments require token_aliases",
+                );
             }
             let mut labels = BTreeMap::new();
-            derived = tokens.iter().map(|v| {
-                let ClassicalValue::DeviceToken(token) = v else { unreachable!() };
-                let next = labels.len() as u64;
-                *labels.entry(token.id()).or_insert(next)
-            }).collect::<Vec<_>>();
+            derived = tokens
+                .iter()
+                .map(|v| {
+                    let ClassicalValue::DeviceToken(token) = v else {
+                        unreachable!()
+                    };
+                    let next = labels.len() as u64;
+                    *labels.entry(token.id()).or_insert(next)
+                })
+                .collect::<Vec<_>>();
             derived.as_slice()
         };
-        let tuples = tokens.iter().map(|v| v.token_budget().unwrap()).collect::<Vec<_>>();
-        validate_aliases(aliases,&tuples)?;
-        let mut bound: BTreeMap<u64,BudgetToken> = BTreeMap::new();
+        let tuples = tokens
+            .iter()
+            .map(|v| v.token_budget().unwrap())
+            .collect::<Vec<_>>();
+        validate_aliases(aliases, &tuples)?;
+        let mut bound: BTreeMap<u64, BudgetToken> = BTreeMap::new();
         let mut handles = BTreeMap::new();
-        for (value,label) in tokens.iter().zip(aliases) {
+        for (value, label) in tokens.iter().zip(aliases) {
             if let ClassicalValue::DeviceToken(token) = value {
-                if bound.get(label).is_some_and(|prior| prior!=token)
-                    || handles.get(&token.id()).is_some_and(|prior| prior!=label) {
-                    return err("§10 K91", "E_ARG: partition differs from actual token identities");
+                if bound.get(label).is_some_and(|prior| prior != token)
+                    || handles.get(&token.id()).is_some_and(|prior| prior != label)
+                {
+                    return err(
+                        "§10 K91",
+                        "E_ARG: partition differs from actual token identities",
+                    );
                 }
-                bound.insert(*label,token.clone());
-                handles.insert(token.id(),*label);
+                bound.insert(*label, token.clone());
+                handles.insert(token.id(), *label);
             }
         }
         // Validate the entire request before allocating any anonymous identity.
-        for (label,tuple) in aliases.iter().zip(&tuples) {
+        for (label, tuple) in aliases.iter().zip(&tuples) {
             if !bound.contains_key(label) {
-                let oracle = self.functions.values().find(|f| f.kind=="oracle")
-                    .ok_or_else(|| crate::Error::new("§10 K91: E_ARG: tuple token requires a program oracle".into()))?;
-                bound.insert(*label,self.token_for(&oracle.name,*tuple,None)?);
+                let oracle = self
+                    .functions
+                    .values()
+                    .find(|f| f.kind == "oracle")
+                    .ok_or_else(|| {
+                        crate::Error::new(
+                            "§10 K91: E_ARG: tuple token requires a program oracle".into(),
+                        )
+                    })?;
+                bound.insert(*label, self.token_for(&oracle.name, *tuple, None)?);
             }
         }
         let mut labels = aliases.iter();
-        Ok(args.iter().map(|v| if v.token_budget().is_some() {
-            ClassicalValue::DeviceToken(bound[labels.next().unwrap()].clone())
-        } else { v.clone() }).collect())
+        Ok(args
+            .iter()
+            .map(|v| {
+                if v.token_budget().is_some() {
+                    ClassicalValue::DeviceToken(bound[labels.next().unwrap()].clone())
+                } else {
+                    v.clone()
+                }
+            })
+            .collect())
     }
     /// Rust adapter for bennett_budget's validated, program-scoped identity.
     pub fn budget_token(&self, oracle: &str, tuple: Budget) -> Result<BudgetToken> {
@@ -156,18 +194,79 @@ impl Object {
 /// K91's canonical first-occurrence labels and equal-label tuple constraint.
 /// Shared by concrete request and certificate/schedule binding validation.
 pub(crate) fn validate_aliases(aliases: &[u64], tuples: &[Budget]) -> Result<()> {
-    if aliases.len()!=tuples.len() {
-        return err("§5.4 K91", "E_ARG: token_aliases arity differs from token list");
+    if aliases.len() != tuples.len() {
+        return err(
+            "§5.4 K91",
+            "E_ARG: token_aliases arity differs from token list",
+        );
     }
     let mut seen = Vec::<Budget>::new();
-    for (label,tuple) in aliases.iter().zip(tuples) {
+    for (label, tuple) in aliases.iter().zip(tuples) {
         if *label > seen.len() as u64 {
-            return err("§5.4 K91", "E_ARG: token_aliases labels must start at zero without gaps");
+            return err(
+                "§5.4 K91",
+                "E_ARG: token_aliases labels must start at zero without gaps",
+            );
         }
-        if *label == seen.len() as u64 { seen.push(*tuple); }
-        else if seen[*label as usize] != *tuple {
-            return err("§5.4 K91", "E_ARG: equal token_aliases labels require equal tuples");
+        if *label == seen.len() as u64 {
+            seen.push(*tuple);
+        } else if seen[*label as usize] != *tuple {
+            return err(
+                "§5.4 K91",
+                "E_ARG: equal token_aliases labels require equal tuples",
+            );
         }
     }
     Ok(())
+}
+
+pub(crate) fn alias_binding(
+    value: Option<&crate::json::Json>,
+    tuples: &[Option<Budget>],
+    implicit: bool,
+) -> Result<Vec<u64>> {
+    use crate::json::Json;
+    let check = || -> Result<Vec<u64>> {
+        let labels = if let Some(value) = value {
+            value
+                .array()?
+                .iter()
+                .map(|v| {
+                    if !matches!(v, Json::Number(_)) {
+                        return err(
+                            "§12.3 K91",
+                            "token_aliases labels require nonnegative integers",
+                        );
+                    }
+                    u64::try_from(v.uint()?).map_err(|_| {
+                        crate::Error::new("§12.3 K91: token_aliases label exceeds u64".into())
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?
+        } else if implicit {
+            (0..tuples.len()).map(|n| n as u64).collect()
+        } else {
+            return err(
+                "§12.3 K91",
+                "token arguments require explicit token_aliases",
+            );
+        };
+        let mut unknown = crate::reserved(tuples.len(), "§12.3 K91", "token binding slots")?;
+        unknown.resize(tuples.len(), Budget::steps(0));
+        validate_aliases(&labels, &unknown)?;
+        let mut known = BTreeMap::new();
+        for (label, tuple) in labels.iter().zip(tuples) {
+            if let Some(tuple) = tuple {
+                if known.get(label).is_some_and(|prior| prior != tuple) {
+                    return err(
+                        "§12.3 K91",
+                        "equal token_aliases labels have unequal tuples",
+                    );
+                }
+                known.insert(*label, *tuple);
+            }
+        }
+        Ok(labels)
+    };
+    check().map_err(|e| e.context("§12.3 K91"))
 }

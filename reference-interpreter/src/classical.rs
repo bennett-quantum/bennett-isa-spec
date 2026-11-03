@@ -396,12 +396,32 @@ impl<'a> ClassicalMachine<'a> {
         args: &[ClassicalValue],
         entropy: &[u8],
     ) -> Result<Self> {
-        Self::construct(object, entry, args, entropy, QuantumRegisters::new(), &[],None)
+        Self::construct(
+            object,
+            entry,
+            args,
+            entropy,
+            QuantumRegisters::new(),
+            &[],
+            None,
+        )
     }
     pub fn new_with_token_aliases(
-        object: &'a Object, entry: &str, args: &[ClassicalValue], aliases: &[u64], entropy: &[u8],
+        object: &'a Object,
+        entry: &str,
+        args: &[ClassicalValue],
+        aliases: &[u64],
+        entropy: &[u8],
     ) -> Result<Self> {
-        Self::construct(object,entry,args,entropy,QuantumRegisters::new(),&[],Some(aliases))
+        Self::construct(
+            object,
+            entry,
+            args,
+            entropy,
+            QuantumRegisters::new(),
+            &[],
+            Some(aliases),
+        )
     }
     fn construct(
         object: &'a Object,
@@ -410,7 +430,7 @@ impl<'a> ClassicalMachine<'a> {
         entropy: &[u8],
         mut registers: QuantumRegisters,
         globals: &[(String, Vec<u8>)],
-        aliases:Option<&[u64]>,
+        aliases: Option<&[u64]>,
     ) -> Result<Self> {
         object.ensure_linked()?;
         let f = object
@@ -432,9 +452,11 @@ impl<'a> ClassicalMachine<'a> {
             0
         };
         let bound = if object.isa_version == crate::IsaVersion::V09 {
-            std::borrow::Cow::Owned(object.bind_entry_tokens(args,aliases,run_id)?)
+            std::borrow::Cow::Owned(object.bind_entry_tokens(args, aliases, run_id)?)
         } else {
-            if aliases.is_some() { return err("§10 K91", "E_ARG: token_aliases requires ISA 0.9"); }
+            if aliases.is_some() {
+                return err("§10 K91", "E_ARG: token_aliases requires ISA 0.9");
+            }
             std::borrow::Cow::Borrowed(args)
         };
         let args = bound.as_ref();
@@ -560,7 +582,7 @@ impl<'a> ClassicalMachine<'a> {
         entropy: &[u8],
         registers: QuantumRegisters,
     ) -> Result<Self> {
-        Self::construct(object, entry, args, entropy, registers, &[],None)
+        Self::construct(object, entry, args, entropy, registers, &[], None)
     }
     /// Like `with_quantum_registers`, with §7.1 global images seeded by the
     /// caller (name, exact bytes) as part of the entry state.
@@ -572,14 +594,27 @@ impl<'a> ClassicalMachine<'a> {
         registers: QuantumRegisters,
         globals: &[(String, Vec<u8>)],
     ) -> Result<Self> {
-        Self::construct(object, entry, args, entropy, registers, globals,None)
+        Self::construct(object, entry, args, entropy, registers, globals, None)
     }
     /// Alias-aware 0.9 launch with caller-provided registers and global bytes.
     pub fn with_token_aliases(
-        object: &'a Object, entry: &str, args: &[ClassicalValue], entropy: &[u8],
-        registers: QuantumRegisters, globals: &[(String,Vec<u8>)], aliases: &[u64],
+        object: &'a Object,
+        entry: &str,
+        args: &[ClassicalValue],
+        entropy: &[u8],
+        registers: QuantumRegisters,
+        globals: &[(String, Vec<u8>)],
+        aliases: &[u64],
     ) -> Result<Self> {
-        Self::construct(object,entry,args,entropy,registers,globals,Some(aliases))
+        Self::construct(
+            object,
+            entry,
+            args,
+            entropy,
+            registers,
+            globals,
+            Some(aliases),
+        )
     }
     pub fn quantum_registers(&self) -> &QuantumRegisters {
         &self.state.quantum
