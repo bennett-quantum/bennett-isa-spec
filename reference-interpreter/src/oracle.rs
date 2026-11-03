@@ -619,6 +619,12 @@ impl Object {
             activation.values.insert(p.name.clone(), v.clone());
         }
         let arguments = self.bind_arguments(root, args)?;
+        self.precheck_qinplace09(
+            root,
+            &arguments,
+            Some(budget),
+            resolved.as_ref().and_then(|r| r.primary.as_ref()),
+        )?;
         for (p, v) in root.params[4].iter().zip(args) {
             if let Some(bits) = argument_bits(self, &p.ty, v)? {
                 activation.values.insert(p.name.clone(), bits);

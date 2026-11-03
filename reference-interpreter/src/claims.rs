@@ -19,6 +19,7 @@ use crate::{
 use std::collections::{BTreeMap, BTreeSet};
 mod images09;
 mod pairs09;
+mod qinplace09;
 mod replay09;
 pub use images09::FixedRegionBinding;
 

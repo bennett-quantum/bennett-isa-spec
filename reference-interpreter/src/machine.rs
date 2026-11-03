@@ -420,6 +420,12 @@ impl<'a> OracleVectorMachine<'a> {
             locations.insert((name.into(), p.name.clone()), v.clone());
         }
         let arguments = object.bind_arguments(root, args)?;
+        object.precheck_qinplace09(
+            root,
+            &arguments,
+            Some(budget),
+            resolved.as_ref().and_then(|r| r.primary.as_ref()),
+        )?;
         let mut pseudo_seen = std::collections::BTreeSet::new();
         for (f, _) in &program.rows {
             if !pseudo_seen.insert(f.name.clone()) {

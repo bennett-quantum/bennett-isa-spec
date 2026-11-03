@@ -331,6 +331,7 @@ impl Object {
                 controls.len(),
             )?;
         }
+        self.precheck_qinplace09(f, &bindings.args, None, None)?;
         let mut env = Environment {
             bindings: bindings.clone(),
             predicates: Vec::new(),
@@ -820,48 +821,83 @@ impl Object {
                         .ok_or_else(|| Error::new("§4.5: qinplace token".into()))?;
                     let gf = &self.functions[g.trim_start_matches('@')];
                     let gif = &self.functions[gi.trim_start_matches('@')];
-                    // §4.5 requires, under tk, FAULT_NONE on every input and
-                    // g∘ginv = ginv∘g = id. Decided here exactly, on the full
-                    // n-bit domain at this token's budget, before any state change.
-                    self.verify_inverse_pair(gf, gif, token)?;
+                    if self.isa_version == crate::IsaVersion::V08 {
+                        self.verify_inverse_pair(gf, gif, token)?;
+                    }
+                    // The 0.9 entry and both compositions were established by
+                    // the whole-region preflight, including disabled contexts.
+                    let primary = e.bindings.args.get(&a[2]).and_then(|v| {
+                        if let Argument::DeviceToken(t) = v {
+                            Some(t)
+                        } else {
+                            None
+                        }
+                    });
+                    let mut inputs = vec![x.clone()];
+                    if a.len() == 7 {
+                        for name in list(&a[4])? {
+                            inputs.push(e.bundle(&name)?);
+                        }
+                    }
+                    let names = if a.len() == 7 {
+                        list(&a[5])?
+                    } else {
+                        Vec::new()
+                    };
+                    let memory = |f: &Function| -> Result<BTreeMap<String, QuantumRegion>> {
+                        f.params[3]
+                            .iter()
+                            .zip(&names)
+                            .map(|(p, n)| {
+                                e.bindings
+                                    .regions
+                                    .get(n)
+                                    .cloned()
+                                    .map(|v| (p.name.clone(), v))
+                                    .ok_or_else(|| {
+                                        Error::new("§4.5 K4: missing qinplace memory".into())
+                                    })
+                            })
+                            .collect()
+                    };
+                    let args = if a.len() == 7 {
+                        list(&a[6])?
+                            .iter()
+                            .map(|n| {
+                                e.bindings.args.get(n).cloned().ok_or_else(|| {
+                                    Error::new("§4.5 K4: missing qinplace argument".into())
+                                })
+                            })
+                            .collect::<Result<Vec<_>>>()?
+                    } else {
+                        Vec::new()
+                    };
                     let fw = gf.params[2][0].ty.width(self.ptr_width)? as usize;
                     let t = q.allocate(x.len())?;
                     let fault = q.allocate(fw)?;
                     self.oracle_quantum(
                         gf,
                         q,
-                        std::slice::from_ref(&x),
+                        &inputs,
                         &t,
                         &fault,
-                        &BTreeMap::new(),
-                        &[],
+                        &memory(gf)?,
+                        &args,
                         token,
-                        e.bindings.args.get(&a[2]).and_then(|a| {
-                            if let Argument::DeviceToken(t) = a {
-                                Some(t)
-                            } else {
-                                None
-                            }
-                        }),
+                        primary,
                         &context,
                     )?;
                     bundle_exchange(q, &x, &t, &context)?;
                     self.oracle_quantum(
                         gif,
                         q,
-                        &[x],
+                        &inputs,
                         &t,
                         &fault,
-                        &BTreeMap::new(),
-                        &[],
+                        &memory(gif)?,
+                        &args,
                         token,
-                        e.bindings.args.get(&a[2]).and_then(|a| {
-                            if let Argument::DeviceToken(t) = a {
-                                Some(t)
-                            } else {
-                                None
-                            }
-                        }),
+                        primary,
                         &context,
                     )?;
                     q.release(&t)?;

@@ -1123,6 +1123,9 @@ impl<'a> ClassicalMachine<'a> {
         } else {
             None
         };
+        self.object
+            .precheck_qinplace09(callee, &bindings.args, budget, primary.as_ref())
+            .map_err(trap)?;
         Ok((
             RegionRecord {
                 name: name.into(),

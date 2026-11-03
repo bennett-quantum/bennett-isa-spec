@@ -78,8 +78,11 @@ fn qinplace_transfer_keeps_the_read_input_versions_in_its_inverse_key() {
     assert!(error.to_string().contains("§6.2"), "{error}");
 }
 fn inverse_certificate() -> String {
-    use bennett_isa_ref::json::Json;
     let object = Object::parse(&(published_source().to_string() + "\n")).unwrap();
+    inverse_certificate_for(&object)
+}
+fn inverse_certificate_for(object: &Object) -> String {
+    use bennett_isa_ref::json::Json;
     let identity = object.identity().unwrap();
     let owner = identity.closure_hashes["addya"].as_ref().unwrap();
     let g = identity.closure_hashes["g"].as_ref().unwrap();
@@ -196,4 +199,78 @@ fn inverse_pair_quantum_domains_must_be_full_but_argument_ranges_are_scoped() {
         object.verify_claim(&owner, 0).unwrap(),
         bennett_isa_ref::ClaimVerdict::Proof
     );
+}
+
+fn quantum_input(
+    x: u128,
+    y: u128,
+) -> (
+    bennett_isa_ref::QuantumState,
+    bennett_isa_ref::QuantumBindings,
+    Vec<u64>,
+) {
+    use bennett_isa_ref::{QuantumBindings, QuantumState};
+    let mut q = QuantumState::new();
+    let wires = q.allocate(4).unwrap();
+    for (i, w) in wires.iter().enumerate() {
+        if (x | (y << 2)) >> i & 1 != 0 {
+            q.gate("x", &[*w], None, &[]).unwrap();
+        }
+    }
+    let mut b = QuantumBindings::default();
+    b.bundles.insert("x".into(), wires[..2].to_vec());
+    b.bundles.insert("y".into(), wires[2..].to_vec());
+    (q, b, wires)
+}
+#[test]
+fn declared_parameterised_pair_executes_every_x_y_a_and_its_adjoint() {
+    use bennett_isa_ref::{Argument, Budget};
+    let object = Object::parse(&inverse_certificate()).unwrap();
+    for steps in [3, 9] {
+        for x in 0..4 {
+            for y in 0..4 {
+                for a in 0..4 {
+                    let (mut q, mut b, wires) = quantum_input(x, y);
+                    b.args
+                        .insert("tk".into(), Argument::Token(Budget::steps(steps)));
+                    b.args.insert("a".into(), Argument::Bits(a));
+                    let before = q.clone();
+                    object
+                        .execute_action_with_token_aliases("addya", &mut q, &b, false, &[], &[0])
+                        .unwrap();
+                    assert_eq!(q.read_basis(&wires).unwrap(), ((x + y + a) & 3) | (y << 2));
+                    object
+                        .execute_action_with_token_aliases("addya", &mut q, &b, true, &[], &[0])
+                        .unwrap();
+                    assert_eq!(q, before);
+                }
+            }
+        }
+    }
+}
+#[test]
+fn uncovered_pair_rejects_before_the_earliest_effect_of_the_region() {
+    use bennett_isa_ref::{Argument, Budget};
+    let text = published_source().replace(
+        "qinplace @g @ginv tk x (y) () (a)",
+        "x x[0]\nqinplace @g @ginv tk x (y) () (a)",
+    ) + "\n";
+    let source = support::rehash(&text);
+    let packet = inverse_certificate_for(&source).replace(
+        "\"hi\":3,\"lo\":0,\"name\":\"a\"",
+        "\"hi\":2,\"lo\":0,\"name\":\"a\"",
+    );
+    for object in [source, Object::parse(&packet).unwrap()] {
+        for (steps, a) in [(2, 1), (3, 3)] {
+            let (mut q, mut b, _) = quantum_input(2, 1);
+            b.args
+                .insert("tk".into(), Argument::Token(Budget::steps(steps)));
+            b.args.insert("a".into(), Argument::Bits(a));
+            let before = q.clone();
+            let result =
+                object.execute_action_with_token_aliases("addya", &mut q, &b, false, &[], &[0]);
+            assert!(result.is_err());
+            assert_eq!(q, before, "uncovered tk={steps}/a={a} changed a prefix");
+        }
+    }
 }

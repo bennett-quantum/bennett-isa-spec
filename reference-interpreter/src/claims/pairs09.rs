@@ -1,12 +1,12 @@
 //! K4's entry-bound relation is separate from ordinary K13 tuple replay.
 use super::*;
 use crate::{Argument, OracleVectorInput, OracleVectorMachine};
-struct Pair<'a> {
-    g: &'a Function,
-    gi: &'a Function,
-    budget: Budget,
-    tokens: BTreeMap<String, Budget>,
-    aliases: Vec<u64>,
+pub(super) struct Pair<'a> {
+    pub(super) g: &'a Function,
+    pub(super) gi: &'a Function,
+    pub(super) budget: Budget,
+    pub(super) tokens: BTreeMap<String, Budget>,
+    pub(super) aliases: Vec<u64>,
 }
 fn entry_budget(value: &Json) -> Result<Budget> {
     let v = value.array()?;
@@ -21,7 +21,7 @@ fn entry_budget(value: &Json) -> Result<Budget> {
         depth: v[3].uint()?,
     })
 }
-fn pair<'a>(object: &'a Object, entry: &Json) -> Result<Pair<'a>> {
+pub(super) fn pair<'a>(object: &'a Object, entry: &Json) -> Result<Pair<'a>> {
     let g = object.region_function(entry.get("g")?.string()?)?;
     let gi = object.region_function(entry.get("ginv")?.string()?)?;
     if g.kind != "oracle"
@@ -92,7 +92,7 @@ fn pair<'a>(object: &'a Object, entry: &Json) -> Result<Pair<'a>> {
         aliases,
     })
 }
-fn args_domain(
+pub(super) fn args_domain(
     object: &Object,
     f: &Function,
     domain: &Json,
@@ -241,6 +241,23 @@ impl Object {
         claim: &Json,
     ) -> Result<ClaimVerdict> {
         self.validate_inverse_pair_claim09(owner, index, claim)?;
+        let key = format!(
+            "{}:{}:{}:{}",
+            self.identity()?.object_hash,
+            self.identity()?.closure_hashes[&owner.name]
+                .as_deref()
+                .unwrap_or(""),
+            index,
+            crate::sha256_hex(self.section("certificate").unwrap().canonical().as_bytes())
+        );
+        if self
+            .pair_proofs
+            .lock()
+            .map_err(|_| Error::new("§12.1 K4: proof cache poisoned".into()))?
+            .contains(&key)
+        {
+            return Ok(ClaimVerdict::Proof);
+        }
         for entry in self.pair_claim_entries(owner, index)? {
             let p = pair(self, entry)?;
             let mut domain = self.domain(p.g, claim.get("domain")?)?;
@@ -366,6 +383,10 @@ impl Object {
                 }
             }
         }
+        self.pair_proofs
+            .lock()
+            .map_err(|_| Error::new("§12.1 K4: proof cache poisoned".into()))?
+            .insert(key);
         Ok(ClaimVerdict::Proof)
     }
 }
