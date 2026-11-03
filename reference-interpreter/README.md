@@ -16,12 +16,20 @@ Build and test offline from the repository root (headless: `DISPLAY`,
 `TMPDIR=$PWD/reference-interpreter/.tmp`, created first):
 
 ```sh
+export CARGO_TARGET_DIR="$PWD/reference-interpreter/.tmp/build"
 cargo build --manifest-path reference-interpreter/Cargo.toml --offline
+python3 -I reference-interpreter/tools/publish-cli.py \
+  "$CARGO_TARGET_DIR/debug/bennett-isa-ref"
 cargo test --manifest-path reference-interpreter/Cargo.toml --offline
 cargo test --manifest-path reference-interpreter/Cargo.toml --offline -- --ignored
 ```
 
-The executable is `reference-interpreter/target/debug/bennett-isa-ref`. Data
+The published executable is `reference-interpreter/target/debug/bennett-isa-ref`.
+The publisher copies a completed private build and atomically replaces that
+path with a regular executable snapshot. Concurrent consumers can continue
+using it while Cargo replaces its private build output. Publish only after a
+successful build; jobs may supply their own `CARGO_TARGET_DIR`.
+Data
 commands write one JSON object to stdout and exit 0; `help`/`--help` prints
 plain usage. Diagnostics go to stderr with exit status 1, and ISA diagnostics
 cite their rule. Integers above 2^53 − 1 are decimal strings (§9.1).

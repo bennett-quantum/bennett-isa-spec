@@ -1,0 +1,18 @@
+{
+  "id": "D-k84-duplicate-component",
+  "suite": "D",
+  "spec": "ISA0.9 §12.3 K84; §12.2 K72",
+  "derivation": "One resolved interface slot occurs twice in domain.bundles. Only the named certificate mutation differs from baseline.",
+  "object": "../../../fixtures/accepted-k84-09/duplicate-component.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 1,
+    "stdout_empty": true,
+    "stderr_contains": [
+      "§12.2"
+    ]
+  }
+}

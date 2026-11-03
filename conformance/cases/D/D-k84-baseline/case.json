@@ -1,0 +1,17 @@
+{
+  "id": "D-k84-baseline",
+  "suite": "D",
+  "spec": "ISA0.9 §12.3 K84; §12.1 K13",
+  "derivation": "Standalone exhaustive NOT table with both input tuples. Only the named certificate mutation differs from baseline.",
+  "object": "../../../fixtures/accepted-k84-09/baseline.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "status": "ok"
+    }
+  }
+}

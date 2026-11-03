@@ -1,0 +1,18 @@
+{
+  "id": "D-k84-missing-expected",
+  "suite": "D",
+  "spec": "ISA0.9 §12.3 K84; §12.1 K13",
+  "derivation": "The exhaustive claim must declare expected. Only the named certificate mutation differs from baseline.",
+  "object": "../../../fixtures/accepted-k84-09/missing-expected.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 1,
+    "stdout_empty": true,
+    "stderr_contains": [
+      "§12.1"
+    ]
+  }
+}

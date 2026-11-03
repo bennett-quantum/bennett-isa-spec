@@ -366,6 +366,27 @@ impl QuantumState {
     pub fn is_basis(&self) -> bool {
         matches!(self.state, State::Basis { .. })
     }
+    /// K13/T3 assertions require one exact basis component with amplitude +1,
+    /// including global phase. Reading each interface bit alone loses phase.
+    pub(crate) fn require_positive_basis(&self) -> Result<()> {
+        let valid = match &self.state {
+            State::Basis { exact, .. } => exact == &Amplitude::one(),
+            State::Vector { amplitudes } => {
+                amplitudes.len() == 1
+                    && amplitudes
+                        .values()
+                        .next()
+                        .is_some_and(|(_, a)| a == &Amplitude::one())
+            }
+        };
+        if !valid {
+            return err(
+                "§12.1 K13/T3",
+                "permutation replay requires exact +1 basis phase",
+            );
+        }
+        Ok(())
+    }
     pub fn allocate(&mut self, n: usize) -> Result<Vec<Wire>> {
         let end = self.next.checked_add(n as u64).ok_or_else(|| {
             Error::host_resource("§4.3: host limit: wire identity exceeds u64".into())

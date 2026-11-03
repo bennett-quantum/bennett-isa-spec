@@ -16,6 +16,7 @@ use crate::{
     Result, Type,
 };
 use std::collections::{BTreeMap, BTreeSet};
+mod replay09;
 
 /// §17 item 13: an explicitly sampled claim defaults to 2^16 samples.
 /// This is a consumer default, never a mutation of certificate JCS.
@@ -45,6 +46,7 @@ pub struct ClaimReport {
 }
 #[derive(Clone, Debug)]
 enum Component {
+    Control(usize),
     Bundle(usize, usize),
     Borrowed(usize, String),
     Cell(usize, usize, usize),
@@ -360,7 +362,17 @@ impl Object {
         f: &Function,
         element: &[(Component, BitVector)],
         budget: Option<Budget>,
+        audit: Option<&mut Vec<crate::quantum::BorrowObservation>>,
+    ) -> Result<Vec<BitVector>> {
+        self.execute_element_bound(f, element, budget, audit, None)
+    }
+    fn execute_element_bound(
+        &self,
+        f: &Function,
+        element: &[(Component, BitVector)],
+        budget: Option<Budget>,
         mut audit: Option<&mut Vec<crate::quantum::BorrowObservation>>,
+        context: Option<&replay09::Invocation>,
     ) -> Result<Vec<BitVector>> {
         let value = |name: &str, width: usize| -> Result<BitVector> {
             let (group, index) = interface_slot(f, name)?;
@@ -406,16 +418,30 @@ impl Object {
                 }
                 input.regions.insert(p.name.clone(), bytes);
             }
-            if !f.params[4].is_empty() {
+            if let Some(context) = context {
+                input.args.clone_from(&context.args);
+            } else if !f.params[4].is_empty() {
                 return err(
                     "§12",
                     "claim domains carry no classical arguments for this oracle",
                 );
             }
             let r = self.run_oracle_vectors(&f.name, &input, budget)?;
-            let mut out = input.ins.clone();
-            out.push(value(&f.params[1][0].name, r.payload.width())?.binary("xor", &r.payload)?);
-            out.push(value(&f.params[2][0].name, r.code.width())?.binary("xor", &r.code)?);
+            let mut out = context.map_or_else(Vec::new, |c| c.controls.clone());
+            let enabled = context.is_none_or(|c| c.controls.iter().all(|v| !v.is_zero()));
+            out.extend(input.ins.iter().cloned());
+            let target = value(&f.params[1][0].name, r.payload.width())?;
+            let fault = value(&f.params[2][0].name, r.code.width())?;
+            out.push(if enabled {
+                target.binary("xor", &r.payload)?
+            } else {
+                target
+            });
+            out.push(if enabled {
+                fault.binary("xor", &r.code)?
+            } else {
+                fault
+            });
             for p in &f.params[3] {
                 let (cells, w) = region_dims(p)?;
                 crate::reserve_more(&mut out, cells, "§12.2", "oracle replay output cells")?;
@@ -423,9 +449,14 @@ impl Object {
                     out.push(cell(&p.name, i, w)?);
                 }
             }
+            if context.is_some() {
+                out.extend(element.iter().filter_map(|(c, v)| {
+                    matches!(c, Component::Borrowed(..)).then_some(v.clone())
+                }));
+            }
             return Ok(out);
         }
-        if !f.params[3].is_empty() {
+        if context.is_none() && !f.params[3].is_empty() {
             return err(
                 "§12",
                 "claim domains carry no classical arguments for this action",
@@ -433,6 +464,14 @@ impl Object {
         }
         let mut q = QuantumState::new();
         let mut b = QuantumBindings::default();
+        if let Some(context) = context {
+            b.args.extend(
+                f.params[3]
+                    .iter()
+                    .zip(&context.args)
+                    .map(|(p, a)| (p.name.clone(), a.clone())),
+            );
+        }
         let set = |q: &mut QuantumState, wires: &[u64], v: &BitVector| -> Result<()> {
             for (i, w) in wires.iter().enumerate() {
                 if v.bit(i)? {
@@ -482,7 +521,24 @@ impl Object {
         if audit.is_some() {
             q.start_borrow_audit()?;
         }
-        self.execute_action(&f.name, &mut q, &b, false, &[])?;
+        let mut control_wires = Vec::new();
+        if let Some(context) = context {
+            for value in &context.controls {
+                let wires = q.allocate(1)?;
+                set(&mut q, &wires, value)?;
+                control_wires.extend(wires);
+            }
+        }
+        self.execute_action(
+            &f.name,
+            &mut q,
+            &b,
+            context.is_some_and(|c| c.adjoint),
+            &control_wires,
+        )?;
+        if context.is_some() {
+            q.require_positive_basis()?;
+        }
         if let Some(audit) = &mut audit {
             audit.extend(q.take_borrow_audit());
         }
@@ -494,6 +550,9 @@ impl Object {
             Ok(v)
         };
         let mut out = Vec::new();
+        for wire in &control_wires {
+            out.push(read(&q, &[*wire])?);
+        }
         for p in f.params[0].iter().chain(&f.params[1]) {
             out.push(read(&q, &b.bundles[&p.name])?);
         }
@@ -555,6 +614,9 @@ impl Object {
         let f = self.region_function(closure)?;
         let kind = claim.get("kind")?.string()?;
         let verdict = match kind {
+            "exhaustive" | "sampled" if self.isa_version == crate::IsaVersion::V09 => {
+                self.verify_replay09(closure, index, claim, f)?
+            }
             "exhaustive" | "sampled" => {
                 let domain = self.domain(f, claim.get("domain")?)?;
                 let budget = self.claim_budget(claim, f)?;
