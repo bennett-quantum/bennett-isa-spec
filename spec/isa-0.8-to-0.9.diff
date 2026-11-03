@@ -265,7 +265,7 @@
 +| K88 | §3.2–§3.3, §7.4, §9.4, §10, §12.3 | **4TA**. Ordered per-wire register class vectors, reversible heterogeneous concat/slice and canonical B5 slot fragments preserve one source slot. S1: all ledger references, atomic class/placement preflight, failed-view reversal, upgraded readers and zero-width runtime vectors binding no slot. Certificate bytes change; unchanged source/signature/closure/object, target, schedule, ref recipes/ordinals/catalog identities. | 4ta; council pass2-4ta-2026-11-02 round 2; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | – |
 +| K89 | §12.1–§12.3 | **7S0**. Selected maximal borrow_frame relations, workspace entry components and entry_products express existing K76/K78 D_F without changing it; union-rank sampling and B-fiber checks fix coverage. S1: K69 positional inherited controls, evidence versus requested-proof rejection, causal-stack/seed witnesses and Cartesian sampler cross-reference. Certificate bytes change; source/closure/object, target/schedule leaves, K78 and ref catalog identities stay unchanged. | 7s0; council pass2-7s0-2026-11-02 round 2; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | – |
 +| K90 | §12.3 | **V2V**. Exclusive uniform frame or complete canonical frame_contexts, validated against each resolved invocation and its allocation/lifetime metadata. S1: pair/two-root/singleton fixtures, truthful legacy migration and checked scope uniformity. Certificate bytes change; no callee clone, source/interface/closure/object, target/schedule, call edge or ref catalog identity change. Narrow reading: future fault-context arrays are not presumed; existing published context obligations stand. | v2v; council pass2-v2v-2026-11-02 round 2; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | – |
-+| K91 | §5.4, §7.4, §10.1, §11, §12.3 | **YSW**. Canonical token_aliases equality partitions preserve actual identities through calls, source builders and reversal; only oracle invocations prepend a primary token. S1: universal partition encoding, schedule matching/history, identity-call carrier and self-adjoint wording. Additive launch/sched token_aliases/1 feature with explicit loader negotiation, preserving legacy symbols; legacy token-argument requests need an alias binding. Alias-bearing schedule/certificate hashes change; args/params_hash, source/interface/closure/object and ref catalog identities stay fixed under unchanged envelopes. Narrow choice: versioned ABI feature rather than a header-version bump. | ysw; council pass2-ysw-2026-11-02 round 2; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | +schedule/certificate bytes |
++| K91 | §5.4, §7.4, §10.1, §11, §12.3 | **YSW**. Canonical token_aliases equality partitions preserve actual identities through calls, source builders and reversal; only oracle invocations prepend a primary token. S1: universal partition encoding, schedule matching/history, identity-call carrier and self-adjoint wording. Additive launch/sched token_aliases/1 feature with explicit loader negotiation, preserving legacy symbols; legacy token-argument requests need an alias binding. Alias-bearing schedule/certificate hashes change; args/params_hash, source/interface/closure/object and ref catalog identities stay fixed under unchanged envelopes. Narrow choice: versioned ABI feature rather than a header-version bump. Editor's note (advisor R21, 2026-11-03): the loader capability negotiation this row invokes (feature-query entry point, defined absent-feature behaviour, version field) is not yet defined in 0.9 text; it is pending b-isa-spec-b3ui (note, sol+astra round, editorial completion of K91). Do not implement against an undefined negotiation. | ysw; council pass2-ysw-2026-11-02 round 2; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | +schedule/certificate bytes |
 +| K92 | §4.5, §12.3 | **2QC**. QINPLACE-CHECKER-COVERAGE: owner-local exact pair presence and all reached bound transitive contexts, explicit unestablished applicability outcome, executor pre-effect coverage retained. S1: correct insertion before CLAIM-BINDING, literal reference-Q traversal including disabled predicates/zero-trip distinction and nested fixture. Compatibility: incorrect executable packets now reject or remain incomplete; correcting missing entries changes certificate bytes/digests. No executor/source/interface/closure/object, target/schedule, expansion or ref catalog identity changes. Narrow reading: owner-local requirements follow existing §4.5 and this K only; held 0jq is not presumed. | 2qc; council derive3-2qc-2026-11-02 round 1; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | – |
 +| K93 | §3.3, §4.4, §11.1, §15 | **SQR**. MCX-BUNDLE-CONTROLS: ordered bundle expansion, wire distinctness, flattened k and scalar target. S1: mixed-list order/arity, phase-sensitive external-reference witness, wire[1] target and active-predicate count. Route taken: in-version 0.9 K by maintainer D2 explicitly naming sqr (Muse sqr-S1); witness object/interface/closure hashes unchanged. Existing ref recipes/catalog bytes stay unchanged; wrong-arity adapter leaf hashes, schedules and cached execution/validation require regeneration and certificates rechecking. | sqr; council derive3-sqr-2026-11-02 round 1; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | – |
 +
@@ -2289,7 +2289,7 @@
  size_t         bennett_estimate_nresources(const bennett_estimate_t*);
  bennett_status bennett_estimate_get(const bennett_estimate_t*, size_t i, const char** name, const char** value_decimal);
  const uint8_t* bennett_estimate_certificate(const bennett_estimate_t*, size_t* len);   void bennett_estimate_free(bennett_estimate_t*);
-@@ -1206,7 +2583,139 @@
+@@ -1206,7 +2583,141 @@
  const uint8_t* bennett_coverage_jcs(const bennett_coverage_t*, size_t* len);   void bennett_coverage_free(bennett_coverage_t*);
  ```
  
@@ -2314,6 +2314,8 @@
 +published C argument layout/symbol meaning silently.
 +
 +The additive symbols and binding rules above define the launch/sched 0.9 feature `token_aliases/1`. Loader capability negotiation establishes support for both additive symbols and the token_aliases metadata contract before issuing an alias-aware request; symbol availability alone does not authorize silently dropping the partition. This feature retains the existing C argument layouts and symbol meanings.
++
++*Editor's note (advisor R21, 2026-11-03).* The loader capability negotiation named above (its query entry point, absent-feature behaviour and version field) is not yet defined by this draft; the text is pending b-isa-spec-b3ui and completes K91 editorially. Implementations MUST NOT invent a negotiation in the meantime.
 +
 +**Resolved request.** `bennett_estimate_run` MUST copy and
 +validate `params_jcs`, the JCS array of **all** classical arguments in
@@ -2430,7 +2432,7 @@
  
  ```c
  typedef struct bennett_sched_request_t bennett_sched_request_t;   typedef struct bennett_sched_response_t bennett_sched_response_t;
-@@ -1218,6 +2727,9 @@
+@@ -1218,6 +2729,9 @@
  bennett_status bennett_sched_request_set_params(bennett_sched_request_t*, const uint8_t* params_jcs, size_t);
  bennett_status bennett_sched_request_set_accuracy(bennett_sched_request_t*, const char* epsilon_decimal);
  bennett_status bennett_sched_request_set_capacity(bennett_sched_request_t*, const char* cls, uint64_t peak_qubits);
@@ -2440,7 +2442,7 @@
  void           bennett_sched_request_free(bennett_sched_request_t*);
  bennett_status bennett_sched_schedule(const bennett_sched_request_t*, bennett_sched_response_t** out);
  typedef enum { BENNETT_SCHED_OK, BENNETT_SCHED_INFEASIBLE, BENNETT_SCHED_UNSUPPORTED } bennett_sched_outcome;
-@@ -1247,69 +2759,1194 @@
+@@ -1247,69 +2761,1194 @@
  schedule MUST keep the ordinals of the operations they keep and MAY
  remove only operations the library marks removable.
  
@@ -3665,7 +3667,7 @@
  `error` entry (§12.3) is a **common upper bound over all contexts** of
  its key; the multiplicity composition of §12.3 is sound for that reason.
  
-@@ -1325,7 +3962,10 @@
+@@ -1325,7 +3964,10 @@
  rejects): Y − J(Φ) ⪰ 0, Y + J(Φ) ⪰ 0, mu·I − Tr_out(Y) ⪰ 0 (partial trace
  over the output factor), and mu ≤ `bound`; then ‖Φ‖◇ ≤ mu (the dual of
  Watrous's SDP with Y₀ = Y₁ = Y; this is the diamond norm itself, not
@@ -3677,7 +3679,7 @@
  hi, im_lo, im_hi]` (decimal strings). **Positivity test.** The checker
  proves each of the three matrices **positive definite** by an interval
  Cholesky (or Hermitian LDL†) factorisation in which the interval lower
-@@ -1335,33 +3975,422 @@
+@@ -1335,33 +3977,422 @@
  strictly feasible by replacing Y with Y + δI and mu with mu′ = mu + δ·(d
  + 1) for a small rational δ > 0 (any mu′ > mu + δ·d suffices): then Y ±
  J(Φ) ⪰ δI ≻ 0 and, since Tr_out(Y + δI) = Tr_out(Y) + δ·d·I, mu′·I −
@@ -4109,7 +4111,7 @@
                                                     fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
              cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },
              error:   { "<variant>:<inherited_controls>": { local: { "operator_norm"?: v, "diamond"?: v }, inclusive: { "operator_norm"?: v, "diamond"?: v } } },
-@@ -1369,6 +4398,426 @@
+@@ -1369,6 +4400,426 @@
    composition { multiplicities: { "<hash>:<variant>:<inherited_controls>": n (from the realised schedule) }, epsilon_total: { "diamond": v }, method: "sum_over_multiplicities" }
  ```
  
@@ -4536,7 +4538,7 @@
  `inclusive(R, key) = local(R, key) + Σ_callees n_c × inclusive(c, key_c)`
  **per metric**, keyed like `cleanup` by `<variant>:<inherited_controls>`
  (the realised error depends on both); every `local` value is a verified
-@@ -1380,27 +4829,49 @@
+@@ -1380,27 +4831,49 @@
  variants) require `operator_norm` bounds throughout. A controlled
  unitary variant requires a `numerical` claim; an ε > 0 realisation
  compared as a channel requires a `channel` claim. Executable claims
@@ -4592,7 +4594,7 @@
  ### 14.2 Quantum state semantics
  
  The state of a Q region is a vector in ⊗ over live wires in allocation
-@@ -1422,10 +4893,20 @@
+@@ -1422,10 +4895,20 @@
  - **T3 (permutation theorem).** If the realised unitary V of a circuit on
    span(D) is a permutation matrix and the final basis tuple equals P(x)
    for every x ∈ D, then V|span(D) = P.
@@ -4617,7 +4619,7 @@
  - **T5.** As §6.3.
  - **T6 (executor agreement).** Two executors conforming to §3–§7 on one
    target with the same schedule produce on every x ∈ D the same final
-@@ -1437,16 +4918,57 @@
+@@ -1437,16 +4920,57 @@
  
  ## 15. Conformance suites
  
@@ -4682,7 +4684,7 @@
  
  ## 16. Canonical textual form (normative)
  
-@@ -1458,7 +4980,17 @@
+@@ -1458,7 +4982,17 @@
  `INT := -?(0|[1-9][0-9]*)`; `FLOAT :=` shortest round-trip decimal with
  `.` or exponent, finite; `STRING := "…"` with escapes `\"`, `\\`, `\n`;
  `HEX := ([0-9a-f]{2})*`. Metadata lines are RFC 8785 canonical JSON
@@ -4701,7 +4703,7 @@
  
  ### 16.2 Grammar
  
-@@ -1472,10 +5004,10 @@
+@@ -1472,10 +5006,10 @@
    dataline  := NAME SP HEX NL
    function  := fhead NL regs? block+
    fhead     := ("fn" SP ("cc"|"r") | "oracle" | "action" | "perm_action" | "lproc") SP "@" NAME SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")"
@@ -4715,7 +4717,7 @@
    regs      := "regs" SP "{" SP (NAME ":" type ("," SP NAME ":" type)*)? SP "}" (SP "bounds" SP "{" INT ("," SP INT)* "}")? NL
    block     := "^" NAME "(" plist "):" NL instr+
    instr     := (lhs SP "=" SP)? OPCODE (SP operand)* (SP "{" NL instr+ "}" (SP "{" NL instr+ "}")?)? NL
-@@ -1485,16 +5017,38 @@
+@@ -1485,16 +5019,38 @@
    VER       := INT "." INT
  ```
  
@@ -4757,7 +4759,7 @@
  
  section functions
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
-@@ -1509,9 +5063,9 @@
+@@ -1509,9 +5065,9 @@
  empty and its envelope is exactly these bytes (each line LF-terminated):
  
  ```
@@ -4769,7 +4771,7 @@
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
  regs { one:reg[8], r:reg[8] }
  ^entry():
-@@ -1521,17 +5075,19 @@
+@@ -1521,17 +5077,19 @@
  ```
  
  With B ≥ 3 every x yields `(x + 1 mod 256, 0)` (`result_val` = 0 ⊕ r);
@@ -4792,7 +4794,7 @@
  
  section functions
  oracle @sum_db (n:wire[8] in) (t:wire[8]) (f:wire[4]) (db:region[4,8] in) ()
-@@ -1590,13 +5146,13 @@
+@@ -1590,13 +5148,13 @@
  is SHA-256 of the ASCII `<scc_hash hex>:0`:
  
  ```
@@ -4809,7 +4811,7 @@
  lift.boundscheck zp 1
  zv = lift.load.i8 zp
  z = lift.icmp.eq n zv
-@@ -1614,21 +5170,390 @@
+@@ -1614,21 +5172,390 @@
  ^done():
  lift.ret acc
  data zero 00
@@ -5206,7 +5208,7 @@
  ## 17. Decisions deferred to implementation, with defaults
  
  Each item is one an implementer must decide to build; any decision is
-@@ -1652,15 +5577,60 @@
+@@ -1652,15 +5579,60 @@
     level. Default: the library `ref` published by `bennett-isa-spec`
     (ripple-carry adders and comparators, linear `inrange` scans,
     one-hot address dispatch, clean scratch released in reverse order);
@@ -5271,7 +5273,7 @@
  10. **`any`-class resolution** (§11). Default: the first class in JCS
      order with capacity.
  11. **Occupancy rate of a class absent from `rate`** (§8.2). Default: 1.
-@@ -1669,7 +5639,65 @@
+@@ -1669,7 +5641,65 @@
  13. **Suite sizes** (§15): the exhaustive widths of suite C and the
      sample counts of `sampled` claims. Default: exhaustive for ≤ 16
      interface bits; 2^16 samples above.
