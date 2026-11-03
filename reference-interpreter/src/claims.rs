@@ -1,7 +1,7 @@
 //! §12 claim checking: re-execution of exhaustive and sampled claims on the
 //! reference semantics, and the syntactic side conditions of structural claims.
 //!
-//! Encodings the specification leaves open are fixed in SPEC-QUESTIONS 21:
+//! Legacy ISA 0.8 encodings fixed in SPEC-QUESTIONS 21:
 //! a domain element's output tuple is the region's final interface in
 //! signature order (oracle: ins, tgt, fault, in-region cells; action: mut
 //! bundles, in bundles, region cells in signature order), then the borrowed
@@ -11,12 +11,15 @@
 //! `channel`) and `expected: "oracle"` (which compares a realisation under a
 //! schedule) need the target/schedule executor and are reported as
 //! `Unverified` with that reason, never as verified.
+//! ISA 0.9's explicit invocation/full-tuple contract is in replay09.rs.
 use crate::{
     err, json::Json, BitVector, Budget, Error, Function, Object, QuantumBindings, QuantumState,
     Result, Type,
 };
 use std::collections::{BTreeMap, BTreeSet};
+mod images09;
 mod replay09;
+pub use images09::FixedRegionBinding;
 
 /// §17 item 13: an explicitly sampled claim defaults to 2^16 samples.
 /// This is a consumer default, never a mutation of certificate JCS.
@@ -32,6 +35,9 @@ pub(crate) fn sample_count(sampler: &Json) -> Result<u128> {
 pub enum ClaimVerdict {
     /// Re-executed over D (or the structural rule holds with verified subclaims).
     Proof,
+    /// K85 theorem conditional on the report's exact in-region images. This
+    /// does not discharge an executable invocation without preparation evidence.
+    ProofRelativeToImage,
     /// Re-executed over a domain that is not all of D (or sampled).
     Evidence { elements: u128 },
     /// Not checkable by this crate yet; the reason names the missing machinery.
@@ -39,10 +45,20 @@ pub enum ClaimVerdict {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ClaimReport {
+    pub closure_hash: String,
     pub region: String,
     pub index: usize,
     pub kind: String,
     pub verdict: ClaimVerdict,
+    pub context_key: Json,
+    pub coverage: Option<ClaimCoverage>,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ClaimCoverage {
+    pub elements: u128,
+    pub full_domain_elements: String,
+    pub covered_fraction: String,
+    pub fixed_regions: Vec<FixedRegionBinding>,
 }
 #[derive(Clone, Debug)]
 enum Component {
@@ -427,6 +443,29 @@ impl Object {
                 );
             }
             let r = self.run_oracle_vectors(&f.name, &input, budget)?;
+            if context.is_some() {
+                // The sequential result alone does not witness clean workspace.
+                // Check the independent reversible machine and the entire
+                // successful/failed padded prefix, including uncomputation.
+                let mut machine = crate::OracleVectorMachine::new(self, &f.name, &input, budget)?;
+                let entry = machine.snapshot();
+                for _ in 0..budget.steps {
+                    machine.forward_step()?;
+                }
+                let other = machine.outcome()?;
+                if (other.payload, other.code) != (r.payload.clone(), r.code.clone()) {
+                    return err("§12.1 K13/T3", "independent oracle replay differs");
+                }
+                for _ in 0..budget.steps {
+                    machine.inverse_step()?;
+                }
+                if machine.snapshot() != entry || !machine.frames_clean() {
+                    return err(
+                        "§12.1 K13/T3",
+                        "oracle replay does not restore clean workspace",
+                    );
+                }
+            }
             let mut out = context.map_or_else(Vec::new, |c| c.controls.clone());
             let enabled = context.is_none_or(|c| c.controls.iter().all(|v| !v.is_zero()));
             out.extend(input.ins.iter().cloned());
@@ -615,7 +654,7 @@ impl Object {
         let kind = claim.get("kind")?.string()?;
         let verdict = match kind {
             "exhaustive" | "sampled" if self.isa_version == crate::IsaVersion::V09 => {
-                self.verify_replay09(closure, index, claim, f)?
+                self.verify_replay09(closure, index, claim, f)?.verdict
             }
             "exhaustive" | "sampled" => {
                 let domain = self.domain(f, claim.get("domain")?)?;
@@ -817,11 +856,23 @@ impl Object {
             let name = self.region_function(closure)?.name.clone();
             let f = self.region_function(closure)?;
             for (index, claim) in region.get("claims")?.array()?.iter().enumerate() {
+                let kind = claim.get("kind")?.string()?;
+                let (verdict, coverage) = if self.isa_version == crate::IsaVersion::V09
+                    && matches!(kind, "exhaustive" | "sampled")
+                {
+                    let outcome = self.verify_replay09(closure, index, claim, f)?;
+                    (outcome.verdict, outcome.coverage)
+                } else {
+                    (self.verify_claim(closure, index)?, None)
+                };
                 reports.push(ClaimReport {
+                    closure_hash: closure.clone(),
                     region: name.clone(),
                     index,
-                    kind: claim.get("kind")?.string()?.into(),
-                    verdict: self.verify_claim(closure, index)?,
+                    kind: kind.into(),
+                    verdict,
+                    context_key: Json::Array(Vec::new()),
+                    coverage,
                 });
             }
             // A borrow_frames claim must be a proof over D with the §5.6 property.

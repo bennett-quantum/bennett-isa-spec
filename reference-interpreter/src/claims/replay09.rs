@@ -10,6 +10,76 @@ pub(super) struct Invocation {
     budget: Budget,
 }
 
+struct ResolvedDomain {
+    domain: Domain,
+    relative_to_image: bool,
+    images: Vec<FixedRegionBinding>,
+}
+pub(super) struct Outcome {
+    pub verdict: ClaimVerdict,
+    pub coverage: Option<ClaimCoverage>,
+}
+
+fn coverage(
+    f: &Function,
+    controls: usize,
+    domain: &ResolvedDomain,
+    elements: usize,
+) -> Result<ClaimCoverage> {
+    let mut bits = controls;
+    for p in f.params.iter().flatten() {
+        let width = match p.ty {
+            Type::Wire(w) => Some(w as u128),
+            Type::Region(a, w) => Some(
+                crate::oracle::power_of_two(a as u128)
+                    .and_then(|n| n.checked_mul(w as u128))
+                    .ok_or_else(|| {
+                        crate::resource_error("§12.2 K74", "full region width exceeds u128")
+                    })?,
+            ),
+            _ => None,
+        };
+        if let Some(width) = width {
+            bits = usize::try_from(width)
+                .ok()
+                .and_then(|w| bits.checked_add(w))
+                .ok_or_else(|| {
+                    crate::resource_error("§12.2 K74", "full interface width exceeds usize")
+                })?;
+        }
+    }
+    for (c, width, ..) in &domain.domain.components {
+        if matches!(c, Component::Borrowed(..)) {
+            bits = bits.checked_add(*width).ok_or_else(|| {
+                crate::resource_error("§12.2 K74", "borrowed width exceeds usize")
+            })?;
+        }
+    }
+    let power = |exponent: usize| -> Result<String> {
+        let width = exponent
+            .checked_add(1)
+            .ok_or_else(|| crate::resource_error("§12.2 K74", "coverage storage exceeds usize"))?;
+        let mut n = BitVector::zero(width)?;
+        n.set(exponent, true)?;
+        Ok(n.to_decimal())
+    };
+    let full_domain_elements = power(bits)?;
+    let mut numerator = elements as u128;
+    let covered_fraction = if numerator == 0 {
+        "0/1".into()
+    } else {
+        let reduce = (numerator.trailing_zeros() as usize).min(bits);
+        numerator >>= reduce;
+        format!("{numerator}/{}", power(bits - reduce)?)
+    };
+    Ok(ClaimCoverage {
+        elements: elements as u128,
+        full_domain_elements,
+        covered_fraction,
+        fixed_regions: domain.images.clone(),
+    })
+}
+
 fn budget(value: &Json) -> Result<Budget> {
     let values = value
         .array()?
@@ -39,11 +109,9 @@ impl Object {
         if subject.get("closure_hash")?.string()? != closure {
             return err("§12.1 K13", "claim subject differs from its region closure");
         }
-        let adjoint = match subject.get("variant")?.string()? {
-            "forward" => false,
-            "adjoint" => true,
-            _ => return err("§12.1 K13", "unknown executable claim variant"),
-        };
+        // Variant is an open identifier selecting a realisation. It does not
+        // change the region's reference semantics or imply an adjoint.
+        let adjoint = false;
         let invocation = if let Some(invocation) = claim.object()?.get("invocation") {
             invocation
         } else {
@@ -89,7 +157,7 @@ impl Object {
         })
     }
 
-    fn domain09(&self, claim: &Json, f: &Function) -> Result<Domain> {
+    fn domain09(&self, claim: &Json, f: &Function) -> Result<ResolvedDomain> {
         let controls = usize::try_from(claim.get("subject")?.get("inherited_controls")?.uint()?)
             .map_err(|_| {
                 crate::resource_error("§12.2 K72", "inherited control count exceeds usize")
@@ -105,7 +173,21 @@ impl Object {
             return err("§12.2 K72", "domain omits inherited controls");
         }
         let inherited = bundles.drain(..controls).collect::<Vec<_>>();
+        let images = self.image_domains09(claim.get("domain")?, f)?;
+        let mut unrestricted = source.clone();
+        for (value, full) in [(&mut source, false), (&mut unrestricted, true)] {
+            let Json::Object(fields) = value else {
+                unreachable!()
+            };
+            let Json::Array(regions) = fields.get_mut("regions").unwrap() else {
+                unreachable!()
+            };
+            for image in &images {
+                regions.push(image.entry(full)?);
+            }
+        }
         let mut domain = self.domain(f, &source)?;
+        let mut relative_to_image = !images.is_empty() && self.domain(f, &unrestricted)?.covers_d;
         let mut components = Vec::new();
         for (i, entry) in inherited.iter().enumerate() {
             if entry.get("width")?.uint()? != 1 {
@@ -114,11 +196,16 @@ impl Object {
             let lo = json_bits(entry.get("lo")?, 1)?;
             let hi = json_bits(entry.get("hi")?, 1)?;
             domain.covers_d &= lo.is_zero() && hi == ones(1)?;
+            relative_to_image &= lo.is_zero() && hi == ones(1)?;
             components.push((Component::Control(i), 1, lo, hi));
         }
         components.append(&mut domain.components);
         domain.components = components;
-        Ok(domain)
+        Ok(ResolvedDomain {
+            domain,
+            relative_to_image,
+            images: images.into_iter().map(|i| i.binding).collect(),
+        })
     }
 
     /// Convert the flat executor output to K13's complete typed tuple; the
@@ -235,7 +322,7 @@ impl Object {
         index: usize,
         claim: &Json,
         f: &Function,
-    ) -> Result<ClaimVerdict> {
+    ) -> Result<Outcome> {
         if claim.get("expected")? == &Json::String("inverse_pair".into()) {
             return err(
                 "§12.1 K4",
@@ -243,15 +330,19 @@ impl Object {
             );
         }
         if claim.get("expected")? == &Json::String("oracle".into()) {
-            return Ok(ClaimVerdict::Unverified(
-                "expected oracle needs realised target/schedule execution (deliverables 9–11)"
-                    .into(),
-            ));
+            return Ok(Outcome {
+                verdict: ClaimVerdict::Unverified(
+                    "expected oracle needs realised target/schedule execution (deliverables 9–11)"
+                        .into(),
+                ),
+                coverage: None,
+            });
         }
         let mut invocation = self.invocation09(claim, f, closure)?;
         let controls = usize::try_from(claim.get("subject")?.get("inherited_controls")?.uint()?)
             .map_err(|_| crate::resource_error("§12.1 K13", "control count exceeds usize"))?;
-        let domain = self.domain09(claim, f)?;
+        let resolved = self.domain09(claim, f)?;
+        let domain = &resolved.domain;
         let sampled = claim.get("kind")?.string()? == "sampled";
         let elements = if sampled {
             let sampler = claim.get("sampler")?;
@@ -267,6 +358,9 @@ impl Object {
                 .collect::<Result<Vec<_>>>()?;
             let mut rng = Xoshiro256([seed[0], seed[1], seed[2], seed[3]]);
             let count = sample_count(sampler)?;
+            // Retain the existing fallible host-capacity check before a
+            // metadata-controlled sampling loop or allocation can run away.
+            let _capacity = sample_elements(count)?;
             let mut distinct = BTreeMap::new();
             for _ in 0..count {
                 let row = domain
@@ -287,7 +381,7 @@ impl Object {
             }
             distinct.into_values().collect::<Vec<_>>()
         } else {
-            enumerate(&domain)?
+            enumerate(domain)?
         };
         let expected = claim.get("expected")?;
         let table = expected
@@ -359,6 +453,8 @@ impl Object {
         }
         let verdict = if !sampled && domain.covers_d {
             ClaimVerdict::Proof
+        } else if !sampled && resolved.relative_to_image {
+            ClaimVerdict::ProofRelativeToImage
         } else {
             ClaimVerdict::Evidence {
                 elements: elements.len() as u128,
@@ -372,6 +468,17 @@ impl Object {
                 "requested proof but replay covers only a slice of D",
             );
         }
-        Ok(verdict)
+        if claim.object()?.get("label") == Some(&Json::String("proof_relative_to_image".into()))
+            && verdict != ClaimVerdict::ProofRelativeToImage
+        {
+            return err(
+                "§12.2 K85",
+                "requested proof_relative_to_image without complete remaining domain",
+            );
+        }
+        Ok(Outcome {
+            verdict,
+            coverage: Some(coverage(f, controls, &resolved, elements.len())?),
+        })
     }
 }

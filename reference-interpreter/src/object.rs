@@ -21,6 +21,8 @@ pub enum Type {
     F64,
     Token,
     Qreg(u64),
+    /// ISA 0.9 register whose unsigned width is carried by the runtime ledger.
+    DynamicQreg,
     /// wire / wire[N]: no upper bound in §3.3; N is held exactly as u64.
     Wire(u64),
     /// reg[N]: no upper bound in §3.3.
@@ -62,6 +64,7 @@ impl Type {
             "f64" => Self::F64,
             "token" => Self::Token,
             "wire" => Self::Wire(1),
+            "qreg[*]" => Self::DynamicQreg,
             _ if s.starts_with('i') => Self::Int(width(&s[1..])?),
             _ if s.starts_with("wire[") && s.ends_with(']') => {
                 Self::Wire(bundle_width(&s[5..s.len() - 1])?)
@@ -106,10 +109,22 @@ impl Type {
             Self::Reg(n) => format!("reg[{n}]"),
             Self::Region(a, w) => format!("region[{a},{w}]"),
             Self::Qreg(n) => format!("qreg[{n}]"),
+            Self::DynamicQreg => "qreg[*]".into(),
             Self::Ptr => "ptr".into(),
             Self::F64 => "f64".into(),
             Self::Token => "token".into(),
         }
+    }
+    pub(crate) fn is_qreg(&self) -> bool {
+        matches!(self, Self::Qreg(_) | Self::DynamicQreg)
+    }
+    pub(crate) fn transfer_from(&self, source: &Self, version: IsaVersion) -> bool {
+        self == source
+            || (version == IsaVersion::V09
+                && matches!(
+                    (self, source),
+                    (Self::DynamicQreg, Self::Qreg(_)) | (Self::Qreg(_), Self::DynamicQreg)
+                ))
     }
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1871,7 +1886,7 @@ fn validate_header(f: &Function, version: IsaVersion) -> Result<()> {
                     matches!(
                         t,
                         Type::Int(_) | Type::Ptr | Type::F64 | Type::Token | Type::Qreg(_)
-                    )
+                    ) || (version == IsaVersion::V09 && matches!(t, Type::DynamicQreg))
                 })?;
             }
             if !f.regs.is_empty() || !f.bounds.is_empty() {

@@ -23,7 +23,10 @@ impl Object {
                 let region = matches!(op, "oracle_call" | "action_call" | "ctl" | "adj");
                 let operands: Vec<String> = match op {
                     "qreg.new" => Vec::new(),
-                    "qreg.slice" | "qreg.free" | "measure" => vec![a[0].clone()],
+                    "qreg.slice" | "qreg.free" | "measure" | "qreg.width" | "qreg.id" => {
+                        vec![a[0].clone()]
+                    }
+                    _ if op.starts_with("measure.") => vec![a[0].clone()],
                     "qreg.concat" => a.clone(),
                     _ => {
                         let mut values = Vec::new();
@@ -43,7 +46,7 @@ impl Object {
                 };
                 let handles: Vec<_> = operands
                     .into_iter()
-                    .filter(|n| matches!(types.get(n), Some(Type::Qreg(_))))
+                    .filter(|n| types.get(n).is_some_and(Type::is_qreg))
                     .collect();
                 for handle in &handles {
                     if views.live.values().any(|parent| parent == handle) {

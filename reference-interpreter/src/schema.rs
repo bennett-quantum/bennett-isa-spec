@@ -27,7 +27,12 @@ fn arity(op: &str, structured: bool) -> Option<(Option<usize>, &'static [usize],
             _ => None,
         };
     }
-    if op.starts_with("const.") || op == "inttoptr" || op == "alloc" || op == "measure" {
+    if op.starts_with("const.")
+        || op == "inttoptr"
+        || op == "alloc"
+        || op == "measure"
+        || op.starts_with("measure.")
+    {
         return fixed(1, &[1]);
     }
     if is_binop(op) || is_div(op) || op.starts_with("icmp.") {
@@ -49,6 +54,7 @@ fn arity(op: &str, structured: bool) -> Option<(Option<usize>, &'static [usize],
         "uncall" => fixed(0, &[3]),
         "trap" => fixed(0, &[0]),
         "qreg.new" | "qreg.concat" => fixed(1, &[2]),
+        "qreg.width" | "qreg.id" | "qreg.from_id" => fixed(1, &[1]),
         "qreg.slice" | "hostcall" => fixed(1, &[3]),
         "oracle_call" => fixed(0, &[7]),
         "action_call" => fixed(0, &[5]),

@@ -11,6 +11,7 @@ enum Status {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Handle {
     wires: Vec<Wire>,
+    classes: Vec<String>,
     status: Status,
     parent: Option<u64>,
 }
@@ -72,6 +73,18 @@ impl QuantumRegisters {
             .ok_or_else(|| Error::new(format!("§3.3: qreg {id} is not live")))?;
         Ok(&h.wires)
     }
+    pub fn width(&self, id: u64) -> Result<u64> {
+        u64::try_from(self.ordinary(id)?.wires.len())
+            .map_err(|_| crate::resource_error("§3.3", "qreg width exceeds u64"))
+    }
+    pub fn classes(&self, id: u64) -> Result<&[String]> {
+        self.bundle(id)?;
+        Ok(&self.handles[&id].classes)
+    }
+    pub fn from_id(&self, id: u64) -> Result<u64> {
+        self.ordinary(id)?;
+        Ok(id)
+    }
     fn ordinary(&self, id: u64) -> Result<&Handle> {
         self.bundle(id)?;
         let h = &self.handles[&id];
@@ -108,7 +121,12 @@ impl QuantumRegisters {
             kernel: KernelUndo::None,
         }
     }
-    fn create(&mut self, wires: Vec<Wire>, parent: Option<u64>) -> Result<u64> {
+    fn create(
+        &mut self,
+        wires: Vec<Wire>,
+        classes: Vec<String>,
+        parent: Option<u64>,
+    ) -> Result<u64> {
         let id = self.next;
         let next = id
             .checked_add(1)
@@ -117,6 +135,7 @@ impl QuantumRegisters {
             id,
             Handle {
                 wires,
+                classes,
                 status: Status::Live,
                 parent,
             },
@@ -128,10 +147,25 @@ impl QuantumRegisters {
         Ok(self.allocate_recorded(n)?.0)
     }
     pub(crate) fn allocate_recorded(&mut self, n: usize) -> Result<(u64, RegisterUndo)> {
+        self.allocate_class_recorded(n, "any")
+    }
+    pub fn allocate_in_class(&mut self, n: usize, class: &str) -> Result<u64> {
+        self.allocate_class_recorded(n, class).map(|r| r.0)
+    }
+    pub(crate) fn allocate_class_recorded(
+        &mut self,
+        n: usize,
+        class: &str,
+    ) -> Result<(u64, RegisterUndo)> {
+        self.next
+            .checked_add(1)
+            .ok_or_else(|| crate::resource_error("§3.3", "qreg id exhausted"))?;
+        let mut classes = crate::reserved(n, "§3.3", "qreg class vector")?;
+        classes.resize(n, class.into());
         let mut undo = self.record(&[self.next]);
         let wires = self.state.allocate(n)?;
         undo.kernel = KernelUndo::Allocation(wires.clone());
-        let id = self.create(wires, None)?;
+        let id = self.create(wires, classes, None)?;
         Ok((id, undo))
     }
     pub fn free(&mut self, id: u64) -> Result<()> {
@@ -165,9 +199,11 @@ impl QuantumRegisters {
             .ok_or_else(|| Error::new("§3.3: qreg slice out of bounds".into()))?;
         let mut wires = crate::reserved(len, "§3.3", "qreg slice wires")?;
         wires.extend_from_slice(&h.wires[lo..end]);
+        let mut classes = crate::reserved(len, "§3.3", "qreg slice class vector")?;
+        classes.extend_from_slice(&h.classes[lo..end]);
         let undo = self.record(&[id, self.next]);
         self.set_status(id, Status::Viewed)?;
-        let view = self.create(wires, Some(id))?;
+        let view = self.create(wires, classes, Some(id))?;
         Ok((view, undo))
     }
     pub fn concat(&mut self, a: u64, b: u64) -> Result<u64> {
@@ -188,10 +224,13 @@ impl QuantumRegisters {
         if wires.iter().collect::<BTreeSet<_>>().len() != wires.len() {
             return err("§3.3", "qreg concat wires overlap");
         }
+        let mut classes = crate::reserved(count, "§3.3", "qreg concat class vector")?;
+        classes.extend_from_slice(&self.handles[&a].classes);
+        classes.extend_from_slice(&self.handles[&b].classes);
         let undo = self.record(&[a, b, self.next]);
         self.set_status(a, Status::Consumed)?;
         self.set_status(b, Status::Consumed)?;
-        let id = self.create(wires, None)?;
+        let id = self.create(wires, classes, None)?;
         Ok((id, undo))
     }
     pub fn complete_call(&mut self, ids: &[u64]) -> Result<()> {

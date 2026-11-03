@@ -365,16 +365,32 @@ fn invocation_budget(value: &Json) -> Result<crate::Budget> {
     })
 }
 
+#[cfg(test)]
 fn domain(value: &Json, f: &Function) -> Result<()> {
+    domain_for(value, f, crate::IsaVersion::V08, 0)
+}
+fn domain_for(
+    value: &Json,
+    f: &Function,
+    version: crate::IsaVersion,
+    controls: u128,
+) -> Result<()> {
     let mut names = BTreeSet::new();
     for group in ["bundles", "borrowed"] {
-        for b in value.get(group)?.array()? {
+        let entries = value.get(group)?.array()?;
+        if group == "bundles" && (entries.len() as u128) < controls {
+            return err("§12.2 K72", "domain omits inherited control positions");
+        }
+        for (position, b) in entries.iter().enumerate() {
+            let inherited = group == "bundles" && (position as u128) < controls;
             let name = text(b.get("name")?)?;
-            if !names.insert((group, name.to_string())) {
+            let label_only =
+                inherited || (version == crate::IsaVersion::V09 && group == "borrowed");
+            if !label_only && !names.insert((group, name.to_string())) {
                 return err("§12.2", "repeated domain component");
             }
             let width = b.get("width")?.uint()?;
-            if width == 0 {
+            if width == 0 || (inherited && width != 1) {
                 return err("§12.2", "zero-width domain component");
             }
             // Admission compares the spelling's magnitude, never allocates width
@@ -386,7 +402,7 @@ fn domain(value: &Json, f: &Function) -> Result<()> {
             if (lo.len(), lo) > (hi.len(), hi) {
                 return err("§12.2", "domain interval with lo > hi");
             }
-            if group == "bundles" {
+            if group == "bundles" && !inherited {
                 let p = f
                     .params
                     .iter()
@@ -635,7 +651,10 @@ impl Object {
                 }
                 let fault = v.get("fault_rate")?;
 
-                domain(fault.get("domain")?, f)?;
+                domain_for(fault.get("domain")?, f, self.isa_version, 0)?;
+                if self.isa_version == crate::IsaVersion::V09 {
+                    self.validate_image_domains09(fault.get("domain")?, f)?;
+                }
                 for (code, count) in fault.get("faults_by_code")?.object()? {
                     code.parse::<u128>()
                         .map_err(|_| Error::new("§12: invalid fault code key".into()))?;
@@ -668,6 +687,9 @@ impl Object {
     fn validate_claim(&self, c: &Json, f: &Function, position: usize) -> Result<()> {
         crate::metadata_schema::validate_for(self.isa_version, "claim", c)?;
         if self.isa_version == crate::IsaVersion::V09 {
+            if let Some(d) = c.object()?.get("domain") {
+                self.validate_image_domains09(d, f)?;
+            }
             let inverse_pair =
                 c.object()?.get("expected") == Some(&Json::String("inverse_pair".into()));
             let subject_schedule = c
@@ -704,13 +726,23 @@ impl Object {
         // indices need the enclosing function/claim list, beyond the grammar.
         match c.get("kind")?.string()? {
             "exhaustive" => {
-                domain(c.get("domain")?, f)?;
+                let controls = if self.isa_version == crate::IsaVersion::V09 {
+                    c.get("subject")?.get("inherited_controls")?.uint()?
+                } else {
+                    0
+                };
+                domain_for(c.get("domain")?, f, self.isa_version, controls)?;
                 if c.get("expected")? == &Json::String("oracle".into()) {
                     subject(c.get("subject")?)?;
                 }
             }
             "sampled" => {
-                domain(c.get("domain")?, f)?;
+                let controls = if self.isa_version == crate::IsaVersion::V09 {
+                    c.get("subject")?.get("inherited_controls")?.uint()?
+                } else {
+                    0
+                };
+                domain_for(c.get("domain")?, f, self.isa_version, controls)?;
                 if !c
                     .get("sampler")?
                     .get("seed")?

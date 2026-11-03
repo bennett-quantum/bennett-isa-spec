@@ -9,6 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 const UNDEFINED: &str = "§3.3: undefined classical operand";
 pub(crate) mod cleanup;
+mod registers09;
 impl Object {
     pub(crate) fn validate_structured(
         &self,
@@ -744,6 +745,11 @@ impl Object {
                     .get(v)
                     .ok_or_else(|| Error::new(format!("§3.3: unknown call operand {v}")))?;
                 let compatible = match (&p.ty, ty) {
+                    (Type::Wire(_) | Type::Region(..), Type::DynamicQreg)
+                        if self.isa_version == crate::IsaVersion::V09 =>
+                    {
+                        true
+                    }
                     (Type::Wire(n), Type::Wire(m)) | (Type::Wire(n), Type::Reg(m)) => n == m,
                     (Type::Wire(n), Type::Qreg(m)) => n == m,
                     (Type::Region(a, w), Type::Region(b, z)) => a == b && w == z,
@@ -759,7 +765,11 @@ impl Object {
                 }
                 if matches!(
                     ty,
-                    Type::Wire(_) | Type::Reg(_) | Type::Qreg(_) | Type::Region(..)
+                    Type::Wire(_)
+                        | Type::Reg(_)
+                        | Type::Qreg(_)
+                        | Type::DynamicQreg
+                        | Type::Region(..)
                 ) && !wires.insert(v.clone())
                 {
                     return err("§3.3", "region interface operands alias");
@@ -791,6 +801,9 @@ impl Object {
     ) -> Result<()> {
         for b in &f.blocks {
             for p in &b.params {
+                if self.isa_version == crate::IsaVersion::V08 && p.ty == Type::DynamicQreg {
+                    return err("§3.3", "qreg[*] requires ISA 0.9");
+                }
                 if types.insert(p.name.clone(), p.ty.clone()).is_some() {
                     return err("§3.3", "duplicate SSA definition");
                 }
@@ -891,7 +904,11 @@ impl Object {
             );
         }
         let mut result = None;
-        if let Some(t) = op.strip_prefix("const.") {
+        if self.isa_version == crate::IsaVersion::V09
+            && (op.starts_with("qreg.") || op == "measure" || op.starts_with("measure."))
+        {
+            result = self.register_instruction09(f, i, types)?;
+        } else if let Some(t) = op.strip_prefix("const.") {
             arity(1, 1)?;
             let t = Type::parse(t)?;
             let Type::Int(n) = t else {
@@ -1013,7 +1030,7 @@ impl Object {
                             return err("§3.3", "branch argument count mismatch");
                         }
                         for (v, p) in vs.iter().zip(&block.params) {
-                            if rd(v)? != p.ty {
+                            if !p.ty.transfer_from(&rd(v)?, self.isa_version) {
                                 return err("§3.3", "branch parameter type mismatch");
                             }
                         }
@@ -1024,7 +1041,7 @@ impl Object {
                         return err("§4.8", "return arity mismatch");
                     }
                     for (v, p) in a.iter().zip(&f.params[1]) {
-                        if rd(v)? != p.ty {
+                        if !p.ty.transfer_from(&rd(v)?, self.isa_version) {
                             return err("§3.3", "return type mismatch");
                         }
                     }
@@ -1068,7 +1085,7 @@ impl Object {
                         return err("§3.3", "call argument count");
                     }
                     for (v, p) in vs.iter().zip(&callee.params[0]) {
-                        if rd(v)? != p.ty {
+                        if !p.ty.transfer_from(&rd(v)?, self.isa_version) {
                             return err("§3.3", "call argument type");
                         }
                     }
@@ -1085,7 +1102,7 @@ impl Object {
                             return err("§3.3", "uncall result count");
                         }
                         for (v, p) in rs.iter().zip(&callee.params[1]) {
-                            if rd(v)? != p.ty {
+                            if !p.ty.transfer_from(&rd(v)?, self.isa_version) {
                                 return err("§3.3", "uncall result type");
                             }
                         }
@@ -1176,7 +1193,10 @@ impl Object {
                 "oracle_call" | "action_call" | "adj" | "ctl" => {
                     let call = normalize_call(i)?;
                     if let Some(control) = &call.control {
-                        if rd(control)? != Type::Qreg(1) {
+                        if rd(control)? != Type::Qreg(1)
+                            && !(self.isa_version == crate::IsaVersion::V09
+                                && rd(control)? == Type::DynamicQreg)
+                        {
                             return err("§3.3", "ctl requires a qreg[1] control (§4.7/§4.8)");
                         }
                     }

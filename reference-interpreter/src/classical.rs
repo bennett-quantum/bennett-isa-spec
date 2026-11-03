@@ -9,6 +9,7 @@ use crate::{
     Result, Retained, Type,
 };
 use std::collections::{BTreeMap, VecDeque};
+mod registers09;
 
 #[cfg_attr(not(test), derive(Clone))]
 #[derive(Debug, PartialEq, Eq)]
@@ -44,7 +45,9 @@ impl ClassicalValue {
             (Self::Int(w, v), Type::Int(n)) => w == n && *v & !mask(*w) == 0,
             (Self::Ptr(v), Type::Ptr) => *v & !mask(ptr) == 0,
             (Self::F64(v), Type::F64) => f64::from_bits(*v).is_finite(),
-            (Self::Token(_), Type::Token) | (Self::Qreg(_), Type::Qreg(_)) => true,
+            (Self::Token(_), Type::Token) | (Self::Qreg(_), Type::Qreg(_) | Type::DynamicQreg) => {
+                true
+            }
             _ => false,
         }
     }
@@ -1354,9 +1357,15 @@ impl<'a> ClassicalMachine<'a> {
                 .iter()
                 .any(|p| op.starts_with(p))
             || op == "inttoptr"
-            || op == "br";
+            || op == "br"
+            || (object.isa_version == crate::IsaVersion::V09
+                && matches!(op, "qreg.width" | "qreg.id" | "qreg.from_id"));
         let execute = (|| -> Result<()> {
-            if let Some(t) = op.strip_prefix("const.") {
+            if object.isa_version == crate::IsaVersion::V09
+                && (op.starts_with("qreg.") || op == "measure" || op.starts_with("measure."))
+            {
+                self.register_step09(&i, &mut undo, &mut output, &mut fault, &mut measurement)?;
+            } else if let Some(t) = op.strip_prefix("const.") {
                 let Type::Int(w) = Type::parse(t)? else {
                     return err("§4.8", "const type");
                 };
@@ -1482,6 +1491,11 @@ impl<'a> ClassicalMachine<'a> {
                         let block = f.blocks.iter().position(|b| b.name == n).ok_or_else(|| {
                             Error::new(format!("§3.4: unknown branch target {n}"))
                         })?;
+                        if object.isa_version == crate::IsaVersion::V09 {
+                            for (p, v) in f.blocks[block].params.iter().zip(&values) {
+                                self.register_transfer09(v, &p.ty)?;
+                            }
+                        }
                         for (p, v) in f.blocks[block].params.iter().zip(values) {
                             self.define(&p.name, v, &mut undo)?;
                         }
@@ -1501,6 +1515,11 @@ impl<'a> ClassicalMachine<'a> {
                             .iter()
                             .map(|n| self.read(n))
                             .collect::<Result<Vec<_>>>()?;
+                        if object.isa_version == crate::IsaVersion::V09 {
+                            for (p, v) in callee.params[0].iter().zip(&values) {
+                                self.register_transfer09(v, &p.ty)?;
+                            }
+                        }
                         let segment = self.segments.len();
                         self.segments.push(Segment {
                             start: self.history.len(),
@@ -1525,6 +1544,11 @@ impl<'a> ClassicalMachine<'a> {
                     }
                     "ret" => {
                         let values = a.iter().map(|n| self.read(n)).collect::<Result<Vec<_>>>()?;
+                        if object.isa_version == crate::IsaVersion::V09 {
+                            for (p, v) in f.params[1].iter().zip(&values) {
+                                self.register_transfer09(v, &p.ty)?;
+                            }
+                        }
                         let active =
                             self.state.control.pop().ok_or_else(|| {
                                 Error::new("§3.4: ret without an activation".into())
