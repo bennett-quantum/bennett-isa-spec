@@ -311,6 +311,63 @@ fn nested_body_captures_share_lexical_snapshots_and_preserve_free_wires() {
 }
 
 #[test]
+fn nested_allocation_scopes_use_the_default_stack_and_keep_lifetime_order() {
+    use json::Json;
+    use std::collections::BTreeMap;
+    const DEPTH: usize = 192;
+    let mut body = Vec::new();
+    for i in 0..DEPTH {
+        body.push(Json::Obj(BTreeMap::from([(
+            "acquire".into(),
+            Json::Str(format!("q{i}")),
+        )])));
+    }
+    for _ in 0..2 {
+        body.push(Json::Obj(BTreeMap::from([
+            ("gate".into(), Json::Str("x".into())),
+            ("wires".into(), Json::Arr(vec![Json::Str("q0".into())])),
+        ])));
+    }
+    for i in (0..DEPTH).rev() {
+        body.push(Json::Obj(BTreeMap::from([(
+            "relinquish".into(),
+            Json::Str(format!("q{i}")),
+        )])));
+    }
+    for i in (0..DEPTH).rev() {
+        body = vec![Json::Obj(BTreeMap::from([
+            ("declare".into(), Json::Str(format!("q{i}"))),
+            ("width".into(), Json::Num(1.0)),
+            ("class".into(), json::parse(r#"{"class":"any"}"#).unwrap()),
+            ("state".into(), Json::Str("clean".into())),
+            ("body".into(), Json::Arr(body)),
+        ]))];
+    }
+    let hash = "a".repeat(64);
+    let registry = Registry::from([(
+        hash.clone(),
+        Json::Obj(BTreeMap::from([
+            ("parameters".into(), Json::Arr(vec![])),
+            ("body".into(), Json::Arr(body)),
+        ])),
+    )]);
+    let leaves = Expander::new(include_str!("../../spec/ref-0.9.json"), registry)
+        .unwrap()
+        .expand(&hash, &[], &[])
+        .unwrap();
+    assert_eq!(leaves.len(), 2 * DEPTH + 2);
+    assert_eq!(leaves[DEPTH].gate, "x");
+    assert_eq!(leaves[DEPTH + 1].gate, "x");
+    for i in 0..DEPTH {
+        assert_eq!(leaves[i].gate, "alloc");
+        let release = &leaves[leaves.len() - 1 - i];
+        assert_eq!(release.gate, "release");
+        assert_eq!(leaves[i].allocation, release.allocation);
+        assert_eq!(leaves[i].allocation.as_ref().unwrap().1, 1);
+    }
+}
+
+#[test]
 fn source_leaf_budget_fails_explicitly_resets_and_leaves_plain_catalogs_unchanged() {
     use bennett_isa_conformance::ref_language::{
         SourceBody, SourceFactory, HOST_RESOURCE_LIMIT_PREFIX,

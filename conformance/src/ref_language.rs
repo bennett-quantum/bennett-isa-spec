@@ -489,15 +489,16 @@ fn validate_body(body: &[Json]) -> Result<(), String> {
     validate_body_mode(body, false)
 }
 fn validate_body_mode(body: &[Json], source: bool) -> Result<(), String> {
-    for c in body {
+    let mut pending = body.iter().rev().collect::<Vec<_>>();
+    while let Some(c) = pending.pop() {
         if c.get("visit").is_some() {
             keys(c, &["visit", "body"])?;
             s(f(c, "visit")?)?;
-            validate_body_mode(a(f(c, "body")?)?, source)?;
+            pending.extend(a(f(c, "body")?)?.iter().rev());
         } else if c.get("declare").is_some() {
             keys(c, &["declare", "width", "class", "state", "body"])?;
             s(f(c, "declare")?)?;
-            validate_body_mode(a(f(c, "body")?)?, source)?;
+            pending.extend(a(f(c, "body")?)?.iter().rev());
         } else if c.get("acquire").is_some() || c.get("relinquish").is_some() {
             let key = if c.get("acquire").is_some() {
                 "acquire"
@@ -558,25 +559,25 @@ fn validate_body_mode(body: &[Json], source: bool) -> Result<(), String> {
             f(c, "perm")?
                 .as_bool()
                 .ok_or("cleanup provenance must be boolean")?;
-            validate_body_mode(a(f(c, "reverse")?)?, true)?;
-            validate_body_mode(a(f(c, "recompute")?)?, true)?;
+            pending.extend(a(f(c, "recompute")?)?.iter().rev());
+            pending.extend(a(f(c, "reverse")?)?.iter().rev());
         } else if c.get("for").is_some() {
             keys(c, &["for", "from", "to", "body"])?;
             s(f(c, "for")?)?;
-            validate_body_mode(a(f(c, "body")?)?, source)?;
+            pending.extend(a(f(c, "body")?)?.iter().rev());
         } else if c.get("each").is_some() {
             keys(c, &["each", "in", "body"])?;
             s(f(c, "each")?)?;
-            validate_body_mode(a(f(c, "body")?)?, source)?;
+            pending.extend(a(f(c, "body")?)?.iter().rev());
         } else if c.get("under").is_some() {
             keys(c, &["under", "body"])?;
-            validate_body_mode(a(f(c, "body")?)?, source)?;
+            pending.extend(a(f(c, "body")?)?.iter().rev());
         } else if c.get("inverse").is_some() {
             keys(c, &["inverse", "body"])?;
             if f(c, "inverse")?.as_bool() != Some(true) {
                 return Err("inverse must be true".into());
             }
-            validate_body_mode(a(f(c, "body")?)?, source)?;
+            pending.extend(a(f(c, "body")?)?.iter().rev());
         } else if c.get("splice").is_some() {
             keys(c, &["splice"])?;
             s(f(c, "splice")?)?;
@@ -751,21 +752,7 @@ impl Expander {
         bundles: &[(&str, usize)],
         symbols: &[SourceSymbol],
     ) -> Result<Vec<Leaf>, String> {
-        // Lexically nested recipes must not depend on an embedding caller's
-        // (often 2 MiB) stack. Captures themselves remain shared snapshots.
-        std::thread::scope(|scope| {
-            std::thread::Builder::new()
-                .name("isa-recipe-expansion".into())
-                .stack_size(32 * 1024 * 1024)
-                .spawn_scoped(scope, || {
-                    self.expand_bound_local(kind, args, bundles, symbols)
-                })
-                .map_err(|e| {
-                    format!("{HOST_RESOURCE_LIMIT_PREFIX}cannot allocate expansion stack: {e}")
-                })?
-                .join()
-                .map_err(|_| "recipe expansion worker panicked".to_string())?
-        })
+        self.expand_bound_local(kind, args, bundles, symbols)
     }
 
     fn expand_bound_local(
@@ -1498,6 +1485,44 @@ impl Expander {
         out.push(l);
         Ok(())
     }
+    fn splice_body(
+        &mut self,
+        name: &str,
+        caller: &Context,
+        path: &[usize],
+        rev: bool,
+        out: &mut Vec<Leaf>,
+    ) -> Result<(), String> {
+        let (mut body, captured) = caller.bodies.get(name).cloned().ok_or("unbound body")?;
+        let mut context = (*captured).clone();
+        context.controls.extend(caller.controls.clone());
+        context.controls.sort();
+        context.controls.dedup();
+        let depth = self.source_depth;
+        let mut forwarded = 0;
+        // Forwarded body actuals are finite syntax. Resolve chains of single
+        // splices iteratively, keeping their lexical snapshots and controls.
+        while body.len() == 1 && body[0].get("splice").is_some() {
+            if depth + forwarded == SOURCE_SCOPE_LIMIT {
+                return Err(format!("{HOST_RESOURCE_LIMIT_PREFIX}source constructor nesting exceeds this host's expansion stack budget"));
+            }
+            keys(&body[0], &["splice"])?;
+            let name = s(f(&body[0], "splice")?)?;
+            let (next, captured) = context.bodies.get(name).cloned().ok_or("unbound body")?;
+            let controls = context.controls.clone();
+            context = (*captured).clone();
+            context.controls.extend(controls);
+            context.controls.sort();
+            context.controls.dedup();
+            body = next;
+            forwarded += 1;
+            self.serial += 1;
+        }
+        self.source_depth += forwarded;
+        let result = self.body(&body, &mut context, path, rev, &mut Vec::new(), out);
+        self.source_depth = depth;
+        result
+    }
     fn body(
         &mut self,
         b: &[Json],
@@ -1526,12 +1551,13 @@ impl Expander {
         out: &mut Vec<Leaf>,
     ) -> Result<(), String> {
         fn declarations(b: &[Json], d: &mut BTreeMap<String, Json>) -> Result<(), String> {
-            for j in b {
+            let mut pending = b.iter().rev().collect::<Vec<_>>();
+            while let Some(j) = pending.pop() {
                 if let Some(n) = j.get("alloc") {
                     d.insert(s(n)?.into(), j.clone());
                 }
                 if let Some(inner) = j.get("body") {
-                    declarations(a(inner)?, d)?;
+                    pending.extend(a(inner)?.iter().rev());
                 }
             }
             Ok(())
@@ -1598,30 +1624,54 @@ impl Expander {
                     }
                     self.body(a(f(j, "body")?)?, &mut local, path, rev, chain, out)?;
                 }
-            } else if let Some(n) = j.get("declare") {
-                let n = s(n)?;
-                if c.has_name(n) {
-                    return Err("declaration shadows binding".into());
+            } else if j.get("declare").is_some() {
+                // Source constructors commonly declare hundreds of independent
+                // slots around one body. Keep that lexical scope on the heap,
+                // rather than spending one Rust call frame per slot.
+                let mut scope = j;
+                let mut handles = Vec::new();
+                let inner = loop {
+                    if self.source_depth + handles.len() >= SOURCE_SCOPE_LIMIT {
+                        return Err(format!("{HOST_RESOURCE_LIMIT_PREFIX}source constructor nesting exceeds this host's expansion stack budget"));
+                    }
+                    let n = s(f(scope, "declare")?)?;
+                    if c.has_name(n) {
+                        return Err("declaration shadows binding".into());
+                    }
+                    let width = usize::try_from(scalar(f(scope, "width")?, &c.ints)?)
+                        .map_err(|_| "negative declaration width")?;
+                    let cls = class(f(scope, "class")?, c)?;
+                    let state = s(f(scope, "state")?)?;
+                    if !matches!(state, "clean" | "borrowed") {
+                        return Err("invalid allocation state".into());
+                    }
+                    let h = Rc::new(RefCell::new(Handle {
+                        declared_scratch: c.scratch_names.contains(n),
+                        scratch: c.scratch_names.contains(n),
+                        metadata: (self.allocation_identity(path), width, cls, state.into()),
+                        live: false,
+                    }));
+                    c.handles.insert(n.into(), h.clone());
+                    handles.push((n, h));
+                    let body = a(f(scope, "body")?)?;
+                    if body.len() == 1 && body[0].get("declare").is_some() {
+                        self.serial += 1;
+                        scope = &body[0];
+                    } else {
+                        break body;
+                    }
+                };
+                let depth = self.source_depth;
+                self.source_depth += handles.len() - 1;
+                let result = self.body(inner, c, path, rev, chain, out);
+                self.source_depth = depth;
+                result?;
+                for (name, handle) in handles.into_iter().rev() {
+                    if handle.borrow().live {
+                        return Err("declaration exits with live allocation".into());
+                    }
+                    c.handles.remove(name);
                 }
-                let width = usize::try_from(scalar(f(j, "width")?, &c.ints)?)
-                    .map_err(|_| "negative declaration width")?;
-                let cls = class(f(j, "class")?, c)?;
-                let state = s(f(j, "state")?)?;
-                if !matches!(state, "clean" | "borrowed") {
-                    return Err("invalid allocation state".into());
-                }
-                let h = Rc::new(RefCell::new(Handle {
-                    declared_scratch: c.scratch_names.contains(n),
-                    scratch: c.scratch_names.contains(n),
-                    metadata: (self.allocation_identity(path), width, cls, state.into()),
-                    live: false,
-                }));
-                c.handles.insert(n.into(), h.clone());
-                self.body(a(f(j, "body")?)?, c, path, rev, chain, out)?;
-                if h.borrow().live {
-                    return Err("declaration exits with live allocation".into());
-                }
-                c.handles.remove(n);
             } else if j.get("acquire").is_some() || j.get("relinquish").is_some() {
                 let acquire = j.get("acquire").is_some() != rev;
                 let n = s(j.get("acquire").or_else(|| j.get("relinquish")).unwrap())?;
@@ -1974,15 +2024,10 @@ impl Expander {
                 )?;
             } else if let Some(n) = j.get("splice") {
                 keys(j, &["splice"])?;
-                let (b, captured) = c.bodies.get(s(n)?).cloned().ok_or("unbound body")?;
-                let mut captured = (*captured).clone();
-                captured.controls.extend(c.controls.clone());
-                captured.controls.sort();
-                captured.controls.dedup();
                 // A captured actual is finite caller syntax, not a declared
                 // dependency of the higher-order callee. Nested qloop(qloop)
                 // is legal; recursive invokes within either body still reject.
-                self.body(&b, &mut captured, path, rev, &mut Vec::new(), out)?;
+                self.splice_body(s(n)?, c, path, rev, out)?;
             } else if let Some(ws) = j.get("under") {
                 keys(j, &["under", "body"])?;
                 let old = c.controls.clone();
