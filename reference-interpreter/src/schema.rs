@@ -5,7 +5,11 @@ use crate::{err, object::list, validation::normalize_call, Error, Instruction, O
 use std::collections::{BTreeMap, BTreeSet};
 
 /// (results, operand counts, structured bodies) of one opcode; None = any count.
-fn arity(op: &str, structured: bool) -> Option<(Option<usize>, &'static [usize], usize)> {
+fn arity(
+    op: &str,
+    structured: bool,
+    version: crate::IsaVersion,
+) -> Option<(Option<usize>, &'static [usize], usize)> {
     use crate::object::{is_binop, is_div};
     let fixed = |lhs: usize, ops: &'static [usize]| Some((Some(lhs), ops, 0));
     if structured {
@@ -17,6 +21,7 @@ fn arity(op: &str, structured: bool) -> Option<(Option<usize>, &'static [usize],
             "qfree" | "qreturn" | "qpred" | "qunpred" => fixed(0, &[1]),
             "qcopy" => fixed(1, &[1]),
             "quncopy" | "qxor" | "qexch" => fixed(0, &[2]),
+            "qinplace" if version == crate::IsaVersion::V09 => fixed(0, &[4, 7]),
             "qinplace" => fixed(0, &[4]),
             "qregion" => fixed(0, &[3, 4]),
             "qunload" | "qstore" | "qexchm" => fixed(0, &[3]),
@@ -65,7 +70,7 @@ fn arity(op: &str, structured: bool) -> Option<(Option<usize>, &'static [usize],
         _ => None,
     }
 }
-fn check(i: &Instruction, structured: bool) -> Result<()> {
+fn check(i: &Instruction, structured: bool, version: crate::IsaVersion) -> Result<()> {
     let bad = |what: &str| err("§4.8", format!("{} at line {}: {what}", i.op, i.line));
     let instruction = if matches!(i.op.as_str(), "adj" | "ctl") {
         normalize_call(i)?.instruction
@@ -74,7 +79,7 @@ fn check(i: &Instruction, structured: bool) -> Result<()> {
     };
     // Unknown or tier-foreign opcodes are reported by the per-function
     // validator with their specific rule (§4.8, §5.1).
-    let Some((lhs, operands, bodies)) = arity(&instruction.op, structured) else {
+    let Some((lhs, operands, bodies)) = arity(&instruction.op, structured, version) else {
         return Ok(());
     };
     if lhs.is_some_and(|n| n != instruction.lhs.len())
@@ -90,7 +95,7 @@ fn check(i: &Instruction, structured: bool) -> Result<()> {
     }
     for body in &i.bodies {
         for child in body {
-            check(child, structured)?;
+            check(child, structured, version)?;
         }
     }
     Ok(())
@@ -142,7 +147,7 @@ impl Object {
             }
             let structured = matches!(f.kind.as_str(), "action" | "perm_action");
             for i in f.instructions() {
-                check(i, structured)?;
+                check(i, structured, self.isa_version)?;
                 if !structured {
                     for operand in &i.operands {
                         if operand.starts_with('(') {

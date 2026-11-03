@@ -369,7 +369,7 @@ pub(crate) fn invocation_budget(value: &Json) -> Result<crate::Budget> {
 fn domain(value: &Json, f: &Function) -> Result<()> {
     domain_for(value, f, crate::IsaVersion::V08, 0)
 }
-fn domain_for(
+pub(crate) fn domain_for(
     value: &Json,
     f: &Function,
     version: crate::IsaVersion,
@@ -718,6 +718,11 @@ impl Object {
     }
     fn validate_claim(&self, c: &Json, f: &Function, position: usize) -> Result<()> {
         crate::metadata_schema::validate_for(self.isa_version, "claim", c)?;
+        if self.isa_version == crate::IsaVersion::V09
+            && c.object()?.get("expected") == Some(&Json::String("inverse_pair".into()))
+        {
+            return self.validate_inverse_pair_claim09(f, position, c);
+        }
         if self.isa_version == crate::IsaVersion::V09 {
             if let Some(d) = c.object()?.get("domain") {
                 self.validate_image_domains09(d, f)?;

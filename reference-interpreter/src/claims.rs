@@ -18,6 +18,7 @@ use crate::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 mod images09;
+mod pairs09;
 mod replay09;
 pub use images09::FixedRegionBinding;
 
@@ -669,6 +670,12 @@ impl Object {
         let f = self.region_function(closure)?;
         let kind = claim.get("kind")?.string()?;
         let verdict = match kind {
+            "exhaustive"
+                if self.isa_version == crate::IsaVersion::V09
+                    && claim.get("expected")? == &Json::String("inverse_pair".into()) =>
+            {
+                self.verify_inverse_pair_claim09(f, index, claim)?
+            }
             "exhaustive" | "sampled" if self.isa_version == crate::IsaVersion::V09 => {
                 self.verify_replay09(closure, index, claim, f)?.verdict
             }
@@ -875,6 +882,7 @@ impl Object {
                 let kind = claim.get("kind")?.string()?;
                 let (verdict, coverage) = if self.isa_version == crate::IsaVersion::V09
                     && matches!(kind, "exhaustive" | "sampled")
+                    && claim.object()?.get("expected") != Some(&Json::String("inverse_pair".into()))
                 {
                     let outcome = self.verify_replay09(closure, index, claim, f)?;
                     (outcome.verdict, outcome.coverage)

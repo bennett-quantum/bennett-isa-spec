@@ -9,6 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 const UNDEFINED: &str = "§3.3: undefined classical operand";
 pub(crate) mod cleanup;
+mod qinplace09;
 mod registers09;
 impl Object {
     pub(crate) fn validate_structured(
@@ -407,6 +408,9 @@ impl Object {
                             *s.cell_epochs.entry(format!("{}[*]", a[0])).or_default() += 1;
                         }
                     }
+                }
+                "qinplace" if self.isa_version == crate::IsaVersion::V09 => {
+                    self.validate_qinplace09(i, s)?;
                 }
                 "qinplace" => {
                     arity(4, 0)?;
