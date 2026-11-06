@@ -196,10 +196,20 @@ fn source_object(ptr: usize) -> Object {
 }
 
 #[test]
+fn source_forwarding_bounded_materialisation_reports_host_capacity() {
+    source_forwarding_materialisation_limit(3, Some(1_024));
+}
+
+#[test]
+#[ignore = "slow-source-forwarding: million-leaf capacity witness; run only under an 8 GiB memory cap"]
 fn source_forwarding_large_materialisation_reports_host_capacity_before_exhausting_memory() {
+    source_forwarding_materialisation_limit(32, None);
+}
+
+fn source_forwarding_materialisation_limit(ptr: usize, leaf_limit: Option<usize>) {
     use bennett_isa_conformance::json;
     use bennett_isa_ref::ref_library::OracleInvocation;
-    let o = source_object(32);
+    let o = source_object(ptr);
     let args=json::parse(r#"["x","t","f",{"address":0,"cell":8,"role":"in","origin":"interface:db","cells":"db"},["6","0","0","0"],"2"]"#).unwrap();
     let context = json::parse(r#"{"token":["8","0","8","1"]}"#).unwrap();
     let call = OracleInvocation::capture_with_token_aliases(
@@ -211,12 +221,13 @@ fn source_forwarding_large_materialisation_reports_host_capacity_before_exhausti
         &[0, 1],
     )
     .unwrap();
-    let error = call
-        .expand_source(
-            &o.bound_ref_library().unwrap(),
-            &[("x", 2), ("t", 2), ("f", 4), ("db", 8)],
-        )
-        .unwrap_err();
+    let library = o.bound_ref_library().unwrap();
+    let bundles = &[("x", 2), ("t", 2), ("f", 4), ("db", 8)];
+    let error = match leaf_limit {
+        Some(limit) => call.expand_source_with_leaf_limit(&library, bundles, limit),
+        None => call.expand_source(&library, bundles),
+    }
+    .unwrap_err();
     assert_eq!(error.kind(), bennett_isa_ref::ErrorKind::HostResource);
     assert!(error.to_string().contains("materialised leaf budget"));
 }

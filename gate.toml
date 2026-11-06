@@ -13,11 +13,15 @@ argv = ["sh", "-c", "for c in reference-interpreter conformance; do rm -rf \"$c/
 
 [[check]]
 name = "cargo test reference-interpreter"
-argv = ["cargo", "test", "--offline", "--manifest-path", "reference-interpreter/Cargo.toml"]
+argv = ["sh", "-ec", "ulimit -v 8388608; ulimit -c 0; exec timeout 1800 cargo test --offline -j3 --manifest-path reference-interpreter/Cargo.toml -- --test-threads=4"]
 
 [[check]]
 name = "cargo test conformance"
-argv = ["cargo", "test", "--offline", "--manifest-path", "conformance/Cargo.toml"]
+argv = ["sh", "-ec", "ulimit -v 8388608; ulimit -c 0; exec timeout 1800 cargo test --offline -j3 --manifest-path conformance/Cargo.toml -- --test-threads=4"]
+
+[[check]]
+name = "slow-source-forwarding (8 GiB cap)"
+argv = ["sh", "reference-interpreter/tools/test-slow-source-forwarding.sh"]
 
 [[check]]
 name = "diff witness"

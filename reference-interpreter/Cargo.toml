@@ -6,3 +6,8 @@ license = "AGPL-3.0-only"
 
 [dependencies]
 bennett-isa-conformance = { path = "../conformance" }
+
+# Keep exhaustive semantic checks practical without dropping debug/overflow checks.
+[profile.test]
+opt-level = 1
+debug = "line-tables-only"
