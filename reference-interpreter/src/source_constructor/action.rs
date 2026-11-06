@@ -362,7 +362,7 @@ impl Compiler<'_> {
                         env.wires.remove(&a[2]);
                     }
                 }
-                "qinplace" => out.extend(self.qinplace(i,env)?),
+                "qinplace" => out.extend(self.qinplace(i, env)?),
                 "oracle_call" | "action_call" | "ctl" | "adj" => out.extend(self.call(i, env)?),
                 _ => {
                     let mut node = if matches!(op, "rx" | "ry" | "rz") {
@@ -518,8 +518,10 @@ fn source_adjoint(body: Vec<Value>, symbols: &mut [SourceSymbol]) -> Result<Vec<
                 let Some(Value::Arr(args)) = m.get_mut("args") else {
                     return Err(Error::new("§11 K62: qinplace actuals".into()));
                 };
-                if args.len()!=6 {return Err(Error::new("§11 K62: qinplace adapter arity".into()));}
-                args.swap(3,4);
+                if args.len() != 6 {
+                    return Err(Error::new("§11 K62: qinplace adapter arity".into()));
+                }
+                args.swap(3, 4);
             } else if kind == "qloop" {
                 let Some(Value::Arr(args)) = m.get_mut("args") else {
                     return Err(Error::new("§11.1: loop body".into()));

@@ -86,6 +86,10 @@ fn certificate_invocations_admit_both_equal_tuple_identity_partitions() {
             object.verify_claim(closure, 0).unwrap(),
             ClaimVerdict::Proof
         );
+        assert_eq!(
+            object.verify_certificate().unwrap()[0].verdict,
+            ClaimVerdict::Proof
+        );
     }
     assert_eq!(
         hashes[0], hashes[1],
@@ -805,4 +809,54 @@ fn controlled_native_oracles_match_the_actual_inherited_control_count() {
             .unwrap();
         assert_eq!(state, entry);
     }
+}
+
+#[test]
+fn schedule_reader_checks_canonical_aliases_and_keeps_the_closed_schema() {
+    let object = oracle_source(true);
+    let original = scheduled(&object, Some("[0,1]"));
+    let parsed = Object::parse(&original).unwrap();
+    assert_eq!(
+        parsed
+            .section("schedule")
+            .unwrap()
+            .get("bindings")
+            .unwrap()
+            .get("token_aliases")
+            .unwrap(),
+        &support::json("[0,1]")
+    );
+    for labels in ["[1,1]", "[0,2]", "[0]", "[]", "[-1,0]", "[0,0.5]"] {
+        let text = scheduled(&object, Some(labels));
+        let error = Object::parse(&text).unwrap_err();
+        assert!(error.to_string().contains("K91"), "{labels}: {error}");
+    }
+    let mut schedule = parsed.section("schedule").unwrap().clone();
+    fields(fields(&mut schedule).get_mut("bindings").unwrap())
+        .insert("token_alias".into(), support::json("[0,1]"));
+    let error = Object::parse(&format!(
+        "{}\nsection schedule\n{}\n",
+        object.text,
+        schedule.canonical()
+    ))
+    .unwrap_err();
+    assert!(error.to_string().contains("unknown"), "{error}");
+}
+
+#[test]
+fn alias_metadata_is_versioned_and_does_not_widen_08_readers() {
+    let original = certificate_object(Some("[0,1]"), 1);
+    let source = original.split_once("section certificate\n").unwrap().0;
+    let legacy = support::rehash(
+        &(source.trim_end().to_string() + "\n")
+            .replace("=0.9", "=0.8")
+            .replace("\"0.9\"", "\"0.8\""),
+    );
+    let with_aliases = scheduled(&legacy, Some("[0,1]"));
+    let error = Object::parse(&with_aliases).unwrap_err();
+    assert!(error.to_string().contains("token_aliases"), "{error}");
+    Object::parse(&scheduled(&legacy, None))
+        .unwrap()
+        .check_hashes()
+        .unwrap();
 }

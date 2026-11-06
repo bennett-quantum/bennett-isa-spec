@@ -273,7 +273,10 @@ impl Object {
             }
             for row in enumerate(&domain)? {
                 let mut input = OracleVectorInput {
-                    ins: p.g.params[0].iter().map(|p| BitVector::zero(p.ty.bits(self.ptr_width)?)).collect::<Result<_>>()?,
+                    ins: p.g.params[0]
+                        .iter()
+                        .map(|p| BitVector::zero(p.ty.bits(self.ptr_width)?))
+                        .collect::<Result<_>>()?,
                     ..Default::default()
                 };
                 for param in &p.g.params[3] {
