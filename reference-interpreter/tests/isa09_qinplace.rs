@@ -106,6 +106,16 @@ fn inverse_certificate_for(object: &Object) -> String {
         "signature".into(),
         object.functions["addya"].signature_for(object.isa_version),
     );
+    fields(&mut record).insert(
+        "bounds".into(),
+        Json::Array(
+            object.functions["addya"]
+                .bounds
+                .iter()
+                .map(|n| Json::Number(n.to_string()))
+                .collect(),
+        ),
+    );
     fields(&mut record).insert("frame".into(),support::json(r#"{"slots":[{"id":"mut:0","role":"mut","class":"any","width":2},{"id":"in:0","role":"in","class":"any","width":2}],"scratch":[],"history":[],"borrow":[],"ancillae":[]}"#));
     fields(&mut record).insert("resources".into(), support::json("{}"));
     fields(&mut record).insert("gates_used".into(), support::json("{}"));
@@ -158,8 +168,11 @@ fn inverse_pair_certificate_rejects_a_noninverse_and_an_unbound_claim() {
     let wrong = original.replace(&format!(r#""ginv":"{gi}""#), &format!(r#""ginv":"{g}""#));
     assert_ne!(wrong, original);
     let wrong = Object::parse(&wrong).unwrap();
-    let error = wrong.verify_certificate().unwrap_err();
+    let owner = identity.closure_hashes["addya"].as_ref().unwrap();
+    let error = wrong.verify_claim(owner, 0).unwrap_err();
     assert!(error.to_string().contains("differs from x"), "{error}");
+    let error = wrong.verify_certificate().unwrap_err();
+    assert!(error.to_string().contains("missing owner-local"), "{error}");
     let no_entry = original.replace(
         &format!(r#"[{{"budget":[3,0,0,0],"claim":0,"g":"{g}","ginv":"{gi}"}}]"#),
         "[]",
@@ -361,4 +374,362 @@ fn source_qinplace_adjoints_preserve_instruction_allocation_and_release_order() 
             }
         }
     }
+}
+
+fn change_certificate(text: &str, change: impl FnOnce(&mut bennett_isa_ref::json::Json)) -> String {
+    let (source, packet) = text.split_once("section certificate\n").unwrap();
+    let mut certificate = bennett_isa_ref::json::Json::parse(packet.trim()).unwrap();
+    change(&mut certificate);
+    format!("{source}section certificate\n{}\n", certificate.canonical())
+}
+fn root_invocation(steps: u64, a: u64) -> bennett_isa_ref::json::Json {
+    support::json(&format!(
+        r#"{{"args":[["{steps}","0","0","0"],"{a}"],"budget":["0","0","0","0"],"token_aliases":[0]}}"#
+    ))
+}
+fn linked_inverse_certificate(wrong_pair: bool) -> String {
+    let text = inverse_certificate();
+    let object = Object::parse(&text).unwrap();
+    let identity = object.identity().unwrap();
+    let owner = identity.closure_hashes["addya"].as_ref().unwrap();
+    let g = identity.closure_hashes["g"].as_ref().unwrap();
+    change_certificate(&text, |certificate| {
+        let regions = fields(fields(certificate).get_mut("regions").unwrap());
+        let mut donor = regions[owner].clone();
+        fields(&mut donor).insert("kind".into(), support::json("\"oracle\""));
+        fields(&mut donor).insert("bounds".into(), support::json("[]"));
+        fields(&mut donor).insert(
+            "signature".into(),
+            object.functions["g"].signature_for(object.isa_version),
+        );
+        fields(&mut donor).insert("frame".into(), support::json(r#"{"slots":[{"id":"in:0","role":"in","class":"any","width":2},{"id":"in:1","role":"in","class":"any","width":2},{"id":"tgt:0","role":"tgt","class":"any","width":2},{"id":"fault:0","role":"fault","class":"any","width":4}],"scratch":[],"history":[],"borrow":[],"ancillae":[]}"#));
+        let record = fields(regions.get_mut(owner).unwrap());
+        record.insert("claims".into(), support::json(&format!(r#"[{{"kind":"structural","rule":"inverse_pair_library","subclaims":[],"witness":{{"library_closure_hash":"{g}","claim_index":0}},"invocation":{}}}]"#, root_invocation(3,1).canonical())));
+        if wrong_pair {
+            let entries = fields(record.get_mut("verification").unwrap())
+                .get_mut("inverse_pairs")
+                .unwrap();
+            let bennett_isa_ref::json::Json::Array(entries) = entries else {
+                panic!("entries")
+            };
+            fields(&mut entries[0]).insert(
+                "ginv".into(),
+                bennett_isa_ref::json::Json::String(g.clone()),
+            );
+        }
+        regions.insert(g.clone(), donor);
+    })
+}
+#[test]
+fn checker_rejects_missing_owner_local_qinplace_inventory() {
+    let text = change_certificate(&inverse_certificate(), |c| {
+        let record = fields(fields(c).get_mut("regions").unwrap())
+            .values_mut()
+            .next()
+            .unwrap();
+        fields(record).insert("claims".into(), support::json("[]"));
+        fields(fields(record).get_mut("verification").unwrap())
+            .insert("inverse_pairs".into(), support::json("[]"));
+    });
+    let error = Object::parse(&text)
+        .unwrap()
+        .verify_certificate()
+        .unwrap_err();
+    assert!(error.to_string().contains("K92"), "{error}");
+}
+#[test]
+fn checker_rejects_bound_invocation_below_the_pair_minimum() {
+    let text = change_certificate(&inverse_certificate(), |c| {
+        fields(fields(c).get_mut("bindings").unwrap())
+            .insert("invocation".into(), root_invocation(2, 1));
+    });
+    let error = Object::parse(&text)
+        .unwrap()
+        .verify_certificate()
+        .unwrap_err();
+    assert!(
+        error.to_string().contains("no covering inverse-pair entry"),
+        "{error}"
+    );
+}
+#[test]
+fn standalone_pair_proof_reports_unestablished_applicability() {
+    let reports = Object::parse(&inverse_certificate())
+        .unwrap()
+        .verify_certificate()
+        .unwrap();
+    assert_eq!(reports[0].verdict, bennett_isa_ref::ClaimVerdict::Proof);
+    assert!(
+        matches!(
+            reports[0].qinplace_applicability,
+            Some(bennett_isa_ref::QinplaceApplicability::Unestablished(_))
+        ),
+        "{reports:?}"
+    );
+}
+#[test]
+fn library_proof_cannot_transfer_to_a_different_pair() {
+    let object = Object::parse(&linked_inverse_certificate(true)).unwrap();
+    let owner = object.identity().unwrap().closure_hashes["addya"]
+        .clone()
+        .unwrap();
+    // g(x;y,a)=x+y+a mod 4: g(g(0;0,1);0,1)=2, so g/g is not inverse.
+    let error = object.verify_claim(&owner, 0).unwrap_err();
+    assert!(error.to_string().contains("same resolved pair"), "{error}");
+    let error = object.verify_certificate().unwrap_err();
+    assert!(error.to_string().contains("K92"), "{error}");
+}
+#[test]
+fn linked_library_pair_executes_every_argument_and_adjoint() {
+    use bennett_isa_ref::{Argument, Budget, ClaimVerdict};
+    let object = Object::parse(&linked_inverse_certificate(false)).unwrap();
+    let owner = object.identity().unwrap().closure_hashes["addya"]
+        .clone()
+        .unwrap();
+    assert_eq!(object.verify_claim(&owner, 0).unwrap(), ClaimVerdict::Proof);
+    for steps in [3, 9] {
+        for x in 0..4 {
+            for y in 0..4 {
+                for a in 0..4 {
+                    let (mut q, mut b, wires) = quantum_input(x, y);
+                    b.args
+                        .insert("tk".into(), Argument::Token(Budget::steps(steps)));
+                    b.args.insert("a".into(), Argument::Bits(a));
+                    let before = q.clone();
+                    object
+                        .execute_action_with_token_aliases("addya", &mut q, &b, false, &[], &[0])
+                        .unwrap();
+                    assert_eq!(q.read_basis(&wires).unwrap(), ((x + y + a) & 3) | (y << 2));
+                    object
+                        .execute_action_with_token_aliases("addya", &mut q, &b, true, &[], &[0])
+                        .unwrap();
+                    assert_eq!(q, before);
+                }
+            }
+        }
+    }
+}
+
+fn loop_certificate(iterations: usize) -> String {
+    let text = published_source()
+        .replace("\"bounds\":[]", &format!("\"bounds\":[{iterations}]"))
+        .replace(
+            "(tk:token, a:i2) ()\n^entry():",
+            &format!("(tk:token, a:i2) ()\nregs {{  }} bounds {{{iterations}}}\n^entry():"),
+        )
+        .replace(
+            "qinplace @g @ginv tk x (y) () (a)",
+            &format!("qloop {iterations} {{\nqinplace @g @ginv tk x (y) () (a)\n}}"),
+        )
+        + "\n";
+    inverse_certificate_for(&support::rehash(&text))
+}
+#[test]
+fn zero_trip_qinplace_requires_inventory_but_has_no_applicability_visit() {
+    let text = loop_certificate(0);
+    let bound = change_certificate(&text, |c| {
+        fields(fields(c).get_mut("bindings").unwrap())
+            .insert("invocation".into(), root_invocation(2, 1));
+    });
+    let reports = Object::parse(&bound).unwrap().verify_certificate().unwrap();
+    assert_eq!(
+        reports[0].qinplace_applicability,
+        Some(bennett_isa_ref::QinplaceApplicability::Established)
+    );
+    let missing = change_certificate(&bound, |c| {
+        let record = fields(fields(c).get_mut("regions").unwrap())
+            .values_mut()
+            .next()
+            .unwrap();
+        fields(record).insert("claims".into(), support::json("[]"));
+        fields(fields(record).get_mut("verification").unwrap())
+            .insert("inverse_pairs".into(), support::json("[]"));
+    });
+    let error = Object::parse(&missing)
+        .unwrap()
+        .verify_certificate()
+        .unwrap_err();
+    assert!(error.to_string().contains("K92"), "{error}");
+}
+#[test]
+fn nested_qinplace_below_minimum_rejects_in_checker_and_before_execution() {
+    use bennett_isa_ref::{Argument, Budget};
+    let text = change_certificate(&loop_certificate(1), |c| {
+        fields(fields(c).get_mut("bindings").unwrap())
+            .insert("invocation".into(), root_invocation(2, 1));
+    });
+    let object = Object::parse(&text).unwrap();
+    let error = object.verify_certificate().unwrap_err();
+    assert!(
+        error.to_string().contains("no covering inverse-pair entry"),
+        "{error}"
+    );
+    let (mut q, mut b, _) = quantum_input(0, 0);
+    b.args
+        .insert("tk".into(), Argument::Token(Budget::steps(2)));
+    b.args.insert("a".into(), Argument::Bits(1));
+    let before = q.clone();
+    let error = object
+        .execute_action_with_token_aliases("addya", &mut q, &b, false, &[], &[0])
+        .unwrap_err();
+    assert!(
+        error.to_string().contains("no covering inverse-pair entry"),
+        "{error}"
+    );
+    assert_eq!(q, before);
+}
+#[test]
+fn library_reuse_preserves_the_proved_minimum_and_argument_domain() {
+    let text = linked_inverse_certificate(false);
+    let object = Object::parse(&text).unwrap();
+    let owner = object.identity().unwrap().closure_hashes["addya"]
+        .clone()
+        .unwrap();
+    let too_small = change_certificate(&text, |c| {
+        let record = fields(fields(c).get_mut("regions").unwrap())
+            .get_mut(&owner)
+            .unwrap();
+        let entries = fields(fields(record).get_mut("verification").unwrap())
+            .get_mut("inverse_pairs")
+            .unwrap();
+        let bennett_isa_ref::json::Json::Array(entries) = entries else {
+            panic!("entries")
+        };
+        fields(&mut entries[0]).insert("budget".into(), support::json("[2,0,0,0]"));
+    });
+    let error = Object::parse(&too_small)
+        .unwrap()
+        .verify_claim(&owner, 0)
+        .unwrap_err();
+    assert!(error.to_string().contains("token context"), "{error}");
+    let scoped = text.replace(
+        "\"hi\":3,\"lo\":0,\"name\":\"a\"",
+        "\"hi\":2,\"lo\":0,\"name\":\"a\"",
+    );
+    assert_ne!(scoped, text);
+    let uncovered = change_certificate(&scoped, |c| {
+        fields(fields(c).get_mut("bindings").unwrap())
+            .insert("invocation".into(), root_invocation(3, 3));
+    });
+    let error = Object::parse(&uncovered)
+        .unwrap()
+        .verify_certificate()
+        .unwrap_err();
+    assert!(
+        error.to_string().contains("no covering inverse-pair entry"),
+        "{error}"
+    );
+}
+
+fn transitive_certificate(include_inner: bool) -> String {
+    use bennett_isa_ref::json::Json;
+    let original = Object::parse(&(published_source().to_string() + "\n")).unwrap();
+    let mut symbols = original.section("symbols").unwrap().clone();
+    let mut inner = fields(&mut symbols)["2"].clone();
+    fields(&mut inner).insert("name".into(), Json::String("inner".into()));
+    fields(&mut symbols).insert("4".into(), inner);
+    let mut lines = original
+        .text
+        .lines()
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let i = lines.iter().position(|s| s == "section symbols").unwrap() + 1;
+    lines[i] = symbols.canonical();
+    let source = (lines.join("\n")+"\n").replace("qinplace @g @ginv tk x (y) () (a)", "action_call @inner (x) (y) () (tk, a)")
+        + "perm_action @inner (x:wire[2]) (y:wire[2] in) () (tk:token, a:i2) ()\n^entry():\nqinplace @g @ginv tk x (y) () (a)\n";
+    let object = support::rehash(&source);
+    let text = inverse_certificate_for(&object);
+    change_certificate(&text, |c| {
+        if include_inner {
+            let hash = object.identity().unwrap().closure_hashes["inner"]
+                .clone()
+                .unwrap();
+            let regions = fields(fields(c).get_mut("regions").unwrap());
+            let record = regions.values().next().unwrap().clone();
+            regions.insert(hash, record);
+        }
+    })
+}
+#[test]
+fn bound_reference_tree_checks_transitive_owner_and_actual_arguments() {
+    for (include_inner, steps) in [(false, 3), (true, 2), (true, 3), (true, 9)] {
+        let text = change_certificate(&transitive_certificate(include_inner), |c| {
+            fields(fields(c).get_mut("bindings").unwrap())
+                .insert("invocation".into(), root_invocation(steps, 1));
+        });
+        let result = Object::parse(&text).unwrap().verify_certificate();
+        if include_inner && steps >= 3 {
+            let reports = result.unwrap();
+            let inner = reports.iter().find(|r| r.region == "inner").unwrap();
+            assert_eq!(
+                inner.qinplace_applicability,
+                Some(bennett_isa_ref::QinplaceApplicability::Established)
+            );
+        } else {
+            let error = result.unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains("no covering inverse-pair entry in @inner"),
+                "{error}"
+            );
+        }
+    }
+}
+#[test]
+fn disabled_coherent_predicate_keeps_the_qinplace_obligation() {
+    let source = published_source().replace("qinplace @g @ginv tk x (y) () (a)", "c = qalloc any 1\nqif c {\nqinplace @g @ginv tk x (y) () (a)\n} {\nx x[0]\nx x[0]\n}\nqfree c") + "\n";
+    let text = change_certificate(&inverse_certificate_for(&support::rehash(&source)), |c| {
+        fields(fields(c).get_mut("bindings").unwrap())
+            .insert("invocation".into(), root_invocation(2, 1));
+    });
+    let error = Object::parse(&text)
+        .unwrap()
+        .verify_certificate()
+        .unwrap_err();
+    assert!(
+        error.to_string().contains("no covering inverse-pair entry"),
+        "{error}"
+    );
+}
+
+#[test]
+fn missing_library_body_reports_unestablished_and_cannot_execute() {
+    use bennett_isa_ref::{Argument, Budget, ClaimVerdict, QinplaceApplicability};
+    let text = linked_inverse_certificate(false);
+    let object = Object::parse(&text).unwrap();
+    let g = object.identity().unwrap().closure_hashes["g"]
+        .clone()
+        .unwrap();
+    let text = change_certificate(&text, |c| {
+        fields(fields(c).get_mut("regions").unwrap()).remove(&g);
+    });
+    let object = Object::parse(&text).unwrap();
+    let report = object.verify_certificate().unwrap().remove(0);
+    assert!(
+        matches!(report.verdict, ClaimVerdict::Unverified(_)),
+        "{report:?}"
+    );
+    assert!(
+        matches!(
+            report.qinplace_applicability,
+            Some(QinplaceApplicability::Unestablished(_))
+        ),
+        "{report:?}"
+    );
+    let (mut q, mut b, _) = quantum_input(0, 0);
+    b.args
+        .insert("tk".into(), Argument::Token(Budget::steps(3)));
+    b.args.insert("a".into(), Argument::Bits(1));
+    let before = q.clone();
+    let error = object
+        .execute_action_with_token_aliases("addya", &mut q, &b, false, &[], &[0])
+        .unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("unestablished qinplace applicability"),
+        "{error}"
+    );
+    assert_eq!(q, before);
 }

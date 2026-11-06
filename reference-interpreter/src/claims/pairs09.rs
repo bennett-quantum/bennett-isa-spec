@@ -188,6 +188,91 @@ fn full_quantum_domain(object: &Object, g: &Function, domain: &Json) -> Result<(
     Ok(())
 }
 impl Object {
+    /// Resolve the pair theorem, retaining its domain through library reuse.
+    /// Every link must bind the same closures and a covered token context.
+    pub(super) fn inverse_pair_theorem09(
+        &self,
+        closure: &str,
+        index: usize,
+        active: &mut BTreeSet<(String, usize)>,
+    ) -> Result<Option<(&Json, &Function)>> {
+        let key = (closure.to_string(), index);
+        if !active.insert(key.clone()) {
+            return err("§12.1 K4", "cyclic inverse-pair library reference");
+        }
+        let regions = self
+            .section("certificate")
+            .unwrap()
+            .get("regions")?
+            .object()?;
+        let Some(record) = regions.get(closure) else {
+            return Ok(None);
+        };
+        let claim = record
+            .get("claims")?
+            .array()?
+            .get(index)
+            .ok_or_else(|| Error::new("§12.1 K4: library claim index out of range".into()))?;
+        let owner = self.region_function(closure)?;
+        let entries = self.pair_claim_entries(owner, index)?;
+        let result = match claim.get("kind")?.string()? {
+            "exhaustive" if claim.get("expected")? == &Json::String("inverse_pair".into()) => {
+                self.validate_inverse_pair_claim09(owner, index, claim)?;
+                Some((claim, pair(self, entries[0])?.g))
+            }
+            "structural" if claim.get("rule")?.string()? == "inverse_pair_library" => {
+                let witness = claim.get("witness")?;
+                let library = witness.get("library_closure_hash")?.string()?;
+                let donor_index = usize::try_from(witness.get("claim_index")?.uint()?)
+                    .map_err(|_| crate::resource_error("§12.1 K4", "claim index exceeds host"))?;
+                let Some(theorem) = self.inverse_pair_theorem09(library, donor_index, active)?
+                else {
+                    return Ok(None);
+                };
+                let donor = self.region_function(library)?;
+                let donor_entries = self.pair_claim_entries(donor, donor_index)?;
+                for entry in entries {
+                    let current = pair(self, entry)?;
+                    let mut covered = false;
+                    for donor_entry in &donor_entries {
+                        let source = pair(self, donor_entry)?;
+                        let (g, gi) = (entry.get("g")?, entry.get("ginv")?);
+                        let (sg, si) = (donor_entry.get("g")?, donor_entry.get("ginv")?);
+                        let same_pair = (g == sg && gi == si) || (g == si && gi == sg);
+                        covered |= same_pair
+                            && current.budget.steps >= source.budget.steps
+                            && current.budget.heap >= source.budget.heap
+                            && current.budget.stack >= source.budget.stack
+                            && current.budget.depth >= source.budget.depth
+                            && current.aliases == source.aliases
+                            && current.g.params[4]
+                                .iter()
+                                .filter(|p| p.ty == Type::Token)
+                                .map(|p| current.tokens[&p.name])
+                                .eq(source.g.params[4]
+                                    .iter()
+                                    .filter(|p| p.ty == Type::Token)
+                                    .map(|p| source.tokens[&p.name]));
+                    }
+                    if !covered {
+                        return err(
+                            "§12.1 K4",
+                            "library theorem must cover the same resolved pair and token context",
+                        );
+                    }
+                }
+                Some(theorem)
+            }
+            _ => {
+                return err(
+                    "§12.1 K4",
+                    "entry claim is not an exhaustive or linked-library inverse-pair theorem",
+                )
+            }
+        };
+        active.remove(&key);
+        Ok(result)
+    }
     fn pair_claim_entries(&self, owner: &Function, index: usize) -> Result<Vec<&Json>> {
         let closure = self.identity()?.closure_hashes[&owner.name]
             .clone()

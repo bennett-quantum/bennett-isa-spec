@@ -106,3 +106,34 @@ The 180-second programme target is **not met** by this batch: conformance's
 tracked in `b-isa-spec-e923` for batch 2; the remaining `b-isa-spec-x6to`
 nits are also outside the batch-1 correctness fixes. Coverage is not remeasured
 in this batch. The complete repository gate is reserved for the orchestrator.
+
+
+## Certificate review remediation
+
+The follow-up keeps the standalone inverse-pair theorem distinct from executable
+applicability. `ClaimReport.qinplace_applicability` records either `Established`
+or `Unestablished(reason)` for a supplied qinplace owner. Static inventory includes
+nested sites and zero-trip loop bodies. Concrete root and standalone claim
+invocations check the transitive reference construction with each callee's actual
+tokens and arguments; coherent predicates retain their obligations. Missing
+owner-local pairs and uncovered bound sites reject through both public checking
+routes. Zero-trip loops have no dynamic applicability visits.
+
+Linked inverse-pair claims must resolve to an exhaustive pair theorem through an
+acyclic library chain. Every link preserves the exact resolved closure pair,
+minimum tuple, argument-token tuples, token partition and proved argument domain.
+The runtime accepts this library route in both orientations. The published
+Example 7 arithmetic and complete reversal are checked over every x, y and a at
+primary budgets 3 and 9, using an exhaustive donor with no domain on the library
+claim itself. A missing library body retains an unverified theorem and explicit
+unestablished applicability; execution rejects it before effects. Scheduled
+realisation trees and unsupported bound root kinds also remain explicitly
+unestablished rather than inheriting a reference-only acceptance.
+
+Five review regressions were run against an archived `b572e17` source tree before
+the implementation: missing owner inventory, uncovered bound minimum, omitted
+unestablished outcome, proof transfer to g/g, and valid library execution each
+failed for its intended semantic reason. The final suite also covers nested
+sites, zero-trip inventory, disabled controls, transitive owners, donor budget and
+argument-domain preservation, and missing library bodies. No published spec or
+fixture bytes changed.

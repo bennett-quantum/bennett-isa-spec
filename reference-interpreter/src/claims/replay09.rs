@@ -8,7 +8,7 @@ pub(super) struct Invocation {
     pub primary: Option<crate::BudgetToken>,
     pub controls: Vec<BitVector>,
     pub adjoint: bool,
-    budget: Budget,
+    pub budget: Budget,
 }
 
 struct ResolvedDomain {
@@ -112,7 +112,6 @@ impl Object {
         }
         // Variant is an open identifier selecting a realisation. It does not
         // change the region's reference semantics or imply an adjoint.
-        let adjoint = false;
         let invocation = if let Some(invocation) = claim.object()?.get("invocation") {
             invocation
         } else {
@@ -125,6 +124,14 @@ impl Object {
             }
             bindings.get("invocation")?
         };
+        self.decode_invocation09(invocation, f)
+    }
+
+    pub(super) fn decode_invocation09(
+        &self,
+        invocation: &Json,
+        f: &Function,
+    ) -> Result<Invocation> {
         let group = if f.kind == "oracle" { 4 } else { 3 };
         let args = invocation
             .get("args")?
@@ -163,7 +170,7 @@ impl Object {
             args: resolved.arguments,
             primary: resolved.primary,
             controls: Vec::new(),
-            adjoint,
+            adjoint: false,
             budget,
         })
     }
