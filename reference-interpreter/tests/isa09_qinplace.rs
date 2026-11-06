@@ -141,6 +141,35 @@ fn k4_inverse_pair_claim_binds_its_entry_and_quantified_arguments() {
         object.verify_claim(&closure, 0).unwrap(),
         bennett_isa_ref::ClaimVerdict::Proof
     );
+
+    let reports = object.verify_certificate().unwrap();
+    assert_eq!(reports.len(), 1);
+    assert_eq!(reports[0].verdict, bennett_isa_ref::ClaimVerdict::Proof);
+    assert!(reports[0].coverage.is_none());
+}
+
+#[test]
+fn inverse_pair_certificate_rejects_a_noninverse_and_an_unbound_claim() {
+    let object = Object::parse(&inverse_certificate()).unwrap();
+    let identity = object.identity().unwrap();
+    let gi = identity.closure_hashes["ginv"].as_ref().unwrap();
+    let g = identity.closure_hashes["g"].as_ref().unwrap();
+    let original = inverse_certificate();
+    let wrong = original.replace(&format!(r#""ginv":"{gi}""#), &format!(r#""ginv":"{g}""#));
+    assert_ne!(wrong, original);
+    let wrong = Object::parse(&wrong).unwrap();
+    let error = wrong.verify_certificate().unwrap_err();
+    assert!(error.to_string().contains("differs from x"), "{error}");
+    let no_entry = original.replace(
+        &format!(r#"[{{"budget":[3,0,0,0],"claim":0,"g":"{g}","ginv":"{gi}"}}]"#),
+        "[]",
+    );
+    assert_ne!(no_entry, original);
+    let error = Object::parse(&no_entry).unwrap_err();
+    assert!(
+        error.to_string().contains("owner-local entry binding"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -275,27 +304,61 @@ fn uncovered_pair_rejects_before_the_earliest_effect_of_the_region() {
     }
 }
 
-
 #[test]
 fn source_qinplace_adjoints_preserve_instruction_allocation_and_release_order() {
-    use bennett_isa_conformance::{json,ref_catalog::Machine,ref_language::permutation};
-    let object=Object::parse(&inverse_certificate()).unwrap();
-    let root=object.identity().unwrap().closure_hashes["addya"].clone().unwrap();
-    let args=json::parse(r#"["x","y",["3","0","0","0"],"1"]"#).unwrap();
-    for adjoint in [false,true] {
-        let leaves=object.expand_action_source_with_token_aliases("addya",args.as_arr().unwrap(),&[("x",2),("y",2)],adjoint,&[0]).unwrap();
-        let own=leaves.iter().filter(|l| l.source.as_ref().is_some_and(|s| s.terminal.symbol==root)).collect::<Vec<_>>();
-        let allocation=own.iter().filter(|l| l.gate=="alloc").map(|l| l.allocation.as_ref().unwrap().1).collect::<Vec<_>>();
-        let release=own.iter().filter(|l| l.gate=="release").map(|l| l.allocation.as_ref().unwrap().1).collect::<Vec<_>>();
-        assert_eq!(allocation,[2,4],"adjoint={adjoint}");
-        assert_eq!(release,[2,4],"adjoint={adjoint}");
-        let machine=Machine::compile(&permutation(&leaves).unwrap(),&[("x",2),("y",2)]).unwrap();
-        for x in 0..4 {for y in 0..4 {
-            let mut state=machine.state();machine.set(&mut state,"x",x);machine.set(&mut state,"y",y);let before=state.clone();
-            machine.run(&mut state,true,false).unwrap();
-            assert_eq!(machine.get(&state,"x"),if adjoint {(x+8-y-1)&3}else{(x+y+1)&3});
-            assert_eq!(machine.get(&state,"y"),y);
-            machine.run(&mut state,true,true).unwrap();assert_eq!(state,before);
-        }}
+    use bennett_isa_conformance::{json, ref_catalog::Machine, ref_language::permutation};
+    let object = Object::parse(&inverse_certificate()).unwrap();
+    let root = object.identity().unwrap().closure_hashes["addya"]
+        .clone()
+        .unwrap();
+    let args = json::parse(r#"["x","y",["3","0","0","0"],"1"]"#).unwrap();
+    for adjoint in [false, true] {
+        let leaves = object
+            .expand_action_source_with_token_aliases(
+                "addya",
+                args.as_arr().unwrap(),
+                &[("x", 2), ("y", 2)],
+                adjoint,
+                &[0],
+            )
+            .unwrap();
+        let own = leaves
+            .iter()
+            .filter(|l| l.source.as_ref().is_some_and(|s| s.terminal.symbol == root))
+            .collect::<Vec<_>>();
+        let allocation = own
+            .iter()
+            .filter(|l| l.gate == "alloc")
+            .map(|l| l.allocation.as_ref().unwrap().1)
+            .collect::<Vec<_>>();
+        let release = own
+            .iter()
+            .filter(|l| l.gate == "release")
+            .map(|l| l.allocation.as_ref().unwrap().1)
+            .collect::<Vec<_>>();
+        assert_eq!(allocation, [2, 4], "adjoint={adjoint}");
+        assert_eq!(release, [2, 4], "adjoint={adjoint}");
+        let machine =
+            Machine::compile(&permutation(&leaves).unwrap(), &[("x", 2), ("y", 2)]).unwrap();
+        for x in 0..4 {
+            for y in 0..4 {
+                let mut state = machine.state();
+                machine.set(&mut state, "x", x);
+                machine.set(&mut state, "y", y);
+                let before = state.clone();
+                machine.run(&mut state, true, false).unwrap();
+                assert_eq!(
+                    machine.get(&state, "x"),
+                    if adjoint {
+                        (x + 8 - y - 1) & 3
+                    } else {
+                        (x + y + 1) & 3
+                    }
+                );
+                assert_eq!(machine.get(&state, "y"), y);
+                machine.run(&mut state, true, true).unwrap();
+                assert_eq!(state, before);
+            }
+        }
     }
 }

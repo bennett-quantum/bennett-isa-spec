@@ -734,6 +734,14 @@ impl Object {
                 .get("subject")
                 .and_then(|s| s.object().ok())
                 .and_then(|s| s.get("schedule_hash"));
+            if let Some(bound_hash) = subject_schedule {
+                let schedule = self
+                    .section("schedule")
+                    .ok_or_else(|| Error::new("§12.1 K13: claim schedule is absent".into()))?;
+                if bound_hash.string()? != sha256_hex(schedule.canonical().as_bytes()) {
+                    return err("§12.1 K13", "claim schedule hash mismatch");
+                }
+            }
             if c.object()?.get("expected") == Some(&Json::String("oracle".into()))
                 && subject_schedule.is_none()
             {

@@ -335,16 +335,19 @@ impl Object {
         f: &Function,
     ) -> Result<Outcome> {
         if claim.get("expected")? == &Json::String("inverse_pair".into()) {
-            return err(
-                "§12.1 K4",
-                "inverse-pair claims require their entry binding",
-            );
+            return Ok(Outcome {
+                verdict: self.verify_inverse_pair_claim09(f, index, claim)?,
+                coverage: None,
+            });
         }
-        if claim.get("expected")? == &Json::String("oracle".into()) {
+        if claim
+            .get("subject")?
+            .object()?
+            .contains_key("schedule_hash")
+        {
             return Ok(Outcome {
                 verdict: ClaimVerdict::Unverified(
-                    "expected oracle needs realised target/schedule execution (deliverables 9–11)"
-                        .into(),
+                    "scheduled subject needs realised target/schedule execution".into(),
                 ),
                 coverage: None,
             });
