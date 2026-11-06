@@ -201,7 +201,9 @@ fn r21_resource_child() {
                 if n <= 8 {
                     assert_eq!(q.bundle(r.unwrap()).unwrap().len(), n);
                 } else {
-                    resource(r, "§4.3");
+                    // Qreg handle/class-vector storage is §3.3; dense
+                    // quantum-state materialisation below remains §4.3.
+                    resource(r, "§3.3");
                 }
                 let mut q = QuantumRegisters::new();
                 let id = q.allocate(8).unwrap();
