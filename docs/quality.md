@@ -77,8 +77,32 @@ python3 -I reference-interpreter/tools/publish-cli.py "$CARGO_TARGET_DIR/debug/b
 /usr/bin/time -v timeout 1800 cargo test --offline -j3 --manifest-path conformance/Cargo.toml --no-fail-fast -- --test-threads=4
 ```
 
-Full default-crate measurements are still running at this checkpoint.
-The 180-second programme target is not met by this batch: conformance's
-1,048,320-tuple call-interface test alone took 337.93 s. Runtime reduction
-is tracked in `b-isa-spec-e923` for batch 2; the remaining `b-isa-spec-x6to`
-nits are also outside the batch-1 correctness fixes.
+Verified at 2026-11-06 07:33:36 UTC. Both complete default
+commands above exited 0 under the 8 GiB address-space cap.
+
+| Crate | Passed | Ignored | Wall (min:sec) | Peak RSS (KiB) | Exit |
+|---|---:|---:|---:|---:|---:|
+| reference-interpreter | 653 | 6 | 19:08.93 | 1,591,284 | 0 |
+| conformance | 129 | 0 | 25:39.00 | 723,100 | 0 |
+
+The reference final run reused compiled artifacts; the conformance measurement
+includes its initial test build. These runs overlapped on a shared Linux host,
+so the numbers describe the observed commands rather than isolated benchmarks.
+The reference's six ignores comprise five existing exhaustive sweeps and the
+new named slow forwarding witness. Conformance has no ignored tests.
+
+The original qinplace and register-capacity failures were reproduced before
+their fixes. The first whole reference run also exposed an older controlled-table
+test that expected the false realised `Proof`; its final test now checks
+`Unverified` for the unchanged scheduled fixture and proves the full table
+through an explicit reference-only invocation. The final complete rerun passed.
+
+Both crates also pass `cargo fmt --check` with their manifest paths. Interpreter
+library/binary linting passed:
+`cargo clippy --offline -j3 --manifest-path reference-interpreter/Cargo.toml --lib --bins -- -D warnings`.
+
+The 180-second programme target is **not met** by this batch: conformance's
+1,048,320-tuple call-interface test alone took 337.93 s. Runtime reduction is
+tracked in `b-isa-spec-e923` for batch 2; the remaining `b-isa-spec-x6to`
+nits are also outside the batch-1 correctness fixes. Coverage is not remeasured
+in this batch. The complete repository gate is reserved for the orchestrator.
