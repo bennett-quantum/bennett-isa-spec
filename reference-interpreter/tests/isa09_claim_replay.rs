@@ -171,12 +171,69 @@ fn standalone_oracle_binds_its_own_argument_budget_and_complete_interface() {
     }
 }
 #[test]
-fn published_full_tuple_tables_verify_as_proof() {
+fn published_full_tuple_tables_prove_only_the_bound_reference_relation() {
     for source in [BASE, CONTROLLED] {
-        assert_eq!(
-            verify_root(&Object::parse(source).unwrap()).unwrap(),
-            ClaimVerdict::Proof
-        );
+        let object = Object::parse(source).unwrap();
+        let certificate = object.section("certificate").unwrap();
+        let root = certificate
+            .get("bindings")
+            .unwrap()
+            .get("closure_hash")
+            .unwrap()
+            .string()
+            .unwrap();
+        let claim = &certificate
+            .get("regions")
+            .unwrap()
+            .get(root)
+            .unwrap()
+            .get("claims")
+            .unwrap()
+            .array()
+            .unwrap()[0];
+        if claim
+            .get("subject")
+            .unwrap()
+            .object()
+            .unwrap()
+            .contains_key("schedule_hash")
+        {
+            assert!(matches!(
+                verify_root(&object).unwrap(),
+                ClaimVerdict::Unverified(_)
+            ));
+            let root_report = |o: &Object| {
+                o.verify_certificate()
+                    .unwrap()
+                    .into_iter()
+                    .find(|r| r.closure_hash == root && r.index == 0)
+                    .unwrap()
+            };
+            assert!(matches!(
+                root_report(&object).verdict,
+                ClaimVerdict::Unverified(_)
+            ));
+            // Keep the published table as a full reference-semantic oracle,
+            // without misrepresenting it as execution of its realisation.
+            let invocation = certificate
+                .get("bindings")
+                .unwrap()
+                .get("invocation")
+                .unwrap()
+                .clone();
+            let reference = changed(source, |claim| {
+                fields(fields(claim).get_mut("subject").unwrap()).remove("schedule_hash");
+                fields(claim).insert("invocation".into(), invocation);
+            });
+            assert_eq!(verify_root(&reference).unwrap(), ClaimVerdict::Proof);
+            assert_eq!(root_report(&reference).verdict, ClaimVerdict::Proof);
+            assert_eq!(
+                reference.identity().unwrap().object_hash,
+                object.identity().unwrap().object_hash
+            );
+        } else {
+            assert_eq!(verify_root(&object).unwrap(), ClaimVerdict::Proof);
+        }
     }
 }
 #[test]
