@@ -1,10 +1,10 @@
 //! Device token identities are not tuple identities. Only validated host/device
 //! minting constructs a handle; integer values cannot fabricate one.
 use crate::{err, Budget, ClassicalValue, Object, Result};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{
     atomic::{AtomicU64, Ordering},
-    Arc,
+    Arc, RwLock, Weak,
 };
 
 #[derive(Debug)]
@@ -29,14 +29,40 @@ fn fresh(counter: &AtomicU64) -> Result<u64> {
         .map_err(|_| crate::resource_error("§5.4", "token/run identity namespace exhausted"))
 }
 
+/// The owning machine publishes its active mint frames after each committed
+/// step. Handles keep only a weak reference, so closing a run revokes them too.
+#[derive(Debug)]
+pub(crate) struct TokenRun {
+    pub id: u64,
+    active: RwLock<BTreeSet<u64>>,
+}
+impl TokenRun {
+    pub fn new(id: u64) -> Self {
+        Self {
+            id,
+            active: RwLock::new(BTreeSet::new()),
+        }
+    }
+    pub fn publish(&self, active: &BTreeSet<u64>) -> Result<()> {
+        self.active
+            .write()
+            .map_err(|_| crate::Error::new("§5.4 K3: mint validity lock poisoned".into()))?
+            .clone_from(active);
+        Ok(())
+    }
+}
+#[derive(Clone, Debug)]
+enum TokenOrigin {
+    Host,
+    Device(Weak<TokenRun>),
+}
+
 #[derive(Clone, Debug)]
 pub struct BudgetToken {
     namespace: Arc<TokenNamespace>,
     id: u64,
     tuple: Budget,
-    /// None is a host token, valid for the loaded program. A device mint is
-    /// tied to one run; its active mint-frame set determines revocation.
-    run: Option<u64>,
+    origin: TokenOrigin,
     oracle: String,
 }
 impl PartialEq for BudgetToken {
@@ -65,9 +91,26 @@ impl BudgetToken {
         active: &std::collections::BTreeSet<u64>,
     ) -> bool {
         self.for_program(object)
-            && self
-                .run
-                .is_none_or(|owner| owner == run && active.contains(&self.id))
+            && match &self.origin {
+                TokenOrigin::Host => true,
+                TokenOrigin::Device(owner) => owner
+                    .upgrade()
+                    .is_some_and(|owner| owner.id == run && active.contains(&self.id)),
+            }
+    }
+    fn mint_is_live(&self) -> Result<bool> {
+        match &self.origin {
+            TokenOrigin::Host => Ok(true),
+            TokenOrigin::Device(owner) => {
+                let Some(owner) = owner.upgrade() else {
+                    return Ok(false);
+                };
+                let active = owner.active.read().map_err(|_| {
+                    crate::Error::new("§5.4 K3: mint validity lock poisoned".into())
+                })?;
+                Ok(active.contains(&self.id))
+            }
+        }
     }
 }
 impl Object {
@@ -172,7 +215,7 @@ impl Object {
         &self,
         oracle: &str,
         tuple: Budget,
-        run: Option<u64>,
+        run: Option<&Arc<TokenRun>>,
     ) -> Result<BudgetToken> {
         if self.isa_version != crate::IsaVersion::V09 {
             return err("§5.4", "device token identities require ISA 0.9");
@@ -185,7 +228,10 @@ impl Object {
             namespace: self.tokens.clone(),
             id: fresh(&self.tokens.next)?,
             tuple,
-            run,
+            origin: match run {
+                Some(run) => TokenOrigin::Device(Arc::downgrade(run)),
+                None => TokenOrigin::Host,
+            },
             oracle: oracle.into(),
         })
     }
@@ -320,6 +366,9 @@ impl Object {
         for t in known.iter().flatten() {
             if !t.for_program(self) {
                 return err("§5.4 K91", "E_ARG: foreign token identity");
+            }
+            if !t.mint_is_live()? {
+                return err("§5.4 K3", "E_ARG: revoked or expired device token");
             }
         }
         let labels = if let Some(labels) = aliases {

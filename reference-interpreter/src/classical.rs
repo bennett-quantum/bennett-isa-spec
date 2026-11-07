@@ -378,7 +378,7 @@ pub struct HostExchange {
     pub reply: Retained<u8>,
 }
 pub struct ClassicalMachine<'a> {
-    run_id: u64,
+    token_run: std::sync::Arc<crate::tokens::TokenRun>,
     object: &'a Object,
     state: ClassicalSnapshot,
     history: Vec<HistoryFrame>,
@@ -564,7 +564,7 @@ impl<'a> ClassicalMachine<'a> {
             quantum: registers,
         };
         Ok(Self {
-            run_id,
+            token_run: std::sync::Arc::new(crate::tokens::TokenRun::new(run_id)),
             object,
             state: state.clone(),
             history: Vec::new(),
@@ -964,7 +964,7 @@ impl<'a> ClassicalMachine<'a> {
         let (groups, memory, args, budget) = if oracle {
             let token = match self.read(&a[1])? {
                 ClassicalValue::DeviceToken(token) => {
-                    if !token.valid(self.object, self.run_id, &self.state.valid_tokens) {
+                    if !token.valid(self.object, self.token_run.id, &self.state.valid_tokens) {
                         return Err(trap(Error::new(
                             "§5.4: revoked or foreign budget token".into(),
                         )));
@@ -1086,7 +1086,7 @@ impl<'a> ClassicalMachine<'a> {
                 ClassicalValue::F64(bits) => Argument::Float(f64::from_bits(bits)),
                 ClassicalValue::Token(b) => Argument::Token(b),
                 ClassicalValue::DeviceToken(token) => {
-                    if !token.valid(self.object, self.run_id, &self.state.valid_tokens) {
+                    if !token.valid(self.object, self.token_run.id, &self.state.valid_tokens) {
                         return Err(trap(Error::new(
                             "§5.4: revoked or foreign token argument".into(),
                         )));
@@ -1211,6 +1211,7 @@ impl<'a> ClassicalMachine<'a> {
             if !self.state.valid_tokens.remove(&id) {
                 return err("§7.4 K3", "mint frame has no live token to revoke");
             }
+            self.token_run.publish(&self.state.valid_tokens)?;
         }
         if !undo.bytes.is_empty() {
             self.state
@@ -1423,7 +1424,10 @@ impl<'a> ClassicalMachine<'a> {
         let draws = self.measurement_draws.clone();
         let rng = self.measurement_rng;
         match run(self, &state) {
-            Ok(value) => Ok(value),
+            Ok(value) => {
+                self.token_run.publish(&self.state.valid_tokens)?;
+                Ok(value)
+            }
             Err(error) => {
                 self.state = state;
                 if let Some(history) = history {
@@ -1438,6 +1442,7 @@ impl<'a> ClassicalMachine<'a> {
                 }
                 self.measurement_draws = draws;
                 self.measurement_rng = rng;
+                self.token_run.publish(&self.state.valid_tokens)?;
                 Err(error)
             }
         }
@@ -1598,7 +1603,7 @@ impl<'a> ClassicalMachine<'a> {
                             depth: self.bits(&a[4])?,
                         };
                         let token = object
-                            .token_for(a[0].trim_start_matches('@'), tuple, Some(self.run_id))
+                            .token_for(a[0].trim_start_matches('@'), tuple, Some(&self.token_run))
                             .map_err(trap)?;
                         let id = token.id();
                         if !self.state.valid_tokens.insert(id) {

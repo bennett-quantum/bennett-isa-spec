@@ -236,7 +236,18 @@ fn observer_rollback_discards_token_validity_and_retry_mints_a_new_identity() {
     let ClassicalValue::DeviceToken(accepted) = &result.values[0] else {
         panic!("minted token")
     };
-    assert_ne!(*accepted, rejected.unwrap());
+    let rejected = rejected.unwrap();
+    assert_ne!(*accepted, rejected);
+    let input = bennett_isa_ref::OracleInput {
+        ins: vec![1],
+        ..Default::default()
+    };
+    assert!(object
+        .run_oracle_with_token("id", &input, &rejected)
+        .is_err());
+    assert!(
+        bennett_isa_ref::OracleMachine::new_with_token(&object, "id", &input, &rejected).is_err()
+    );
     machine.reverse().unwrap();
     assert_eq!(machine.snapshot(), before);
 }
@@ -404,4 +415,55 @@ fn public_cli_alias_requests_execute_reverse_and_replay_without_serializing_ids(
         );
         assert_eq!(std::fs::read_to_string(&tape).unwrap(), "preserve\n");
     }
+}
+
+#[test]
+fn reversed_mint_tokens_reject_both_public_oracle_entry_paths() {
+    use bennett_isa_ref::{OracleInput, OracleMachine};
+    let object = program();
+    let args = [1, 0, 0, 0].map(|v| ClassicalValue::int(64, v).unwrap());
+    let mut mint = ClassicalMachine::new(&object, "mint", &args, &[]).unwrap();
+    let before = mint.snapshot();
+    let result = mint.run(20).unwrap();
+    let ClassicalValue::DeviceToken(token) = &result.values[0] else {
+        panic!("device token")
+    };
+    let input = OracleInput {
+        ins: vec![1],
+        ..Default::default()
+    };
+    assert_eq!(
+        object
+            .run_oracle_with_token("id", &input, token)
+            .unwrap()
+            .payload,
+        1
+    );
+    let mut oracle = OracleMachine::new_with_token(&object, "id", &input, token).unwrap();
+    oracle.forward_step().unwrap();
+    assert_eq!(oracle.commit(0, 0).unwrap(), (1, 0));
+    mint.reverse().unwrap();
+    assert_eq!(mint.snapshot(), before);
+    assert!(object.run_oracle_with_token("id", &input, token).is_err());
+    assert!(OracleMachine::new_with_token(&object, "id", &input, token).is_err());
+}
+
+#[test]
+fn device_tokens_expire_when_their_owning_run_is_dropped() {
+    use bennett_isa_ref::{OracleInput, OracleMachine};
+    let object = program();
+    let args = [1, 0, 0, 0].map(|v| ClassicalValue::int(64, v).unwrap());
+    let token = {
+        let mut mint = ClassicalMachine::new(&object, "mint", &args, &[]).unwrap();
+        let ClassicalValue::DeviceToken(token) = mint.run(20).unwrap().values[0].clone() else {
+            panic!("device token")
+        };
+        token
+    };
+    let input = OracleInput {
+        ins: vec![1],
+        ..Default::default()
+    };
+    assert!(object.run_oracle_with_token("id", &input, &token).is_err());
+    assert!(OracleMachine::new_with_token(&object, "id", &input, &token).is_err());
 }

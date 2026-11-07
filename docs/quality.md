@@ -265,3 +265,18 @@ The existing source lexical-alias regression passed in both runs. All runs are
 headless with the job's private TMPDIR/CARGO_TARGET_DIR, an 8 GiB address-space
 cap, disabled core dumps and four test threads. Full validation is recorded below
 when complete; these focused results do not claim a full gate.
+
+Device mint handles now consult their owning run's published active mint frames
+at the shared invocation-token resolver. Reversed frames and observer rollback
+revoke escaped handles; closing the owning machine expires them. Both
+`run_oracle_with_token` and `OracleMachine::new_with_token` reject these handles
+before execution, while live tokens still run the one-row identity and nested
+CC/R region calls. The mint suite passes all 13 tests:
+
+```sh
+timeout 600 cargo test --offline -j3 --manifest-path reference-interpreter/Cargo.toml --test isa09_budget_mint -- --test-threads=4
+```
+
+The added closed-run and extended observer-rollback checks also failed before the
+token fix (three intended mint failures in `c1-token-red.log`) and passed after
+it (`c1-token-green.log`).
