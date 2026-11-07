@@ -3853,6 +3853,14 @@ adjoint. The claim's own §12.3 `invocation` binds its classical arguments,
 budget and K91 token identities, or quantifies over all of them in the
 existing parameter-uniform form. [deps: ISA-5.3, ISA-5.6, ISA-12.3]
 
+Resolve rotation angles through positional classical forwarding in the
+checked source closure. A nonfinite angle at a concrete invocation violates
+the source premise and rejects (§3.1, §4.4, K20). A parameter-uniform angle
+proof quantifies over source-admissible invocations satisfying that finiteness
+precondition; it does not certify nonfinite concrete angle bindings. Unused
+`f64` data arguments retain their existing bit-pattern encodings.
+[deps: ISA-3.1, ISA-4.4, ISA-11.1, ISA-12.3]
+
 The checker MUST check the following finite syntactic premises, including
 nested bodies, both `qif` arms and zero-trip loop bodies:
 
@@ -3869,7 +3877,13 @@ nested bodies, both `qif` arms and zero-trip loop bodies:
    signature, bounds, read-only/control, version, lifetime/cleanup and borrow
    conditions of §§3–6 MUST hold; matching syntax alone cannot waive them.
    Every referenced function and data definition in the dependency closure
-   MUST be linked before the checker establishes this theorem. Recursive
+   MUST be linked before the checker establishes this theorem. This includes
+   the data images and applicable layout dependencies selected by §9.2 for
+   every reached definition, not only explicit instruction operands. Check
+   current type invariants, including positive widths. For a zero-trip body,
+   check entry/exit live-name and type agreement and predicate-stack balance
+   before discarding its hypothetical exit state; same-name/same-type
+   rebinding and legal version changes remain permitted. Recursive
    lifted dependencies are visited as a finite definition graph, not unrolled.
 3. Each listed subclaim MUST independently return **established/proof** under
    its own rule and binding. Subclaims are optional additional conjunctive

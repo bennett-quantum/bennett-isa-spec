@@ -106,6 +106,7 @@ impl Object {
         let mut reached = BTreeSet::new();
         self.adjoint_source09(f, &mut reached, &mut unavailable)?;
         self.validate_adjoint_source09(&reached)?;
+        self.validate_adjoint_angles09(f, invocation)?;
         for sub in claim.get("subclaims")?.array()? {
             let s = usize::try_from(sub.uint()?).map_err(|_| {
                 Error::new("§12.1 adjoint_table: subclaim index exceeds usize".into())
@@ -156,6 +157,19 @@ impl Object {
         }
         if !seen.insert(f.name.clone()) {
             return Ok(());
+        }
+        // §9.2 includes every global image and the block image in each
+        // oracle's closure, even without an explicit @ operand in its rows.
+        if f.kind == "oracle" {
+            if let Some(layout) = self.section("layout") {
+                for (name, global) in layout.get("globals")?.object()? {
+                    seen.insert(name.clone());
+                    seen.insert(global.get("image")?.string()?.into());
+                }
+                if let Some(image) = layout.object()?.get("block_image") {
+                    seen.insert(image.string()?.into());
+                }
+            }
         }
         for block in &f.blocks {
             self.adjoint_dependencies09(f, &block.instructions, seen, unavailable)?;
@@ -230,6 +244,20 @@ impl Object {
             };
             imports.retain(|name, _| reached.contains(name));
         }
+        let oracles = source
+            .functions
+            .iter()
+            .filter(|(_, f)| f.kind == "oracle")
+            .map(|(name, _)| name.clone())
+            .collect::<BTreeSet<_>>();
+        if let Some(layout) = source.metadata.get_mut("layout") {
+            let Json::Object(layout) = layout else {
+                return err("§12.1 adjoint_table", "layout must be an object");
+            };
+            if let Some(Json::Object(interfaces)) = layout.get_mut("interface_regions") {
+                interfaces.retain(|name, _| oracles.contains(name));
+            }
+        }
         let scope = format!("§12.1 adjoint_table source closure {reached:?}");
         source
             .validate_metadata_types()
@@ -238,6 +266,9 @@ impl Object {
             .validate_metadata_versions()
             .map_err(|e| e.context(&scope))?;
         source.validate_symbols().map_err(|e| e.context(&scope))?;
+        if !oracles.is_empty() {
+            source.validate_layout().map_err(|e| e.context(&scope))?;
+        }
         source
             .validate_local_schemas()
             .map_err(|e| e.context(&scope))?;

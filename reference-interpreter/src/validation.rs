@@ -168,7 +168,14 @@ impl Object {
                         return err("§4.6", "qloop selector width mismatch");
                     }
                     if n == 0 {
-                        self.validate_action_sequence(f, &i.bodies[0], &mut s.clone())?;
+                        let mut exit = s.clone();
+                        self.validate_action_sequence(f, &i.bodies[0], &mut exit)?;
+                        if exit.types != s.types {
+                            return err("§4.6", "loop body altered live names or types");
+                        }
+                        if exit.predicates != s.predicates {
+                            return err("§3.5", "loop body altered predicate stack");
+                        }
                         continue;
                     }
                     let initial_predicates = s.predicates.clone();

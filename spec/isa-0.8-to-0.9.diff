@@ -2443,7 +2443,7 @@
  void           bennett_sched_request_free(bennett_sched_request_t*);
  bennett_status bennett_sched_schedule(const bennett_sched_request_t*, bennett_sched_response_t** out);
  typedef enum { BENNETT_SCHED_OK, BENNETT_SCHED_INFEASIBLE, BENNETT_SCHED_UNSUPPORTED } bennett_sched_outcome;
-@@ -1247,69 +2762,1259 @@
+@@ -1247,69 +2762,1273 @@
  schedule MUST keep the ordinals of the operations they keep and MAY
  remove only operations the library marks removable.
  
@@ -3563,6 +3563,14 @@
 +budget and K91 token identities, or quantifies over all of them in the
 +existing parameter-uniform form. [deps: ISA-5.3, ISA-5.6, ISA-12.3]
 +
++Resolve rotation angles through positional classical forwarding in the
++checked source closure. A nonfinite angle at a concrete invocation violates
++the source premise and rejects (§3.1, §4.4, K20). A parameter-uniform angle
++proof quantifies over source-admissible invocations satisfying that finiteness
++precondition; it does not certify nonfinite concrete angle bindings. Unused
++`f64` data arguments retain their existing bit-pattern encodings.
++[deps: ISA-3.1, ISA-4.4, ISA-11.1, ISA-12.3]
++
 +The checker MUST check the following finite syntactic premises, including
 +nested bodies, both `qif` arms and zero-trip loop bodies:
 +
@@ -3579,7 +3587,13 @@
 +   signature, bounds, read-only/control, version, lifetime/cleanup and borrow
 +   conditions of §§3–6 MUST hold; matching syntax alone cannot waive them.
 +   Every referenced function and data definition in the dependency closure
-+   MUST be linked before the checker establishes this theorem. Recursive
++   MUST be linked before the checker establishes this theorem. This includes
++   the data images and applicable layout dependencies selected by §9.2 for
++   every reached definition, not only explicit instruction operands. Check
++   current type invariants, including positive widths. For a zero-trip body,
++   check entry/exit live-name and type agreement and predicate-stack balance
++   before discarding its hypothetical exit state; same-name/same-type
++   rebinding and legal version changes remain permitted. Recursive
 +   lifted dependencies are visited as a finite definition graph, not unrolled.
 +3. Each listed subclaim MUST independently return **established/proof** under
 +   its own rule and binding. Subclaims are optional additional conjunctive
@@ -3733,7 +3747,7 @@
  `error` entry (§12.3) is a **common upper bound over all contexts** of
  its key; the multiplicity composition of §12.3 is sound for that reason.
  
-@@ -1325,7 +4030,10 @@
+@@ -1325,7 +4044,10 @@
  rejects): Y − J(Φ) ⪰ 0, Y + J(Φ) ⪰ 0, mu·I − Tr_out(Y) ⪰ 0 (partial trace
  over the output factor), and mu ≤ `bound`; then ‖Φ‖◇ ≤ mu (the dual of
  Watrous's SDP with Y₀ = Y₁ = Y; this is the diamond norm itself, not
@@ -3745,7 +3759,7 @@
  hi, im_lo, im_hi]` (decimal strings). **Positivity test.** The checker
  proves each of the three matrices **positive definite** by an interval
  Cholesky (or Hermitian LDL†) factorisation in which the interval lower
-@@ -1335,33 +4043,422 @@
+@@ -1335,33 +4057,422 @@
  strictly feasible by replacing Y with Y + δI and mu with mu′ = mu + δ·(d
  + 1) for a small rational δ > 0 (any mu′ > mu + δ·d suffices): then Y ±
  J(Φ) ⪰ δI ≻ 0 and, since Tr_out(Y + δI) = Tr_out(Y) + δ·d·I, mu′·I −
@@ -4177,7 +4191,7 @@
                                                     fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
              cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },
              error:   { "<variant>:<inherited_controls>": { local: { "operator_norm"?: v, "diamond"?: v }, inclusive: { "operator_norm"?: v, "diamond"?: v } } },
-@@ -1369,6 +4466,426 @@
+@@ -1369,6 +4480,426 @@
    composition { multiplicities: { "<hash>:<variant>:<inherited_controls>": n (from the realised schedule) }, epsilon_total: { "diamond": v }, method: "sum_over_multiplicities" }
  ```
  
@@ -4604,7 +4618,7 @@
  `inclusive(R, key) = local(R, key) + Σ_callees n_c × inclusive(c, key_c)`
  **per metric**, keyed like `cleanup` by `<variant>:<inherited_controls>`
  (the realised error depends on both); every `local` value is a verified
-@@ -1380,27 +4897,49 @@
+@@ -1380,27 +4911,49 @@
  variants) require `operator_norm` bounds throughout. A controlled
  unitary variant requires a `numerical` claim; an ε > 0 realisation
  compared as a channel requires a `channel` claim. Executable claims
@@ -4660,7 +4674,7 @@
  ### 14.2 Quantum state semantics
  
  The state of a Q region is a vector in ⊗ over live wires in allocation
-@@ -1422,10 +4961,20 @@
+@@ -1422,10 +4975,20 @@
  - **T3 (permutation theorem).** If the realised unitary V of a circuit on
    span(D) is a permutation matrix and the final basis tuple equals P(x)
    for every x ∈ D, then V|span(D) = P.
@@ -4685,7 +4699,7 @@
  - **T5.** As §6.3.
  - **T6 (executor agreement).** Two executors conforming to §3–§7 on one
    target with the same schedule produce on every x ∈ D the same final
-@@ -1437,16 +4986,57 @@
+@@ -1437,16 +5000,57 @@
  
  ## 15. Conformance suites
  
@@ -4750,7 +4764,7 @@
  
  ## 16. Canonical textual form (normative)
  
-@@ -1458,7 +5048,17 @@
+@@ -1458,7 +5062,17 @@
  `INT := -?(0|[1-9][0-9]*)`; `FLOAT :=` shortest round-trip decimal with
  `.` or exponent, finite; `STRING := "…"` with escapes `\"`, `\\`, `\n`;
  `HEX := ([0-9a-f]{2})*`. Metadata lines are RFC 8785 canonical JSON
@@ -4769,7 +4783,7 @@
  
  ### 16.2 Grammar
  
-@@ -1472,10 +5072,10 @@
+@@ -1472,10 +5086,10 @@
    dataline  := NAME SP HEX NL
    function  := fhead NL regs? block+
    fhead     := ("fn" SP ("cc"|"r") | "oracle" | "action" | "perm_action" | "lproc") SP "@" NAME SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")"
@@ -4783,7 +4797,7 @@
    regs      := "regs" SP "{" SP (NAME ":" type ("," SP NAME ":" type)*)? SP "}" (SP "bounds" SP "{" INT ("," SP INT)* "}")? NL
    block     := "^" NAME "(" plist "):" NL instr+
    instr     := (lhs SP "=" SP)? OPCODE (SP operand)* (SP "{" NL instr+ "}" (SP "{" NL instr+ "}")?)? NL
-@@ -1485,16 +5085,38 @@
+@@ -1485,16 +5099,38 @@
    VER       := INT "." INT
  ```
  
@@ -4825,7 +4839,7 @@
  
  section functions
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
-@@ -1509,9 +5131,9 @@
+@@ -1509,9 +5145,9 @@
  empty and its envelope is exactly these bytes (each line LF-terminated):
  
  ```
@@ -4837,7 +4851,7 @@
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
  regs { one:reg[8], r:reg[8] }
  ^entry():
-@@ -1521,17 +5143,19 @@
+@@ -1521,17 +5157,19 @@
  ```
  
  With B ≥ 3 every x yields `(x + 1 mod 256, 0)` (`result_val` = 0 ⊕ r);
@@ -4860,7 +4874,7 @@
  
  section functions
  oracle @sum_db (n:wire[8] in) (t:wire[8]) (f:wire[4]) (db:region[4,8] in) ()
-@@ -1590,13 +5214,13 @@
+@@ -1590,13 +5228,13 @@
  is SHA-256 of the ASCII `<scc_hash hex>:0`:
  
  ```
@@ -4877,7 +4891,7 @@
  lift.boundscheck zp 1
  zv = lift.load.i8 zp
  z = lift.icmp.eq n zv
-@@ -1614,21 +5238,392 @@
+@@ -1614,21 +5252,392 @@
  ^done():
  lift.ret acc
  data zero 00
@@ -5276,7 +5290,7 @@
  ## 17. Decisions deferred to implementation, with defaults
  
  Each item is one an implementer must decide to build; any decision is
-@@ -1652,15 +5647,60 @@
+@@ -1652,15 +5661,60 @@
     level. Default: the library `ref` published by `bennett-isa-spec`
     (ripple-carry adders and comparators, linear `inrange` scans,
     one-hot address dispatch, clean scratch released in reverse order);
@@ -5341,7 +5355,7 @@
  10. **`any`-class resolution** (§11). Default: the first class in JCS
      order with capacity.
  11. **Occupancy rate of a class absent from `rate`** (§8.2). Default: 1.
-@@ -1669,7 +5709,65 @@
+@@ -1669,7 +5723,65 @@
  13. **Suite sizes** (§15): the exhaustive widths of suite C and the
      sample counts of `sampled` claims. Default: exhaustive for ≤ 16
      interface bits; 2^16 samples above.

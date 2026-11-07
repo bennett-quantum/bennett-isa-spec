@@ -1124,6 +1124,15 @@ impl Object {
     }
     pub(crate) fn validate_function(&self, f: &Function) -> Result<()> {
         f.validate_body_shape()?;
+        for p in f
+            .params
+            .iter()
+            .flatten()
+            .chain(&f.regs)
+            .chain(f.blocks.iter().flat_map(|b| &b.params))
+        {
+            Type::parse(&p.ty.text())?;
+        }
         let lifted = matches!(f.kind.as_str(), "oracle" | "lproc");
         let mut types = BTreeMap::new();
         for p in f
@@ -1533,7 +1542,7 @@ impl Object {
         }
         Ok(())
     }
-    fn validate_layout(&self) -> Result<()> {
+    pub(crate) fn validate_layout(&self) -> Result<()> {
         let Some(l) = self.section("layout") else {
             for f in self.functions.values() {
                 if f.kind == "lproc"

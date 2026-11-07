@@ -476,3 +476,184 @@ fn loader_empty_body_diagnostics_remain_byte_identical() {
         assert_eq!(Object::parse(&text).unwrap_err().to_string(), diagnostic);
     }
 }
+
+fn zero_trip_source(body: &str) -> String {
+    let sig = r#"{"abi":"0.9","args":[],"bounds":[0],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}"#;
+    support::object(&[("a", sig, &format!("perm_action @a (x:wire mut) () () () ()\nregs {{  }} bounds {{0}}\n^entry():\nqloop 0 {{\n{body}\n}}"))], "{}", "").replace("0.8", "0.9")
+}
+fn rejects_zero_trip_body(body: &str, tag: &str) {
+    let text = zero_trip_source(body);
+    match Object::parse(&text) {
+        Err(e) => assert!(
+            e.to_string().contains("§4.6") || e.to_string().contains("§3.5"),
+            "{e}"
+        ),
+        Ok(_) => {
+            let base = support::rehash(&text);
+            base.check_hashes().unwrap();
+            let path = std::path::PathBuf::from(std::env::var("TMPDIR").unwrap())
+                .join(format!("zero-trip-{tag}.bisa"));
+            std::fs::write(path, &base.text).unwrap();
+            let (o, root) = with_claim(&base, false);
+            let verdict = o.verify_claim(&root, 0);
+            assert!(verdict.is_err(), "malformed zero-trip {tag}: {verdict:?}");
+            assert!(o.verify_certificate().is_err());
+        }
+    }
+}
+#[test]
+fn zero_trip_unmatched_allocation_rejects() {
+    rejects_zero_trip_body("d = qalloc any 1", "allocation");
+}
+#[test]
+fn zero_trip_unmatched_predicate_rejects() {
+    rejects_zero_trip_body("qpred x", "predicate");
+}
+#[test]
+fn zero_trip_balanced_lifetimes_and_version_changes_prove() {
+    for body in ["d = qalloc any 1\nqfree d", "qpred x\nqunpred x", "x x[0]"] {
+        let base = support::rehash(&zero_trip_source(body));
+        let (o, root) = with_claim(&base, false);
+        assert_eq!(o.verify_claim(&root, 0).unwrap(), ClaimVerdict::Proof);
+        assert_eq!(
+            o.verify_certificate().unwrap().claims[0].verdict,
+            ClaimVerdict::Proof
+        );
+    }
+}
+
+#[test]
+fn zero_trip_same_name_same_type_rebinding_proves() {
+    let mut text = zero_trip_source("qfree d\nd = qalloc any 1")
+        .replace("^entry():\n", "^entry():\nd = qalloc any 1\n");
+    text.push_str("qfree d\n");
+    let base = support::rehash(&text);
+    let (o, root) = with_claim(&base, false);
+    assert_eq!(o.verify_claim(&root, 0).unwrap(), ClaimVerdict::Proof);
+    assert_eq!(
+        o.verify_certificate().unwrap().claims[0].verdict,
+        ClaimVerdict::Proof
+    );
+}
+
+#[test]
+fn current_zero_trip_exit_premises_reject_through_both_apis() {
+    for body in ["d = qalloc any 1\nqfree d", "qpred x\nqunpred x"] {
+        let base = support::rehash(&zero_trip_source(body));
+        let (mut o, root) = with_claim(&base, false);
+        o.functions.get_mut("a").unwrap().blocks[0].instructions[0].bodies[0].pop();
+        rejects_current_definition(&o, &root, "a");
+    }
+}
+
+fn angle_object(forward: bool, used: bool) -> Object {
+    let sig = r#"{"abi":"0.9","args":["f64"],"bounds":[],"in":[],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
+    let root_body = if forward {
+        "action_call @z (x) () () (theta)"
+    } else if used {
+        "rx theta x[0]"
+    } else {
+        "x x[0]"
+    };
+    let root = format!("action @a (x:wire mut) () () (theta:f64) ()\n^entry():\n{root_body}");
+    let child = "action @z (x:wire mut) () () (phi:f64) ()\n^entry():\nrz phi x[0]";
+    let mut functions = vec![("a", sig, root.as_str())];
+    if forward {
+        functions.push(("z", sig, child));
+    }
+    support::rehash(&support::object(&functions, "{}", "").replace("0.8", "0.9"))
+}
+fn angle_claim(bits: u64) -> Json {
+    support::json(&CLAIM.replace(
+        r#""args":"all","budget":"all""#,
+        &format!(r#""args":["0x{bits:016x}"],"budget":["0","0","0","0"]"#),
+    ))
+}
+#[test]
+fn nonfinite_concrete_rotation_angles_reject() {
+    for bits in [0x7ff0000000000000, 0xfff0000000000000, 0x7ff8000000000001] {
+        let (text, root) = attach(&angle_object(false, true), vec![angle_claim(bits)]);
+        let o = Object::parse(&text).unwrap();
+        o.check_hashes().unwrap();
+        rejects_current_definition(&o, &root, "a");
+    }
+}
+#[test]
+fn nonfinite_forwarded_rotation_angles_reject() {
+    for bits in [0x7ff0000000000000, 0x7ff8000000000001] {
+        let (text, root) = attach(&angle_object(true, true), vec![angle_claim(bits)]);
+        let o = Object::parse(&text).unwrap();
+        o.check_hashes().unwrap();
+        rejects_current_definition(&o, &root, "z");
+    }
+}
+#[test]
+fn finite_symbolic_and_unused_nonfinite_f64_arguments_prove() {
+    for forward in [false, true] {
+        let base = angle_object(forward, true);
+        for claim in [
+            angle_claim(0),
+            angle_claim(0x3ff0000000000000),
+            support::json(CLAIM),
+        ] {
+            let (text, root) = attach(&base, vec![claim]);
+            let o = Object::parse(&text).unwrap();
+            assert_eq!(o.verify_claim(&root, 0).unwrap(), ClaimVerdict::Proof);
+            assert_eq!(
+                o.verify_certificate().unwrap().claims[0].verdict,
+                ClaimVerdict::Proof
+            );
+        }
+    }
+    let (text, root) = attach(
+        &angle_object(false, false),
+        vec![angle_claim(0x7ff8000000000001)],
+    );
+    assert_eq!(verify(&text, &root, 0).unwrap(), ClaimVerdict::Proof);
+}
+
+#[test]
+fn reached_zero_width_register_rejects_current_type() {
+    use bennett_isa_ref::{Instruction, Param, Type};
+    let (mut o, root) = lifted_dependencies(true);
+    assert_eq!(o.verify_claim(&root, 0).unwrap(), ClaimVerdict::Proof);
+    let worker = o.functions.get_mut("worker").unwrap();
+    worker.regs.push(Param {
+        name: "zero".into(),
+        ty: Type::Reg(0),
+        role: None,
+    });
+    worker.blocks[0].instructions.insert(
+        0,
+        Instruction {
+            lhs: vec!["zero".into()],
+            op: "lift.mov".into(),
+            operands: vec!["zero".into()],
+            bodies: vec![],
+            line: 0,
+        },
+    );
+    rejects_current_definition(&o, &root, "worker");
+}
+#[test]
+fn implicit_oracle_layout_data_signature_rejects() {
+    let layout = "\nsection layout\n{\"A_tab\":1,\"H\":8,\"S_cells\":0,\"globals\":{\"g\":{\"base\":1,\"image\":\"g\",\"size\":1}},\"heap_base\":16,\"heap_limit_max\":0,\"interface_regions\":{},\"null_size\":1,\"ptr_width\":32}\n";
+    let base = support::rehash(&support::object_with_data(&[
+        ("a", TOKEN_ACTION, "perm_action @a (x:wire mut) () () (tk:token) ()\n^entry():\nf = qalloc any 4\noracle_call @z tk () x f () ()\noracle_call @z tk () x f () ()\nqfree f"),
+        ("z", EMPTY_ORACLE, "oracle @z () (t:wire) (f:wire[4]) () ()\nregs { r:reg[1] }\n^entry():\nr = lift.const.i1 1\nlift.retval r"),
+    ], &[("g", "00")], layout).replace("0.8", "0.9"));
+    let (mut o, root) = with_claim(&base, true);
+    assert_eq!(o.verify_claim(&root, 0).unwrap(), ClaimVerdict::Proof);
+    let symbols = fields(o.metadata.get_mut("symbols").unwrap());
+    let g = symbols
+        .values_mut()
+        .find(|s| s.get("name").unwrap().string().unwrap() == "g")
+        .unwrap();
+    fields(fields(g).get_mut("signature").unwrap()).insert("size".into(), support::json("2"));
+    let new_root = o.identity().unwrap().closure_hashes["a"].clone().unwrap();
+    let certificate = o.metadata.get_mut("certificate").unwrap();
+    let regions = fields(fields(certificate).get_mut("regions").unwrap());
+    let record = regions.remove(&root).unwrap();
+    regions.insert(new_root.clone(), record);
+    rejects_current_definition(&o, &new_root, "g");
+}
