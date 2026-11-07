@@ -263,8 +263,8 @@ timeout 600 cargo test --offline -j3 --manifest-path reference-interpreter/Cargo
 Logs are private job artifacts (`c1-baseline-red.log`, `c1-council-focused.log`).
 The existing source lexical-alias regression passed in both runs. All runs are
 headless with the job's private TMPDIR/CARGO_TARGET_DIR, an 8 GiB address-space
-cap, disabled core dumps and four test threads. Full validation is recorded below
-when complete; these focused results do not claim a full gate.
+cap, disabled core dumps and four test threads. Full crate validation is recorded below; these focused results do not claim a
+full gate.
 
 Device mint handles now consult their owning run's published active mint frames
 at the shared invocation-token resolver. Reversed frames and observer rollback
@@ -301,3 +301,30 @@ timeout 900 cargo test --offline -j3 --manifest-path reference-interpreter/Cargo
 Both crates also passed `timeout 120 cargo fmt --manifest-path <crate>/Cargo.toml
 -- --check` and `timeout 600 cargo clippy --offline -j3 --manifest-path
 <crate>/Cargo.toml --lib --bins -- -D warnings`.
+
+Full crate validation completed at **2026-11-07 08:10:22 UTC**, on the unchanged
+production code from `7fc37fd` (run head `d3d906d` adds evidence only). Both full
+default commands ran sequentially under the same headless 8 GiB cap:
+
+```sh
+timeout 2400 cargo test --offline -j3 --manifest-path reference-interpreter/Cargo.toml -- --test-threads=4
+BENNETT_CONFORMANCE_BIN="$CARGO_TARGET_DIR/debug/bennett-isa-ref" timeout 2400 cargo test --offline -j3 --manifest-path conformance/Cargo.toml -- --test-threads=4
+```
+
+- Reference: **677 passed, six existing ignores**, exit 0, **5:28.36 wall**,
+  **1591476 KiB maximum RSS**.
+- Conformance: **129 passed, no ignores**, exit 0, **9:08.00 wall**,
+  **722896 KiB maximum RSS**. The selected private interpreter binary contains
+  the mint-validity fix; its SHA-256 is retained with the run evidence.
+
+The named lexical-alias check also passed on its own (one test, exit 0):
+
+```sh
+timeout 180 cargo test --offline -j3 --manifest-path reference-interpreter/Cargo.toml --test isa09_qinplace source_qinplace_adjoints_preserve_instruction_allocation_and_release_order -- --test-threads=4
+```
+
+Completed logs, statuses and measurements are private artifacts named
+`c1-full-reference.*`, `c1-full-conformance.*`, `c1-conformance-binary.sha256` and
+`c1-alias.log`. No full repository gate, gate tool or sibling gate ran. The
+180-second runtime target and the broader quality programme remain open; this
+validation covers the scoped semantic fixes.
