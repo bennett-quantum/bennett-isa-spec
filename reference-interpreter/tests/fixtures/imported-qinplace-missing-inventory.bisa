@@ -1,0 +1,15 @@
+bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"4dc068f587f3c82dc1bddc8ae32860be149ddffe595c038d6cef77e047fad31a","kind":"perm_action","name":"addya","signature":{"abi":"0.9","args":["token","i2"],"bounds":[],"in":[2],"kind":"perm_action","mem":[],"mut":[2],"tier":"q"}}}
+
+section imports
+{"g":{"pinned_closure_hash":"0d65d926275688cfebf2831c1de960b03a6b8ea6400866e6d9fef8f393ca2c2e","signature":{"abi":"0.9","args":["i2"],"fault":4,"in":[2,2],"kind":"oracle","mem":[],"tgt":2,"tier":"q"}},"ginv":{"pinned_closure_hash":"786f1970ca3d78ef3d5de795411ee276286711c89b756872757c24f9bd569cc9","signature":{"abi":"0.9","args":["i2"],"fault":4,"in":[2,2],"kind":"oracle","mem":[],"tgt":2,"tier":"q"}}}
+
+section functions
+perm_action @addya (x:wire[2]) (y:wire[2] in) () (tk:token, a:i2) ()
+^entry():
+qinplace @g @ginv tk x (y) () (a)
+
+section certificate
+{"bindings":{"closure_hash":"5999b6d3d2362f8c1971ef6f37b404766aa5c18f6ba1880d767bfde351e47392","dialect_mapping_version":"k84-vectors.1","interface_hash":"4dc068f587f3c82dc1bddc8ae32860be149ddffe595c038d6cef77e047fad31a","invocation":{"args":[["3","0","0","0"],"1"],"budget":["0","0","0","0"],"token_aliases":[0]},"object_hash":"a6214cd11a94baed6b7fff9c06079c26e58141040922594d971f71fe798c6d03","reference_program_hash":"5999b6d3d2362f8c1971ef6f37b404766aa5c18f6ba1880d767bfde351e47392","target_hash":"0000000000000000000000000000000000000000000000000000000000000000"},"composition":{"epsilon_total":{"diamond":0},"method":"sum_over_multiplicities","multiplicities":{}},"producer":{"materialisation":{"llvm_version":"none","normaliser_version":"1","pipeline":"k84-vectors"},"name":"conformance","version":"1"},"regions":{"5999b6d3d2362f8c1971ef6f37b404766aa5c18f6ba1880d767bfde351e47392":{"bounds":[],"claims":[],"cleanup":{},"definedness_assumptions":[],"error":{"forward:0":{"inclusive":{"operator_norm":0},"local":{"operator_norm":0}}},"frame":{"ancillae":[],"borrow":[],"history":[],"scratch":[],"slots":[{"class":"any","id":"mut:0","role":"mut","width":2},{"class":"any","id":"in:0","role":"in","width":2}]},"gates_used":{},"kind":"perm_action","resources":{},"signature":{"abi":"0.9","args":["token","i2"],"bounds":[],"in":[2],"kind":"perm_action","mem":[],"mut":[2],"tier":"q"},"verification":{"borrow_frames":[],"channel":[],"fault_rate":{"domain":{"borrowed":[],"bundles":[],"regions":[]},"faults_by_code":{},"layout_dependent_excluded":0,"undefined_excluded":0},"inverse_pairs":[],"oracle":null,"unitary":[]}}},"versions":{"cert":"0.9","coverage":"0.9","isa":"0.9","launch":"0.9","object":"0.9","sched":"0.9","target":"0.9"}}

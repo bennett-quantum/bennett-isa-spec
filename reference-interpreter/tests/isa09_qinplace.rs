@@ -437,6 +437,316 @@ fn checker_rejects_missing_owner_local_qinplace_inventory() {
         .unwrap_err();
     assert!(error.to_string().contains("K92"), "{error}");
 }
+
+#[test]
+fn imported_pair_requires_owner_inventory_before_missing_body_outcome() {
+    assert_imported_pair_requires_inventory(true);
+}
+#[test]
+fn imported_pair_requires_static_owner_inventory_without_invocation() {
+    assert_imported_pair_requires_inventory(false);
+}
+fn assert_imported_pair_requires_inventory(invocation: bool) {
+    let witness = include_str!("fixtures/imported-qinplace-missing-inventory.bisa");
+    let text = change_certificate(witness, |c| {
+        if !invocation {
+            fields(fields(c).get_mut("bindings").unwrap()).remove("invocation");
+        }
+    });
+    let object = Object::parse(&text).unwrap();
+    object.check_hashes().unwrap();
+    let imports = object.section("imports").unwrap();
+    assert_eq!(
+        imports
+            .get("g")
+            .unwrap()
+            .get("pinned_closure_hash")
+            .unwrap()
+            .string()
+            .unwrap(),
+        "0d65d926275688cfebf2831c1de960b03a6b8ea6400866e6d9fef8f393ca2c2e"
+    );
+    assert_eq!(
+        imports
+            .get("ginv")
+            .unwrap()
+            .get("pinned_closure_hash")
+            .unwrap()
+            .string()
+            .unwrap(),
+        "786f1970ca3d78ef3d5de795411ee276286711c89b756872757c24f9bd569cc9"
+    );
+    let error = object
+        .verify_certificate()
+        .expect_err("missing imported pair inventory must reject");
+    assert!(
+        error
+            .to_string()
+            .contains("§12.3 K92: missing owner-local inverse-pair entry in @addya"),
+        "invocation={invocation}: {error}"
+    );
+}
+
+#[test]
+fn local_pair_requires_owner_inventory_with_and_without_invocation() {
+    for invocation in [true, false] {
+        let text = change_certificate(&inverse_certificate(), |c| {
+            if invocation {
+                fields(fields(c).get_mut("bindings").unwrap())
+                    .insert("invocation".into(), root_invocation(3, 1));
+            }
+            let record = fields(fields(c).get_mut("regions").unwrap())
+                .values_mut()
+                .next()
+                .unwrap();
+            fields(record).insert("claims".into(), support::json("[]"));
+            fields(fields(record).get_mut("verification").unwrap())
+                .insert("inverse_pairs".into(), support::json("[]"));
+        });
+        let object = Object::parse(&text).unwrap();
+        object.check_hashes().unwrap();
+        let error = object
+            .verify_certificate()
+            .expect_err("missing local pair inventory must reject");
+        assert!(
+            error
+                .to_string()
+                .contains("§12.3 K92: missing owner-local inverse-pair entry in @addya"),
+            "invocation={invocation}: {error}"
+        );
+    }
+}
+
+#[test]
+fn imported_pair_rejects_invalid_referenced_claim_before_missing_body_outcome() {
+    let text = change_certificate(
+        include_str!("fixtures/imported-qinplace-missing-inventory.bisa"),
+        |c| {
+            let record = fields(fields(c).get_mut("regions").unwrap())
+                .values_mut()
+                .next()
+                .unwrap();
+            fields(record).insert("claims".into(), support::json(r#"[{"kind":"structural","rule":"adjoint_table","subclaims":[],"witness":{},"invocation":{"args":"all","budget":"all","token_aliases":"all"}}]"#));
+            fields(fields(record).get_mut("verification").unwrap()).insert("inverse_pairs".into(), support::json(r#"[{"g":"0d65d926275688cfebf2831c1de960b03a6b8ea6400866e6d9fef8f393ca2c2e","ginv":"786f1970ca3d78ef3d5de795411ee276286711c89b756872757c24f9bd569cc9","claim":0,"budget":[3,0,0,0]}]"#));
+        },
+    );
+    let object = Object::parse(&text).unwrap();
+    object.check_hashes().unwrap();
+    let error = object
+        .verify_certificate()
+        .expect_err("invalid referenced claim must reject even without pair bodies");
+    assert!(
+        error
+            .to_string()
+            .contains("entry claim is not an exhaustive or linked-library inverse-pair theorem"),
+        "{error}"
+    );
+}
+
+#[test]
+fn imported_pair_inventory_resolves_pins_in_either_orientation_without_proof_replay() {
+    use bennett_isa_ref::{ClaimVerdict, QinplaceApplicability};
+    let witness = include_str!("fixtures/imported-qinplace-missing-inventory.bisa");
+    let imported = Object::parse(witness).unwrap();
+    let imports = imported.section("imports").unwrap();
+    let g = imports
+        .get("g")
+        .unwrap()
+        .get("pinned_closure_hash")
+        .unwrap()
+        .string()
+        .unwrap();
+    let gi = imports
+        .get("ginv")
+        .unwrap()
+        .get("pinned_closure_hash")
+        .unwrap()
+        .string()
+        .unwrap();
+    for reverse in [false, true] {
+        let text = change_certificate(witness, |c| {
+            fields(fields(c).get_mut("bindings").unwrap()).remove("invocation");
+            let record = fields(fields(c).get_mut("regions").unwrap())
+                .values_mut()
+                .next()
+                .unwrap();
+            fields(record).insert("claims".into(), support::json(&format!(r#"[{{"kind":"structural","rule":"inverse_pair_library","subclaims":[],"witness":{{"library_closure_hash":"{g}","claim_index":0}},"invocation":{{"args":"all","budget":"all","token_aliases":"all"}}}}]"#)));
+            let (eg, ei) = if reverse { (gi, g) } else { (g, gi) };
+            fields(fields(record).get_mut("verification").unwrap()).insert(
+                "inverse_pairs".into(),
+                support::json(&format!(
+                    r#"[{{"g":"{eg}","ginv":"{ei}","claim":0,"budget":[3,0,0,0]}}]"#
+                )),
+            );
+        });
+        let object = Object::parse(&text).unwrap();
+        object.check_hashes().unwrap();
+        let report = object.verify_certificate().unwrap();
+        assert!(
+            matches!(report.claims[0].verdict, ClaimVerdict::Unverified(_)),
+            "{report:?}"
+        );
+        assert!(
+            matches!(
+                report.claims[0].qinplace_applicability,
+                Some(QinplaceApplicability::Unestablished(_))
+            ),
+            "{report:?}"
+        );
+    }
+}
+
+#[test]
+fn unresolved_action_callee_cannot_hide_another_supplied_owners_missing_inventory() {
+    let (object, _) = pinned_import_qinplace_certificate(true);
+    let object = Object::parse(
+        &(object
+            .text
+            .split_once("section certificate\n")
+            .unwrap()
+            .0
+            .trim_end()
+            .to_string()
+            + "\n"),
+    )
+    .unwrap();
+    let inner = object.identity().unwrap().closure_hashes["inner"]
+        .clone()
+        .unwrap();
+    let text = change_certificate(&inverse_certificate_for(&object), |c| {
+        fields(fields(c).get_mut("bindings").unwrap())
+            .insert("invocation".into(), root_invocation(3, 1));
+        let regions = fields(fields(c).get_mut("regions").unwrap());
+        let mut record = regions.values().next().unwrap().clone();
+        fields(&mut record).insert("claims".into(), support::json("[]"));
+        fields(fields(&mut record).get_mut("verification").unwrap())
+            .insert("inverse_pairs".into(), support::json("[]"));
+        regions.clear();
+        regions.insert(inner, record);
+    });
+    let object = Object::parse(&text).unwrap();
+    object.check_hashes().unwrap();
+    let error = object.verify_certificate().unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("§12.3 K92: missing owner-local inverse-pair entry in @inner"),
+        "{error}"
+    );
+}
+
+#[test]
+fn unresolved_oracle_body_cannot_hide_supplied_owner_inventory() {
+    use bennett_isa_ref::{json::Json, QinplaceApplicability};
+    let original = Object::parse(&(published_source().to_string() + "\n")).unwrap();
+    let g = original.identity().unwrap().closure_hashes["g"]
+        .clone()
+        .unwrap();
+    let imports = format!(
+        r#"{{"missing":{{"pinned_closure_hash":"{g}","signature":{}}}}}"#,
+        original.functions["g"]
+            .signature_for(original.isa_version)
+            .canonical()
+    );
+    let source = support::rehash(&original.text.replace(
+        "\nsection functions\n",
+        &format!("\nsection imports\n{imports}\n\nsection functions\n"),
+    ));
+    let identity = source.identity().unwrap();
+    let text = change_certificate(&inverse_certificate_for(&source), |c| {
+        let bindings = fields(fields(c).get_mut("bindings").unwrap());
+        for key in ["closure_hash", "reference_program_hash"] {
+            bindings.insert(key.into(), Json::String(g.clone()));
+        }
+        bindings.insert(
+            "interface_hash".into(),
+            Json::String(identity.interface_hashes["g"].clone()),
+        );
+        bindings.insert(
+            "invocation".into(),
+            support::json(r#"{"args":["1"],"budget":["3","0","0","0"],"token_aliases":[0]}"#),
+        );
+        let record = fields(fields(c).get_mut("regions").unwrap())
+            .values_mut()
+            .next()
+            .unwrap();
+        fields(record).insert("claims".into(), support::json("[]"));
+        fields(fields(record).get_mut("verification").unwrap())
+            .insert("inverse_pairs".into(), support::json("[]"));
+    });
+    let object = Object::parse(&text).unwrap();
+    object.check_hashes().unwrap();
+    let error = object.verify_certificate().unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("§12.3 K92: missing owner-local inverse-pair entry in @addya"),
+        "{error}"
+    );
+    let text = change_certificate(&text, |c| {
+        fields(fields(c).get_mut("regions").unwrap()).clear();
+    });
+    let report = Object::parse(&text).unwrap().verify_certificate().unwrap();
+    assert!(
+        matches!(report.qinplace_applicability.get(&g), Some(QinplaceApplicability::Unestablished(reason)) if reason.contains("missing linked body for @missing")),
+        "{report:?}"
+    );
+}
+
+#[test]
+fn unavailable_library_still_rejects_malformed_owner_pair_context() {
+    assert_unavailable_library_rejects_owner_context(
+        "arg_tokens",
+        r#"{"absent":[3,0,0,0]}"#,
+        "arg_tokens must bind exactly",
+    );
+}
+#[test]
+fn unavailable_library_still_rejects_malformed_owner_alias_context() {
+    assert_unavailable_library_rejects_owner_context("token_aliases", "[]", "token_aliases");
+}
+fn assert_unavailable_library_rejects_owner_context(field: &str, value: &str, diagnostic: &str) {
+    let text = linked_inverse_certificate(false);
+    let object = Object::parse(&text).unwrap();
+    let identity = object.identity().unwrap();
+    let owner = identity.closure_hashes["addya"].as_ref().unwrap();
+    let library = identity.closure_hashes["g"].as_ref().unwrap();
+    let text = change_certificate(&text, |c| {
+        let regions = fields(fields(c).get_mut("regions").unwrap());
+        regions.remove(library);
+        let claims = fields(regions.get_mut(owner).unwrap())
+            .get_mut("claims")
+            .unwrap();
+        let bennett_isa_ref::json::Json::Array(claims) = claims else {
+            panic!("claims")
+        };
+        fields(&mut claims[0]).insert(
+            "invocation".into(),
+            support::json(r#"{"args":"all","budget":"all","token_aliases":"all"}"#),
+        );
+        let entries = fields(
+            fields(regions.get_mut(owner).unwrap())
+                .get_mut("verification")
+                .unwrap(),
+        )
+        .get_mut("inverse_pairs")
+        .unwrap();
+        let bennett_isa_ref::json::Json::Array(entries) = entries else {
+            panic!("entries")
+        };
+        fields(&mut entries[0]).insert(field.into(), support::json(value));
+    });
+    let object = Object::parse(&text).unwrap();
+    object.check_hashes().unwrap();
+    let error = object
+        .verify_certificate()
+        .expect_err("missing library must not hide malformed owner context");
+    assert!(error.to_string().contains(diagnostic), "{field}: {error}");
+    let error = object
+        .verify_claim(owner, 0)
+        .expect_err("standalone claim must reject malformed owner context");
+    assert!(error.to_string().contains(diagnostic), "{field}: {error}");
+}
 #[test]
 fn checker_rejects_bound_invocation_below_the_pair_minimum() {
     let text = change_certificate(&inverse_certificate(), |c| {

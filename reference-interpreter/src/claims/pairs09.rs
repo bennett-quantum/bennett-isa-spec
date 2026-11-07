@@ -8,6 +8,24 @@ pub(super) struct Pair<'a> {
     pub(super) tokens: BTreeMap<String, Budget>,
     pub(super) aliases: Vec<u64>,
 }
+pub(super) enum PairClaim {
+    Exhaustive,
+    Library,
+}
+pub(super) fn pair_claim(claim: &Json) -> Result<PairClaim> {
+    match claim.get("kind")?.string()? {
+        "exhaustive" if claim.get("expected")? == &Json::String("inverse_pair".into()) => {
+            Ok(PairClaim::Exhaustive)
+        }
+        "structural" if claim.get("rule")?.string()? == "inverse_pair_library" => {
+            Ok(PairClaim::Library)
+        }
+        _ => err(
+            "§12.1 K4",
+            "entry claim is not an exhaustive or linked-library inverse-pair theorem",
+        ),
+    }
+}
 fn entry_budget(value: &Json) -> Result<Budget> {
     let v = value.array()?;
     if v.len() != 4 {
@@ -215,22 +233,54 @@ impl Object {
             .get(index)
             .ok_or_else(|| Error::new("§12.1 K4: library claim index out of range".into()))?;
         let owner = self.region_function(closure)?;
-        let result = match claim.get("kind")?.string()? {
-            "exhaustive" if claim.get("expected")? == &Json::String("inverse_pair".into()) => {
+        let result = match pair_claim(claim)? {
+            PairClaim::Exhaustive => {
                 self.validate_inverse_pair_claim09(owner, index, claim)?;
                 Some((claim, pair(self, entry)?.g))
             }
-            "structural" if claim.get("rule")?.string()? == "inverse_pair_library" => {
+            PairClaim::Library => {
                 let witness = claim.get("witness")?;
                 let library = witness.get("library_closure_hash")?.string()?;
                 let donor_index = usize::try_from(witness.get("claim_index")?.uint()?)
                     .map_err(|_| crate::resource_error("§12.1 K4", "claim index exceeds host"))?;
-                if !regions.contains_key(library) {
-                    active.remove(&key);
-                    return Ok(None);
+                let identity = self.identity()?;
+                let mut pins = BTreeSet::new();
+                if let Some(imports) = self.section("imports") {
+                    for import in imports.object()?.values() {
+                        if let Some(pin) = import.object()?.get("pinned_closure_hash") {
+                            pins.insert(pin.string()?);
+                        }
+                    }
                 }
+                let mut bodies_available = true;
+                for hash in [entry.get("g")?.string()?, entry.get("ginv")?.string()?] {
+                    if !identity
+                        .closure_hashes
+                        .values()
+                        .any(|h| h.as_deref() == Some(hash))
+                    {
+                        if !pins.contains(hash) {
+                            return err(
+                                "§12.1 K4",
+                                "inverse-pair closure is neither local nor imported by pin",
+                            );
+                        }
+                        bodies_available = false;
+                    }
+                }
+                let current = if bodies_available {
+                    Some(pair(self, entry)?)
+                } else {
+                    None
+                };
+                let current = match (regions.contains_key(library), current) {
+                    (true, Some(current)) => current,
+                    _ => {
+                        active.remove(&key);
+                        return Ok(None);
+                    }
+                };
                 let donor = self.region_function(library)?;
-                let current = pair(self, entry)?;
                 let mut matched = None;
                 for donor_entry in self.pair_claim_entries(donor, donor_index)? {
                     let source = pair(self, donor_entry)?;
@@ -263,12 +313,6 @@ impl Object {
                     );
                 };
                 self.inverse_pair_theorem09(library, donor_index, donor_entry, active)?
-            }
-            _ => {
-                return err(
-                    "§12.1 K4",
-                    "entry claim is not an exhaustive or linked-library inverse-pair theorem",
-                )
             }
         };
         active.remove(&key);

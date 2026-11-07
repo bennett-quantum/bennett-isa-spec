@@ -92,22 +92,22 @@ impl Object {
         for (closure, record) in certificate.get("regions")?.object()? {
             let f = self.region_function(closure)?;
             for site in qinplace_sites(f) {
-                if let Some(name) = site.operands[..2]
+                let missing_body = site.operands[..2]
                     .iter()
-                    .find(|name| !self.functions.contains_key(name.trim_start_matches('@')))
-                {
-                    outcomes.insert(
-                        closure.clone(),
-                        QinplaceApplicability::Unestablished(format!(
-                            "missing linked body for {name}"
-                        )),
-                    );
-                    continue;
-                }
+                    .find(|name| !self.functions.contains_key(name.trim_start_matches('@')));
                 let hash = |name: &str| -> Result<&str> {
-                    identity.closure_hashes[name.trim_start_matches('@')]
-                        .as_deref()
-                        .ok_or_else(|| Error::new("§12.3 K92: unresolved qinplace closure".into()))
+                    let name = name.trim_start_matches('@');
+                    if let Some(hash) = identity.closure_hashes.get(name) {
+                        return hash.as_deref().ok_or_else(|| {
+                            Error::new("§12.3 K92: unresolved qinplace closure".into())
+                        });
+                    }
+                    self.section("imports")
+                        .map(|imports| imports.get(name)?.get("pinned_closure_hash")?.string())
+                        .transpose()?
+                        .ok_or_else(|| {
+                            Error::new(format!("§12.3 K92: unresolved qinplace closure @{name}"))
+                        })
                 };
                 let g = hash(&site.operands[0])?;
                 let gi = hash(&site.operands[1])?;
@@ -122,6 +122,13 @@ impl Object {
                     let index = usize::try_from(entry.get("claim")?.uint()?).map_err(|_| {
                         crate::resource_error("§12.3 K92", "claim index exceeds host")
                     })?;
+                    let claim = record.get("claims")?.array()?.get(index).ok_or_else(|| {
+                        Error::new("§12.3 K92: pair claim index out of range".into())
+                    })?;
+                    pairs09::pair_claim(claim)?;
+                    if missing_body.is_some() {
+                        continue;
+                    }
                     self.inverse_pair_theorem09(closure, index, entry, &mut BTreeSet::new())?;
                     self.verify_claim_guarded(closure, index, &mut BTreeSet::new())?;
                 }
@@ -133,9 +140,10 @@ impl Object {
                 }
                 outcomes.insert(
                     closure.clone(),
-                    QinplaceApplicability::Unestablished(
-                        "no resolved invocation establishes qinplace applicability".into(),
-                    ),
+                    QinplaceApplicability::Unestablished(match missing_body {
+                        Some(name) => format!("missing linked body for {name}"),
+                        None => "no resolved invocation establishes qinplace applicability".into(),
+                    }),
                 );
             }
         }

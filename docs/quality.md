@@ -328,3 +328,55 @@ Completed logs, statuses and measurements are private artifacts named
 `c1-alias.log`. No full repository gate, gate tool or sibling gate ran. The
 180-second runtime target and the broader quality programme remain open; this
 validation covers the scoped semantic fixes.
+
+## Missing-body rejection ordering
+
+K92's owner inventory is checked before any unavailable-body outcome. Local
+closure identities come from `identity.closure_hashes`; imported identities come
+from their §9.3 pins. An exact pair in either orientation is required even without
+`bindings.invocation`. Missing entries and references to another claim rule
+reject; unavailable pair bodies defer proof replay and retain `Unestablished`
+applicability. The imported witness is preserved verbatim in
+`reference-interpreter/tests/fixtures/imported-qinplace-missing-inventory.bisa`.
+
+The class sweep examined every added `continue`, `return` and `break` in
+`d46df99` and `7fc37fd`, including relocated exits and changed guard conditions:
+
+| Location / exit | Mandatory rejection ordering and regression |
+| --- | --- |
+| `certificate.rs::validate_claim`, subject-conflict error | Already rejects before replay; `scheduled_and_reference_relations_reject_conflicting_subject_closures` retains the scheduled/reference table/program matrix. |
+| `pairs09.rs::inverse_pair_theorem09`, missing donor `Ok(None)` | Another ordering defect: a parameter-uniform claim could hide malformed local owner `arg_tokens` or `token_aliases`. Local pair context now validates first. `unavailable_library_still_rejects_malformed_owner_pair_context` and `unavailable_library_still_rejects_malformed_owner_alias_context` check both public checker APIs. Pinned pair bodies may remain unavailable; undeclared pair closures reject. |
+| Same function, first covering donor `break` and no-covering-donor error | The break selects an alternative theorem binding; the error is a terminal rejection. Existing `library_proof_cannot_transfer_to_a_different_pair`, `library_reuse_preserves_the_proved_minimum_and_argument_domain`, and shared-claim entry-order/orientation matrices retain pair/context rejection and valid donor controls. |
+| `qinplace09.rs::check_qinplace_bindings09`, no-work guard and missing-pair-body `continue` | No-work requires neither imports nor local sites. The defective missing-body skip now follows exact pair presence, valid claim index and theorem-rule checks. New `imported_pair_requires_owner_inventory_before_missing_body_outcome`, `imported_pair_requires_static_owner_inventory_without_invocation`, `imported_pair_rejects_invalid_referenced_claim_before_missing_body_outcome`, and `local_pair_requires_owner_inventory_with_and_without_invocation` cover the rejections. `imported_pair_inventory_resolves_pins_in_either_orientation_without_proof_replay` retains valid inventory without inventing a proof. |
+| `qinplace09.rs::qinplace_coverage09`, no-work guard / missing callee body `continue` | Every supplied owner's static inventory is checked before invocation traversal. `unresolved_action_callee_cannot_hide_another_supplied_owners_missing_inventory` adds the ordering control. Both existing `pinned_import_*_local_qinplace_keeps_unresolved_root_obligation` tests retain absent-body outcomes without panic and linked positive controls. |
+| Same function, oracle missing-import `continue` | `unresolved_oracle_body_cannot_hide_supplied_owner_inventory` requires the visible owner's missing-pair rejection first; removing that record leaves the root `Unestablished`, naming the unavailable import. |
+| Same function, reached qinplace missing-pair-body `continue` | The new imported-pair rejection and theorem-rule tests bind a concrete root invocation; static obligations reject before this branch. Existing unresolved-root tests and the valid imported-pair inventory control retain unavailable-body outcomes. Execution still rejects unestablished applicability before effects. |
+| `tokens.rs::BudgetToken::mint_is_live`, expired owner `Ok(false)`; `resolve_invocation_tokens`, revoked-token error | The false result feeds an immediate K3 rejection, before token partition handling or effects. Existing `device_tokens_expire_when_their_owning_run_is_dropped`, `reversed_mint_tokens_reject_both_public_oracle_entry_paths`, and observer-rollback tests exercise both public entry paths and live-token controls. |
+
+`claims.rs` and `classical.rs` add no early exits in those commits. Existing
+zero-budget, zero-trip, predicate and argument-domain tests remain in the focused
+suite; their pre-existing traversal skips were not removed or weakened.
+
+The final regression file was copied into a private archive of exact `5b71208`
+with production sources unchanged. This command exited **101**, with **35 passed
+and five intended failures** (imported bound/static inventory, invalid referenced
+claim, malformed local token arguments and aliases hidden by a missing donor):
+
+```sh
+timeout 600 cargo test --offline -j3 --manifest-path .tmp/quality-isaref/tmp/c2-baseline-5b71208/reference-interpreter/Cargo.toml --test isa09_qinplace -- --test-threads=4
+```
+
+The baseline result is retained in private `c2-baseline-red.log`, `.status` and
+`.time` artifacts. Fixture-construction errors encountered before that final run
+were corrected and are not counted as production regressions.
+
+The corrected implementation passes **68 focused tests**, exit 0, **20.57 s
+wall**, **833928 KiB maximum RSS** (`c2-focused.log`, `.status`, `.time`):
+
+```sh
+timeout 900 cargo test --offline -j3 --manifest-path reference-interpreter/Cargo.toml --test isa09_qinplace --test isa09_claim_replay --test isa09_certificate --test isa09_budget_mint -- --test-threads=4
+```
+
+Both crates pass `timeout 120 cargo fmt --manifest-path <crate>/Cargo.toml --
+--check`, and `git diff --check` passes. These runs use the same headless private
+TMPDIR/target, 8 GiB address-space cap and four test threads as above.
