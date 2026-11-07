@@ -25,7 +25,7 @@ fn sol_r22_b01_false_proof_and_controls() {
                 ClaimVerdict::Evidence { elements: 4 }
             );
             assert_eq!(
-                o.verify_certificate().unwrap()[0].verdict,
+                o.verify_certificate().unwrap().claims[0].verdict,
                 ClaimVerdict::Evidence { elements: 4 }
             );
         }
@@ -205,7 +205,7 @@ fn r23_public_oracle_roles_and_explicit_region_cells() {
         .unwrap();
         p.check_hashes().unwrap();
         let verdict = p.verify_claim(&hash, 0).unwrap();
-        assert_eq!(p.verify_certificate().unwrap()[0].verdict, verdict);
+        assert_eq!(p.verify_certificate().unwrap().claims[0].verdict, verdict);
         verdict
     }
     let sig =

@@ -46,6 +46,14 @@ pub enum ClaimVerdict {
     Unverified(String),
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CertificateReport {
+    pub claims: Vec<ClaimReport>,
+    /// K92 obligations keyed by the owning or bound root closure. These survive
+    /// absent owner records and empty claim lists; a claim proof does not
+    /// discharge an unestablished invocation obligation.
+    pub qinplace_applicability: BTreeMap<String, QinplaceApplicability>,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ClaimReport {
     pub closure_hash: String,
     pub region: String,
@@ -654,7 +662,8 @@ impl Object {
         }))
     }
     /// Checks one claim of region `closure`. A false claim is an error; an
-    /// uncheckable one is `Unverified` with its reason.
+    /// uncheckable one is `Unverified` with its reason. This standalone verdict
+    /// does not establish executable applicability; see `verify_certificate`.
     pub fn verify_claim(&self, closure: &str, index: usize) -> Result<ClaimVerdict> {
         let verdict = self.verify_claim_guarded(closure, index, &mut BTreeSet::new())?;
         if self.isa_version == crate::IsaVersion::V09 {
@@ -884,8 +893,8 @@ impl Object {
         )
     }
     /// Checks every claim of the certificate: false claims are errors, and
-    /// the report lists each claim's verdict.
-    pub fn verify_certificate(&self) -> Result<Vec<ClaimReport>> {
+    /// the report lists each claim's verdict and independent K92 obligations.
+    pub fn verify_certificate(&self) -> Result<CertificateReport> {
         let certificate = self
             .section("certificate")
             .ok_or_else(|| Error::new("§12: object has no certificate".into()))?;
@@ -939,7 +948,10 @@ impl Object {
                 self.check_borrow_independence(f, closure, i)?;
             }
         }
-        Ok(reports)
+        Ok(CertificateReport {
+            claims: reports,
+            qinplace_applicability: applicability,
+        })
     }
     /// §5.6 library route: a region whose frames the symbolic decision cannot
     /// settle is admitted iff each of its certificate `borrow_frames` claims

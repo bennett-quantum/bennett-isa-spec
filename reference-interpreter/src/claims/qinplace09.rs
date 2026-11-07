@@ -121,6 +121,7 @@ impl Object {
         let bindings = certificate.get("bindings")?;
         let root = bindings.get("closure_hash")?.string()?;
         let mut invocations = Vec::new();
+        let mut unresolved = BTreeMap::new();
         if let Some(invocation) = bindings.object()?.get("invocation") {
             invocations.push((root, invocation));
         }
@@ -131,16 +132,28 @@ impl Object {
                     // proving applicability requires a separate uniform check.
                     if invocation.get("args")?.array().is_ok() {
                         invocations.push((closure.as_str(), invocation));
+                    } else {
+                        unresolved.insert(
+                            closure.clone(),
+                            QinplaceApplicability::Unestablished(
+                                "parameter-uniform invocation tree is not checked".into(),
+                            ),
+                        );
                     }
                 }
             }
         }
-        let mut unresolved = None;
         let mut checked = BTreeMap::new();
         for (closure, binding) in invocations {
             let f = self.region_function(closure)?;
             if !matches!(f.kind.as_str(), "oracle" | "action" | "perm_action") {
-                unresolved = Some(format!("bound @{} invocation tree is not checked", f.name));
+                unresolved.insert(
+                    closure.to_string(),
+                    QinplaceApplicability::Unestablished(format!(
+                        "bound @{} invocation tree is not checked",
+                        f.name
+                    )),
+                );
                 continue;
             }
             let invocation = self.decode_invocation09(binding, f)?;
@@ -167,20 +180,27 @@ impl Object {
                     }
                 }
                 Ok(_) => {
-                    unresolved = Some("complete realised invocation tree is not checked".into());
+                    unresolved.insert(
+                        closure.to_string(),
+                        QinplaceApplicability::Unestablished(
+                            "complete realised invocation tree is not checked".into(),
+                        ),
+                    );
                 }
                 Err(error) if error.kind() == crate::ErrorKind::HostResource => {
-                    unresolved = Some(error.to_string());
+                    unresolved.insert(
+                        closure.to_string(),
+                        QinplaceApplicability::Unestablished(error.to_string()),
+                    );
                 }
                 Err(error) => return Err(error),
             }
         }
         outcomes.extend(checked);
-        if let Some(reason) = unresolved {
-            for outcome in outcomes.values_mut() {
-                *outcome = QinplaceApplicability::Unestablished(reason.clone());
-            }
-        }
+        // Root obligations cannot depend on discovering an owner or a claim.
+        // An unchecked context also takes precedence over a checked context of
+        // the same closure: one invocation cannot discharge another's coverage.
+        outcomes.extend(unresolved);
         Ok(outcomes)
     }
     fn check_qinplace_site09(

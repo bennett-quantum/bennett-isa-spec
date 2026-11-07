@@ -160,7 +160,7 @@ fn scheduled_table_and_program_claims_never_prove_reference_only_replay() {
             ),
             "{relation}"
         );
-        let reports = o.verify_certificate().unwrap();
+        let reports = o.verify_certificate().unwrap().claims;
         assert!(
             matches!(reports[0].verdict, ClaimVerdict::Unverified(_)),
             "{relation}"

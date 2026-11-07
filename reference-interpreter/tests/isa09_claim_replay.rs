@@ -205,6 +205,7 @@ fn published_full_tuple_tables_prove_only_the_bound_reference_relation() {
             let root_report = |o: &Object| {
                 o.verify_certificate()
                     .unwrap()
+                    .claims
                     .into_iter()
                     .find(|r| r.closure_hash == root && r.index == 0)
                     .unwrap()
@@ -405,7 +406,7 @@ fn fixed_image_metadata_is_admitted_without_inspecting_quantum_state() {
         verify_root(&object).unwrap(),
         ClaimVerdict::ProofRelativeToImage
     );
-    let report = object.verify_certificate().unwrap().remove(0);
+    let report = object.verify_certificate().unwrap().claims.remove(0);
     let coverage = report.coverage.unwrap();
     assert_eq!(
         (
@@ -471,7 +472,7 @@ fn sampled_singleton_report_has_exact_distinct_coverage() {
             support::json(r#"{"algorithm":"xoshiro256**","seed":["1","0","0","0"],"count":4}"#),
         );
     });
-    let report = object.verify_certificate().unwrap().remove(0);
+    let report = object.verify_certificate().unwrap().claims.remove(0);
     assert_eq!(report.verdict, ClaimVerdict::Evidence { elements: 1 });
     let coverage = report.coverage.unwrap();
     assert_eq!(coverage.covered_fraction, "1/33554432");

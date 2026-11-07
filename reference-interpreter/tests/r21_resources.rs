@@ -48,7 +48,7 @@ fn claim(text: &str, small: bool) {
     let r = catch_unwind(|| o.verify_certificate()).expect("no certificate panic");
     if small {
         assert_eq!(
-            r.unwrap()[0].verdict,
+            r.unwrap().claims[0].verdict,
             ClaimVerdict::Evidence { elements: 1 }
         );
     } else {
@@ -160,7 +160,7 @@ fn r21_resource_child() {
                 .unwrap();
             o.check_hashes().unwrap();
             assert_eq!(
-                o.verify_certificate().unwrap()[0].verdict,
+                o.verify_certificate().unwrap().claims[0].verdict,
                 ClaimVerdict::Proof
             );
         }

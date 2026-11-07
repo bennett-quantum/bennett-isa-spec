@@ -87,7 +87,7 @@ fn certificate_invocations_admit_both_equal_tuple_identity_partitions() {
             ClaimVerdict::Proof
         );
         assert_eq!(
-            object.verify_certificate().unwrap()[0].verdict,
+            object.verify_certificate().unwrap().claims[0].verdict,
             ClaimVerdict::Proof
         );
     }

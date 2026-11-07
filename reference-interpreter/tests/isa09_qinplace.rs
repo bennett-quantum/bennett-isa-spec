@@ -152,7 +152,7 @@ fn k4_inverse_pair_claim_binds_its_entry_and_quantified_arguments() {
         bennett_isa_ref::ClaimVerdict::Proof
     );
 
-    let reports = object.verify_certificate().unwrap();
+    let reports = object.verify_certificate().unwrap().claims;
     assert_eq!(reports.len(), 1);
     assert_eq!(reports[0].verdict, bennett_isa_ref::ClaimVerdict::Proof);
     assert!(reports[0].coverage.is_none());
@@ -457,7 +457,8 @@ fn standalone_pair_proof_reports_unestablished_applicability() {
     let reports = Object::parse(&inverse_certificate())
         .unwrap()
         .verify_certificate()
-        .unwrap();
+        .unwrap()
+        .claims;
     assert_eq!(reports[0].verdict, bennett_isa_ref::ClaimVerdict::Proof);
     assert!(
         matches!(
@@ -531,7 +532,11 @@ fn zero_trip_qinplace_requires_inventory_but_has_no_applicability_visit() {
         fields(fields(c).get_mut("bindings").unwrap())
             .insert("invocation".into(), root_invocation(2, 1));
     });
-    let reports = Object::parse(&bound).unwrap().verify_certificate().unwrap();
+    let reports = Object::parse(&bound)
+        .unwrap()
+        .verify_certificate()
+        .unwrap()
+        .claims;
     assert_eq!(
         reports[0].qinplace_applicability,
         Some(bennett_isa_ref::QinplaceApplicability::Established)
@@ -659,7 +664,7 @@ fn bound_reference_tree_checks_transitive_owner_and_actual_arguments() {
         });
         let result = Object::parse(&text).unwrap().verify_certificate();
         if include_inner && steps >= 3 {
-            let reports = result.unwrap();
+            let reports = result.unwrap().claims;
             let inner = reports.iter().find(|r| r.region == "inner").unwrap();
             assert_eq!(
                 inner.qinplace_applicability,
@@ -705,7 +710,7 @@ fn missing_library_body_reports_unestablished_and_cannot_execute() {
         fields(fields(c).get_mut("regions").unwrap()).remove(&g);
     });
     let object = Object::parse(&text).unwrap();
-    let report = object.verify_certificate().unwrap().remove(0);
+    let report = object.verify_certificate().unwrap().claims.remove(0);
     assert!(
         matches!(report.verdict, ClaimVerdict::Unverified(_)),
         "{report:?}"
@@ -732,4 +737,227 @@ fn missing_library_body_reports_unestablished_and_cannot_execute() {
         "{error}"
     );
     assert_eq!(q, before);
+}
+
+enum CertificateContents {
+    PairClaim,
+    EmptyClaims,
+    EmptyRecords,
+}
+
+fn unsupported_bound_root_certificate(contents: CertificateContents) -> String {
+    use bennett_isa_ref::json::Json;
+    let text = transitive_certificate(false);
+    let identity = Object::parse(&text).unwrap().identity().unwrap();
+    change_certificate(&text, |c| {
+        let bindings = fields(fields(c).get_mut("bindings").unwrap());
+        for (key, value) in [
+            (
+                "closure_hash",
+                identity.closure_hashes["run"].as_ref().unwrap(),
+            ),
+            (
+                "reference_program_hash",
+                identity.closure_hashes["run"].as_ref().unwrap(),
+            ),
+            ("interface_hash", &identity.interface_hashes["run"]),
+        ] {
+            bindings.insert(key.into(), Json::String(value.clone()));
+        }
+        bindings.insert("invocation".into(), root_invocation(2, 1));
+        let regions = fields(fields(c).get_mut("regions").unwrap());
+        match contents {
+            CertificateContents::PairClaim => {}
+            CertificateContents::EmptyRecords => regions.clear(),
+            CertificateContents::EmptyClaims => {
+                for record in regions.values_mut() {
+                    fields(record).insert("claims".into(), support::json("[]"));
+                    fields(fields(record).get_mut("verification").unwrap())
+                        .insert("inverse_pairs".into(), support::json("[]"));
+                }
+            }
+        }
+    })
+}
+
+#[test]
+fn unsupported_bound_root_keeps_applicability_without_direct_owner() {
+    use bennett_isa_ref::{ClaimVerdict, QinplaceApplicability};
+    let object = Object::parse(&unsupported_bound_root_certificate(
+        CertificateContents::PairClaim,
+    ))
+    .unwrap();
+    let identity = object.identity().unwrap();
+    let owner = identity.closure_hashes["addya"].as_ref().unwrap();
+    let root = identity.closure_hashes["run"].as_ref().unwrap();
+    let report = object.verify_certificate().unwrap();
+    assert_eq!(report.claims.len(), 1);
+    assert_eq!(report.claims[0].verdict, ClaimVerdict::Proof);
+    assert_eq!(object.verify_claim(owner, 0).unwrap(), ClaimVerdict::Proof);
+    assert_eq!(report.qinplace_applicability.len(), 1);
+    assert!(
+        matches!(report.qinplace_applicability.get(root), Some(QinplaceApplicability::Unestablished(reason)) if reason.contains("bound @run")),
+        "{report:?}"
+    );
+}
+
+#[test]
+fn unsupported_bound_root_keeps_applicability_without_claims() {
+    let object = Object::parse(&unsupported_bound_root_certificate(
+        CertificateContents::EmptyClaims,
+    ))
+    .unwrap();
+    let root = object.identity().unwrap().closure_hashes["run"]
+        .clone()
+        .unwrap();
+    let report = object.verify_certificate().unwrap();
+    assert!(report.claims.is_empty(), "{report:?}");
+    assert!(
+        matches!(report.qinplace_applicability.get(&root), Some(bennett_isa_ref::QinplaceApplicability::Unestablished(reason)) if reason.contains("bound @run")),
+        "{report:?}"
+    );
+}
+
+#[test]
+fn unsupported_bound_root_keeps_applicability_without_records() {
+    let object = Object::parse(&unsupported_bound_root_certificate(
+        CertificateContents::EmptyRecords,
+    ))
+    .unwrap();
+    let root = object.identity().unwrap().closure_hashes["run"]
+        .clone()
+        .unwrap();
+    let report = object.verify_certificate().unwrap();
+    assert!(report.claims.is_empty(), "{report:?}");
+    assert!(
+        matches!(report.qinplace_applicability.get(&root), Some(bennett_isa_ref::QinplaceApplicability::Unestablished(reason)) if reason.contains("bound @run")),
+        "{report:?}"
+    );
+}
+
+#[test]
+fn uncheckable_uniform_transitive_claim_keeps_applicability() {
+    // The outer caller has no local site; universal transitive coverage is
+    // separate from the structural theorem.
+    let source = transitive_certificate(false);
+    let owner = Object::parse(&source)
+        .unwrap()
+        .identity()
+        .unwrap()
+        .closure_hashes["addya"]
+        .clone()
+        .unwrap();
+    let text = change_certificate(&source, |c| {
+        let record = fields(fields(c).get_mut("regions").unwrap())
+            .get_mut(&owner)
+            .unwrap();
+        fields(record).insert("claims".into(), support::json(r#"[{"kind":"structural","rule":"adjoint_table","subclaims":[],"witness":{},"invocation":{"args":"all","budget":"all","token_aliases":"all"}}]"#));
+        fields(fields(record).get_mut("verification").unwrap())
+            .insert("inverse_pairs".into(), support::json("[]"));
+    });
+    let report = Object::parse(&text).unwrap().verify_certificate().unwrap();
+    assert_eq!(report.claims.len(), 1);
+    assert!(
+        matches!(report.qinplace_applicability.get(&owner), Some(bennett_isa_ref::QinplaceApplicability::Unestablished(reason)) if reason.contains("parameter-uniform")),
+        "{report:?}"
+    );
+}
+
+#[test]
+fn scheduled_root_keeps_unchecked_tree_obligation_without_owners_or_claims() {
+    use bennett_isa_ref::{json::Json, sha256_hex, QinplaceApplicability};
+    let text = transitive_certificate(false);
+    let original = Object::parse(&text).unwrap();
+    let mut symbols = original.section("symbols").unwrap().clone();
+    fields(
+        fields(fields(&mut symbols).get_mut("2").unwrap())
+            .get_mut("signature")
+            .unwrap(),
+    )
+    .insert("bounds".into(), support::json("[0]"));
+    let mut lines = text.lines().map(str::to_string).collect::<Vec<_>>();
+    let index = lines
+        .iter()
+        .position(|line| line == "section symbols")
+        .unwrap()
+        + 1;
+    lines[index] = symbols.canonical();
+    let text = lines.join("\n");
+    let source = text.split_once("section certificate\n").unwrap().0.replace(
+        "action_call @inner (x) (y) () (tk, a)",
+        "qloop 0 {\naction_call @inner (x) (y) () (tk, a)\n}",
+    ).replace(
+        "perm_action @addya (x:wire[2]) (y:wire[2] in) () (tk:token, a:i2) ()\n^entry():",
+        "perm_action @addya (x:wire[2]) (y:wire[2] in) () (tk:token, a:i2) ()\nregs {  } bounds {0}\n^entry():",
+    );
+    let object = support::rehash(&(source.trim_end().to_string() + "\n"));
+    let owner = object.identity().unwrap().closure_hashes["addya"]
+        .clone()
+        .unwrap();
+    let invocation = root_invocation(3, 1);
+    let params = sha256_hex(invocation.get("args").unwrap().canonical().as_bytes());
+    let schedule = support::json(&format!(
+        r#"{{"bindings":{{"budget":[0,0,0,0],"closure_hash":"{owner}","epsilon":0,"inherited_controls":0,"params_hash":"{params}","region":"addya","scheduler":{{"name":"test","version":"1"}},"target_hash":"{}","token_aliases":[0],"variant":"forward"}},"entries":[]}}"#,
+        "0".repeat(64)
+    ));
+    let text = change_certificate(&inverse_certificate_for(&object), |c| {
+        fields(fields(c).get_mut("regions").unwrap()).clear();
+        let bindings = fields(fields(c).get_mut("bindings").unwrap());
+        bindings.insert("invocation".into(), invocation);
+        bindings.insert("target_hash".into(), Json::String("0".repeat(64)));
+        bindings.insert(
+            "schedule_hash".into(),
+            Json::String(sha256_hex(schedule.canonical().as_bytes())),
+        );
+    });
+    let (source, certificate) = text.split_once("section certificate\n").unwrap();
+    let text = format!(
+        "{}\n\nsection schedule\n{}\n\nsection certificate\n{certificate}",
+        source.trim_end(),
+        schedule.canonical()
+    );
+    let report = Object::parse(&text).unwrap().verify_certificate().unwrap();
+    assert!(report.claims.is_empty());
+    assert!(
+        matches!(report.qinplace_applicability.get(&owner), Some(QinplaceApplicability::Unestablished(reason)) if reason.contains("realised invocation tree")),
+        "{report:?}"
+    );
+}
+
+#[test]
+fn checked_concrete_context_does_not_discharge_uniform_applicability() {
+    let text = linked_inverse_certificate(false);
+    let object = Object::parse(&text).unwrap();
+    let owner = object.identity().unwrap().closure_hashes["addya"]
+        .clone()
+        .unwrap();
+    let text = change_certificate(&text, |c| {
+        fields(fields(c).get_mut("bindings").unwrap())
+            .insert("invocation".into(), root_invocation(3, 1));
+        let record = fields(fields(c).get_mut("regions").unwrap())
+            .get_mut(&owner)
+            .unwrap();
+        let bennett_isa_ref::json::Json::Array(claims) = fields(record).get_mut("claims").unwrap()
+        else {
+            panic!("claims")
+        };
+        fields(&mut claims[0]).insert(
+            "invocation".into(),
+            support::json(r#"{"args":"all","budget":"all","token_aliases":"all"}"#),
+        );
+    });
+    let report = Object::parse(&text).unwrap().verify_certificate().unwrap();
+    assert_eq!(
+        report
+            .claims
+            .iter()
+            .find(|c| c.closure_hash == owner)
+            .unwrap()
+            .verdict,
+        bennett_isa_ref::ClaimVerdict::Proof
+    );
+    assert!(
+        matches!(report.qinplace_applicability.get(&owner), Some(bennett_isa_ref::QinplaceApplicability::Unestablished(reason)) if reason.contains("parameter-uniform")),
+        "{report:?}"
+    );
 }
