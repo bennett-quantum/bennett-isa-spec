@@ -103,7 +103,9 @@ impl Object {
             );
         }
         let mut unavailable = BTreeSet::new();
-        self.adjoint_source09(f, &mut BTreeSet::new(), &mut unavailable)?;
+        let mut reached = BTreeSet::new();
+        self.adjoint_source09(f, &mut reached, &mut unavailable)?;
+        self.validate_adjoint_source09(&reached)?;
         for sub in claim.get("subclaims")?.array()? {
             let s = usize::try_from(sub.uint()?).map_err(|_| {
                 Error::new("§12.1 adjoint_table: subclaim index exceeds usize".into())
@@ -142,22 +144,18 @@ impl Object {
         seen: &mut BTreeSet<String>,
         unavailable: &mut BTreeSet<String>,
     ) -> Result<()> {
+        if !self
+            .functions
+            .get(&f.name)
+            .is_some_and(|definition| std::ptr::eq(definition, f))
+        {
+            return err(
+                "§12.1 adjoint_table",
+                format!("source definition @{} differs from its map key", f.name),
+            );
+        }
         if !seen.insert(f.name.clone()) {
             return Ok(());
-        }
-        if matches!(f.kind.as_str(), "action" | "perm_action") {
-            for block in &f.blocks {
-                check_steps(&block.instructions)?;
-            }
-            let mut types = f
-                .params
-                .iter()
-                .flatten()
-                .chain(&f.regs)
-                .map(|p| (p.name.clone(), p.ty.clone()))
-                .collect();
-            let labels = f.blocks.iter().map(|b| &b.name).collect();
-            self.validate_structured(f, &mut types, &labels)?;
         }
         for block in &f.blocks {
             self.adjoint_dependencies09(f, &block.instructions, seen, unavailable)?;
@@ -186,11 +184,14 @@ impl Object {
                     }
                     if let Some(callee) = self.functions.get(name) {
                         self.adjoint_source09(callee, seen, unavailable)?;
-                    } else if !self.data.contains_key(name) {
+                    } else if self.data.contains_key(name) {
+                        seen.insert(name.into());
+                    } else {
                         let imports = self.section("imports").ok_or_else(|| {
                             Error::new(format!("§12.1 adjoint_table: undefined symbol @{name}"))
                         })?;
                         imports.get(name)?;
+                        seen.insert(name.into());
                         unavailable.insert(format!(
                             "adjoint_table linked definition unavailable: @{name}"
                         ));
@@ -200,6 +201,61 @@ impl Object {
             for body in &i.bodies {
                 self.adjoint_dependencies09(f, body, seen, unavailable)?;
             }
+        }
+        Ok(())
+    }
+
+    fn validate_adjoint_source09(&self, reached: &BTreeSet<String>) -> Result<()> {
+        // K94 premise 2 is scoped to this dependency closure, not unrelated
+        // definitions. The copy selects current fields; no cached lines,
+        // parse verdict or pair-proof cache establishes source validity.
+        let mut source = self.clone();
+        source.functions.retain(|name, _| reached.contains(name));
+        source.data.retain(|name, _| reached.contains(name));
+        source
+            .metadata
+            .retain(|section, _| matches!(section.as_str(), "symbols" | "imports" | "layout"));
+        let mut symbols = BTreeMap::new();
+        for (index, symbol) in self.symbols()? {
+            if reached.contains(symbol.get("name")?.string()?) {
+                symbols.insert(index.clone(), symbol.clone());
+            }
+        }
+        source
+            .metadata
+            .insert("symbols".into(), Json::Object(symbols));
+        if let Some(imports) = source.metadata.get_mut("imports") {
+            let Json::Object(imports) = imports else {
+                return err("§12.1 adjoint_table", "imports must be an object");
+            };
+            imports.retain(|name, _| reached.contains(name));
+        }
+        let scope = format!("§12.1 adjoint_table source closure {reached:?}");
+        source
+            .validate_metadata_types()
+            .map_err(|e| e.context(&scope))?;
+        source
+            .validate_metadata_versions()
+            .map_err(|e| e.context(&scope))?;
+        source.validate_symbols().map_err(|e| e.context(&scope))?;
+        source
+            .validate_local_schemas()
+            .map_err(|e| e.context(&scope))?;
+        source
+            .validate_call_graph()
+            .map_err(|e| e.context(&scope))?;
+        for name in source.functions.keys() {
+            let f = &self.functions[name];
+            let scope = format!("§12.1 adjoint_table source @{name}");
+            if matches!(f.kind.as_str(), "action" | "perm_action") {
+                for block in &f.blocks {
+                    check_steps(&block.instructions).map_err(|e| e.context(&scope))?;
+                }
+            }
+            // Keep the original linked object as validation context: a valid
+            // borrow certificate may refer to an independent proof/program
+            // outside the source-call closure. Only the selected f is checked.
+            self.validate_function(f).map_err(|e| e.context(&scope))?;
         }
         Ok(())
     }

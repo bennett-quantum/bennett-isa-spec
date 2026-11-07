@@ -1030,7 +1030,7 @@ impl Object {
         self.validate_metadata()?;
         Ok(())
     }
-    fn validate_symbols(&self) -> Result<()> {
+    pub(crate) fn validate_symbols(&self) -> Result<()> {
         let mut names = BTreeSet::new();
         for (index, s) in self.symbols()? {
             if !integer(index) || index.starts_with('-') {
@@ -1109,7 +1109,7 @@ impl Object {
         }
         Ok(())
     }
-    fn validate_function(&self, f: &Function) -> Result<()> {
+    pub(crate) fn validate_function(&self, f: &Function) -> Result<()> {
         let lifted = matches!(f.kind.as_str(), "oracle" | "lproc");
         let mut types = BTreeMap::new();
         for p in f

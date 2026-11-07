@@ -272,3 +272,178 @@ fn binding_and_source_obligations_reject_instead_of_establishing() {
         "wrong source bounds established"
     );
 }
+
+const TOKEN_ACTION: &str = r#"{"abi":"0.9","args":["token"],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}"#;
+const EMPTY_ORACLE: &str =
+    r#"{"abi":"0.9","args":[],"fault":4,"in":[],"kind":"oracle","mem":[],"tgt":1,"tier":"q"}"#;
+const EMPTY_LPROC: &str = r#"{"abi":"0.9","args":[],"kind":"lproc","mem":[],"params":[],"result":1,"tier":"q","tokens":[]}"#;
+const LAYOUT: &str = "\nsection layout\n{\"A_tab\":0,\"H\":8,\"S_cells\":4,\"globals\":{},\"heap_base\":16,\"heap_limit_max\":0,\"interface_regions\":{},\"null_size\":1,\"ptr_width\":32}\n";
+
+fn with_claim(base: &Object, tokens: bool) -> (Object, String) {
+    let claim = if tokens {
+        CLAIM.replace(
+            r#""budget":"all""#,
+            r#""budget":"all","token_aliases":"all""#,
+        )
+    } else {
+        CLAIM.into()
+    };
+    let (text, root) = attach(base, vec![support::json(&claim)]);
+    (Object::parse(&text).unwrap(), root)
+}
+fn lifted_dependencies(lproc: bool) -> (Object, String) {
+    let result = if lproc {
+        "r = lift.call @worker ()"
+    } else {
+        "r = lift.const.i1 1"
+    };
+    let oracle = format!("oracle @z () (t:wire) (f:wire[4]) () ()\nregs {{ r:reg[1] }}\n^entry():\n{result}\nlift.retval r");
+    let base = support::rehash(&support::object(&[
+        ("a", TOKEN_ACTION, "perm_action @a (x:wire mut) () () (tk:token) ()\n^entry():\nf = qalloc any 4\noracle_call @z tk () x f () ()\noracle_call @z tk () x f () ()\nqfree f"),
+        ("z", EMPTY_ORACLE, &oracle),
+        ("worker", EMPTY_LPROC, "lproc @worker () (r:reg[1]) () () ()\n^entry():\nr = lift.const.i1 1\nlift.ret r"),
+    ], "{}", LAYOUT).replace("0.8", "0.9"));
+    with_claim(&base, true)
+}
+fn rejects_current_definition(o: &Object, root: &str, name: &str) {
+    let verdict = o.verify_claim(root, 0);
+    assert!(
+        verdict.is_err(),
+        "invalid linked {name} verdict: {verdict:?}"
+    );
+    let diagnostic = verdict.unwrap_err().to_string();
+    assert!(
+        diagnostic.contains("adjoint_table") && diagnostic.contains(name),
+        "{diagnostic}"
+    );
+    assert!(
+        o.verify_certificate().is_err(),
+        "certificate proved invalid linked {name}"
+    );
+}
+
+#[test]
+fn invalid_current_linked_oracle_rejects_after_an_earlier_proof() {
+    let (mut o, root) = lifted_dependencies(false);
+    assert_eq!(o.verify_claim(&root, 0).unwrap(), ClaimVerdict::Proof);
+    o.functions.get_mut("z").unwrap().blocks[0].instructions[0].op = "lift.magic".into();
+    rejects_current_definition(&o, &root, "z");
+    o.functions.get_mut("z").unwrap().blocks[0].instructions[0].op = "lift.const.i1".into();
+    assert_eq!(o.verify_claim(&root, 0).unwrap(), ClaimVerdict::Proof);
+}
+
+#[test]
+fn invalid_current_transitive_lproc_rejects_after_an_earlier_proof() {
+    let (mut o, root) = lifted_dependencies(true);
+    assert_eq!(o.verify_claim(&root, 0).unwrap(), ClaimVerdict::Proof);
+    o.functions.get_mut("worker").unwrap().blocks[0].instructions[0].op = "lift.magic".into();
+    rejects_current_definition(&o, &root, "worker");
+}
+
+#[test]
+fn unreached_invalid_lproc_is_outside_the_premise_two_dependency_closure() {
+    // K94 premise 2 explicitly names the dependency closure; worker is linked
+    // here but z does not call it. This is not a whole-object validity verdict.
+    let (mut o, root) = lifted_dependencies(false);
+    o.functions.get_mut("worker").unwrap().blocks[0].instructions[0].op = "lift.magic".into();
+    assert_eq!(o.verify_claim(&root, 0).unwrap(), ClaimVerdict::Proof);
+    assert_eq!(
+        o.verify_certificate().unwrap().claims[0].verdict,
+        ClaimVerdict::Proof
+    );
+}
+
+fn action_dependency(kind: &str) -> (Object, String) {
+    let sig = format!(
+        r#"{{"abi":"0.9","args":[],"bounds":[],"in":[],"kind":"{kind}","mem":[],"mut":[1],"tier":"q"}}"#
+    );
+    let root =
+        format!("{kind} @a (x:wire mut) () () () ()\n^entry():\naction_call @z (x) () () ()");
+    let child = format!("{kind} @z (x:wire mut) () () () ()\n^entry():\nx x[0]");
+    let base = support::rehash(
+        &support::object(&[("a", &sig, &root), ("z", &sig, &child)], "{}", "")
+            .replace("0.8", "0.9"),
+    );
+    with_claim(&base, false)
+}
+
+#[test]
+fn both_linked_action_kinds_revalidate_current_instructions() {
+    for kind in ["action", "perm_action"] {
+        let (mut o, root) = action_dependency(kind);
+        assert_eq!(o.verify_claim(&root, 0).unwrap(), ClaimVerdict::Proof);
+        o.functions.get_mut("z").unwrap().blocks[0].instructions[0].op = "qmagic".into();
+        rejects_current_definition(&o, &root, "z");
+    }
+}
+
+#[test]
+fn both_linked_action_kinds_revalidate_current_signatures() {
+    for kind in ["action", "perm_action"] {
+        let (mut o, root) = action_dependency(kind);
+        o.functions.get_mut("z").unwrap().params[0][0].role = Some("in".into());
+        rejects_current_definition(&o, &root, "z");
+    }
+}
+
+#[test]
+fn linked_data_definition_matches_its_current_declared_signature() {
+    let sig = r#"{"abi":"0.9","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}"#;
+    let base = support::rehash(
+        &support::object_with_data(
+            &[(
+                "a",
+                sig,
+                "perm_action @a (x:wire mut) () () () ()\n^entry():\nqregion r 0 8 @image",
+            )],
+            &[("image", "00")],
+            "",
+        )
+        .replace("0.8", "0.9"),
+    );
+    let (mut o, root) = with_claim(&base, false);
+    assert_eq!(o.verify_claim(&root, 0).unwrap(), ClaimVerdict::Proof);
+    let symbols = fields(o.metadata.get_mut("symbols").unwrap());
+    let image = symbols
+        .values_mut()
+        .find(|v| v.get("name").unwrap().string().unwrap() == "image")
+        .unwrap();
+    fields(fields(image).get_mut("signature").unwrap()).insert("size".into(), support::json("2"));
+    // The declaration changes the closure identity. Rebind the same claim to
+    // that identity so lookup cannot mask the source-validity obligation.
+    let new_root = o.identity().unwrap().closure_hashes["a"].clone().unwrap();
+    let certificate = o.metadata.get_mut("certificate").unwrap();
+    let regions = fields(fields(certificate).get_mut("regions").unwrap());
+    let record = regions.remove(&root).unwrap();
+    regions.insert(new_root.clone(), record);
+    let bindings = fields(fields(certificate).get_mut("bindings").unwrap());
+    for key in ["closure_hash", "reference_program_hash"] {
+        bindings.insert(key.into(), Json::String(new_root.clone()));
+    }
+    rejects_current_definition(&o, &new_root, "image");
+}
+
+#[test]
+fn classical_function_kinds_cannot_be_quantum_dependencies() {
+    // All function kinds are covered: action, perm_action, oracle and lproc
+    // above; cc/r cannot be reached by a well-typed Q-region call.
+    for kind in ["cc", "r"] {
+        let (mut o, root) = action_dependency("perm_action");
+        o.functions.get_mut("z").unwrap().kind = kind.into();
+        assert!(
+            o.verify_claim(&root, 0).is_err(),
+            "Q call admitted {kind} callee"
+        );
+        assert!(
+            o.verify_certificate().is_err(),
+            "certificate admitted {kind} callee"
+        );
+    }
+}
+
+#[test]
+fn renamed_definition_cannot_escape_dependency_closure_validation() {
+    let (mut o, root) = action_dependency("perm_action");
+    o.functions.get_mut("z").unwrap().name = "renamed".into();
+    rejects_current_definition(&o, &root, "renamed");
+}
