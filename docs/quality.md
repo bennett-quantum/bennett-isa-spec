@@ -209,3 +209,18 @@ The full default reference command above ran once after the source was frozen:
 This run reused the compiled test artifacts and retained the 8 GiB address-space
 cap. Reference results recorded at 2026-11-07 06:52:55 UTC. The completed CLI was atomically
 published inside this worktree before starting the conformance command.
+
+
+Complete bound-root validation recorded at 2026-11-07 07:04:00 UTC. Both default commands
+listed above ran once, sequentially, with `ulimit -v 8388608`, `timeout 1800`,
+three compiler jobs and four test threads. Source stayed unchanged between runs.
+
+| Crate | Passed | Ignored | Wall (min:sec) | Peak RSS (KiB) | Exit |
+|---|---:|---:|---:|---:|---:|
+| reference-interpreter | 670 | 6 | 7:00.81 | 1,591,540 | 0 |
+| conformance | 129 | 0 | 11:27.10 | 727,476 | 0 |
+
+Both runs reused compiled test artifacts on the shared host. The reference's
+six ignores are unchanged; conformance has none. The 180-second target, coverage
+measurement and remaining structural quality work are still deferred to batch 2.
+No full repository or sibling gate ran.
