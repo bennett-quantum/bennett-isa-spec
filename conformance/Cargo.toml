@@ -5,3 +5,8 @@ edition = "2021"
 license = "AGPL-3.0-only"
 
 [dependencies]
+
+# Keep exhaustive semantic checks practical without dropping debug/overflow checks.
+[profile.test]
+opt-level = 1
+debug = "line-tables-only"

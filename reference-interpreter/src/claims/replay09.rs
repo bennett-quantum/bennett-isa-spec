@@ -8,7 +8,7 @@ pub(super) struct Invocation {
     pub primary: Option<crate::BudgetToken>,
     pub controls: Vec<BitVector>,
     pub adjoint: bool,
-    budget: Budget,
+    pub budget: Budget,
 }
 
 struct ResolvedDomain {
@@ -112,7 +112,6 @@ impl Object {
         }
         // Variant is an open identifier selecting a realisation. It does not
         // change the region's reference semantics or imply an adjoint.
-        let adjoint = false;
         let invocation = if let Some(invocation) = claim.object()?.get("invocation") {
             invocation
         } else {
@@ -125,6 +124,14 @@ impl Object {
             }
             bindings.get("invocation")?
         };
+        self.decode_invocation09(invocation, f)
+    }
+
+    pub(super) fn decode_invocation09(
+        &self,
+        invocation: &Json,
+        f: &Function,
+    ) -> Result<Invocation> {
         let group = if f.kind == "oracle" { 4 } else { 3 };
         let args = invocation
             .get("args")?
@@ -163,7 +170,7 @@ impl Object {
             args: resolved.arguments,
             primary: resolved.primary,
             controls: Vec::new(),
-            adjoint,
+            adjoint: false,
             budget,
         })
     }
@@ -335,16 +342,19 @@ impl Object {
         f: &Function,
     ) -> Result<Outcome> {
         if claim.get("expected")? == &Json::String("inverse_pair".into()) {
-            return err(
-                "§12.1 K4",
-                "inverse-pair claims require their entry binding",
-            );
+            return Ok(Outcome {
+                verdict: self.verify_inverse_pair_claim09(f, index, claim)?,
+                coverage: None,
+            });
         }
-        if claim.get("expected")? == &Json::String("oracle".into()) {
+        if claim
+            .get("subject")?
+            .object()?
+            .contains_key("schedule_hash")
+        {
             return Ok(Outcome {
                 verdict: ClaimVerdict::Unverified(
-                    "expected oracle needs realised target/schedule execution (deliverables 9–11)"
-                        .into(),
+                    "scheduled subject needs realised target/schedule execution".into(),
                 ),
                 coverage: None,
             });

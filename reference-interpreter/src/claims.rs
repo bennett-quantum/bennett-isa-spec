@@ -46,6 +46,14 @@ pub enum ClaimVerdict {
     Unverified(String),
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CertificateReport {
+    pub claims: Vec<ClaimReport>,
+    /// K92 obligations keyed by the owning or bound root closure. These survive
+    /// absent owner records and empty claim lists; a claim proof does not
+    /// discharge an unestablished invocation obligation.
+    pub qinplace_applicability: BTreeMap<String, QinplaceApplicability>,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ClaimReport {
     pub closure_hash: String,
     pub region: String,
@@ -54,6 +62,13 @@ pub struct ClaimReport {
     pub verdict: ClaimVerdict,
     pub context_key: Json,
     pub coverage: Option<ClaimCoverage>,
+    /// K92 applicability is separate from the standalone theorem's verdict.
+    pub qinplace_applicability: Option<QinplaceApplicability>,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum QinplaceApplicability {
+    Established,
+    Unestablished(String),
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ClaimCoverage {
@@ -647,9 +662,14 @@ impl Object {
         }))
     }
     /// Checks one claim of region `closure`. A false claim is an error; an
-    /// uncheckable one is `Unverified` with its reason.
+    /// uncheckable one is `Unverified` with its reason. This standalone verdict
+    /// does not establish executable applicability; see `verify_certificate`.
     pub fn verify_claim(&self, closure: &str, index: usize) -> Result<ClaimVerdict> {
-        self.verify_claim_guarded(closure, index, &mut BTreeSet::new())
+        let verdict = self.verify_claim_guarded(closure, index, &mut BTreeSet::new())?;
+        if self.isa_version == crate::IsaVersion::V09 {
+            self.check_qinplace_bindings09()?;
+        }
+        Ok(verdict)
     }
     fn verify_claim_guarded(
         &self,
@@ -805,6 +825,13 @@ impl Object {
                         ClaimVerdict::Proof
                     }
                     "inverse_pair_library" => {
+                        if self.isa_version == crate::IsaVersion::V09 {
+                            for entry in self.pair_claim_entries(f, index)? {
+                                self.inverse_pair_theorem09(
+                                    closure, index, entry, &mut BTreeSet::new(),
+                                )?;
+                            }
+                        }
                         let library = witness.get("library_closure_hash")?.string()?;
                         let i = usize::try_from(witness.get("claim_index")?.uint()?)
                             .map_err(|_| Error::new("§12: claim index".into()))?;
@@ -870,11 +897,16 @@ impl Object {
         )
     }
     /// Checks every claim of the certificate: false claims are errors, and
-    /// the report lists each claim's verdict.
-    pub fn verify_certificate(&self) -> Result<Vec<ClaimReport>> {
+    /// the report lists each claim's verdict and independent K92 obligations.
+    pub fn verify_certificate(&self) -> Result<CertificateReport> {
         let certificate = self
             .section("certificate")
             .ok_or_else(|| Error::new("§12: object has no certificate".into()))?;
+        let applicability = if self.isa_version == crate::IsaVersion::V09 {
+            self.check_qinplace_bindings09()?
+        } else {
+            BTreeMap::new()
+        };
         let mut reports = Vec::new();
         for (closure, region) in certificate.get("regions")?.object()? {
             let name = self.region_function(closure)?.name.clone();
@@ -888,7 +920,10 @@ impl Object {
                     let outcome = self.verify_replay09(closure, index, claim, f)?;
                     (outcome.verdict, outcome.coverage)
                 } else {
-                    (self.verify_claim(closure, index)?, None)
+                    (
+                        self.verify_claim_guarded(closure, index, &mut BTreeSet::new())?,
+                        None,
+                    )
                 };
                 reports.push(ClaimReport {
                     closure_hash: closure.clone(),
@@ -898,6 +933,7 @@ impl Object {
                     verdict,
                     context_key: Json::Array(Vec::new()),
                     coverage,
+                    qinplace_applicability: applicability.get(closure).cloned(),
                 });
             }
             // A borrow_frames claim must be a proof over D with the §5.6 property.
@@ -916,7 +952,10 @@ impl Object {
                 self.check_borrow_independence(f, closure, i)?;
             }
         }
-        Ok(reports)
+        Ok(CertificateReport {
+            claims: reports,
+            qinplace_applicability: applicability,
+        })
     }
     /// §5.6 library route: a region whose frames the symbolic decision cannot
     /// settle is admitted iff each of its certificate `borrow_frames` claims

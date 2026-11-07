@@ -31,7 +31,10 @@ mod sha256;
 mod validation;
 pub use bits::BitVector;
 pub use borrow::validate_translation_lemma;
-pub use claims::{ClaimCoverage, ClaimReport, ClaimVerdict, FixedRegionBinding, Xoshiro256};
+pub use claims::{
+    CertificateReport, ClaimCoverage, ClaimReport, ClaimVerdict, FixedRegionBinding,
+    QinplaceApplicability, Xoshiro256,
+};
 pub use classical::{
     ClassicalMachine, ClassicalOutcome, ClassicalSnapshot, ClassicalValue, RegisterDelta,
     SnapshotDelta, StepPoint, TapeEntry,

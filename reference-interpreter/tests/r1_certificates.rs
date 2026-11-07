@@ -63,7 +63,7 @@ fn b14_checked_borrow_claim_and_altered_or_incomplete_claims() {
     let text = swap_frame(n);
     let good = certificate(&text, n, &claim(n, "15", 1, r#"{"program":"ID"}"#), "0");
     let o = Object::parse(&good).unwrap();
-    let reports = o.verify_certificate().unwrap();
+    let reports = o.verify_certificate().unwrap().claims;
     assert_eq!(reports.len(), 1);
     assert_eq!(reports[0].verdict, ClaimVerdict::Proof);
     // Altered: the expected program is the frame itself... replaced by a
@@ -79,7 +79,12 @@ fn b14_checked_borrow_claim_and_altered_or_incomplete_claims() {
     let table = format!(r#"{{"table":[{}]}}"#, rows.join(","));
     let exact = certificate(&text, n, &claim(n, "15", 1, &table), "0");
     assert_eq!(
-        Object::parse(&exact).unwrap().verify_certificate().unwrap()[0].verdict,
+        Object::parse(&exact)
+            .unwrap()
+            .verify_certificate()
+            .unwrap()
+            .claims[0]
+            .verdict,
         ClaimVerdict::Proof
     );
     let wrong = table.replacen("[0,0,0]", "[1,0,0]", 1);
@@ -115,7 +120,11 @@ fn b14_seventeen_wire_frame_with_checked_claim() {
     let n = 16;
     let text = swap_frame(n);
     let good = certificate(&text, n, &claim(n, "65535", 1, r#"{"program":"ID"}"#), "0");
-    let reports = Object::parse(&good).unwrap().verify_certificate().unwrap();
+    let reports = Object::parse(&good)
+        .unwrap()
+        .verify_certificate()
+        .unwrap()
+        .claims;
     assert_eq!(reports[0].verdict, ClaimVerdict::Proof);
 }
 
@@ -279,7 +288,7 @@ fn sol_assert_translation(text: &str, claim: &str, valid: bool) {
     let h = o.identity().unwrap().closure_hashes["a"].clone().unwrap();
     for verdict in [
         o.verify_claim(&h, 0),
-        o.verify_certificate().map(|r| r[0].verdict.clone()),
+        o.verify_certificate().map(|r| r.claims[0].verdict.clone()),
     ] {
         if valid {
             assert_eq!(verdict.unwrap(), ClaimVerdict::Proof);
@@ -395,7 +404,7 @@ fn sol_positional_verdict(text: &str, claim: &str) -> Result<ClaimVerdict, benne
     let o = Object::parse(&certificate(text, 1, claim, "")).unwrap();
     let h = o.identity().unwrap().closure_hashes["a"].clone().unwrap();
     let v = o.verify_claim(&h, 0)?;
-    assert_eq!(o.verify_certificate().unwrap()[0].verdict, v);
+    assert_eq!(o.verify_certificate().unwrap().claims[0].verdict, v);
     Ok(v)
 }
 #[test]
@@ -610,7 +619,7 @@ fn sol_r5_b01_library_replay_checks_boundaries_even_when_region_map_is_identity(
     ] {
         let o = Object::parse(&support::certified_borrow_identity(body, &[2])).unwrap();
         assert_eq!(
-            o.verify_certificate().unwrap()[0].verdict,
+            o.verify_certificate().unwrap().claims[0].verdict,
             ClaimVerdict::Proof
         );
         support::borrow_identity(&o);
@@ -633,7 +642,7 @@ fn sol_r5_b01_certificate_return_checks_keep_quantum_surrounding_state() {
         ))
         .unwrap();
         assert_eq!(
-            o.verify_certificate().unwrap()[0].verdict,
+            o.verify_certificate().unwrap().claims[0].verdict,
             ClaimVerdict::Proof
         );
         support::borrow_identity(&o);
@@ -825,7 +834,7 @@ fn codex_r5_b02_exact_cz_certificate_cannot_admit_a_nonpermutation_frame() {
         ))
         .unwrap();
         assert_eq!(
-            o.verify_certificate().unwrap()[0].verdict,
+            o.verify_certificate().unwrap().claims[0].verdict,
             ClaimVerdict::Proof
         );
         support::borrow_identity(&o);

@@ -724,6 +724,13 @@ impl Object {
             return self.validate_inverse_pair_claim09(f, position, c);
         }
         if self.isa_version == crate::IsaVersion::V09 {
+            if let Some(subject) = c.object()?.get("subject") {
+                if self.identity()?.closure_hashes[&f.name].as_deref()
+                    != Some(subject.get("closure_hash")?.string()?)
+                {
+                    return err("§12.1 K13", "claim subject differs from its region closure");
+                }
+            }
             if let Some(d) = c.object()?.get("domain") {
                 self.validate_image_domains09(d, f)?;
             }
@@ -734,6 +741,14 @@ impl Object {
                 .get("subject")
                 .and_then(|s| s.object().ok())
                 .and_then(|s| s.get("schedule_hash"));
+            if let Some(bound_hash) = subject_schedule {
+                let schedule = self
+                    .section("schedule")
+                    .ok_or_else(|| Error::new("§12.1 K13: claim schedule is absent".into()))?;
+                if bound_hash.string()? != sha256_hex(schedule.canonical().as_bytes()) {
+                    return err("§12.1 K13", "claim schedule hash mismatch");
+                }
+            }
             if c.object()?.get("expected") == Some(&Json::String("oracle".into()))
                 && subject_schedule.is_none()
             {

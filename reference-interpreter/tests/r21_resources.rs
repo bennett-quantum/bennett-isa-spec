@@ -48,7 +48,7 @@ fn claim(text: &str, small: bool) {
     let r = catch_unwind(|| o.verify_certificate()).expect("no certificate panic");
     if small {
         assert_eq!(
-            r.unwrap()[0].verdict,
+            r.unwrap().claims[0].verdict,
             ClaimVerdict::Evidence { elements: 1 }
         );
     } else {
@@ -160,7 +160,7 @@ fn r21_resource_child() {
                 .unwrap();
             o.check_hashes().unwrap();
             assert_eq!(
-                o.verify_certificate().unwrap()[0].verdict,
+                o.verify_certificate().unwrap().claims[0].verdict,
                 ClaimVerdict::Proof
             );
         }
@@ -201,7 +201,9 @@ fn r21_resource_child() {
                 if n <= 8 {
                     assert_eq!(q.bundle(r.unwrap()).unwrap().len(), n);
                 } else {
-                    resource(r, "§4.3");
+                    // Qreg handle/class-vector storage is §3.3; dense
+                    // quantum-state materialisation below remains §4.3.
+                    resource(r, "§3.3");
                 }
                 let mut q = QuantumRegisters::new();
                 let id = q.allocate(8).unwrap();

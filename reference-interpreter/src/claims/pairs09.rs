@@ -8,6 +8,24 @@ pub(super) struct Pair<'a> {
     pub(super) tokens: BTreeMap<String, Budget>,
     pub(super) aliases: Vec<u64>,
 }
+pub(super) enum PairClaim {
+    Exhaustive,
+    Library,
+}
+pub(super) fn pair_claim(claim: &Json) -> Result<PairClaim> {
+    match claim.get("kind")?.string()? {
+        "exhaustive" if claim.get("expected")? == &Json::String("inverse_pair".into()) => {
+            Ok(PairClaim::Exhaustive)
+        }
+        "structural" if claim.get("rule")?.string()? == "inverse_pair_library" => {
+            Ok(PairClaim::Library)
+        }
+        _ => err(
+            "§12.1 K4",
+            "entry claim is not an exhaustive or linked-library inverse-pair theorem",
+        ),
+    }
+}
 fn entry_budget(value: &Json) -> Result<Budget> {
     let v = value.array()?;
     if v.len() != 4 {
@@ -20,6 +38,35 @@ fn entry_budget(value: &Json) -> Result<Budget> {
         stack: v[2].uint()?,
         depth: v[3].uint()?,
     })
+}
+pub(super) struct PairContext {
+    budget: Budget,
+    tokens: BTreeMap<String, Budget>,
+}
+pub(super) fn pair_context(object: &Object, entry: &Json) -> Result<PairContext> {
+    let budget = entry_budget(entry.get("budget")?)?;
+    object.validate_budget(budget)?;
+    let tokens = entry
+        .object()?
+        .get("arg_tokens")
+        .map(|v| {
+            v.object()?
+                .iter()
+                .map(|(n, b)| Ok((n.clone(), entry_budget(b)?)))
+                .collect::<Result<BTreeMap<_, _>>>()
+        })
+        .transpose()?
+        .unwrap_or_default();
+    for b in tokens.values() {
+        object.validate_budget(*b)?;
+    }
+    // Formal argument order needs the body; partition shape does not.
+    crate::tokens::alias_binding(
+        entry.object()?.get("token_aliases"),
+        &vec![None; tokens.len() + 1],
+        tokens.is_empty(),
+    )?;
+    Ok(PairContext { budget, tokens })
 }
 pub(super) fn pair<'a>(object: &'a Object, entry: &Json) -> Result<Pair<'a>> {
     let g = object.region_function(entry.get("g")?.string()?)?;
@@ -45,19 +92,7 @@ pub(super) fn pair<'a>(object: &'a Object, entry: &Json) -> Result<Pair<'a>> {
             "inverse-pair oracle signatures are incompatible",
         );
     }
-    let budget = entry_budget(entry.get("budget")?)?;
-    object.validate_budget(budget)?;
-    let tokens = entry
-        .object()?
-        .get("arg_tokens")
-        .map(|v| {
-            v.object()?
-                .iter()
-                .map(|(n, b)| Ok((n.clone(), entry_budget(b)?)))
-                .collect::<Result<BTreeMap<_, _>>>()
-        })
-        .transpose()?
-        .unwrap_or_default();
+    let PairContext { budget, tokens } = pair_context(object, entry)?;
     let expected = g.params[4]
         .iter()
         .filter(|p| p.ty == Type::Token)
@@ -68,9 +103,6 @@ pub(super) fn pair<'a>(object: &'a Object, entry: &Json) -> Result<Pair<'a>> {
             "§12.3 K4",
             "arg_tokens must bind exactly the token-typed oracle arguments",
         );
-    }
-    for b in tokens.values() {
-        object.validate_budget(*b)?;
     }
     let mut tuples = vec![Some(budget)];
     tuples.extend(
@@ -188,7 +220,120 @@ fn full_quantum_domain(object: &Object, g: &Function, domain: &Json) -> Result<(
     Ok(())
 }
 impl Object {
-    fn pair_claim_entries(&self, owner: &Function, index: usize) -> Result<Vec<&Json>> {
+    /// Resolve the pair theorem, retaining its domain through library reuse.
+    /// Every link must bind the same closures and a covered token context.
+    pub(super) fn inverse_pair_theorem09(
+        &self,
+        closure: &str,
+        index: usize,
+        entry: &Json,
+        active: &mut BTreeSet<(String, usize)>,
+    ) -> Result<Option<(&Json, &Function)>> {
+        let key = (closure.to_string(), index);
+        if !active.insert(key.clone()) {
+            return err("§12.1 K4", "cyclic inverse-pair library reference");
+        }
+        let regions = self
+            .section("certificate")
+            .unwrap()
+            .get("regions")?
+            .object()?;
+        let Some(record) = regions.get(closure) else {
+            return Ok(None);
+        };
+        let claim = record
+            .get("claims")?
+            .array()?
+            .get(index)
+            .ok_or_else(|| Error::new("§12.1 K4: library claim index out of range".into()))?;
+        let owner = self.region_function(closure)?;
+        let result = match pair_claim(claim)? {
+            PairClaim::Exhaustive => {
+                self.validate_inverse_pair_claim09(owner, index, claim)?;
+                Some((claim, pair(self, entry)?.g))
+            }
+            PairClaim::Library => {
+                let witness = claim.get("witness")?;
+                let library = witness.get("library_closure_hash")?.string()?;
+                let donor_index = usize::try_from(witness.get("claim_index")?.uint()?)
+                    .map_err(|_| crate::resource_error("§12.1 K4", "claim index exceeds host"))?;
+                pair_context(self, entry)?;
+                let identity = self.identity()?;
+                let mut pins = BTreeSet::new();
+                if let Some(imports) = self.section("imports") {
+                    for import in imports.object()?.values() {
+                        if let Some(pin) = import.object()?.get("pinned_closure_hash") {
+                            pins.insert(pin.string()?);
+                        }
+                    }
+                }
+                let mut bodies_available = true;
+                for hash in [entry.get("g")?.string()?, entry.get("ginv")?.string()?] {
+                    if !identity
+                        .closure_hashes
+                        .values()
+                        .any(|h| h.as_deref() == Some(hash))
+                    {
+                        if !pins.contains(hash) {
+                            return err(
+                                "§12.1 K4",
+                                "inverse-pair closure is neither local nor imported by pin",
+                            );
+                        }
+                        bodies_available = false;
+                    }
+                }
+                let current = if bodies_available {
+                    Some(pair(self, entry)?)
+                } else {
+                    None
+                };
+                let current = match (regions.contains_key(library), current) {
+                    (true, Some(current)) => current,
+                    _ => {
+                        active.remove(&key);
+                        return Ok(None);
+                    }
+                };
+                let donor = self.region_function(library)?;
+                let mut matched = None;
+                for donor_entry in self.pair_claim_entries(donor, donor_index)? {
+                    let source = pair(self, donor_entry)?;
+                    let (g, gi) = (entry.get("g")?, entry.get("ginv")?);
+                    let (sg, si) = (donor_entry.get("g")?, donor_entry.get("ginv")?);
+                    let same_pair = (g == sg && gi == si) || (g == si && gi == sg);
+                    let covered = same_pair
+                        && current.budget.steps >= source.budget.steps
+                        && current.budget.heap >= source.budget.heap
+                        && current.budget.stack >= source.budget.stack
+                        && current.budget.depth >= source.budget.depth
+                        && current.aliases == source.aliases
+                        && current.g.params[4]
+                            .iter()
+                            .filter(|p| p.ty == Type::Token)
+                            .map(|p| current.tokens[&p.name])
+                            .eq(source.g.params[4]
+                                .iter()
+                                .filter(|p| p.ty == Type::Token)
+                                .map(|p| source.tokens[&p.name]));
+                    if covered {
+                        matched = Some(donor_entry);
+                        break;
+                    }
+                }
+                let Some(donor_entry) = matched else {
+                    return err(
+                        "§12.1 K4",
+                        "library theorem must cover the same resolved pair and token context",
+                    );
+                };
+                self.inverse_pair_theorem09(library, donor_index, donor_entry, active)?
+            }
+        };
+        active.remove(&key);
+        Ok(result)
+    }
+    pub(super) fn pair_claim_entries(&self, owner: &Function, index: usize) -> Result<Vec<&Json>> {
         let closure = self.identity()?.closure_hashes[&owner.name]
             .clone()
             .ok_or_else(|| Error::new("§12.3 K4: unlinked pair owner".into()))?;
@@ -273,7 +418,10 @@ impl Object {
             }
             for row in enumerate(&domain)? {
                 let mut input = OracleVectorInput {
-                    ins: p.g.params[0].iter().map(|p| BitVector::zero(p.ty.bits(self.ptr_width)?)).collect::<Result<_>>()?,
+                    ins: p.g.params[0]
+                        .iter()
+                        .map(|p| BitVector::zero(p.ty.bits(self.ptr_width)?))
+                        .collect::<Result<_>>()?,
                     ..Default::default()
                 };
                 for param in &p.g.params[3] {
