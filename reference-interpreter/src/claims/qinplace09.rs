@@ -42,7 +42,7 @@ fn token(args: &BTreeMap<String, Argument>, name: &str) -> Result<BudgetToken> {
 }
 fn push(
     work: &mut Vec<Invocation>,
-    f: &Function,
+    name: &str,
     names: &[String],
     args: &BTreeMap<String, Argument>,
     primary: Option<BudgetToken>,
@@ -57,7 +57,7 @@ fn push(
         .collect::<Result<_>>()?;
     crate::reserve_more(work, 1, "§4.5 K92", "reference invocation contexts")?;
     work.push(Invocation {
-        name: f.name.clone(),
+        name: name.trim_start_matches('@').into(),
         args: actuals,
         budget: primary.as_ref().map(BudgetToken::tuple),
         primary,
@@ -65,6 +65,19 @@ fn push(
     Ok(())
 }
 impl Object {
+    fn qinplace_tree_needs_check09(&self) -> Result<bool> {
+        let unresolved_imports = self
+            .section("imports")
+            .map(|imports| imports.object().map(|imports| !imports.is_empty()))
+            .transpose()?
+            .unwrap_or(false);
+        Ok(self.isa_version == crate::IsaVersion::V09
+            && (unresolved_imports
+                || self
+                    .functions
+                    .values()
+                    .any(|f| !qinplace_sites(f).is_empty())))
+    }
     /// Inventory is static (including zero-trip bodies); applicability belongs
     /// to the resolved invocation tree, never to the standalone proof label.
     pub(super) fn check_qinplace_bindings09(
@@ -73,16 +86,24 @@ impl Object {
         let certificate = self.section("certificate").unwrap();
         let identity = self.identity()?;
         let mut outcomes = BTreeMap::new();
-        if !self
-            .functions
-            .values()
-            .any(|f| !qinplace_sites(f).is_empty())
-        {
+        if !self.qinplace_tree_needs_check09()? {
             return Ok(outcomes);
         }
         for (closure, record) in certificate.get("regions")?.object()? {
             let f = self.region_function(closure)?;
             for site in qinplace_sites(f) {
+                if let Some(name) = site.operands[..2]
+                    .iter()
+                    .find(|name| !self.functions.contains_key(name.trim_start_matches('@')))
+                {
+                    outcomes.insert(
+                        closure.clone(),
+                        QinplaceApplicability::Unestablished(format!(
+                            "missing linked body for {name}"
+                        )),
+                    );
+                    continue;
+                }
                 let hash = |name: &str| -> Result<&str> {
                     identity.closure_hashes[name.trim_start_matches('@')]
                         .as_deref()
@@ -101,7 +122,7 @@ impl Object {
                     let index = usize::try_from(entry.get("claim")?.uint()?).map_err(|_| {
                         crate::resource_error("§12.3 K92", "claim index exceeds host")
                     })?;
-                    self.inverse_pair_theorem09(closure, index, &mut BTreeSet::new())?;
+                    self.inverse_pair_theorem09(closure, index, entry, &mut BTreeSet::new())?;
                     self.verify_claim_guarded(closure, index, &mut BTreeSet::new())?;
                 }
                 if !found {
@@ -274,7 +295,7 @@ impl Object {
             let index = usize::try_from(entry.get("claim")?.uint()?)
                 .map_err(|_| crate::resource_error("§12.3 K4", "claim index exceeds host"))?;
             let Some((claim, domain_function)) =
-                self.inverse_pair_theorem09(owner_hash, index, &mut BTreeSet::new())?
+                self.inverse_pair_theorem09(owner_hash, index, entry, &mut BTreeSet::new())?
             else {
                 unresolved = Some("linked inverse-pair theorem is unavailable".into());
                 continue;
@@ -333,14 +354,12 @@ impl Object {
         budget: Option<Budget>,
         primary: Option<&BudgetToken>,
     ) -> Result<BTreeMap<String, QinplaceApplicability>> {
-        if self.isa_version != crate::IsaVersion::V09
-            || !self
-                .functions
-                .values()
-                .any(|f| !qinplace_sites(f).is_empty())
-        {
+        if !self.qinplace_tree_needs_check09()? {
             return Ok(BTreeMap::new());
         }
+        let root = self.identity()?.closure_hashes[&f.name]
+            .clone()
+            .ok_or_else(|| Error::new("§12.3 K92: unresolved invocation root".into()))?;
         let mut work = vec![Invocation {
             name: f.name.clone(),
             args: values(f, args)?,
@@ -350,7 +369,16 @@ impl Object {
         let mut visited = BTreeSet::new();
         let mut owners = BTreeMap::new();
         while let Some(invocation) = work.pop() {
-            let f = &self.functions[&invocation.name];
+            let Some(f) = self.functions.get(&invocation.name) else {
+                owners.insert(
+                    root.clone(),
+                    QinplaceApplicability::Unestablished(format!(
+                        "missing linked body for @{}",
+                        invocation.name
+                    )),
+                );
+                continue;
+            };
             let ids = invocation
                 .args
                 .iter()
@@ -390,6 +418,21 @@ impl Object {
                 if invocation.budget.is_none_or(|b| b.steps == 0) {
                     continue;
                 }
+                if let Some(imports) = self.section("imports") {
+                    if let Some(name) = imports
+                        .object()?
+                        .keys()
+                        .find(|name| !self.functions.contains_key(*name))
+                    {
+                        owners.insert(
+                            root.clone(),
+                            QinplaceApplicability::Unestablished(format!(
+                                "missing linked body for @{name}"
+                            )),
+                        );
+                        continue;
+                    }
+                }
                 let program = crate::oracle::Program::new(self, &f.name)?;
                 for (activation, i) in &program.rows {
                     if !matches!(
@@ -401,10 +444,9 @@ impl Object {
                     let fixed = program.arguments(activation, &args)?;
                     let a = &i.operands;
                     let oracle = i.op != "lift.perm_call";
-                    let callee = &self.functions[a[0].trim_start_matches('@')];
                     push(
                         &mut work,
-                        callee,
+                        &a[0],
                         &crate::object::list(&a[if oracle { 6 } else { 4 }])?,
                         &fixed,
                         if oracle {
@@ -433,6 +475,17 @@ impl Object {
                         }
                         let a = &i.operands;
                         if i.op == "qinplace" {
+                            if let Some(name) = a[..2].iter().find(|name| {
+                                !self.functions.contains_key(name.trim_start_matches('@'))
+                            }) {
+                                owners.insert(
+                                    root.clone(),
+                                    QinplaceApplicability::Unestablished(format!(
+                                        "missing linked body for {name}"
+                                    )),
+                                );
+                                continue;
+                            }
                             let outcome = self.check_qinplace_site09(f, i, &args)?;
                             if let QinplaceApplicability::Unestablished(_) = outcome {
                                 let closure = self.identity()?.closure_hashes[&f.name]
@@ -448,13 +501,7 @@ impl Object {
                                 Vec::new()
                             };
                             for name in &a[..2] {
-                                push(
-                                    &mut work,
-                                    &self.functions[name.trim_start_matches('@')],
-                                    &names,
-                                    &args,
-                                    Some(token(&args, &a[2])?),
-                                )?;
+                                push(&mut work, name, &names, &args, Some(token(&args, &a[2])?))?;
                             }
                         } else if matches!(
                             i.op.as_str(),
@@ -465,7 +512,7 @@ impl Object {
                             let oracle = call.instruction.op == "oracle_call";
                             push(
                                 &mut work,
-                                &self.functions[a[0].trim_start_matches('@')],
+                                &a[0],
                                 &crate::object::list(&a[if oracle { 6 } else { 4 }])?,
                                 &args,
                                 if oracle {

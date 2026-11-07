@@ -826,7 +826,11 @@ impl Object {
                     }
                     "inverse_pair_library" => {
                         if self.isa_version == crate::IsaVersion::V09 {
-                            self.inverse_pair_theorem09(closure, index, &mut BTreeSet::new())?;
+                            for entry in self.pair_claim_entries(f, index)? {
+                                self.inverse_pair_theorem09(
+                                    closure, index, entry, &mut BTreeSet::new(),
+                                )?;
+                            }
                         }
                         let library = witness.get("library_closure_hash")?.string()?;
                         let i = usize::try_from(witness.get("claim_index")?.uint()?)

@@ -194,3 +194,62 @@ fn claim_schedule_hash_requires_a_present_matching_schedule() {
         "{error}"
     );
 }
+
+#[test]
+fn scheduled_and_reference_relations_reject_conflicting_subject_closures() {
+    use bennett_isa_ref::ClaimVerdict;
+    let source = include_str!("../../conformance/fixtures/accepted-k91-09/pair-distinct.bisa");
+    let object = Object::parse(source).unwrap();
+    let root = object.identity().unwrap().closure_hashes["pair"]
+        .clone()
+        .unwrap();
+    for scheduled in [true, false] {
+        for program in [false, true] {
+            let mut c = object.section("certificate").unwrap().clone();
+            let schedule = c
+                .get("bindings")
+                .unwrap()
+                .get("schedule_hash")
+                .unwrap()
+                .clone();
+            if scheduled {
+                fields(fields(claim(&mut c)).get_mut("subject").unwrap())
+                    .insert("schedule_hash".into(), schedule);
+            }
+            if program {
+                fields(claim(&mut c)).insert(
+                    "expected".into(),
+                    support::json(&format!(r#"{{"program":"{root}"}}"#)),
+                );
+            }
+            if scheduled {
+                let valid = Object::parse(&replace(source, "certificate", Some(&c))).unwrap();
+                assert!(matches!(
+                    valid.verify_claim(&root, 0).unwrap(),
+                    ClaimVerdict::Unverified(_)
+                ));
+                let report = valid.verify_certificate().unwrap();
+                assert!(matches!(
+                    report.claims[0].verdict,
+                    ClaimVerdict::Unverified(_)
+                ));
+                assert!(report.claims[0].coverage.is_none());
+            }
+            fields(fields(claim(&mut c)).get_mut("subject").unwrap())
+                .insert("closure_hash".into(), Json::String("ab".repeat(32)));
+            match Object::parse(&replace(source, "certificate", Some(&c))) {
+                Err(error) => assert!(error.to_string().contains("subject"), "{error}"),
+                Ok(invalid) => {
+                    assert!(
+                        invalid.verify_claim(&root, 0).is_err(),
+                        "scheduled={scheduled}, program={program}"
+                    );
+                    assert!(
+                        invalid.verify_certificate().is_err(),
+                        "scheduled={scheduled}, program={program}"
+                    );
+                }
+            }
+        }
+    }
+}

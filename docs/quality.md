@@ -224,3 +224,44 @@ Both runs reused compiled test artifacts on the shared host. The reference's
 six ignores are unchanged; conformance has none. The 180-second target, coverage
 measurement and remaining structural quality work are still deferred to batch 2.
 No full repository or sibling gate ran.
+
+## Council blocker regressions
+
+The multi-entry inverse-pair regressions share claim 0 across pairs whose
+classical argument names occur in different positional orders. Both the identity
+probe and the four-row addition/subtraction probe check both concrete bindings,
+entry orders, pair orientations and direct/linked-library routes. The selected
+owner entry and terminal donor entry retain their own argument-domain mapping.
+Covered bindings establish applicability and execute/adjoint exactly; uncovered
+bindings reject through both public checker APIs and leave the complete
+`QuantumState` unchanged. CC/R wrappers mint their token and fault with code 4
+before quantum, memory, clock or tape effects; whole-run reversal restores entry.
+
+Pinned imports with and without any local qinplace retain an independent bound
+root `Unestablished` obligation naming the missing linked body. Both fixtures
+parse and pass identity checks without panicking at verification; linking the
+matching body with its owner-local inverse-pair entry establishes applicability.
+Scheduled table/program relations reject conflicting subject closures before the
+staged `Unverified` result; valid scheduled subjects still have no coverage.
+
+Before implementation, production sources matched `8056ecf` (the later branch
+commits changed review documents only). Command:
+
+```sh
+timeout 600 cargo test --offline -j3 --manifest-path reference-interpreter/Cargo.toml --test isa09_qinplace --test isa09_certificate --test isa09_budget_mint --no-fail-fast -- --test-threads=4
+```
+
+It exited 101 with six intended regression failures: wrong per-entry domain,
+post-effect CC/R cleanliness error, unresolved-import panic, missing unresolved
+root obligation, conflicting scheduled subject acceptance and revoked token use.
+The two council test files subsequently passed 37 tests with:
+
+```sh
+timeout 600 cargo test --offline -j3 --manifest-path reference-interpreter/Cargo.toml --test isa09_qinplace --test isa09_certificate -- --test-threads=4
+```
+
+Logs are private job artifacts (`c1-baseline-red.log`, `c1-council-focused.log`).
+The existing source lexical-alias regression passed in both runs. All runs are
+headless with the job's private TMPDIR/CARGO_TARGET_DIR, an 8 GiB address-space
+cap, disabled core dumps and four test threads. Full validation is recorded below
+when complete; these focused results do not claim a full gate.
