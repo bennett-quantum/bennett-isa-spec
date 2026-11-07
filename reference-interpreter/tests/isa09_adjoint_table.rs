@@ -537,6 +537,17 @@ fn zero_trip_same_name_same_type_rebinding_proves() {
 }
 
 #[test]
+fn legacy08_zero_trip_bindings_keep_published_admission() {
+    for (text, _, _) in [
+        support::r6_witness("zero-trip"),
+        support::r8_witness("zero-wide"),
+    ] {
+        let o = Object::parse(&text).unwrap();
+        o.check_hashes().unwrap();
+    }
+}
+
+#[test]
 fn current_zero_trip_exit_premises_reject_through_both_apis() {
     for body in ["d = qalloc any 1\nqfree d", "qpred x\nqunpred x"] {
         let base = support::rehash(&zero_trip_source(body));

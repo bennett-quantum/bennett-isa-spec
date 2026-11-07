@@ -170,10 +170,14 @@ impl Object {
                     if n == 0 {
                         let mut exit = s.clone();
                         self.validate_action_sequence(f, &i.bodies[0], &mut exit)?;
-                        if exit.types != s.types {
+                        // §4.6 live-binding agreement is the ISA 0.9 contract;
+                        // 0.8 retains its published zero-trip binding vectors.
+                        if self.isa_version == crate::IsaVersion::V09 && exit.types != s.types {
                             return err("§4.6", "loop body altered live names or types");
                         }
-                        if exit.predicates != s.predicates {
+                        if self.isa_version == crate::IsaVersion::V09
+                            && exit.predicates != s.predicates
+                        {
                             return err("§3.5", "loop body altered predicate stack");
                         }
                         continue;
