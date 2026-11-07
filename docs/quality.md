@@ -280,3 +280,24 @@ timeout 600 cargo test --offline -j3 --manifest-path reference-interpreter/Cargo
 The added closed-run and extended observer-rollback checks also failed before the
 token fix (three intended mint failures in `c1-token-red.log`) and passed after
 it (`c1-token-green.log`).
+
+The final three test files were also run against an archive of exact `8056ecf`:
+
+```sh
+timeout 600 cargo test --offline -j3 --manifest-path .tmp/quality-isaref/tmp/c1-baseline-8056ecf/reference-interpreter/Cargo.toml --test isa09_qinplace --test isa09_certificate --test isa09_budget_mint --no-fail-fast -- --test-threads=4
+```
+
+This exited 101 with all eight intended failures (four qinplace, one subject
+binding, three mint validity), recorded in `c1-8056ecf-red.log`. The archive
+retained baseline production sources and used the final regression fixtures.
+
+At code head `7fc37fd`, the combined focused check passed **119 tests, two existing
+ignores**, exit 0, **58.23 s wall**, **960108 KiB maximum RSS**:
+
+```sh
+timeout 900 cargo test --offline -j3 --manifest-path reference-interpreter/Cargo.toml --test isa09_qinplace --test isa09_claim_replay --test isa09_certificate --test isa09_token_aliases --test isa09_forwarding --test isa09_budget_mint --test r1_certificates --test r21_resources --test r22_coverage -- --test-threads=4
+```
+
+Both crates also passed `timeout 120 cargo fmt --manifest-path <crate>/Cargo.toml
+-- --check` and `timeout 600 cargo clippy --offline -j3 --manifest-path
+<crate>/Cargo.toml --lib --bins -- -D warnings`.
