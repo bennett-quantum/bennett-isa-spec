@@ -170,3 +170,42 @@ The reference run includes rebuilding affected binaries; conformance reused its
 compiled artifacts. They ran sequentially on a shared host. The 180-second
 programme target remains open for batch 2; these measurements do not claim it
 is met. No full repository or sibling gate was run for this remediation.
+
+## Bound-root obligation reporting
+
+Certificate checking now returns `CertificateReport`: its `claims` field retains
+standalone claim verdicts, while `qinplace_applicability` records obligations by
+owner or bound root closure independently of the claim collection. Callers that
+previously consumed the returned claim vector select `.claims`. A retained
+standalone `Proof` does not establish executable acceptance when the report
+contains an unestablished applicability obligation.
+
+Unsupported bound root kinds retain their obligation even when no supplied
+record directly owns qinplace, all claims and inverse-pair entries are removed,
+or the region map is empty. The same rule applies to unchecked scheduled trees,
+parameter-uniform invocations and host-resource-limited traversal. Unresolved
+contexts take precedence over checked contexts of the same closure. Concrete
+reference traversal still rejects missing owner-local entries and uncovered
+sites; unbound direct owners retain their separate unestablished outcome.
+
+The attachment audit covered inventory owners, concrete roots, standalone claim
+invocations, uniform invocations, scheduled traversal and work-limit exits, and
+the final claim-report construction. Obligations no longer require a discovered
+owner, claim, record or inverse-pair entry to reach the certificate report.
+Three empty-collection variants and an unchecked uniform transitive claim were
+reproduced as semantic failures before the fix. Additional regressions cover an
+unchecked scheduled root with no reached owners or claims and a concrete check
+that cannot discharge a separate uniform obligation. No published spec or
+fixture bytes changed.
+
+
+Bound-root focused validation passed **64 tests with one existing ignore**, using
+the focused command above. Both crates passed the same formatting and strict
+library/binary Clippy commands, and all reference test binaries compiled with
+`timeout 600 cargo test --offline -j3 --manifest-path reference-interpreter/Cargo.toml --no-run`.
+
+The full default reference command above ran once after the source was frozen:
+**670 passed, six existing ignores, exit 0, 7:00.81 wall, 1,591,540 KiB peak RSS**.
+This run reused the compiled test artifacts and retained the 8 GiB address-space
+cap. Reference results recorded at 2026-11-07 06:52:55 UTC. The completed CLI was atomically
+published inside this worktree before starting the conformance command.
