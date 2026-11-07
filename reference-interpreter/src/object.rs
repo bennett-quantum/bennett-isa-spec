@@ -147,6 +147,14 @@ pub struct Block {
     pub params: Vec<Param>,
     pub instructions: Vec<Instruction>,
 }
+impl Block {
+    fn validate_body_shape(&self) -> Result<()> {
+        if self.instructions.is_empty() {
+            return err("§16.2", "empty block");
+        }
+        Ok(())
+    }
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Function {
     pub kind: String,
@@ -158,6 +166,15 @@ pub struct Function {
     pub lines: Vec<String>,
 }
 impl Function {
+    fn validate_body_shape(&self) -> Result<()> {
+        if self.blocks.is_empty() {
+            return err("§16.2", "function requires blocks");
+        }
+        for block in &self.blocks {
+            block.validate_body_shape()?;
+        }
+        Ok(())
+    }
     /// An imported declaration has the same operand schema as a definition.
     /// Its synthetic parameter names are local to validation, never executable.
     pub(crate) fn from_signature(name: &str, signature: &Json) -> Result<Self> {
@@ -989,15 +1006,11 @@ impl Object {
                 while ip < numbered.len() {
                     block.instructions.push(instruction(&numbered, &mut ip)?);
                 }
-                if block.instructions.is_empty() {
-                    return err("§16.2", "empty block");
-                }
+                block.validate_body_shape()?;
                 f.blocks.push(block);
                 pos = end;
             }
-            if f.blocks.is_empty() {
-                return err("§16.2", "function requires blocks");
-            }
+            f.validate_body_shape()?;
             f.lines = lines[start..pos].iter().map(|s| s.to_string()).collect();
             self.function_order.push(n.into());
             if self.functions.insert(n.into(), f).is_some() {
@@ -1030,7 +1043,7 @@ impl Object {
         self.validate_metadata()?;
         Ok(())
     }
-    fn validate_symbols(&self) -> Result<()> {
+    pub(crate) fn validate_symbols(&self) -> Result<()> {
         let mut names = BTreeSet::new();
         for (index, s) in self.symbols()? {
             if !integer(index) || index.starts_with('-') {
@@ -1109,7 +1122,17 @@ impl Object {
         }
         Ok(())
     }
-    fn validate_function(&self, f: &Function) -> Result<()> {
+    pub(crate) fn validate_function(&self, f: &Function) -> Result<()> {
+        f.validate_body_shape()?;
+        for p in f
+            .params
+            .iter()
+            .flatten()
+            .chain(&f.regs)
+            .chain(f.blocks.iter().flat_map(|b| &b.params))
+        {
+            Type::parse(&p.ty.text())?;
+        }
         let lifted = matches!(f.kind.as_str(), "oracle" | "lproc");
         let mut types = BTreeMap::new();
         for p in f
@@ -1519,7 +1542,7 @@ impl Object {
         }
         Ok(())
     }
-    fn validate_layout(&self) -> Result<()> {
+    pub(crate) fn validate_layout(&self) -> Result<()> {
         let Some(l) = self.section("layout") else {
             for f in self.functions.values() {
                 if f.kind == "lproc"

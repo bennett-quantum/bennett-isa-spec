@@ -1,0 +1,18 @@
+{
+  "id": "F-adjoint-table-witness-nonempty",
+  "suite": "F",
+  "spec": "ISA 0.9 §12.1 K94 adjoint-table side conditions; §9.1 closed claim schema",
+  "derivation": "The same published object with a nonempty adjoint_table witness. Section 12.1 requires exactly {}; the closed claim schema rejects before a verdict can be established.",
+  "object": "object.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 1,
+    "stdout_empty": true,
+    "stderr_contains": [
+      "§12.1"
+    ]
+  }
+}

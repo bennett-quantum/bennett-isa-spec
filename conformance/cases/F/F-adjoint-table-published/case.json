@@ -1,0 +1,17 @@
+{
+  "id": "F-adjoint-table-published",
+  "suite": "F",
+  "spec": "ISA 0.9 §12.1 K94 adjoint-table side conditions; §9.1 closed claim schema",
+  "derivation": "Published bennett-arith d62140e874cd3581209bccd5be4ec38f841634bd adders/objects/arith.bij.add.w1.bisa, copied as data. Subtraction claim 1 is the universal empty-subclaim adjoint theorem; unchanged object and closure hashes bind the source. CLI admission must accept the unchanged schema.",
+  "object": "object.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "status": "ok"
+    }
+  }
+}

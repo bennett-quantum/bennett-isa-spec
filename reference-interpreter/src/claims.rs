@@ -17,6 +17,8 @@ use crate::{
     Result, Type,
 };
 use std::collections::{BTreeMap, BTreeSet};
+mod adjoint09;
+mod angles09;
 mod images09;
 mod pairs09;
 mod qinplace09;
@@ -680,6 +682,16 @@ impl Object {
         if !active.insert((closure.to_string(), index)) {
             return err("§12", "cyclic claim reference");
         }
+        let result = self.verify_claim_inner(closure, index, active);
+        active.remove(&(closure.to_string(), index));
+        result
+    }
+    fn verify_claim_inner(
+        &self,
+        closure: &str,
+        index: usize,
+        active: &mut BTreeSet<(String, usize)>,
+    ) -> Result<ClaimVerdict> {
         let certificate = self
             .section("certificate")
             .ok_or_else(|| Error::new("§12: object has no certificate".into()))?;
@@ -809,6 +821,12 @@ impl Object {
                 }
             }
             "structural" => {
+                let rule = adjoint09::StructuralRule::parse(claim.get("rule")?.string()?)?;
+                if matches!(rule, adjoint09::StructuralRule::AdjointTable)
+                    && self.isa_version == crate::IsaVersion::V09
+                {
+                    return self.verify_adjoint_table09(closure, index, claim, f, active);
+                }
                 for sub in claim.get("subclaims")?.array()? {
                     let s = usize::try_from(sub.uint()?)
                         .map_err(|_| Error::new("§12: subclaim".into()))?;
@@ -819,12 +837,12 @@ impl Object {
                     }
                 }
                 let witness = claim.get("witness")?;
-                match claim.get("rule")?.string()? {
-                    "translation_lemma" => {
+                match rule {
+                    adjoint09::StructuralRule::TranslationLemma => {
                         self.check_translation_witness(f, witness)?;
                         ClaimVerdict::Proof
                     }
-                    "inverse_pair_library" => {
+                    adjoint09::StructuralRule::InversePairLibrary => {
                         if self.isa_version == crate::IsaVersion::V09 {
                             for entry in self.pair_claim_entries(f, index)? {
                                 self.inverse_pair_theorem09(
@@ -843,7 +861,7 @@ impl Object {
                             ))
                         }
                     }
-                    _ => ClaimVerdict::Unverified(
+                    adjoint09::StructuralRule::AdjointTable => ClaimVerdict::Unverified(
                         "the adjoint_table rule's side conditions are not specified beyond its subclaims".into(),
                     ),
                 }
@@ -852,7 +870,6 @@ impl Object {
                 "{kind} claims need the rigorous interval checker (§12.1), staged as deliverable 11"
             )),
         };
-        active.remove(&(closure.to_string(), index));
         Ok(verdict)
     }
     fn check_translation_witness(&self, f: &Function, w: &Json) -> Result<()> {
