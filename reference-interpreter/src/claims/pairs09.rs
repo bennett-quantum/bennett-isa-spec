@@ -39,6 +39,35 @@ fn entry_budget(value: &Json) -> Result<Budget> {
         depth: v[3].uint()?,
     })
 }
+pub(super) struct PairContext {
+    budget: Budget,
+    tokens: BTreeMap<String, Budget>,
+}
+pub(super) fn pair_context(object: &Object, entry: &Json) -> Result<PairContext> {
+    let budget = entry_budget(entry.get("budget")?)?;
+    object.validate_budget(budget)?;
+    let tokens = entry
+        .object()?
+        .get("arg_tokens")
+        .map(|v| {
+            v.object()?
+                .iter()
+                .map(|(n, b)| Ok((n.clone(), entry_budget(b)?)))
+                .collect::<Result<BTreeMap<_, _>>>()
+        })
+        .transpose()?
+        .unwrap_or_default();
+    for b in tokens.values() {
+        object.validate_budget(*b)?;
+    }
+    // Formal argument order needs the body; partition shape does not.
+    crate::tokens::alias_binding(
+        entry.object()?.get("token_aliases"),
+        &vec![None; tokens.len() + 1],
+        tokens.is_empty(),
+    )?;
+    Ok(PairContext { budget, tokens })
+}
 pub(super) fn pair<'a>(object: &'a Object, entry: &Json) -> Result<Pair<'a>> {
     let g = object.region_function(entry.get("g")?.string()?)?;
     let gi = object.region_function(entry.get("ginv")?.string()?)?;
@@ -63,19 +92,7 @@ pub(super) fn pair<'a>(object: &'a Object, entry: &Json) -> Result<Pair<'a>> {
             "inverse-pair oracle signatures are incompatible",
         );
     }
-    let budget = entry_budget(entry.get("budget")?)?;
-    object.validate_budget(budget)?;
-    let tokens = entry
-        .object()?
-        .get("arg_tokens")
-        .map(|v| {
-            v.object()?
-                .iter()
-                .map(|(n, b)| Ok((n.clone(), entry_budget(b)?)))
-                .collect::<Result<BTreeMap<_, _>>>()
-        })
-        .transpose()?
-        .unwrap_or_default();
+    let PairContext { budget, tokens } = pair_context(object, entry)?;
     let expected = g.params[4]
         .iter()
         .filter(|p| p.ty == Type::Token)
@@ -86,9 +103,6 @@ pub(super) fn pair<'a>(object: &'a Object, entry: &Json) -> Result<Pair<'a>> {
             "§12.3 K4",
             "arg_tokens must bind exactly the token-typed oracle arguments",
         );
-    }
-    for b in tokens.values() {
-        object.validate_budget(*b)?;
     }
     let mut tuples = vec![Some(budget)];
     tuples.extend(
@@ -243,6 +257,7 @@ impl Object {
                 let library = witness.get("library_closure_hash")?.string()?;
                 let donor_index = usize::try_from(witness.get("claim_index")?.uint()?)
                     .map_err(|_| crate::resource_error("§12.1 K4", "claim index exceeds host"))?;
+                pair_context(self, entry)?;
                 let identity = self.identity()?;
                 let mut pins = BTreeSet::new();
                 if let Some(imports) = self.section("imports") {

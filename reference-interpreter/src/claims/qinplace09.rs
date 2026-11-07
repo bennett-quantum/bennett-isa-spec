@@ -126,6 +126,7 @@ impl Object {
                         Error::new("§12.3 K92: pair claim index out of range".into())
                     })?;
                     pairs09::pair_claim(claim)?;
+                    pairs09::pair_context(self, entry)?;
                     if missing_body.is_some() {
                         continue;
                     }

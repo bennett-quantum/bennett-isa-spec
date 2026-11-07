@@ -546,6 +546,25 @@ fn imported_pair_rejects_invalid_referenced_claim_before_missing_body_outcome() 
 #[test]
 fn imported_pair_inventory_resolves_pins_in_either_orientation_without_proof_replay() {
     use bennett_isa_ref::{ClaimVerdict, QinplaceApplicability};
+    for reverse in [false, true] {
+        let text = imported_pair_library_certificate(reverse);
+        let object = Object::parse(&text).unwrap();
+        object.check_hashes().unwrap();
+        let report = object.verify_certificate().unwrap();
+        assert!(
+            matches!(report.claims[0].verdict, ClaimVerdict::Unverified(_)),
+            "{report:?}"
+        );
+        assert!(
+            matches!(
+                report.claims[0].qinplace_applicability,
+                Some(QinplaceApplicability::Unestablished(_))
+            ),
+            "{report:?}"
+        );
+    }
+}
+fn imported_pair_library_certificate(reverse: bool) -> String {
     let witness = include_str!("fixtures/imported-qinplace-missing-inventory.bisa");
     let imported = Object::parse(witness).unwrap();
     let imports = imported.section("imports").unwrap();
@@ -563,37 +582,67 @@ fn imported_pair_inventory_resolves_pins_in_either_orientation_without_proof_rep
         .unwrap()
         .string()
         .unwrap();
-    for reverse in [false, true] {
-        let text = change_certificate(witness, |c| {
-            fields(fields(c).get_mut("bindings").unwrap()).remove("invocation");
-            let record = fields(fields(c).get_mut("regions").unwrap())
-                .values_mut()
-                .next()
-                .unwrap();
-            fields(record).insert("claims".into(), support::json(&format!(r#"[{{"kind":"structural","rule":"inverse_pair_library","subclaims":[],"witness":{{"library_closure_hash":"{g}","claim_index":0}},"invocation":{{"args":"all","budget":"all","token_aliases":"all"}}}}]"#)));
-            let (eg, ei) = if reverse { (gi, g) } else { (g, gi) };
-            fields(fields(record).get_mut("verification").unwrap()).insert(
-                "inverse_pairs".into(),
-                support::json(&format!(
-                    r#"[{{"g":"{eg}","ginv":"{ei}","claim":0,"budget":[3,0,0,0]}}]"#
-                )),
-            );
-        });
-        let object = Object::parse(&text).unwrap();
-        object.check_hashes().unwrap();
-        let report = object.verify_certificate().unwrap();
-        assert!(
-            matches!(report.claims[0].verdict, ClaimVerdict::Unverified(_)),
-            "{report:?}"
+    change_certificate(witness, |c| {
+        fields(fields(c).get_mut("bindings").unwrap()).remove("invocation");
+        let record = fields(fields(c).get_mut("regions").unwrap())
+            .values_mut()
+            .next()
+            .unwrap();
+        fields(record).insert("claims".into(), support::json(&format!(r#"[{{"kind":"structural","rule":"inverse_pair_library","subclaims":[],"witness":{{"library_closure_hash":"{g}","claim_index":0}},"invocation":{{"args":"all","budget":"all","token_aliases":"all"}}}}]"#)));
+        let (eg, ei) = if reverse { (gi, g) } else { (g, gi) };
+        fields(fields(record).get_mut("verification").unwrap()).insert(
+            "inverse_pairs".into(),
+            support::json(&format!(
+                r#"[{{"g":"{eg}","ginv":"{ei}","claim":0,"budget":[3,0,0,0]}}]"#
+            )),
         );
-        assert!(
-            matches!(
-                report.claims[0].qinplace_applicability,
-                Some(QinplaceApplicability::Unestablished(_))
-            ),
-            "{report:?}"
-        );
-    }
+    })
+}
+
+#[test]
+fn imported_pair_rejects_invalid_entry_budget_before_missing_body_outcome() {
+    assert_imported_pair_rejects_entry_context("budget", "[3,1,0,0]", "memoryless budgets");
+    assert_imported_pair_rejects_entry_context(
+        "arg_tokens",
+        r#"{"absent":[3,1,0,0]}"#,
+        "memoryless budgets",
+    );
+}
+#[test]
+fn imported_pair_rejects_invalid_alias_structure_before_missing_body_outcome() {
+    assert_imported_pair_rejects_entry_context("token_aliases", "[]", "token_aliases arity");
+    assert_imported_pair_rejects_entry_context("token_aliases", "[1]", "labels must start at zero");
+}
+fn assert_imported_pair_rejects_entry_context(field: &str, value: &str, diagnostic: &str) {
+    let text = change_certificate(&imported_pair_library_certificate(false), |c| {
+        let record = fields(fields(c).get_mut("regions").unwrap())
+            .values_mut()
+            .next()
+            .unwrap();
+        let entries = fields(fields(record).get_mut("verification").unwrap())
+            .get_mut("inverse_pairs")
+            .unwrap();
+        let bennett_isa_ref::json::Json::Array(entries) = entries else {
+            panic!("entries")
+        };
+        fields(&mut entries[0]).insert(field.into(), support::json(value));
+        if field == "arg_tokens" {
+            fields(&mut entries[0]).insert("token_aliases".into(), support::json("[0,1]"));
+        }
+    });
+    let object = Object::parse(&text).unwrap();
+    object.check_hashes().unwrap();
+    let owner = object.identity().unwrap().closure_hashes["addya"]
+        .clone()
+        .unwrap();
+    let error = object
+        .verify_certificate()
+        .expect_err("static entry context must reject without pair bodies");
+    assert!(error.to_string().contains(diagnostic), "{field}: {error}");
+    let error = object
+        .verify_claim(&owner, 0)
+        .expect_err("standalone claim must reject malformed entry context");
+    assert!(error.to_string().contains(diagnostic), "{field}: {error}");
 }
 
 #[test]
@@ -735,6 +784,9 @@ fn assert_unavailable_library_rejects_owner_context(field: &str, value: &str, di
             panic!("entries")
         };
         fields(&mut entries[0]).insert(field.into(), support::json(value));
+        if field == "arg_tokens" {
+            fields(&mut entries[0]).insert("token_aliases".into(), support::json("[0,1]"));
+        }
     });
     let object = Object::parse(&text).unwrap();
     object.check_hashes().unwrap();
