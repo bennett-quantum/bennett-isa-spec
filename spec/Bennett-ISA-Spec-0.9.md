@@ -254,6 +254,7 @@ north star §3.1 requires).
 | K91 | §5.4, §7.4, §10.1, §11, §12.3 | **YSW**. Canonical token_aliases equality partitions preserve actual identities through calls, source builders and reversal; only oracle invocations prepend a primary token. S1: universal partition encoding, schedule matching/history, identity-call carrier and self-adjoint wording. Additive launch/sched token_aliases/1 feature with explicit loader negotiation, preserving legacy symbols; legacy token-argument requests need an alias binding. Alias-bearing schedule/certificate hashes change; args/params_hash, source/interface/closure/object and ref catalog identities stay fixed under unchanged envelopes. Narrow choice: versioned ABI feature rather than a header-version bump. Editor's note (advisor R21, 2026-11-03): the loader capability negotiation this row invokes (feature-query entry point, defined absent-feature behaviour, version field) is not yet defined in 0.9 text; it is pending b-isa-spec-b3ui (note, sol+astra round, editorial completion of K91). Do not implement against an undefined negotiation. | ysw; council pass2-ysw-2026-11-02 round 2; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | +schedule/certificate bytes |
 | K92 | §4.5, §12.3 | **2QC**. QINPLACE-CHECKER-COVERAGE: owner-local exact pair presence and all reached bound transitive contexts, explicit unestablished applicability outcome, executor pre-effect coverage retained. S1: correct insertion before CLAIM-BINDING, literal reference-Q traversal including disabled predicates/zero-trip distinction and nested fixture. Compatibility: incorrect executable packets now reject or remain incomplete; correcting missing entries changes certificate bytes/digests. No executor/source/interface/closure/object, target/schedule, expansion or ref catalog identity changes. Narrow reading: owner-local requirements follow existing §4.5 and this K only; held 0jq is not presumed. | 2qc; council derive3-2qc-2026-11-02 round 1; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | – |
 | K93 | §3.3, §4.4, §11.1, §15 | **SQR**. MCX-BUNDLE-CONTROLS: ordered bundle expansion, wire distinctness, flattened k and scalar target. S1: mixed-list order/arity, phase-sensitive external-reference witness, wire[1] target and active-predicate count. Route taken: in-version 0.9 K by maintainer D2 explicitly naming sqr (Muse sqr-S1); witness object/interface/closure hashes unchanged. Existing ref recipes/catalog bytes stay unchanged; wrong-arity adapter leaf hashes, schedules and cached execution/validation require regeneration and certificates rechecking. | sqr; council derive3-sqr-2026-11-02 round 1; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | – |
+| K94 | §12.1, §16.3 example 3 | **ADJOINT-TABLE-PREMISES**. Defines the reference-action adjoint theorem, full-D/control scope, optional conjunctive subclaims and decidable syntactic premises; distinguishes established proof, named unchecked premises and malformed/refuted rejection. Compatibility: formerly Unverified adjoint_table claims become established or rejected when checkable; unavailable premises remain Unverified. No grammar or envelope changes: unchanged source/interface/closure/object, target/schedule/certificate and ref recipe/catalog bytes and hashes stay fixed; checker verdicts and validation caches require rechecking. Narrow reading: generated adjoint, no self-adjointness or variant-name inference, no mandatory replay subclaim. | in-version 0.9 K, advisor R34 2026-11-07; council pending | S | – |
 
 **Decided Q14 (applied 2026-10-29, confirmed 2026-10-30; b-isa-spec-7u6).** Lprocs take explicit
 token and classical parameters (§3.7, §4.2, §4.7, §16.2), forwarded by
@@ -3838,6 +3839,71 @@ Witness envelope SHA-256: `299510fd67cc626fdcbcc10adcd40730f9af294ba596d86fb25fd
 | `numerical` | `{ "subject": { "closure_hash", "variant", "inherited_controls", "schedule_hash" }, "metric": "operator_norm", "precision_bits": n, "bound": decimal }` | **checker-computed, for every invocation context of the subject** (below): build the realised unitary U of that invocation (the region's realisation under the root schedule at that path, with its resolved classical arguments, budget, epsilon shares and cleanup choices, and `inherited_controls` control wires prepended) and the reference unitary V (the region's §5.3 semantics with the same arguments, controlled on the same wires) at the subject's signature widths in interval arithmetic at `precision_bits` (basis order = allocation order, controls first), form interval enclosures of `V†U − I` entrywise, derive the operator-norm bound as the Frobenius-norm upper bound in interval arithmetic, and verify it is ≤ `bound`; the claim holds iff it holds for every context |
 | `channel` | `{ "subject": as above, "metric": "diamond", "precision_bits", "bound", "dual": [ { "Y": interval Hermitian matrix, "mu": decimal } … ] }` | for every invocation context of the subject, in enumeration order, verify its dual witness for the **diamond-norm SDP** below in interval arithmetic and `mu` ≤ `bound` (one witness per context; too few witnesses: reject) |
 
+**Adjoint-table side conditions (K94).** A `structural` claim with
+`rule:"adjoint_table"` asserts that the §5.3 adjoint construction of its
+**containing certificate region**, an `action` or `perm_action`, denotes
+U† when that region's reference semantics denotes U. Both compositions
+are identity on the full §5.3 domain D, with clean workspace/local images
+and identity on borrowed and external reference systems. This includes
+every inherited effective control set: the construction inverts controlled-U
+with the same controls. It neither asserts U = U† nor compares a separately
+written inverse body or a scheduled realisation. There is no `subject`,
+`variant` or `domain` field for this rule; no variant spelling selects an
+adjoint. The claim's own §12.3 `invocation` binds its classical arguments,
+budget and K91 token identities, or quantifies over all of them in the
+existing parameter-uniform form. [deps: ISA-5.3, ISA-5.6, ISA-12.3]
+
+The checker MUST check the following finite syntactic premises, including
+nested bodies, both `qif` arms and zero-trip loop bodies:
+
+1. The containing region is an action, the witness is exactly `{}`, and
+   each subclaim index is an earlier index in that same region's claim array.
+   The existing closed claim schema and invocation-binding rules apply.
+2. Every source instruction has its §5.3 replacement: reverse the complete
+   source sequence and renumber versions; exchange allocation/release,
+   copy/uncopy, load/unload and gate pairs, negate rotation angles, exchange
+   the `qinplace` pair, retain oracle calls and toggle action-call adjoints.
+   Reverse predicate pairs and the complete `qif` expansion with unconditional
+   lifetimes; use the specified bounded-loop and while-flag constructions.
+   Apply the same check transitively to action callees. All source operand,
+   signature, bounds, read-only/control, version, lifetime/cleanup and borrow
+   conditions of §§3–6 MUST hold; matching syntax alone cannot waive them.
+   Every referenced function and data definition in the dependency closure
+   MUST be linked before the checker establishes this theorem. Recursive
+   lifted dependencies are visited as a finite definition graph, not unrolled.
+3. Each listed subclaim MUST independently return **established/proof** under
+   its own rule and binding. Subclaims are optional additional conjunctive
+   premises, not an encoding of the source-to-adjoint transformation; `[]`
+   is permitted. Their kinds, labels, replay subjects/variants, invocations
+   and domains retain their existing meanings. They need not name an adjoint,
+   a common variant or a common invocation, because no assertion or coverage
+   is transferred from them to the theorem. A sampled or restricted-domain
+   observation does not become a proof by being listed here. A producer's
+   label never substitutes for the checker's result.
+[deps: ISA-3.3, ISA-3.5, ISA-4.3, ISA-4.5, ISA-4.6, ISA-5.3, ISA-5.6, ISA-6.2, ISA-9.3, ISA-12.1, ISA-12.2, ISA-12.3]
+
+When all premises hold the outcome is **established/proof**, including for
+an empty subclaim list and a parameter-uniform invocation; no basis replay
+is required to prove the syntactic adjoint law. `evidence`,
+`proof_relative_to_image` or `Unverified` for any listed subclaim instead
+yields **Unverified**, with reason `adjoint_table subclaim <index> is not an
+established proof`. An unavailable linked definition yields **Unverified**,
+with reason `adjoint_table linked definition unavailable: @<name>`.
+These are the only unchecked-premise outcomes for this rule; a host-resource
+failure remains an explicit checker resource diagnostic. Malformed claims,
+violated syntactic premises and refuted subclaims reject. Check every
+available premise even after an unchecked one: rejection takes precedence
+over Unverified, and all unchecked reasons may be reported. In particular
+an absent proof cannot justify accepting a false later subclaim.
+[deps: ISA-12.1, ISA-12.2, ISA-12.3]
+
+This theorem does not itself prove a forward table/program relation, an
+independent borrow-frame relation or a `qinplace` inverse-pair theorem.
+The source's semantic preconditions remain obligations; K92 executable
+applicability is checked and reported separately and is never discharged
+by this adjoint law. Reference-only proof in an object containing a schedule
+still establishes only the reference adjoint law. [deps: ISA-4.5, ISA-5.3, ISA-5.6, ISA-12.3]
+
 **Selected borrow-frame claims (K89).** The exhaustive and sampled productions additionally admit:
 
 ```text
@@ -5224,7 +5290,9 @@ borrowed wire entangled with a reference system it acts as that
 permutation ⊗ I. The map is an involution, so the adjoint (the reverse
 sequence `cx b[0] t; cx x b[0]; cx b[0] t; cx x b[0]`) realises the same
 permutation; the adjoint's frame is not of the lemma's shape and is
-covered by the `adjoint_table` rule (§12.1).
+covered by the `adjoint_table` rule (§12.1): once the forward borrow
+conditions are established, its generated adjoint preserves them and
+implements U†. The involution here follows separately from the displayed map.
 
 **Example 4** (`ones`, BLK-1): a register of run-time width, its id
 stored to memory and reloaded, wires addressed by run-time slices.
