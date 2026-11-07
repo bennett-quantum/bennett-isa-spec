@@ -137,3 +137,20 @@ failed for its intended semantic reason. The final suite also covers nested
 sites, zero-trip inventory, disabled controls, transitive owners, donor budget and
 argument-domain preservation, and missing library bodies. No published spec or
 fixture bytes changed.
+
+
+The remediation focused check passed **58 tests with one existing ignore**:
+
+```sh
+timeout 600 cargo test --offline -j3 --manifest-path reference-interpreter/Cargo.toml --test isa09_qinplace --test isa09_claim_replay --test isa09_certificate --test r1_certificates --test r1_qinplace -- --test-threads=4
+```
+
+Both crates passed `cargo fmt --manifest-path <crate>/Cargo.toml -- --check`
+and strict library/binary linting with
+`timeout 600 cargo clippy --offline -j3 --manifest-path <crate>/Cargo.toml --lib --bins -- -D warnings`.
+The reference default command documented above was run once after the source
+changes, with the same environment and caps: **664 passed, six existing ignores,
+exit 0, 21:58.05 wall, 1,592,024 KiB peak RSS**. The freshly built CLI was then
+published to the stable path inside this worktree for the conformance run.
+The conformance default run is pending. Runtime and wider quality work remain
+outside this remediation.
