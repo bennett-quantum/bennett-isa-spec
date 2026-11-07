@@ -393,3 +393,23 @@ its `.comments` companion and literal interface pin were missing. Both were adde
 without weakening the audit; all seven `r1_fixtures` tests pass in the focused
 command above. The failed run is retained as `c2-fixture-audit-red.*`; it is not
 counted as a completed full validation.
+
+Final full validation completed at **2026-11-07 09:14:53 UTC**, run head `b618b16`,
+with production sources unchanged since `09f183d`. Both commands exited **0**:
+
+```sh
+timeout 2400 cargo test --offline -j3 --manifest-path reference-interpreter/Cargo.toml -- --test-threads=4
+BENNETT_CONFORMANCE_BIN="$CARGO_TARGET_DIR/debug/bennett-isa-ref" timeout 2400 cargo test --offline -j3 --manifest-path conformance/Cargo.toml -- --test-threads=4
+```
+
+| Crate | Passed | Existing ignores | Wall time | Maximum RSS (KiB) |
+| --- | ---: | ---: | --- | ---: |
+| reference | 688 | 6 | 4:38.86 | 1591396 |
+| conformance | 129 | 0 | 8:01.38 | 723376 |
+
+Logs, statuses and timings are private `c2-full-reference.*` and
+`c2-full-conformance.*` artifacts; `c2-conformance-binary.sha256` records the
+rebuilt private interpreter selected by conformance. These final runs include
+the static-context extension and completed fixture audit. No full repository
+gate, gate tool or sibling gate ran. The broader runtime/quality programme
+remains outside this semantic repair.
