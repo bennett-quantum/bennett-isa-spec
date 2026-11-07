@@ -447,3 +447,32 @@ fn renamed_definition_cannot_escape_dependency_closure_validation() {
     o.functions.get_mut("z").unwrap().name = "renamed".into();
     rejects_current_definition(&o, &root, "renamed");
 }
+
+#[test]
+fn empty_current_lifted_bodies_cannot_inherit_parse_time_validity() {
+    for lproc in [false, true] {
+        let name = if lproc { "worker" } else { "z" };
+        for remove_blocks in [false, true] {
+            let (mut o, root) = lifted_dependencies(lproc);
+            let f = o.functions.get_mut(name).unwrap();
+            if remove_blocks {
+                f.blocks.clear();
+            } else {
+                f.blocks[0].instructions.clear();
+            }
+            rejects_current_definition(&o, &root, name);
+        }
+    }
+}
+
+#[test]
+fn loader_empty_body_diagnostics_remain_byte_identical() {
+    for (suffix, diagnostic) in [
+        ("\n^entry():", "§16.2: empty block"),
+        ("", "§16.2: function requires blocks"),
+    ] {
+        let body = format!("oracle @z () (t:wire) (f:wire[4]) () ()\nregs {{ r:reg[1] }}{suffix}");
+        let text = support::object(&[("z", EMPTY_ORACLE, &body)], "{}", "").replace("0.8", "0.9");
+        assert_eq!(Object::parse(&text).unwrap_err().to_string(), diagnostic);
+    }
+}
