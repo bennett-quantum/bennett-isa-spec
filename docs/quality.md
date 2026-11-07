@@ -152,5 +152,21 @@ The reference default command documented above was run once after the source
 changes, with the same environment and caps: **664 passed, six existing ignores,
 exit 0, 21:58.05 wall, 1,592,024 KiB peak RSS**. The freshly built CLI was then
 published to the stable path inside this worktree for the conformance run.
-The conformance default run is pending. Runtime and wider quality work remain
+The conformance default command also passed once after publication, with no
+source changes between either complete run. Runtime and wider quality work remain
 outside this remediation.
+
+
+Final remediation validation recorded at 2026-11-07 06:23:46 UTC.
+Both exact default commands are listed above; each used `ulimit -v 8388608`,
+`timeout 1800`, three compiler jobs and four test threads.
+
+| Crate | Passed | Ignored | Wall (min:sec) | Peak RSS (KiB) | Exit |
+|---|---:|---:|---:|---:|---:|
+| reference-interpreter | 664 | 6 | 21:58.05 | 1,592,024 | 0 |
+| conformance | 129 | 0 | 16:52.64 | 723,256 | 0 |
+
+The reference run includes rebuilding affected binaries; conformance reused its
+compiled artifacts. They ran sequentially on a shared host. The 180-second
+programme target remains open for batch 2; these measurements do not claim it
+is met. No full repository or sibling gate was run for this remediation.
