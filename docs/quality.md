@@ -375,11 +375,11 @@ The baseline result is retained in private `c2-baseline-red.log`, `.status` and
 `.time` artifacts. Fixture-construction errors encountered before that final run
 were corrected and are not counted as production regressions.
 
-The corrected implementation passes **70 focused tests**, exit 0, **33.10 s
-wall**, **214148 KiB maximum RSS** (`c2-focused.log`, `.status`, `.time`):
+The corrected implementation passes **77 focused tests**, exit 0, **21.13 s
+wall**, **203964 KiB maximum RSS** (`c2-focused.log`, `.status`, `.time`):
 
 ```sh
-timeout 900 cargo test --offline -j3 --manifest-path reference-interpreter/Cargo.toml --test isa09_qinplace --test isa09_claim_replay --test isa09_certificate --test isa09_budget_mint -- --test-threads=4
+timeout 900 cargo test --offline -j3 --manifest-path reference-interpreter/Cargo.toml --test isa09_qinplace --test isa09_claim_replay --test isa09_certificate --test isa09_budget_mint --test r1_fixtures -- --test-threads=4
 ```
 
 Both crates pass `timeout 120 cargo fmt --manifest-path <crate>/Cargo.toml --
@@ -387,3 +387,9 @@ Both crates pass `timeout 120 cargo fmt --manifest-path <crate>/Cargo.toml --
 TMPDIR/target, 8 GiB address-space cap and four test threads as above.
 Both crates also pass `timeout 600 cargo clippy --offline -j3 --manifest-path
 <crate>/Cargo.toml --lib --bins -- -D warnings`.
+
+The first full reference run exposed the new fixture's required audit integration:
+its `.comments` companion and literal interface pin were missing. Both were added
+without weakening the audit; all seven `r1_fixtures` tests pass in the focused
+command above. The failed run is retained as `c2-fixture-audit-red.*`; it is not
+counted as a completed full validation.

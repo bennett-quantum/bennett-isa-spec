@@ -653,6 +653,11 @@ fn fixture_identities_are_pinned_as_literals() {
             "a",
             "bb983f1dc5a8eea46912ea64d1226a9345a05d6cba6cc8452efc9f39b4a17a89",
         ),
+        (
+            "imported-qinplace-missing-inventory",
+            "addya",
+            "4dc068f587f3c82dc1bddc8ae32860be149ddffe595c038d6cef77e047fad31a",
+        ),
     ];
     let mut checked = 0;
     for (fixture, symbol, hash) in pinned {
