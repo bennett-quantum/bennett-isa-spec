@@ -1,0 +1,165 @@
+{
+  "cases": [
+    {
+      "case": "global",
+      "entries": [
+        "top"
+      ],
+      "vectors": [
+        [
+          0,
+          18
+        ]
+      ],
+      "source_sha256": "db3c5bb8a4e8eef9b38e8e282164b0cdf5e271375f6b88dca3db2735d3c05693"
+    },
+    {
+      "case": "handle-input",
+      "entries": [
+        "top"
+      ],
+      "vectors": [
+        [
+          0,
+          13
+        ]
+      ],
+      "source_sha256": "09f2b7d68fc7f8951c5aee50dbc16b1717ef59f055acac95b2849f91acd68289"
+    },
+    {
+      "case": "several-entries",
+      "entries": [
+        "first",
+        "second"
+      ],
+      "vectors": [
+        [
+          0,
+          {
+            "first": 18,
+            "second": 30
+          }
+        ]
+      ],
+      "source_sha256": "d089ebf0279b1c613b84defd2fca0620b20229a22c66cde8de96a7ea7bb97a11"
+    },
+    {
+      "case": "heap-history",
+      "entries": [
+        "top"
+      ],
+      "vectors": [
+        [
+          1,
+          18
+        ],
+        [
+          5,
+          18
+        ]
+      ],
+      "source_sha256": "cb5fcf4352d772972e4878298496b103f441f96583b522f3fb5591fe38904b26"
+    },
+    {
+      "case": "address-observation",
+      "entries": [
+        "top"
+      ],
+      "vectors": [
+        [
+          0,
+          6
+        ]
+      ],
+      "source_sha256": "c72aeeeb5505dcd080ac9b6a7645597b541a8c51a6b6560083ce3ed912cf40d0"
+    },
+    {
+      "case": "allocator-only",
+      "entries": [
+        "top"
+      ],
+      "vectors": [
+        [
+          0,
+          6
+        ],
+        [
+          3,
+          10
+        ]
+      ],
+      "source_sha256": "261145b0fdc348792181516a60fb6ab909f7261f125cee430a34c836541889f2"
+    },
+    {
+      "case": "logical-stack",
+      "entries": [
+        "top"
+      ],
+      "vectors": [
+        [
+          3,
+          18
+        ]
+      ],
+      "source_sha256": "f3c2e502ecb9fe2b743ce950d309a132c6b04b8a649c51ffb6601fdfb297d739"
+    },
+    {
+      "case": "popped-frame",
+      "entries": [
+        "top"
+      ],
+      "vectors": [
+        [
+          1,
+          1799
+        ]
+      ],
+      "source_sha256": "3c8300cc3d1e70b03a680cc295e1505ad2385b167789efaa360c12085a5cdb2e"
+    },
+    {
+      "case": "restored-allocation",
+      "entries": [
+        "top"
+      ],
+      "vectors": [
+        [
+          1,
+          1799
+        ]
+      ],
+      "source_sha256": "7b9189caccdd8f3660ca86e8795123274c781ca2d04e3b99cb07ec03b3f49f45"
+    },
+    {
+      "case": "dead-entry",
+      "entries": [
+        "top"
+      ],
+      "vectors": [
+        [
+          0,
+          1792
+        ]
+      ],
+      "source_sha256": "470c486ddade8751dbee37d5a69346875a95d97955de0358883e92c8c9e7a463"
+    },
+    {
+      "case": "save-state",
+      "entries": [
+        "top"
+      ],
+      "vectors": [
+        [
+          0,
+          2
+        ]
+      ],
+      "source_sha256": "9ac6fe611d0c8a6eb78b5e646d131a90ead5729f1f1ab1d6200590830a734a0e"
+    }
+  ],
+  "debug_check_invocations": 12,
+  "release_run_program_invocations": 14,
+  "total_interpreter_invocations": 26,
+  "script_unchanged_across_pin_move": true,
+  "script_sha256": "365d936c133ad9d7384b59ec95f92f720b598a2693f600accc712d6e0fff9a15",
+  "pin_move": "30a354b"
+}

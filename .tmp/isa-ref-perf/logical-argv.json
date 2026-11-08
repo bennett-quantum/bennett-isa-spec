@@ -1,0 +1,9 @@
+[
+  "run-program",
+  "/home/tobias/Projects/bennett-workspace/bennett-isa-spec-job-perf/.tmp/isa-ref-perf/logical-stack.bisa",
+  "top",
+  "--args",
+  "3,1000000,6,1000000,1000000,1000000",
+  "--budget",
+  "10000000,48,4096,16"
+]
