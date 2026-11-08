@@ -10,6 +10,33 @@ pub struct Rational {
 }
 
 impl Rational {
+    pub(super) fn power_two(exponent: i64) -> Self {
+        let one = BigInt::from_i128(1);
+        if exponent >= 0 {
+            Self {
+                n: one.shl(exponent as u64),
+                d: one,
+            }
+        } else {
+            Self {
+                n: one.clone(),
+                d: one.shl(exponent.unsigned_abs()),
+            }
+        }
+    }
+    pub(super) fn binary_exponent(&self) -> Result<i64> {
+        assert!(self.n > BigInt::zero());
+        let n_bits = i64::try_from(self.n.bit_len())
+            .map_err(|_| crate::resource_error("§12.1", "numerator width exceeds host range"))?;
+        let d_bits = i64::try_from(self.d.bit_len())
+            .map_err(|_| crate::resource_error("§12.1", "denominator width exceeds host range"))?;
+        let exponent = n_bits - d_bits;
+        Ok(if *self < Self::power_two(exponent) {
+            exponent - 1
+        } else {
+            exponent
+        })
+    }
     pub fn integer(value: i128) -> Self {
         Self {
             n: BigInt::from_i128(value),

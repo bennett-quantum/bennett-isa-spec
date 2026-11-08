@@ -1,6 +1,17 @@
 use super::BigInt;
 
 impl BigInt {
+    pub(crate) fn sqrt_floor(&self) -> Self {
+        assert!(*self >= Self::zero());
+        let mut root = Self::zero();
+        for bit in (0..self.bit_len().div_ceil(2)).rev() {
+            let candidate = root.add(&Self::from_i128(1).shl(bit as u64));
+            if candidate.mul(&candidate) <= *self {
+                root = candidate;
+            }
+        }
+        root
+    }
     pub(crate) fn abs(&self) -> Self {
         Self {
             negative: false,
