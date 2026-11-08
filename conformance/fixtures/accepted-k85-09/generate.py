@@ -240,6 +240,11 @@ def generate(binary, temporary):
         input_dimension=1, output_dimension=2,
         restricted_frobenius_squared=0, unrestricted_frobenius_squared=4,
         restricted_choi_difference=[[0, 0], [0, 0]],
+        phase_sensitive=dict(U=[[-1, 0], [0, -1]], V=[[1, 0], [0, 1]],
+                             restricted_frobenius_squared=4,
+                             uncontrolled_choi_difference=[[0, 0], [0, 0]],
+                             derivation="(-I-I)|0>=-2|0>, norm 2, while both uncontrolled channels map |0><0| to itself. "
+                                        "A free control retains that phase on its one branch; equal channels cannot discharge the controlled-unitary bound."),
         strict_dual=dict(Y=[["0.125", "0"], ["0", "0.125"]], mu="0.375", bound="0.375"),
         derivation="(Z-I)J=0 at fixed |0>; Choi difference is 2x2, input dimension 1, full output dimension 2. "
                    "Y=I2/8 has pivots 1/8; Tr_out(Y)=1/4, mu=3/8 leaves pivot 1/8. "

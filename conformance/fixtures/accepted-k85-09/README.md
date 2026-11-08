@@ -23,7 +23,7 @@ from that CLI. Both image certificates have identical executable identities.
 | “exact +1 basis-phase” | `phase`: S² adds -1 to output-one tuples despite matching basis outputs | Replay rejects |
 | “borrowed ... inherited controls ... external-reference” | `controlled-dirty` covers 256 tuples; `external-reference` also runs with controls, address and dirty wire each Bell-entangled with an untouched reference | Replay and exact state restoration |
 | “cannot discharge ... unrestricted borrow-frame” | Integration test attaches `controlled-dirty` to borrow_frames: standalone conditional theorem survives, full-D obligation rejects | Certificate API |
-| “(U−V)J_I ... reduced input ... complete output” | `restricted-map.json`: Z|0> = I|0>, restricted norm 0, unrestricted Frobenius norm 2; Choi difference is 2×2 for input 1/output 2 | Independent exact integer/dyadic map test only |
+| “(U−V)J_I ... reduced input ... complete output” | `restricted-map.json`: Z|0> = I|0>, restricted norm 0, unrestricted Frobenius norm 2; Choi difference is 2×2 for input 1/output 2. Its -I/I case has equal uncontrolled channels but phase-sensitive norm 2. | Independent exact integer/dyadic map test only |
 
 The action loads the selected byte, XORs its low bit into t and unloads it.
 It preserves f, a and both region cells. The complete before/after tables vary

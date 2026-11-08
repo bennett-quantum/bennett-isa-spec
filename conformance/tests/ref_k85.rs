@@ -155,6 +155,8 @@ fn restricted_z_identity_map_has_reduced_input_and_complete_output() {
     assert_eq!(u, vec![vec![1, 0], vec![0, -1]]);
     assert_eq!(v, vec![vec![1, 0], vec![0, 1]]);
     assert_eq!(j, vec![vec![1], vec![0]]);
+    assert_eq!(vector.get("input_dimension"), Some(&Json::Num(1.0)));
+    assert_eq!(vector.get("output_dimension"), Some(&Json::Num(2.0)));
     // Exact integer algebra: no interpreter state or numerical output is read.
     let difference = (0..2)
         .map(|r| (0..2).map(|c| u[r][c] - v[r][c]).collect::<Vec<_>>())
@@ -169,7 +171,15 @@ fn restricted_z_identity_map_has_reduced_input_and_complete_output() {
         })
         .collect::<Vec<_>>();
     assert_eq!(restricted, vec![0, 0]);
+    assert_eq!(
+        vector.get("restricted_frobenius_squared"),
+        Some(&Json::Num(0.0))
+    );
     assert_eq!(difference.iter().flatten().map(|x| x * x).sum::<i64>(), 4);
+    assert_eq!(
+        vector.get("unrestricted_frobenius_squared"),
+        Some(&Json::Num(4.0))
+    );
     // Reduced input dimension one times complete output dimension two gives
     // a 2x2 Choi difference, not 1x1 and not unrestricted 4x4.
     assert_eq!(
@@ -201,4 +211,39 @@ fn restricted_z_identity_map_has_reduced_input_and_complete_output() {
     let mu = eighths(text(dual.get("mu").unwrap()));
     assert!(a > 0 && b > 0);
     assert_eq!(mu - (a + b), 1);
+
+    let phase = vector.get("phase_sensitive").unwrap();
+    let phase_u = matrix(phase.get("U").unwrap());
+    let phase_v = matrix(phase.get("V").unwrap());
+    assert_eq!(phase_u, vec![vec![-1, 0], vec![0, -1]]);
+    assert_eq!(phase_v, v);
+    let column = |m: &[Vec<i64>]| {
+        (0..2)
+            .map(|r| (0..2).map(|c| m[r][c] * j[c][0]).sum::<i64>())
+            .collect::<Vec<_>>()
+    };
+    let prepared_u = column(&phase_u);
+    let prepared_v = column(&phase_v);
+    let phase_norm_squared = prepared_u
+        .iter()
+        .zip(&prepared_v)
+        .map(|(u, v)| (u - v) * (u - v))
+        .sum::<i64>();
+    assert_eq!(phase_norm_squared, 4);
+    assert_eq!(
+        phase.get("restricted_frobenius_squared"),
+        Some(&Json::Num(phase_norm_squared as f64))
+    );
+    let choi = (0..2)
+        .map(|r| {
+            (0..2)
+                .map(|c| prepared_u[r] * prepared_u[c] - prepared_v[r] * prepared_v[c])
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        choi,
+        matrix(phase.get("uncontrolled_choi_difference").unwrap())
+    );
+    assert_eq!(choi, vec![vec![0, 0], vec![0, 0]]);
 }
