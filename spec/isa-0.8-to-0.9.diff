@@ -1020,7 +1020,7 @@
  | Instruction | Form | Rules |
  |---|---|---|
  | `qregion` | `qregion name A W [@image]` | function-local region of 2^A cells of `wire[W]`, created at function entry (unconditional allocation, X gates from the data image, default zero), back at its image before exit, image gates reversed, cells released clean; scope is the function. `@image` is a `data` symbol reference (size 2^A·W/8 bytes, cell i = bits [iW, (i+1)W) of the little-endian image) and is part of the function's identity (§9.2) |
-@@ -521,6 +1117,12 @@
+@@ -521,6 +1117,13 @@
  | `qloop` | `qloop n { body }` | body n times |
  | `qloop … while` | `qloop n while cond { body }` | `cond : wire[n]` permutation-provenance wires computed before the loop from wires the body does not modify; flags `c_1..c_n` clean; `cx cond[0] c_1`; iteration i under `qpred c_i`; after iteration i < n: `ccx c_i cond[i] c_{i+1}`; flags uncomputed in reverse and freed |
  
@@ -1028,12 +1028,13 @@
 +names against the bindings live at its entry, and its exit bindings
 +supply the next visit's entry bindings; the entry and exit live names
 +and their types MUST agree, with consumed body-local names absent from
-+both. [deps: ISA-3.3-P3, ISA-4.6-P8, ISA-4.6-P9]
++both. A loop body leaves the predicate stack exactly as at body entry.
++See §3.5. [deps: ISA-3.3-P3, ISA-4.6-P8, ISA-4.6-P9]
 +
  ### 4.7 Region calls (structured code, CC and R)
  
  `oracle_call @o tk (ins..) tgt fr (mem..) (args..)`; `action_call @a
-@@ -528,26 +1130,96 @@
+@@ -528,26 +1131,96 @@
  …` ≡ `oracle_call …`; `ctl w <call>` ≡ the call under `qpred w`. In CC
  and R, wire and region slots are filled by `qreg` operands per §3.3
  (§3.1: R functions call Q regions exactly as CC does; the call is one
@@ -1135,7 +1136,7 @@
  ## 5. Regions
  
  ### 5.1 Interfaces and common well-formedness
-@@ -555,16 +1227,30 @@
+@@ -555,16 +1228,30 @@
  Signatures list roles: `oracle @o (in a: wire[8]) (tgt t: wire[8]) (fault
  f: wire[4]) (mem db: region[10,8] in) (args n: i64)`. **Interface
  regions** are caller-owned, passed by name, role `in` (returned to entry
@@ -1171,7 +1172,7 @@
  
  ### 5.2 Lifted oracle
  
-@@ -595,10 +1281,14 @@
+@@ -595,10 +1282,14 @@
  
  ### 5.3 Quantum action
  
@@ -1190,7 +1191,7 @@
  control yields the padded unitary under declared bounds, part of the
  action's identity. **Permutation action**: realised unitary a
  permutation matrix (ε = 0, permutation gates only, transitively).
-@@ -606,6 +1296,9 @@
+@@ -606,6 +1297,9 @@
  **Body**: gates; `qcopy quncopy qxor qexch qinplace`; `qload qunload
  qstore qexchm`; `qpred qunpred qif qloop`; `oracle_call action_call`;
  `qalloc qborrow qfree qreturn`; `qregion`.
@@ -1200,7 +1201,7 @@
  
  **Bounds.** The `bounds { … }` list of an action's `regs` line and the
  `bounds` array of its signature hold, in text order, the trip count `n`
-@@ -621,9 +1314,11 @@
+@@ -621,9 +1315,11 @@
  ```
    rx/ry/rz(θ) ↦ (−θ)   s ↔ sdg   t ↔ tdg   x cx ccx mcx swap h cz: self-adjoint
    qalloc ↔ qfree   qborrow ↔ qreturn   qregion creation ↔ release   qcopy ↔ quncopy   qload ↔ qunload
@@ -1214,7 +1215,7 @@
    qloop n while cond {A} ↦ flags computed forward as §4.6; adj A for i = n..1 under c_i; flags uncomputed
  ```
  
-@@ -631,22 +1326,94 @@
+@@ -631,22 +1327,94 @@
  allocated unconditionally; every gate of the body and its cleanup runs
  under `w` in addition to the active predicate.
  
@@ -1311,7 +1312,7 @@
  
  ### 5.5 Nesting and matched cleanup
  
-@@ -655,10 +1422,25 @@
+@@ -655,10 +1423,25 @@
  = lift.icmp.ne fr' zero; lift.faultif p FAULT_CALLEE` (with `zero` a
  `lift.const` location) where the source requires it. To clear `fr'`, the
  producer emits `lift.oracle_uncall @o` with the same token, callee, `ins`
@@ -1340,7 +1341,7 @@
  
  ### 5.6 Borrowed systems and borrow frames
  
-@@ -669,9 +1451,13 @@
+@@ -669,9 +1452,13 @@
  **Rule (suite F).** Borrowed wires (set B) are touched (as control or
  target) only inside **borrow frames**: maximal contiguous permutation-
  only subcircuits from the first to the last instruction touching B. The
@@ -1357,7 +1358,7 @@
  **structurally by the translation lemma**: the frame is `V; W; V⁻¹; W`
  where
  
-@@ -692,11 +1478,88 @@
+@@ -692,11 +1479,88 @@
  (target outside B), and `W = swap y z; cx b y` (swap excluded). Oracles
  are one frame verified by their own T3 claim over D.
  
@@ -1447,7 +1448,7 @@
  
  ## 6. Uncomputation validity (static discipline)
  
-@@ -722,8 +1585,36 @@
+@@ -722,8 +1586,36 @@
  | `oracle_call @o (ins) tgt fr (mem)` | tgt, fr: perm with S = ins ∪ {tgt, fr} ∪ cells(every region passed) ∪ Π; `in` regions unchanged |
  | `lift.perm_call` / permutation `action_call` | each mut: perm with S = mut ∪ ins ∪ cells(regions passed) ∪ Π; `mut`-region cells advance with the same S |
  | non-permutation `action_call` | every mut and every `mut`-region cell: other |
@@ -1485,7 +1486,7 @@
  
  ### 6.2 Window and obligations
  
-@@ -731,12 +1622,25 @@
+@@ -731,12 +1623,25 @@
  until the first of: a non-diagonal gate on a wire in S or in g; a version
  advance of a cell in S; a non-permutation action call touching a wire in
  S; a permutation change to a wire in S not undone before g's cleanup.
@@ -1514,7 +1515,7 @@
  
  ### 6.3 T5
  
-@@ -752,7 +1656,7 @@
+@@ -752,7 +1657,7 @@
  (legal for `perm` values only: recompute g into a fresh clean bundle by
  the same sequence, `qxor` it into g's wires, uncompute the fresh bundle
  by the adjoint). **Measurement-based cleanup is not admitted in sched/
@@ -1523,7 +1524,7 @@
  target capability `mbu` is reserved and MUST be `false`, and no cleanup
  produces a `channel` claim. *(non-normative)* The fixup after an X-basis
  measurement of g with outcome m is the phase (−1)^{m·g(x)}, a function
-@@ -778,8 +1682,11 @@
+@@ -778,8 +1683,11 @@
  `(base, size = n, live = 1, pinned = 0)` and advances by `max(n, 1)`;
  globals have pre-entered pinned live entries; an access is valid iff its
  whole byte range lies in one live entry; `free p` marks the unique live
@@ -1537,7 +1538,7 @@
  Initial state: bump = `heap_base`, table = the pre-entries in layout
  order, memory zero except images.
  
-@@ -806,6 +1713,8 @@
+@@ -806,6 +1714,8 @@
  
  ### 7.3 Device models and tapes (R)
  
@@ -1546,7 +1547,7 @@
  Every device operation takes classical-memory operands and writes its
  results to memory; each `effect` is **atomic**: validated (operands in
  range, tape available) before any change, and a failing validation is a
-@@ -818,6 +1727,35 @@
+@@ -818,6 +1728,35 @@
  | `entropy` | position `p` (0) into the entropy tape (§10) | `read(ptr, len)`: copies tape[p..p+len) to ptr; p += len | p + len > length: fault `FAULT_ENTROPY_EXHAUSTED` | overwritten bytes; p −= len |
  | `block` | sector map from the `block_image` (else empty), 512-byte sectors; absent sectors read as zero | `read(sector, ptr)`; `write(sector, ptr)` | – | read: overwritten 512 bytes; write: the old sector contents **and a presence bit** (absent sectors are removed again on reversal) |
  
@@ -1582,7 +1583,7 @@
  Each `effect` appends `(dev, op, args)` to the effect tape.
  
  ### 7.4 Run history and the dynamic SSA model (CC, R)
-@@ -836,26 +1774,44 @@
+@@ -836,26 +1775,44 @@
  | `call` | invocation boundary (callee, argument values) |
  | `ret` | result values, the callee's activation and the frame link |
  | `uncall` | the reversed segment's id (skipped by whole-run reversal, below) |
@@ -1637,7 +1638,7 @@
  
  **Segment uncall** (`uncall @f (args) (results)`). Let S be the most
  recent completed call segment of the history (a `call` frame, its
-@@ -864,15 +1820,15 @@
+@@ -864,15 +1821,15 @@
  values equal the operand values, **every frame after S is pure**, and S
  contains, at any nesting depth, **no `measure` frame** and no `qreg.
  free` frame whose cleanliness was not verified (hardware, §17 item 14);
@@ -1657,7 +1658,7 @@
  `uncall` are pure, so at the `uncall` frame every component except the
  retained instances already equals its value before S. T4 is stated over
  these frames. *(non-normative)* S is never re-executed and never redone;
-@@ -882,7 +1838,7 @@
+@@ -882,7 +1839,7 @@
  leaves the clock at its entry value; and `uncall` of a segment that
  measured is a trap.
  
@@ -1666,7 +1667,7 @@
  
  ### 8.1 Format and expressions
  
-@@ -902,6 +1858,30 @@
+@@ -902,6 +1859,30 @@
  and a table index outside the array are load-time errors. Costs MUST be
  nonnegative and finite.
  
@@ -1697,7 +1698,7 @@
  **Variable binding** by evaluation context; referencing a variable that
  the context does not bind is a load-time error:
  
-@@ -941,7 +1921,8 @@
+@@ -941,7 +1922,8 @@
  instructions and effects take `classical_step_time`. Sequential in
  program order unless the schedule assigns start times; a gate occupies
  its wires for its `time`; gates on disjoint wires MAY overlap unless
@@ -1707,7 +1708,7 @@
  Interface wires are charged to the caller for the call's duration;
  borrowed wires to the borrower at `dirty_rate`, replacing the owner's
  charge.
-@@ -951,8 +1932,9 @@
+@@ -951,8 +1933,9 @@
  ```
    "ptr_widths_supported": [32, 64],
    "classes": { "<cls>": { "qubit_second": n, "dirty_rate": n, "capacity": n | "unbounded" } },
@@ -1718,7 +1719,7 @@
    "schemes": [ { "name": "<name>", "realises": { "op": "<gate>", "controls": {"min": n, "max": n | "unbounded"}, "params": ["theta"]? },
                   "ancillae": { "count": expr, "state": "clean" | "dirty", "class": "<cls>" },
                   "template": [ { "gate": "<op>", "wires": [ "c[<expr>]" | "t" | "t2" | "a[<expr>]", … ], "params": [expr]?,
-@@ -983,11 +1965,174 @@
+@@ -983,11 +1966,174 @@
  descriptor. A scheme's correctness is the target author's obligation
  (suite E: T3 for permutation schemes, suite D for ε > 0).
  
@@ -1894,7 +1895,7 @@
  
  ### 9.1 Sections and schemas
  
-@@ -998,34 +2143,65 @@
+@@ -998,34 +2144,65 @@
  ```
    symbols:  { "<local index>": { "name", "kind": "cc"|"r"|"oracle"|"action"|"perm_action"|"lproc"|"data", "signature": <sig>, "interface_hash" } }
    imports:  { "<name>": { "signature": <sig>, "pinned_closure_hash"?: hex } }
@@ -1967,7 +1968,7 @@
    (5c) for an R/CC function, for every device model and service it uses, sorted: "device " <name> " " <JCS entry>
    (6) for every referenced symbol outside the symbol's SCC, in order of first reference: its 64-hex hash
  ```
-@@ -1055,7 +2231,13 @@
+@@ -1055,7 +2232,13 @@
  header line is a definition, not a reference, and is left unchanged); the **interface hash** uses
  interface hashes of defined symbols and `SHA-256(name ‖ 0x00 ‖ JCS
  signature)` (hex) for unresolved imports; the **closure hash** uses
@@ -1982,7 +1983,7 @@
  SCC `@name` token (parts (4)–(5)) is replaced by `@$<decimal index>`;
  intra-SCC references contribute no part-(6) line; `scc_hash` = SHA-256
  over the concatenation of the members' envelopes in that order; member
-@@ -1064,14 +2246,52 @@
+@@ -1064,14 +2247,52 @@
  `schedule`, `certificate` and `coverage` sections deleted together with
  the blank line preceding each. `reference_program_hash` = the oracle's
  interface hash. `params_hash` = SHA-256 of the JCS array of classical
@@ -2036,7 +2037,7 @@
  Imports resolve by name + signature (mismatch: link error; pinned hash:
  equality required); resolved closure hashes are recorded in the linked
  certificate. Equal-closure-hash duplicates deduplicate; unequal under one
-@@ -1086,14 +2306,140 @@
+@@ -1086,14 +2307,140 @@
  - Region calls: interface bundles and regions passed in declared order,
    caller-owned; callee owns its workspace, returns it clean, local regions
    at image, borrowed bundles returned.
@@ -2184,7 +2185,7 @@
  
  **Model.** A run executes a device CC entry; the host passes classical
  arguments, register ids and the entropy tape, receives classical
-@@ -1101,9 +2447,11 @@
+@@ -1101,9 +2448,11 @@
  reached by `hostcall`. **Positional binding**: argument i of `bennett_
  run` binds to parameter i of the entry's signature: `INT(width, bytes)`
  to `iN` with width = N (else `E_ARG`), `F64` to `f64`, `QREG` to `qreg[n]`
@@ -2198,7 +2199,7 @@
  Accessor-returned pointers are valid until the owning object is freed.
  `bennett_unload` with a run not CLOSED: `E_INVALID_STATE`.
  
-@@ -1111,17 +2459,30 @@
+@@ -1111,17 +2460,30 @@
  calls); an R call's subtree is owned by its R history; `bennett_reverse`
  reverses post-order: CC segments by their run history, R calls by LIFO
  reversal of their history (§7.4, reversed segments and `uncall` frames
@@ -2235,7 +2236,7 @@
  is no reset and no trace-out: a register in unknown state is released by
  a `measure` inside a run, which consumes its handle (§3.3).
  
-@@ -1131,8 +2492,14 @@
+@@ -1131,8 +2493,14 @@
  `TOKEN` as the 8-byte little-endian id, `*width` = 64. A `cap` smaller
  than that byte count is `E_ARG` and nothing is written. Fault records
  are read by `bennett_result_nfaults` / `bennett_result_fault` (codes of
@@ -2252,7 +2253,7 @@
  
  **Waiting.** `bennett_wait` blocks until the run leaves `RUNNING` and
  returns `OK` with exactly one outcome: `HOST_REQUEST` (`*request_out`
-@@ -1145,7 +2512,9 @@
+@@ -1145,7 +2513,9 @@
  lie in one live allocation (else CC trap and no request is made); those
  bytes are copied into the request; the run enters `HOST_REQUEST`; the
  reply payload is written to `[ptr, ptr + min(len, reply length))` and
@@ -2263,7 +2264,7 @@
  records the request bytes, the overwritten bytes and the reply bytes.
  Every `service` is declared in `devices.services`; an undeclared one is
  a load error.
-@@ -1156,7 +2525,7 @@
+@@ -1156,7 +2526,7 @@
  `*alen` = 8 × arity.
  
  ```c
@@ -2272,7 +2273,7 @@
     released with the matching *_free. Status 0 = BENNETT_OK. */
  typedef enum { BENNETT_OK=0, BENNETT_E_VERSION, BENNETT_E_PTR_WIDTH, BENNETT_E_DEVICE_MISSING, BENNETT_E_GATE_UNSUPPORTED,
    BENNETT_E_TARGET, BENNETT_E_BUDGET, BENNETT_E_QREG_NOT_CLEAN, BENNETT_E_INVALID_STATE, BENNETT_E_NOT_REVERSIBLE,
-@@ -1198,7 +2567,16 @@
+@@ -1198,7 +2568,16 @@
  bennett_status bennett_tape_open(bennett_program_t*, bennett_run_id, bennett_tape_iter_t** out);
  bennett_status bennett_tape_next(bennett_tape_iter_t*, const char** dev, const char** op, const uint8_t** args, size_t* alen);
  void           bennett_tape_free(bennett_tape_iter_t*);
@@ -2290,7 +2291,7 @@
  size_t         bennett_estimate_nresources(const bennett_estimate_t*);
  bennett_status bennett_estimate_get(const bennett_estimate_t*, size_t i, const char** name, const char** value_decimal);
  const uint8_t* bennett_estimate_certificate(const bennett_estimate_t*, size_t* len);   void bennett_estimate_free(bennett_estimate_t*);
-@@ -1206,7 +2584,141 @@
+@@ -1206,7 +2585,141 @@
  const uint8_t* bennett_coverage_jcs(const bennett_coverage_t*, size_t* len);   void bennett_coverage_free(bennett_coverage_t*);
  ```
  
@@ -2433,7 +2434,7 @@
  
  ```c
  typedef struct bennett_sched_request_t bennett_sched_request_t;   typedef struct bennett_sched_response_t bennett_sched_response_t;
-@@ -1218,6 +2730,9 @@
+@@ -1218,6 +2731,9 @@
  bennett_status bennett_sched_request_set_params(bennett_sched_request_t*, const uint8_t* params_jcs, size_t);
  bennett_status bennett_sched_request_set_accuracy(bennett_sched_request_t*, const char* epsilon_decimal);
  bennett_status bennett_sched_request_set_capacity(bennett_sched_request_t*, const char* cls, uint64_t peak_qubits);
@@ -2443,7 +2444,7 @@
  void           bennett_sched_request_free(bennett_sched_request_t*);
  bennett_status bennett_sched_schedule(const bennett_sched_request_t*, bennett_sched_response_t** out);
  typedef enum { BENNETT_SCHED_OK, BENNETT_SCHED_INFEASIBLE, BENNETT_SCHED_UNSUPPORTED } bennett_sched_outcome;
-@@ -1247,69 +2762,1273 @@
+@@ -1247,69 +2763,1273 @@
  schedule MUST keep the ordinals of the operations they keep and MAY
  remove only operations the library marks removable.
  
@@ -3747,7 +3748,7 @@
  `error` entry (§12.3) is a **common upper bound over all contexts** of
  its key; the multiplicity composition of §12.3 is sound for that reason.
  
-@@ -1325,7 +4044,10 @@
+@@ -1325,7 +4045,10 @@
  rejects): Y − J(Φ) ⪰ 0, Y + J(Φ) ⪰ 0, mu·I − Tr_out(Y) ⪰ 0 (partial trace
  over the output factor), and mu ≤ `bound`; then ‖Φ‖◇ ≤ mu (the dual of
  Watrous's SDP with Y₀ = Y₁ = Y; this is the diamond norm itself, not
@@ -3759,7 +3760,7 @@
  hi, im_lo, im_hi]` (decimal strings). **Positivity test.** The checker
  proves each of the three matrices **positive definite** by an interval
  Cholesky (or Hermitian LDL†) factorisation in which the interval lower
-@@ -1335,33 +4057,422 @@
+@@ -1335,33 +4058,422 @@
  strictly feasible by replacing Y with Y + δI and mu with mu′ = mu + δ·(d
  + 1) for a small rational δ > 0 (any mu′ > mu + δ·d suffices): then Y ±
  J(Φ) ⪰ δI ≻ 0 and, since Tr_out(Y + δI) = Tr_out(Y) + δ·d·I, mu′·I −
@@ -4191,7 +4192,7 @@
                                                     fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
              cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },
              error:   { "<variant>:<inherited_controls>": { local: { "operator_norm"?: v, "diamond"?: v }, inclusive: { "operator_norm"?: v, "diamond"?: v } } },
-@@ -1369,6 +4480,426 @@
+@@ -1369,6 +4481,426 @@
    composition { multiplicities: { "<hash>:<variant>:<inherited_controls>": n (from the realised schedule) }, epsilon_total: { "diamond": v }, method: "sum_over_multiplicities" }
  ```
  
@@ -4618,7 +4619,7 @@
  `inclusive(R, key) = local(R, key) + Σ_callees n_c × inclusive(c, key_c)`
  **per metric**, keyed like `cleanup` by `<variant>:<inherited_controls>`
  (the realised error depends on both); every `local` value is a verified
-@@ -1380,27 +4911,49 @@
+@@ -1380,27 +4912,49 @@
  variants) require `operator_norm` bounds throughout. A controlled
  unitary variant requires a `numerical` claim; an ε > 0 realisation
  compared as a channel requires a `channel` claim. Executable claims
@@ -4674,7 +4675,7 @@
  ### 14.2 Quantum state semantics
  
  The state of a Q region is a vector in ⊗ over live wires in allocation
-@@ -1422,10 +4975,20 @@
+@@ -1422,10 +4976,20 @@
  - **T3 (permutation theorem).** If the realised unitary V of a circuit on
    span(D) is a permutation matrix and the final basis tuple equals P(x)
    for every x ∈ D, then V|span(D) = P.
@@ -4699,7 +4700,7 @@
  - **T5.** As §6.3.
  - **T6 (executor agreement).** Two executors conforming to §3–§7 on one
    target with the same schedule produce on every x ∈ D the same final
-@@ -1437,16 +5000,57 @@
+@@ -1437,16 +5001,57 @@
  
  ## 15. Conformance suites
  
@@ -4764,7 +4765,7 @@
  
  ## 16. Canonical textual form (normative)
  
-@@ -1458,7 +5062,17 @@
+@@ -1458,7 +5063,17 @@
  `INT := -?(0|[1-9][0-9]*)`; `FLOAT :=` shortest round-trip decimal with
  `.` or exponent, finite; `STRING := "…"` with escapes `\"`, `\\`, `\n`;
  `HEX := ([0-9a-f]{2})*`. Metadata lines are RFC 8785 canonical JSON
@@ -4783,7 +4784,7 @@
  
  ### 16.2 Grammar
  
-@@ -1472,10 +5086,10 @@
+@@ -1472,10 +5087,10 @@
    dataline  := NAME SP HEX NL
    function  := fhead NL regs? block+
    fhead     := ("fn" SP ("cc"|"r") | "oracle" | "action" | "perm_action" | "lproc") SP "@" NAME SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")"
@@ -4797,7 +4798,7 @@
    regs      := "regs" SP "{" SP (NAME ":" type ("," SP NAME ":" type)*)? SP "}" (SP "bounds" SP "{" INT ("," SP INT)* "}")? NL
    block     := "^" NAME "(" plist "):" NL instr+
    instr     := (lhs SP "=" SP)? OPCODE (SP operand)* (SP "{" NL instr+ "}" (SP "{" NL instr+ "}")?)? NL
-@@ -1485,16 +5099,38 @@
+@@ -1485,16 +5100,38 @@
    VER       := INT "." INT
  ```
  
@@ -4839,7 +4840,7 @@
  
  section functions
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
-@@ -1509,9 +5145,9 @@
+@@ -1509,9 +5146,9 @@
  empty and its envelope is exactly these bytes (each line LF-terminated):
  
  ```
@@ -4851,7 +4852,7 @@
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
  regs { one:reg[8], r:reg[8] }
  ^entry():
-@@ -1521,17 +5157,19 @@
+@@ -1521,17 +5158,19 @@
  ```
  
  With B ≥ 3 every x yields `(x + 1 mod 256, 0)` (`result_val` = 0 ⊕ r);
@@ -4874,7 +4875,7 @@
  
  section functions
  oracle @sum_db (n:wire[8] in) (t:wire[8]) (f:wire[4]) (db:region[4,8] in) ()
-@@ -1590,13 +5228,13 @@
+@@ -1590,13 +5229,13 @@
  is SHA-256 of the ASCII `<scc_hash hex>:0`:
  
  ```
@@ -4891,7 +4892,7 @@
  lift.boundscheck zp 1
  zv = lift.load.i8 zp
  z = lift.icmp.eq n zv
-@@ -1614,21 +5252,392 @@
+@@ -1614,21 +5253,392 @@
  ^done():
  lift.ret acc
  data zero 00
@@ -5290,7 +5291,7 @@
  ## 17. Decisions deferred to implementation, with defaults
  
  Each item is one an implementer must decide to build; any decision is
-@@ -1652,15 +5661,60 @@
+@@ -1652,15 +5662,60 @@
     level. Default: the library `ref` published by `bennett-isa-spec`
     (ripple-carry adders and comparators, linear `inrange` scans,
     one-hot address dispatch, clean scratch released in reverse order);
@@ -5355,7 +5356,7 @@
  10. **`any`-class resolution** (§11). Default: the first class in JCS
      order with capacity.
  11. **Occupancy rate of a class absent from `rate`** (§8.2). Default: 1.
-@@ -1669,7 +5723,65 @@
+@@ -1669,7 +5724,65 @@
  13. **Suite sizes** (§15): the exhaustive widths of suite C and the
      sample counts of `sampled` claims. Default: exhaustive for ≤ 16
      interface bits; 2^16 samples above.
