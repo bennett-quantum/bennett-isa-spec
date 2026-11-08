@@ -1,6 +1,14 @@
+# bad: [3b1090790d82a00ac95d30b8da6b42d1d7a9f5d1] Merge job/quality-isaref: ISA 0.9 reference interpreter quality floor
+# good: [ecaaac060c44e317d1181345fa6b8e38c096c099] wip(codex job sol-ref09): attempt 2 end
+git bisect start '--no-checkout' '--first-parent' '3b10907' 'ecaaac0'
+# good: [1ec981bf79d18838857cd64bcebba2300d73a1fd] wip(codex job sol-4ht-audit): attempt 1 end
+git bisect good 1ec981bf79d18838857cd64bcebba2300d73a1fd
 # bad: [b9487bf0e9b7cc3d70939bb2765744028d42a2eb] beads: b-isa-spec-n5x D4 (native-sharing first in 0.10)
+git bisect bad b9487bf0e9b7cc3d70939bb2765744028d42a2eb
+# good: [c91359960601b1be505fd1a962b95750ea3fc600] wip(codex job sol-ref09): attempt end (session wind-down 2026-11-02)
+git bisect good c91359960601b1be505fd1a962b95750ea3fc600
 # good: [59ff0ac92e68e8caa931248133f735e90fe31364] wip(codex job sol-ref09): attempt 1 checkpoint
-git bisect start '--no-checkout' '--first-parent' 'b9487bf' '59ff0ac'
+git bisect good 59ff0ac92e68e8caa931248133f735e90fe31364
 # bad: [8b2d5ed2dc72c33739e404f80ba9ac0d62a58446] wip(codex job sol-ref09): attempt 1 checkpoint
 git bisect bad 8b2d5ed2dc72c33739e404f80ba9ac0d62a58446
 # good: [5d0264cab9cfbaacded1e13e365673650774709a] beads: file cross-repo requests (shift 4 clerk)
