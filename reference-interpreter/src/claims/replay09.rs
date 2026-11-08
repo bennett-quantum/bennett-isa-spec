@@ -9,7 +9,7 @@ pub(super) struct Invocation {
     pub controls: Vec<BitVector>,
     pub adjoint: bool,
     pub budget: Budget,
-    pub borrowed_widths: Vec<usize>,
+    pub borrowed_widths: Option<Vec<usize>>,
 }
 
 #[cfg(test)]
@@ -162,7 +162,14 @@ impl Object {
             }
             bindings.get("invocation")?
         };
-        self.decode_invocation09(invocation, f)
+        let mut invocation = self.decode_invocation09(invocation, f)?;
+        invocation.borrowed_widths =
+            Some(self.checked_borrow_lifetimes(&f.name)?.ok_or_else(|| {
+                Error::new(
+                    "§12.2 K70: checked borrow lifetime inventory requires linked actions".into(),
+                )
+            })?);
+        Ok(invocation)
     }
 
     pub(super) fn decode_invocation09(
@@ -210,11 +217,9 @@ impl Object {
             controls: Vec::new(),
             adjoint: false,
             budget,
-            borrowed_widths: self.checked_borrow_lifetimes(&f.name)?.ok_or_else(|| {
-                Error::new(
-                    "§12.2 K70: checked borrow lifetime inventory requires linked actions".into(),
-                )
-            })?,
+            // K92 uses this decoder without replay or a linked borrow closure.
+            // Only invocation09 attaches a checked replay inventory.
+            borrowed_widths: None,
         })
     }
 

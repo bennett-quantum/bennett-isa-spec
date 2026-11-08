@@ -319,11 +319,16 @@ impl Object {
             .ok_or_else(|| Error::new(format!("§12: closure {closure} is not a function")))
     }
     fn domain(&self, f: &Function, d: &Json) -> Result<Domain> {
-        let borrowed_widths = self.checked_borrow_lifetimes(&f.name)?.ok_or_else(|| {
-            Error::new(
-                "§12.2 K70: checked borrow lifetime inventory requires linked actions".into(),
-            )
-        })?;
+        let borrowed_widths = if self.isa_version == crate::IsaVersion::V09 {
+            self.checked_borrow_lifetimes(&f.name)?.ok_or_else(|| {
+                Error::new(
+                    "§12.2 K70: checked borrow lifetime inventory requires linked actions".into(),
+                )
+            })?
+        } else {
+            // Frozen 0.8 tuples retain their explicitly supplied idle pool.
+            Vec::new()
+        };
         let mut components = Vec::new();
         let mut bundles = BTreeSet::new();
         let mut regions = BTreeSet::new();
@@ -333,7 +338,10 @@ impl Object {
                 let name = b.get("name")?.string()?.to_string();
                 let width = usize::try_from(b.get("width")?.uint()?)
                     .map_err(|_| Error::host_resource("§12.2: host limit: domain width".into()))?;
-                if borrowed && borrowed_widths.get(ordinal) != Some(&width) {
+                if self.isa_version == crate::IsaVersion::V09
+                    && borrowed
+                    && borrowed_widths.get(ordinal) != Some(&width)
+                {
                     return err(
                         "§12.2 K70/K72",
                         "borrowed position or width differs from checked lifetime inventory",
@@ -403,7 +411,9 @@ impl Object {
                 }
             }
         }
-        full &= d.get("borrowed")?.array()?.len() == borrowed_widths.len();
+        if self.isa_version == crate::IsaVersion::V09 {
+            full &= d.get("borrowed")?.array()?.len() == borrowed_widths.len();
+        }
         // D: every interface bundle and every region in the region's input
         // domain (§5.2, §5.3; tgt/fault included for oracles).
         let groups = if f.kind == "oracle" { 4 } else { 3 };
@@ -620,43 +630,66 @@ impl Object {
                 },
             );
         }
-        let borrowed_widths = if let Some(context) = context {
-            context.borrowed_widths.clone()
+        let mut borrowed = Vec::new();
+        if self.isa_version == crate::IsaVersion::V08 {
+            // Preserve the frozen legacy flat-tuple/idle-pool encoding. K70/K71
+            // complete-lifetime replay below belongs to the 0.9 checker.
+            for (component, value) in element {
+                if let Component::Borrowed(ordinal, _) = component {
+                    if *ordinal != borrowed.len() {
+                        return err("§12.2", "borrowed component position mismatch");
+                    }
+                    let wires = q.allocate(value.width())?;
+                    set(&mut q, &wires, value)?;
+                    borrowed.push(wires.clone());
+                    b.borrowed.push(wires);
+                }
+            }
         } else {
-            self.checked_borrow_lifetimes(&f.name)?.ok_or_else(|| {
-                Error::new(
-                    "§12.2 K70: checked borrow lifetime inventory requires linked actions".into(),
-                )
-            })?
-        };
-        let mut borrowed = crate::reserved(
-            borrowed_widths.len(),
-            "§12.2 K70",
-            "borrowed replay systems",
-        )?;
-        for (ordinal, width) in borrowed_widths.iter().copied().enumerate() {
-            let value = element.iter().find_map(|(component, value)| {
-                matches!(component, Component::Borrowed(position, _) if *position == ordinal)
-                    .then_some(value)
-            });
-            let zero;
-            let value = match value {
-                Some(value) if value.width() == width => value,
-                Some(_) => {
-                    return err(
-                        "§12.2 K72",
-                        "borrowed replay width differs from checked lifetime",
+            let borrowed_widths = if let Some(context) = context {
+                context.borrowed_widths.clone().ok_or_else(|| {
+                    Error::new(
+                        "§12.2 K70: replay invocation has no checked borrow lifetime inventory"
+                            .into(),
                     )
-                }
-                None => {
-                    zero = BitVector::zero(width)?;
-                    &zero
-                }
+                })?
+            } else {
+                self.checked_borrow_lifetimes(&f.name)?.ok_or_else(|| {
+                    Error::new(
+                        "§12.2 K70: checked borrow lifetime inventory requires linked actions"
+                            .into(),
+                    )
+                })?
             };
-            let wires = q.allocate(width)?;
-            set(&mut q, &wires, value)?;
-            borrowed.push(wires.clone());
-            b.borrowed.push(wires);
+            crate::reserve_more(
+                &mut borrowed,
+                borrowed_widths.len(),
+                "§12.2 K70",
+                "borrowed replay systems",
+            )?;
+            for (ordinal, width) in borrowed_widths.iter().copied().enumerate() {
+                let value = element.iter().find_map(|(component, value)| {
+                    matches!(component, Component::Borrowed(position, _) if *position == ordinal).then_some(value)
+                });
+                let zero;
+                let value = match value {
+                    Some(value) if value.width() == width => value,
+                    Some(_) => {
+                        return err(
+                            "§12.2 K72",
+                            "borrowed replay width differs from checked lifetime",
+                        )
+                    }
+                    None => {
+                        zero = BitVector::zero(width)?;
+                        &zero
+                    }
+                };
+                let wires = q.allocate(width)?;
+                set(&mut q, &wires, value)?;
+                borrowed.push(wires.clone());
+                b.borrowed.push(wires);
+            }
         }
         if audit.is_some() {
             q.start_borrow_audit()?;
@@ -1141,7 +1174,11 @@ impl Object {
                 .filter(|(c, _)| matches!(c, Component::Borrowed(..)))
                 .map(|(_, v)| v.to_decimal())
                 .collect();
-            let k = domain.borrowed_widths.len();
+            let k = if self.isa_version == crate::IsaVersion::V09 {
+                domain.borrowed_widths.len()
+            } else {
+                borrowed_in.len()
+            };
             let split = out
                 .len()
                 .checked_sub(k)
