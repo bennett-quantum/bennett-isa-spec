@@ -157,7 +157,13 @@ pub(super) fn args_domain(
     Ok(args)
 }
 fn full_quantum_domain(object: &Object, g: &Function, domain: &Json) -> Result<()> {
-    crate::certificate::domain_for(domain, g, crate::IsaVersion::V09, 0)?;
+    crate::certificate::domain_for(
+        domain,
+        g,
+        crate::IsaVersion::V09,
+        0,
+        object.checked_borrow_lifetimes(&g.name)?.as_deref(),
+    )?;
     if !domain.get("borrowed")?.array()?.is_empty()
         || domain
             .object()?

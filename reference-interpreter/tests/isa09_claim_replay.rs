@@ -102,15 +102,19 @@ fn typed_oracle(argument: &str, steps: u64) -> Object {
         "\nsection layout\n{\"A_tab\":1,\"H\":2,\"S_cells\":0,\"globals\":{},\"heap_base\":3,\"heap_limit_max\":0,\"interface_regions\":{\"sum\":{\"db\":{\"base\":1}}},\"null_size\":1,\"ptr_width\":2}\n")
         .replace("=0.8", "=0.9").replace("\"0.8\"", "\"0.9\"").replace("ptr_width=32", "ptr_width=2");
     let object = support::rehash(&source);
+    assert_eq!(
+        object.checked_borrow_lifetimes("sum").unwrap(),
+        Some(vec![])
+    );
     let mut claim = support::json(
         r#"{
         "kind":"exhaustive","subject":{"closure_hash":"","variant":"forward","inherited_controls":0},
         "invocation":{"args":["2"],"budget":["2","0","0","0"]},
         "domain":{"bundles":[{"name":"x","width":2,"lo":1,"hi":1},{"name":"t","width":2,"lo":2,"hi":2},{"name":"f","width":4,"lo":3,"hi":3}],
-          "borrowed":[{"name":"dirty","width":1,"lo":1,"hi":1}],
+          "borrowed":[],
           "regions":[{"name":"db","cells":[{"index":0,"lo":2,"hi":2},{"index":1,"lo":1,"hi":1}]}]},
-        "expected":{"table":[{"before":{"bundles":["1","2","3"],"borrowed":["1"],"regions":[["2","1"]]},
-                               "after":{"bundles":["1","1","3"],"borrowed":["1"],"regions":[["2","1"]]}}]}}
+        "expected":{"table":[{"before":{"bundles":["1","2","3"],"borrowed":[],"regions":[["2","1"]]},
+                               "after":{"bundles":["1","1","3"],"borrowed":[],"regions":[["2","1"]]}}]}}
     "#,
     );
     fields(fields(&mut claim).get_mut("invocation").unwrap()).insert(
@@ -146,7 +150,7 @@ fn standalone_oracle_binds_its_own_argument_budget_and_complete_interface() {
         let error = verify_root(&object).unwrap_err().to_string();
         assert!(error.contains("full tuple mismatch"), "{error}");
     }
-    for field in ["bundles", "borrowed", "regions"] {
+    for field in ["bundles", "regions"] {
         let object = changed(&typed_oracle("2", 2).text, |claim| {
             let table = fields(fields(claim).get_mut("expected").unwrap())
                 .get_mut("table")
@@ -369,10 +373,7 @@ fn fixed_image_oracle() -> Object {
             {"name":"f","width":4,"lo":0,"hi":15}]"#,
             ),
         );
-        fields(domain).insert(
-            "borrowed".into(),
-            support::json(r#"[{"name":"dirty","width":1,"lo":0,"hi":1}]"#),
-        );
+        fields(domain).insert("borrowed".into(), support::json("[]"));
         fields(domain).insert("regions".into(), support::json("[]"));
         fields(domain).insert(
             "fixed_regions".into(),
@@ -385,11 +386,12 @@ fn fixed_image_oracle() -> Object {
         for x in 0..4 {
             for t in 0..4 {
                 for f in 0..16 {
-                    for b in 0..2 {
-                        rows.push(support::json(&format!(r#"{{
-                "before":{{"bundles":["{x}","{t}","{f}"],"borrowed":["{b}"],"regions":[["2","1"]]}},
-                "after":{{"bundles":["{x}","{}","{f}"],"borrowed":["{b}"],"regions":[["2","1"]]}}}}"#, t^((x+2)&3))));
-                    }
+                    rows.push(support::json(&format!(
+                        r#"{{
+                "before":{{"bundles":["{x}","{t}","{f}"],"borrowed":[],"regions":[["2","1"]]}},
+                "after":{{"bundles":["{x}","{}","{f}"],"borrowed":[],"regions":[["2","1"]]}}}}"#,
+                        t ^ ((x + 2) & 3)
+                    )));
                 }
             }
         }
@@ -414,7 +416,7 @@ fn fixed_image_metadata_is_admitted_without_inspecting_quantum_state() {
             coverage.full_domain_elements.as_str(),
             coverage.covered_fraction.as_str()
         ),
-        (512, "33554432", "1/65536")
+        (256, "16777216", "1/65536")
     );
     assert_eq!(coverage.fixed_regions.len(), 1);
     assert_eq!(coverage.fixed_regions[0].sha256, sha256_hex(&[2, 1]));
@@ -475,5 +477,5 @@ fn sampled_singleton_report_has_exact_distinct_coverage() {
     let report = object.verify_certificate().unwrap().claims.remove(0);
     assert_eq!(report.verdict, ClaimVerdict::Evidence { elements: 1 });
     let coverage = report.coverage.unwrap();
-    assert_eq!(coverage.covered_fraction, "1/33554432");
+    assert_eq!(coverage.covered_fraction, "1/16777216");
 }

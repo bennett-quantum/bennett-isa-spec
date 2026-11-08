@@ -262,7 +262,7 @@ fn frame09(value: &Json, f: &Function, contexts: &[u128]) -> Result<()> {
     }
     Ok(())
 }
-fn table09(c: &Json, f: &Function) -> Result<()> {
+fn table09(c: &Json, f: &Function, borrowed: Option<&[usize]>) -> Result<()> {
     let expected = c.get("expected")?;
     let Some(table) = expected.object().ok().and_then(|m| m.get("table")) else {
         return Ok(());
@@ -280,13 +280,8 @@ fn table09(c: &Json, f: &Function) -> Result<()> {
             }
         })
         .collect::<Vec<_>>();
-    let borrowed = c
-        .get("domain")?
-        .get("borrowed")?
-        .array()?
-        .iter()
-        .map(|p| p.get("width")?.uint())
-        .collect::<Result<Vec<_>>>()?;
+    // Unlinked source retains an unchecked replay obligation; producer domain
+    // entries cannot establish the missing lifetime inventory.
     let regions = f
         .params
         .iter()
@@ -322,11 +317,13 @@ fn table09(c: &Json, f: &Function) -> Result<()> {
                 crate::object::unsigned_literal(b.string()?, w)?;
             }
             let values = tuple.get("borrowed")?.array()?;
-            if values.len() != borrowed.len() {
-                return err("§12.1 K13", "incomplete borrowed tuple");
-            }
-            for (v, w) in values.iter().zip(&borrowed) {
-                crate::object::unsigned_literal(v.string()?, *w)?;
+            if let Some(borrowed) = borrowed {
+                if values.len() != borrowed.len() {
+                    return err("§12.1 K13", "incomplete borrowed tuple");
+                }
+                for (v, w) in values.iter().zip(borrowed) {
+                    crate::object::unsigned_literal(v.string()?, *w as u128)?;
+                }
             }
             let cells = tuple.get("regions")?.array()?;
             if cells.len() != regions.len() {
@@ -367,13 +364,14 @@ pub(crate) fn invocation_budget(value: &Json) -> Result<crate::Budget> {
 
 #[cfg(test)]
 fn domain(value: &Json, f: &Function) -> Result<()> {
-    domain_for(value, f, crate::IsaVersion::V08, 0)
+    domain_for(value, f, crate::IsaVersion::V08, 0, None)
 }
 pub(crate) fn domain_for(
     value: &Json,
     f: &Function,
     version: crate::IsaVersion,
     controls: u128,
+    borrowed: Option<&[usize]>,
 ) -> Result<()> {
     let mut names = BTreeSet::new();
     for group in ["bundles", "borrowed"] {
@@ -390,6 +388,19 @@ pub(crate) fn domain_for(
                 return err("§12.2", "repeated domain component");
             }
             let width = b.get("width")?.uint()?;
+            if version == crate::IsaVersion::V09 && group == "borrowed" {
+                if let Some(widths) = borrowed {
+                    let actual = widths.get(position).ok_or_else(|| {
+                        Error::new(
+                            "§12.2 K70: borrowed position exceeds checked lifetime inventory"
+                                .into(),
+                        )
+                    })?;
+                    if width != *actual as u128 {
+                        return err("§12.2 K72", "borrowed width differs from checked lifetime");
+                    }
+                }
+            }
             if width == 0 || (inherited && width != 1) {
                 return err("§12.2", "zero-width domain component");
             }
@@ -683,7 +694,13 @@ impl Object {
                 }
                 let fault = v.get("fault_rate")?;
 
-                domain_for(fault.get("domain")?, f, self.isa_version, 0)?;
+                domain_for(
+                    fault.get("domain")?,
+                    f,
+                    self.isa_version,
+                    0,
+                    self.admission_borrow_lifetimes(f)?.as_deref(),
+                )?;
                 if self.isa_version == crate::IsaVersion::V09 {
                     self.validate_image_domains09(fault.get("domain")?, f)?;
                 }
@@ -716,6 +733,19 @@ impl Object {
             Ok(())
         })
     }
+    // §12.2 K75: inability to materialise an inventory is a deferred checking
+    // obligation, not malformed producer metadata. Replay resolves it again
+    // inside the per-claim host-limit boundary before any successful verdict.
+    fn admission_borrow_lifetimes(&self, f: &Function) -> Result<Option<Vec<usize>>> {
+        if self.isa_version != crate::IsaVersion::V09 {
+            return Ok(None);
+        }
+        match self.checked_borrow_lifetimes(&f.name) {
+            Err(error) if error.kind() == crate::ErrorKind::HostResource => Ok(None),
+            result => result,
+        }
+    }
+
     fn validate_claim(&self, c: &Json, f: &Function, position: usize) -> Result<()> {
         crate::metadata_schema::validate_for(self.isa_version, "claim", c)?;
         if self.isa_version == crate::IsaVersion::V09
@@ -758,7 +788,16 @@ impl Object {
                 );
             }
             if matches!(c.get("kind")?.string()?, "exhaustive" | "sampled") {
-                table09(c, f)?;
+                let borrowed = self.admission_borrow_lifetimes(f)?;
+                let controls = c.get("subject")?.get("inherited_controls")?.uint()?;
+                domain_for(
+                    c.get("domain")?,
+                    f,
+                    self.isa_version,
+                    controls,
+                    borrowed.as_deref(),
+                )?;
+                table09(c, f, borrowed.as_deref())?;
             }
             if let Some(v) = c.object()?.get("invocation") {
                 if v.get("args")? != &Json::String("all".into()) {
@@ -790,7 +829,15 @@ impl Object {
                 } else {
                     0
                 };
-                domain_for(c.get("domain")?, f, self.isa_version, controls)?;
+                if self.isa_version != crate::IsaVersion::V09 {
+                    domain_for(
+                        c.get("domain")?,
+                        f,
+                        self.isa_version,
+                        controls,
+                        self.admission_borrow_lifetimes(f)?.as_deref(),
+                    )?;
+                }
                 if c.get("expected")? == &Json::String("oracle".into()) {
                     subject(c.get("subject")?)?;
                 }
@@ -801,7 +848,15 @@ impl Object {
                 } else {
                     0
                 };
-                domain_for(c.get("domain")?, f, self.isa_version, controls)?;
+                if self.isa_version != crate::IsaVersion::V09 {
+                    domain_for(
+                        c.get("domain")?,
+                        f,
+                        self.isa_version,
+                        controls,
+                        self.admission_borrow_lifetimes(f)?.as_deref(),
+                    )?;
+                }
                 if !c
                     .get("sampler")?
                     .get("seed")?
