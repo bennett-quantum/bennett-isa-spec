@@ -1,0 +1,17 @@
+{
+  "sha": "8b2d5ed2dc72c33739e404f80ba9ac0d62a58446",
+  "method": "perf record -e cycles:u -F99 --call-graph fp; cargo release opt3, force-frame-pointers=yes, debuginfo=1, no allocation instrumentation",
+  "samples": {
+    "cpu_atom": 3,
+    "cpu_core": 587,
+    "lost": 0
+  },
+  "core_children_percent": {
+    "ClassicalSnapshot::clone": 39.63,
+    "BTreeMap<u64, Handle>::clone_subtree": 25.46,
+    "Vec<String>::clone": 23.72,
+    "String::clone": 14.51
+  },
+  "cause": "Algorithmic repeated copying: immutable per-wire Handle.classes Vec<String> added by culprit is deep-cloned by ClassicalSnapshot/QuantumRegisters snapshots and register undo records. Work scales with all retained handle widths at every snapshot. Keep classes and their ISA0.9 meaning; share immutable class vector across handle clones.",
+  "output": "Profile stdout byte-identical to3b10907 saved global stdout; both pins and all logical measurements also byte-identical."
+}
