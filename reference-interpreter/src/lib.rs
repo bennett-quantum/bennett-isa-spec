@@ -23,6 +23,7 @@ mod quantum;
 pub mod ref_library;
 mod registers;
 mod retained;
+pub mod target;
 mod tokens;
 pub use retained::Retained;
 pub use tokens::BudgetToken;
