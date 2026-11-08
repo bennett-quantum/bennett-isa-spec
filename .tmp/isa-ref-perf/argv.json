@@ -1,9 +1,0 @@
-[
-  "run-program",
-  "/home/tobias/Projects/bennett-workspace/bennett-isa-spec-job-perf/.tmp/isa-ref-perf/entry.bisa",
-  "top",
-  "--args",
-  "0,1000000,6,1000000,1000000,1000000",
-  "--budget",
-  "10000000,0,4096,16"
-]
