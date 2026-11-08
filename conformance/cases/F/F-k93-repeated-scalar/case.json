@@ -1,0 +1,18 @@
+{
+  "id": "F-k93-repeated-scalar",
+  "suite": "F",
+  "spec": "ISA 0.9 \u00a74.4 K93; \u00a715 MCX operand and phase witnesses",
+  "derivation": "\u00a74.4 applies \u00a73.3 to every resolved control and the scalar live target before execution: repeated wires, overlap, missing/out-of-range or multiwire target reject as operands, independent of a relation claim.",
+  "object": "../../../fixtures/accepted-k93-09/repeated-scalar.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 1,
+    "stdout_empty": true,
+    "stderr_contains": [
+      "\u00a73.3"
+    ]
+  }
+}

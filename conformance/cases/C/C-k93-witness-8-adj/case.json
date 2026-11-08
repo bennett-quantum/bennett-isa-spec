@@ -1,0 +1,38 @@
+{
+  "id": "C-k93-witness-8-adj",
+  "suite": "C",
+  "spec": "ISA 0.9 \u00a74.4 K93; \u00a715 MCX operand and phase witnesses",
+  "derivation": "\u00a715: SWAP first gives (q,p,c); MCX then XORs [c=3] into the first wire, with amplitude +1. The adjoint undoes MCX before SWAP.",
+  "object": "../../../fixtures/accepted-k93-09/witness.bisa",
+  "command": [
+    "run-action",
+    "{object}",
+    "a",
+    "--mut",
+    "0,1",
+    "--in",
+    "0",
+    "--adjoint"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "mut": [
+        1,
+        0
+      ],
+      "in": [
+        0
+      ],
+      "state": {
+        "1000": [
+          1,
+          0
+        ]
+      }
+    },
+    "stdout_json_exact_at": [
+      "state"
+    ]
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "id": "C-k93-predicate-6-adj",
+  "suite": "C",
+  "spec": "ISA 0.9 \u00a74.4 K93; \u00a715 MCX operand and phase witnesses",
+  "derivation": "\u00a715: three explicit controls plus active r give c=4; toggle iff r=s=1 and b=3, phase +1.",
+  "object": "../../../fixtures/accepted-k93-09/predicate.bisa",
+  "command": [
+    "run-action",
+    "{object}",
+    "a",
+    "--mut",
+    "0",
+    "--in",
+    "0,1,2",
+    "--adjoint"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "mut": [
+        0
+      ],
+      "in": [
+        0,
+        1,
+        2
+      ],
+      "state": {
+        "00101": [
+          1,
+          0
+        ]
+      }
+    },
+    "stdout_json_exact_at": [
+      "state"
+    ]
+  }
+}

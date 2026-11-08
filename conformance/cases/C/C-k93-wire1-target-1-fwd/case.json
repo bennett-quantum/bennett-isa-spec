@@ -1,0 +1,36 @@
+{
+  "id": "C-k93-wire1-target-1-fwd",
+  "suite": "C",
+  "spec": "ISA 0.9 \u00a74.4 K93; \u00a715 MCX operand and phase witnesses",
+  "derivation": "\u00a74.4: target is exactly one live wire; a bare wire[1] or t[1] is scalar; only that bit toggles for c=3.",
+  "object": "../../../fixtures/accepted-k93-09/wire1-target.bisa",
+  "command": [
+    "run-action",
+    "{object}",
+    "a",
+    "--mut",
+    "0",
+    "--in",
+    "1"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "mut": [
+        0
+      ],
+      "in": [
+        1
+      ],
+      "state": {
+        "010": [
+          1,
+          0
+        ]
+      }
+    },
+    "stdout_json_exact_at": [
+      "state"
+    ]
+  }
+}

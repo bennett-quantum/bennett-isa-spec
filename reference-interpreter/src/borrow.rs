@@ -930,7 +930,15 @@ impl Compiler<'_> {
                     let (controls, targets, diagonal, other) = gate_operands(i)?;
                     let mut c = effective.clone();
                     for control in &controls {
-                        c = with(&[(self.scalar(control)?, true)], &c);
+                        let wires =
+                            if op == "mcx" && self.object.isa_version == crate::IsaVersion::V09 {
+                                self.bundle(control)?
+                            } else {
+                                vec![self.scalar(control)?]
+                            };
+                        for wire in wires {
+                            c = with(&[(wire, true)], &c);
+                        }
                     }
                     let targets = targets
                         .iter()

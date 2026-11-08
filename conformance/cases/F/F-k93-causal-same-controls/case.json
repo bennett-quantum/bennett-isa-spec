@@ -1,0 +1,17 @@
+{
+  "id": "F-k93-causal-same-controls",
+  "suite": "F",
+  "spec": "ISA 0.9 \u00a74.4 K93; \u00a715 MCX operand and phase witnesses",
+  "derivation": "\u00a75.6 K78: reversed written control order resolves to the same complete control set; the two flips pop at every operand, restoring allocated c=0. Thus CX(c,d) preserves arbitrary borrowed d. The final two flips restore the exact allocation version before qfree.",
+  "object": "../../../fixtures/accepted-k93-09/causal-same-controls.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "status": "ok"
+    }
+  }
+}

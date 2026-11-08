@@ -1,0 +1,9 @@
+bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=8
+
+section symbols
+{"0":{"interface_hash":"503a2b4da068bd3448dd2838a3cd8e07c7937ec907c60bd575c0c8b94896f43d","kind":"action","name":"a","signature":{"abi":"0.9","args":[],"bounds":[],"in":[3],"kind":"action","mem":[],"mut":[1],"tier":"q"}}}
+
+section functions
+action @a (t:wire mut) (c:wire[3] in) () () ()
+^entry():
+mcx (c) t

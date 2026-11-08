@@ -382,10 +382,12 @@ impl Compiler<'_> {
                             ("params", array([angle])),
                         ])
                     } else if op == "mcx" {
-                        let mut wires = crate::object::list(&a[0])?
-                            .iter()
-                            .map(|n| env.wire(n))
-                            .collect::<Result<Vec<_>>>()?;
+                        let mut wires = Vec::new();
+                        for name in crate::object::list(&a[0])? {
+                            for index in 0..env.width(&name)? {
+                                wires.push(env.indexed(&name, index)?);
+                            }
+                        }
                         wires.push(env.wire(&a[1])?);
                         gate(op, wires)
                     } else if matches!(

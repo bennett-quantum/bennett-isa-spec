@@ -438,7 +438,11 @@ impl Object {
                 let mut angle = None;
                 if op == "mcx" {
                     for n in list(&a[0])? {
-                        wires.push(e.scalar(&n)?);
+                        if self.isa_version == crate::IsaVersion::V09 {
+                            wires.extend(e.bundle(&n)?);
+                        } else {
+                            wires.push(e.scalar(&n)?);
+                        }
                     }
                     wires.push(e.scalar(&a[1])?);
                 } else if matches!(op, "rx" | "ry" | "rz") {
