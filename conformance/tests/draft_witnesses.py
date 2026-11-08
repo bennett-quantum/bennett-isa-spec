@@ -3,8 +3,13 @@ from pathlib import Path
 from fractions import Fraction
 import hashlib
 import json
+import os
+import tomllib
 
 root = Path(__file__).resolve().parents[2]
+reference = Path(os.environ.get("BENNETT_CONFORMANCE_BIN", str(
+    root / "reference-interpreter/target/debug/bennett-isa-ref")))
+assert reference.is_file(), f"reference binary missing: {reference}; build it or set BENNETT_CONFORMANCE_BIN"
 draft = (root / "spec/Bennett-ISA-Spec-0.9.md").read_text()
 accepted = root / "spec/Bennett-ISA-Spec.md"
 assert hashlib.sha256(accepted.read_bytes()).hexdigest() == "90e61d9c377c939fe9652758f61cd5ead068ef06e4e40d812d3f3c5197ab605e"
@@ -175,7 +180,7 @@ for t in range(4):
         first = t ^ 1
         expected = first ^ ((first & 1) << 1) ^ p
         for value, adjoint, output in [(t, False, expected), (expected, True, t)]:
-            command = [str(root / "reference-interpreter/target/debug/bennett-isa-ref"), "run-action", str(multi_dir / "two-blocks.bisa"), "flip", "--mut", str(value), "--in", str(p)]
+            command = [str(reference), "run-action", str(multi_dir / "two-blocks.bisa"), "flip", "--mut", str(value), "--in", str(p)]
             if adjoint:
                 command.append("--adjoint")
             result = subprocess.run(command, capture_output=True, text=True)
@@ -225,7 +230,7 @@ assert bits == draws["outcomes_bits"] and values == draws["outcomes_values"]
 assert values[::-1] == draws["reversed_draw_values"]
 assert [bit_order.index(b) for b in bits] == draws["integer_order_values"]
 draw_dir = root / "conformance/cases/A/A-measure-draw-order-09"
-result = subprocess.run([str(root / "reference-interpreter/target/debug/bennett-isa-ref"), "run-program", str(draw_dir / "two-measures.bisa"), "twice", "--draws", ",".join(draws["draws"])], capture_output=True, text=True)
+result = subprocess.run([str(reference), "run-program", str(draw_dir / "two-measures.bisa"), "twice", "--draws", ",".join(draws["draws"])], capture_output=True, text=True)
 assert result.returncode == 0, result.stderr
 measurements = json.loads(result.stdout)["measurements"]
 assert [m["bits"] for m in measurements] == bits
@@ -269,7 +274,22 @@ runpy.run_path(str(root / "conformance/tools/draft_examples.py"))["check"](draft
 fixture = runpy.run_path(str(root / "conformance/tools/controlled_action_fixture.py"))
 for name, raw in fixture["artifacts"]().items():
     assert (fixture["DIR"] / name).read_bytes() == raw, name
-pinned = root.parent / "bennett-isa-spec-review/reference-interpreter/target/debug/bennett-isa-ref"
+name = "bennett-isa-spec-review"
+pin = tomllib.loads((root / "gate.toml").read_text())["siblings"][name]["sha"]
+# The gate exposes a symlink beside its detached checkout. Direct crate runs
+# use that same pin's materialised cache, never an unpinned sibling worktree.
+pinned_checkout = root.parent / name
+if not pinned_checkout.is_symlink():
+    pinned_checkout = root / ".tmp/gate/cache" / f"{name}@{pin[:12]}" / name
+assert pinned_checkout.is_dir(), f"materialise gate.toml sibling {name}@{pin} before checking witnesses"
+head = subprocess.run(["git", "-C", str(pinned_checkout), "rev-parse", "HEAD"],
+                      check=True, capture_output=True, text=True).stdout.strip()
+assert head == pin, f"pinned witness checkout {head} differs from gate.toml {pin}"
+dirty = subprocess.run(["git", "-C", str(pinned_checkout), "status", "--porcelain", "-uno"],
+                       check=True, capture_output=True, text=True).stdout
+assert not dirty, f"pinned witness checkout has tracked changes: {dirty}"
+pinned = pinned_checkout / "reference-interpreter/target/debug/bennett-isa-ref"
+assert pinned.is_file(), f"build gate.toml sibling {name}@{pin} before checking witnesses"
 compat = fixture["DIR"] / "compat-0.8.bisa"
 for command in ("check", "hash"):
     result = subprocess.run([str(pinned), command, str(compat)], capture_output=True, text=True)
