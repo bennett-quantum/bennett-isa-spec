@@ -12,7 +12,7 @@ fn all_k93_portable_vectors_run_against_the_published_cli() {
         .iter()
         .map(|v| v.as_str().unwrap().to_string())
         .collect::<BTreeSet<_>>();
-    assert_eq!(ids.len(), 289);
+    assert_eq!(ids.len(), 291);
     let temporary = std::path::PathBuf::from(std::env::var("TMPDIR").unwrap()).join("k93-harness");
     std::fs::create_dir_all(&temporary).unwrap();
     let mut seen = BTreeSet::new();

@@ -217,7 +217,10 @@ fn original_witness_retains_published_byte_identities() {
         Some("e38d5da64f9a0ae89a66243bcbe5a321cb807a5bbabf83952b63d3465dfab346")
     );
     let library = object.bound_ref_library().unwrap();
-    assert_eq!(library.hash(), bennett_isa_ref::ref_library::REF09_HASH);
+    assert_eq!(
+        library.hash(),
+        "5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197"
+    );
 }
 
 #[test]
@@ -229,7 +232,15 @@ fn external_reference_coherence_preserves_both_exact_prepared_amplitudes() {
     q.gate("cx", &[wires[4], wires[2]], None, &[]).unwrap();
     q.gate("cx", &[wires[4], wires[3]], None, &[]).unwrap();
     let before = q.clone();
-    let amplitude = q.exact_support()[0].1;
+    // §4.4 H and the §15 witness give 1/sqrt(2) independently of execution.
+    let amplitude = (std::f64::consts::FRAC_1_SQRT_2, 0.0);
+    assert_eq!(
+        q.exact_support(),
+        vec![
+            (vec![false; 5], amplitude),
+            (vec![false, false, true, true, true], amplitude)
+        ]
+    );
     let mut bindings = QuantumBindings::default();
     bindings.bundles.insert("p".into(), vec![wires[0]]);
     bindings.bundles.insert("q".into(), vec![wires[1]]);
@@ -284,15 +295,61 @@ fn resolved_aliases_reject_before_any_gate_executes() {
 
 #[test]
 fn k78_matches_complete_control_sets_after_bundle_expansion() {
-    let signature = r#"{"abi":"0.9","args":[],"bounds":[],"in":[1,2],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
-    let body = "action @a (t:wire mut) (s:wire in, b:wire[2] in) () () ()\n^entry():\nc = qalloc any 1\nmcx (s, b) c\nmcx (b, s) c\nd = qborrow any 1\ncx c d\nqreturn d\nmcx (b, s) c\nmcx (s, b) c\nqfree c";
-    let source = support::object(&[("a", signature, body)], "{}", "").replace("=0.8", "=0.9");
-    let object = support::rehash(&source);
+    let object = Object::parse(&fixture("causal-same-controls.bisa")).unwrap();
     object.check_hashes().unwrap();
     // c=0 follows from two matching resolved flips. The subsequent frame
     // may touch arbitrary d only if K78 supplied that exact entry fact.
-    let wrong = source.replace("mcx (b, s) c", "mcx (b) c");
-    let error = Object::parse(&wrong).expect_err("different effective controls cannot match");
+    let error = Object::parse(&fixture("causal-different-controls.bisa"))
+        .expect_err("different effective controls cannot match");
+    assert!(error.to_string().contains("§5.6"), "{error}");
+}
+
+#[test]
+fn rechecked_certificate_proves_all_controls_and_rejects_stale_first_bit_relation() {
+    let closure = "e38d5da64f9a0ae89a66243bcbe5a321cb807a5bbabf83952b63d3465dfab346";
+    let corrected = Object::parse(&fixture("witness-certified.bisa")).unwrap();
+    corrected.check_hashes().unwrap();
+    assert_eq!(
+        corrected.verify_claim(closure, 0).unwrap(),
+        bennett_isa_ref::ClaimVerdict::Proof
+    );
+    let stale = Object::parse(&fixture("witness-firstbit-certificate.bisa")).unwrap();
+    stale.check_hashes().unwrap(); // identical source hashes do not prove the table
+    let error = stale.verify_claim(closure, 0).unwrap_err();
+    assert!(error.to_string().contains("full tuple mismatch"), "{error}");
+    assert_eq!(
+        corrected.identity().unwrap().object_hash,
+        stale.identity().unwrap().object_hash
+    );
+}
+
+#[test]
+fn cached_callee_transfer_remaps_complete_bundle_for_each_actual_binding() {
+    let root = r#"{"abi":"0.9","args":[],"bounds":[],"in":[2,2],"kind":"action","mem":[],"mut":[1],"tier":"q"}"#;
+    let child = r#"{"abi":"0.9","args":[],"bounds":[],"in":[2],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}"#;
+    let body = "action @a (t:wire mut) (b:wire[2] in, c:wire[2] in) () () ()\n^entry():\nd = qborrow any 1\naction_call @g (d) (b) () ()\naction_call @g (d) (b) () ()\nqreturn d";
+    let source = support::object(
+        &[
+            ("a", root, body),
+            (
+                "g",
+                child,
+                "perm_action @g (t:wire mut) (b:wire[2] in) () () ()\n^entry():\nmcx (b) t",
+            ),
+        ],
+        "{}",
+        "",
+    )
+    .replace("=0.8", "=0.9");
+    support::rehash(&source).check_hashes().unwrap();
+    // The callee is cached on its first use. A different second actual must
+    // retain both c bits, rather than reusing the first call's b mapping.
+    let wrong = source.replacen(
+        "action_call @g (d) (b) () ()\nqreturn d",
+        "action_call @g (d) (c) () ()\nqreturn d",
+        1,
+    );
+    let error = Object::parse(&wrong).expect_err("independent conjunctions cannot restore d");
     assert!(error.to_string().contains("§5.6"), "{error}");
 }
 

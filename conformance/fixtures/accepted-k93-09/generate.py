@@ -112,6 +112,17 @@ def main():
         case("F", name, name, ["check", "{object}"],
              {"exit": 1, "stdout_empty": True, "stderr_contains": ["§3.3"]},
              "§4.4 applies §3.3 to every resolved control and the scalar live target before execution: repeated wires, overlap, missing/out-of-range or multiwire target reject as operands, independent of a relation claim.")
+    causal = ("c = qalloc any 1\nmcx (s, b) c\nmcx (b, s) c\n"
+              "d = qborrow any 1\ncx c d\nqreturn d\n"
+              "mcx (b, s) c\nmcx (s, b) c\nqfree c")
+    objects["causal-same-controls"] = source([("t", 1)], [("s", 1), ("b", 2)], causal)
+    objects["causal-different-controls"] = source([("t", 1)], [("s", 1), ("b", 2)], causal.replace("mcx (b, s) c", "mcx (b) c"))
+    case("F", "causal-same-controls", "causal-same-controls", ["check", "{object}"],
+         {"exit": 0, "stdout_json": {"status": "ok"}},
+         "§5.6 K78: reversed written control order resolves to the same complete control set; the two flips pop at every operand, restoring allocated c=0. Thus CX(c,d) preserves arbitrary borrowed d. The final two flips restore the exact allocation version before qfree.")
+    case("F", "causal-different-controls", "causal-different-controls", ["check", "{object}"],
+         {"exit": 1, "stdout_empty": True, "stderr_contains": ["§5.6"]},
+         "§5.6 K78: omitting scalar s changes the effective control set. Entry analysis cannot prove c=0, so CX(c,d) does not restore arbitrary borrowed d. This is a frame relation failure with well-formed MCX operands.")
     for adjoint in (False, True):
         before, after = ("0000", "1011") if not adjoint else ("0000", "0011")
         # Components are unnormalised binary64 inputs; H-based reference test
@@ -125,10 +136,44 @@ def main():
 
     # Exact original witness bytes, including ptr_width=8 and its published hash.
     objects["witness"] = objects["witness"].replace("0" * 64, "e38d5da64f9a0ae89a66243bcbe5a321cb807a5bbabf83952b63d3465dfab346")
+    closure = "e38d5da64f9a0ae89a66243bcbe5a321cb807a5bbabf83952b63d3465dfab346"
+    invocation = {"args": [], "budget": ["0", "0", "0", "0"]}
+    signature = {"abi": "0.9", "args": [], "bounds": [], "in": [2], "kind": "action", "mem": [], "mut": [1, 1], "tier": "q"}
+    for stale in (False, True):
+        table = []
+        for p in range(2):
+            for q in range(2):
+                for c in range(4):
+                    def state(values):
+                        return {"borrowed": [], "bundles": list(map(str, values)), "regions": []}
+                    table.append({"before": state([p, q, c]),
+                                  "after": state([q ^ ((c & 1) if stale else (c == 3)), p, c])})
+        claim = {"kind": "exhaustive", "label": "proof", "invocation": invocation,
+                 "subject": {"closure_hash": closure, "inherited_controls": 0, "variant": "forward"},
+                 "domain": {"borrowed": [], "regions": [], "bundles": [
+                     {"name": n, "width": w, "lo": 0, "hi": (1 << w) - 1} for n, w in [("p", 1), ("q", 1), ("c", 2)]]},
+                 "expected": {"table": table}}
+        region = {"kind": "action", "signature": signature, "bounds": [], "claims": [claim],
+                  "cleanup": {}, "definedness_assumptions": [], "error": {}, "gates_used": {}, "resources": {},
+                  "frame": {"ancillae": [], "borrow": [], "history": [], "scratch": [], "slots": [
+                      {"id": ident, "role": role, "width": width, "class": "fast"}
+                      for ident, role, width in [("mut:0", "mut", 1), ("mut:1", "mut", 1), ("in:0", "in", 2)]]},
+                  "verification": {"borrow_frames": [], "channel": [], "inverse_pairs": [], "oracle": None, "unitary": [0],
+                                   "fault_rate": {"domain": {"borrowed": [], "bundles": [], "regions": []}, "faults_by_code": {}, "layout_dependent_excluded": 0, "undefined_excluded": 0}}}
+        certificate = {"bindings": {"closure_hash": closure, "interface_hash": closure, "reference_program_hash": closure,
+                                    "object_hash": "db3d3f92a79077074901449d83532f1a0d82ef1621bd833adb7ad14d1aedd467",
+                                    "target_hash": "0" * 64, "dialect_mapping_version": "none", "invocation": invocation},
+                       "composition": {"epsilon_total": {"diamond": 0}, "method": "sum_over_multiplicities", "multiplicities": {}},
+                       "producer": {"name": "conformance", "version": "1", "materialisation": {"llvm_version": "none", "normaliser_version": "1", "pipeline": "synthetic"}},
+                       "regions": {closure: region},
+                       "versions": {k: "0.9" for k in ("cert", "coverage", "isa", "launch", "object", "sched", "target")}}
+        name = "witness-firstbit-certificate" if stale else "witness-certified"
+        objects[name] = objects["witness"] + "\nsection certificate\n" + canonical(certificate) + "\n"
     outputs = {}
     for name, content in objects.items():
         destination = HERE / f"{name}.bisa"
-        if args.ref and not any(name == n[0] for n in negatives):
+        rejected = any(name == n[0] for n in negatives) or name == "causal-different-controls"
+        if args.ref and not rejected:
             probe = HERE / "identity-input.bisa"
             probe.write_text(content)
             try:
@@ -136,11 +181,13 @@ def main():
             finally:
                 probe.unlink()
             identity = json.loads(result.stdout)
-            content = content.replace("0" * 64, identity["symbols"]["a"]["interface_hash"])
-        elif destination.exists() and not any(name == n[0] for n in negatives):
+            content = content.replace('"interface_hash":"' + "0" * 64 + '"',
+                                      '"interface_hash":"' + identity["symbols"]["a"]["interface_hash"] + '"')
+        elif destination.exists() and not rejected:
             # Regeneration without CLI keeps already-published identity metadata.
             old = destination.read_text().split("section symbols\n")[1].splitlines()[0]
-            content = content.replace("0" * 64, json.loads(old)["0"]["interface_hash"])
+            content = content.replace('"interface_hash":"' + "0" * 64 + '"',
+                                      '"interface_hash":"' + json.loads(old)["0"]["interface_hash"] + '"')
         outputs[destination] = content
     manifest = {"format": "bennett.k93.v1", "isa": "0.9", "vectors": vectors,
                 "witness_object_hash": "db3d3f92a79077074901449d83532f1a0d82ef1621bd833adb7ad14d1aedd467",

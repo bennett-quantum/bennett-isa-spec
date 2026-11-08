@@ -14,6 +14,7 @@ only the published `hash` command for identity metadata, never gate results.
 | `empty/empty-predicate` | Empty conjunction is true; X applies unconditionally or under r. Explicit k=0. |
 | `wire1-target/indexed-target` | Target denotes one live bit: a bare wire[1] or t[1]. Only that bit XORs `[c=3]`. |
 | suite F negatives | Repeated scalar/bundle controls, target/control overlap, multiwire target, missing target and out-of-range index violate §3.3/§4.4 before any relation is checked. |
+| `causal-same-controls/causal-different-controls` | K78 matches the complete control set after flattening, allowing allocated c=0 at a borrowed frame entry. Removing s prevents that match and rejects the frame relation despite well-formed operands. |
 
 Every basis case asserts an exact state dictionary with its sole amplitude
 `[1,0]`, detecting relative or global phase and extra components. Each row is
@@ -36,6 +37,13 @@ published `ref@0.9` catalog remains
 `5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`.
 The interpreter's borrow-call and constructor caches live only within one
 fresh validation/expansion; no persistent resolution cache format changes.
+`witness-certified.bisa` carries an independently generated complete 16-row
+table using the conjunction formula. The reference test rechecks it as Proof.
+`witness-firstbit-certificate.bisa` has the same source hashes and a stale
+first-bit table: its operands and certificate schema admit, but semantic
+replay rejects the tuple at c=1. Thus operand rejection and relation failure
+are tested separately. These fixtures have no bound schedules to regenerate;
+the source adapter's resolved operands are asserted directly.
 
 Reproduce with headless environment and project-local TMPDIR:
 
