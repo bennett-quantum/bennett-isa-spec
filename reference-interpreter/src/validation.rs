@@ -600,7 +600,16 @@ impl Object {
                     {
                         return err("§3.3", "gate angle must be a classical f64 argument");
                     }
-                    let (controls, targets, diagonal, other) = gate_operands(i)?;
+                    let (mut controls, targets, diagonal, other) = gate_operands(i)?;
+                    if op == "mcx" && self.isa_version == crate::IsaVersion::V09 {
+                        // §4.4: expand each entry before checking distinctness;
+                        // neither source operands nor their order are rewritten.
+                        controls = controls
+                            .iter()
+                            .map(|name| s.wires(name))
+                            .collect::<Result<Vec<_>>>()?
+                            .concat();
+                    }
                     if f.kind == "perm_action" && (diagonal || other) {
                         return err("§5.3", "permutation action contains non-permutation gate");
                     }

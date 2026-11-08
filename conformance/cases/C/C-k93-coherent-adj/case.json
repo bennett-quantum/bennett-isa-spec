@@ -1,0 +1,33 @@
+{
+  "id": "C-k93-coherent-adj",
+  "suite": "C",
+  "spec": "ISA 0.9 \u00a74.4 K93; \u00a715 MCX operand and phase witnesses",
+  "derivation": "\u00a74.4/\u00a715 linearity: exact +1 basis columns preserve both input binary64 amplitudes; the 00,c=3 branch toggles p. External-reference witness is separately recorded in k93.json and exercised by the reference test.",
+  "object": "../../../fixtures/accepted-k93-09/witness.bisa",
+  "command": [
+    "run-action",
+    "{object}",
+    "a",
+    "--state",
+    "0000=0.7071067811865476;1011=0.7071067811865476",
+    "--adjoint"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "state": {
+        "0000": [
+          0.7071067811865476,
+          0
+        ],
+        "0011": [
+          0.7071067811865476,
+          0
+        ]
+      }
+    },
+    "stdout_json_exact_at": [
+      "state"
+    ]
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "id": "C-k93-width-2-5-fwd",
+  "suite": "C",
+  "spec": "ISA 0.9 \u00a74.4 K93; \u00a715 MCX operand and phase witnesses",
+  "derivation": "\u00a74.4: AND of all increasing-index control bits equals [c=2^width-1]; target XORs it, exact phase +1.",
+  "object": "../../../fixtures/accepted-k93-09/width-2.bisa",
+  "command": [
+    "run-action",
+    "{object}",
+    "a",
+    "--mut",
+    "1",
+    "--in",
+    "1"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "mut": [
+        1
+      ],
+      "in": [
+        1
+      ],
+      "state": {
+        "110": [
+          1,
+          0
+        ]
+      }
+    },
+    "stdout_json_exact_at": [
+      "state"
+    ]
+  }
+}
