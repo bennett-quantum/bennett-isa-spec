@@ -1980,6 +1980,94 @@ impl Object {
         }
         Ok(compiler)
     }
+    /// §12.2 K70: widths of distinct checked borrow lifetimes, in allocation
+    /// order, including every repeated visit and transitive action call.
+    /// `None` means an unlinked action prevents a complete inventory. This
+    /// reads the existing compiler's facts without changing its semantics.
+    pub fn checked_borrow_lifetimes(&self, root: &str) -> Result<Option<Vec<usize>>> {
+        // Prove absence before materialising compiler wire coordinates. In
+        // particular, a large legal interface with no borrows needs no storage
+        // proportional to that interface merely to establish an empty list.
+        fn inspect(seq: &[Instruction], borrows: &mut bool, calls: &mut Vec<String>) -> Result<()> {
+            for instruction in seq {
+                *borrows |= instruction.op == "qborrow";
+                if matches!(instruction.op.as_str(), "action_call" | "adj" | "ctl") {
+                    let call = normalize_call(instruction)?;
+                    if call.instruction.op == "action_call" {
+                        calls.push(call.instruction.operands[0].trim_start_matches('@').into());
+                    }
+                }
+                for body in &instruction.bodies {
+                    inspect(body, borrows, calls)?;
+                }
+            }
+            Ok(())
+        }
+        fn collect(nodes: &[Node], out: &mut Vec<usize>) -> Result<()> {
+            for node in nodes {
+                match node {
+                    Node::Borrow(wires) => {
+                        crate::reserve_more(out, 1, "§12.2 K70", "checked borrow lifetimes")?;
+                        out.push(wires.len());
+                    }
+                    Node::Call {
+                        body: Some(body), ..
+                    } => collect(body, out)?,
+                    Node::Repeat(copies, body) => {
+                        let mut period = Vec::new();
+                        collect(body, &mut period)?;
+                        if period.is_empty() {
+                            continue;
+                        }
+                        let count = usize::try_from(*copies)
+                            .ok()
+                            .and_then(|n| n.checked_mul(period.len()))
+                            .ok_or_else(|| {
+                                crate::resource_error(
+                                    "§12.2 K70",
+                                    "checked borrow lifetime count exceeds usize",
+                                )
+                            })?;
+                        crate::reserve_more(out, count, "§12.2 K70", "checked borrow lifetimes")?;
+                        for _ in 0..*copies {
+                            out.extend_from_slice(&period);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Ok(())
+        }
+        let Some(function) = self.functions.get(root) else {
+            return Ok(None);
+        };
+        if !matches!(function.kind.as_str(), "action" | "perm_action") {
+            return Ok(Some(Vec::new()));
+        }
+        let mut pending = vec![root.to_string()];
+        let mut seen = BTreeSet::new();
+        let mut borrows = false;
+        while let Some(name) = pending.pop() {
+            if !seen.insert(name.clone()) {
+                continue;
+            }
+            let Some(callee) = self.functions.get(&name) else {
+                return Ok(None);
+            };
+            for block in &callee.blocks {
+                inspect(&block.instructions, &mut borrows, &mut pending)?;
+            }
+        }
+        if !borrows {
+            return Ok(Some(Vec::new()));
+        }
+        let mut compiler = self.borrow_compiler(function)?;
+        let mut nodes = Vec::new();
+        compiler.compile_function(function, &[], &mut nodes)?;
+        let mut widths = Vec::new();
+        collect(&nodes, &mut widths)?;
+        Ok(Some(widths))
+    }
     /// Check a named source frame against the complete compiled circuit,
     /// including inherited predicates, loop structure and physical wire names.
     pub(crate) fn check_translation_frame(
