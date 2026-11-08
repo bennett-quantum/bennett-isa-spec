@@ -143,3 +143,4 @@ Run `python3 -I conformance/tools/ref_gate.py` for the headless offline gate.
 | ISA 0.9 portable vector | Coverage | Reproduction |
 |---|---|---|
 | [K81](fixtures/accepted-k81-09/README.md) | Joint inverse / first-release ownership, reversed release order and selector tie | Reference `cleanup_partition::portable_k81_joint_first_release_vectors_exact_bytes` |
+| [K85](fixtures/accepted-k85-09/README.md) | Fixed images, exclusive replay verdicts, exact coverage, malformed bindings, controlled/dirty/reference systems; independent restricted-map data | Reference `isa09_fixed_image`; conformance `ref_k85`; rigorous numerical/preparation checker remains staged |

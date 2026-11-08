@@ -1,0 +1,17 @@
+{
+  "id": "D-k85-controlled-dirty",
+  "suite": "D",
+  "spec": "ISA0.9 §12.2 K85",
+  "derivation": "Both controls and dirty bit range fully; two CX(b,t) cancel exactly, including entangled references. 256/2^24=1/65536. CLI check covers admission; portable checker APIs cover replay.",
+  "object": "../../../fixtures/accepted-k85-09/controlled-dirty.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "status": "ok"
+    }
+  }
+}

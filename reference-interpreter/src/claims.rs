@@ -47,6 +47,31 @@ pub enum ClaimVerdict {
     /// Not checkable by this crate yet; the reason names the missing machinery.
     Unverified(String),
 }
+
+/// §12.2 K85: requests constrain the independently computed successful
+/// category. An unchecked claim has no successful category to advertise.
+fn check_requested_label(claim: &Json, verdict: &ClaimVerdict) -> Result<()> {
+    if matches!(verdict, ClaimVerdict::Unverified(_)) {
+        return Ok(());
+    }
+    let requested = claim.object()?.get("label").map(Json::string).transpose()?;
+    let matches = match requested {
+        None | Some("evidence") => true,
+        Some("proof") => *verdict == ClaimVerdict::Proof,
+        Some("proof_relative_to_image") => *verdict == ClaimVerdict::ProofRelativeToImage,
+        Some(other) => return err("§12.2 K85", format!("unknown requested label {other}")),
+    };
+    if !matches {
+        return err(
+            "§12.2 K85",
+            format!(
+                "requested {} differs from computed outcome",
+                requested.unwrap()
+            ),
+        );
+    }
+    Ok(())
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CertificateReport {
     pub claims: Vec<ClaimReport>,
@@ -682,7 +707,21 @@ impl Object {
         if !active.insert((closure.to_string(), index)) {
             return err("§12", "cyclic claim reference");
         }
-        let result = self.verify_claim_inner(closure, index, active);
+        let result = self
+            .verify_claim_inner(closure, index, active)
+            .and_then(|verdict| {
+                let claim = &self
+                    .section("certificate")
+                    .unwrap()
+                    .get("regions")?
+                    .get(closure)?
+                    .get("claims")?
+                    .array()?[index];
+                if self.isa_version == crate::IsaVersion::V09 {
+                    check_requested_label(claim, &verdict)?;
+                }
+                Ok(verdict)
+            });
         active.remove(&(closure.to_string(), index));
         result
     }

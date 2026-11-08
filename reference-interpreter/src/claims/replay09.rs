@@ -11,10 +11,49 @@ pub(super) struct Invocation {
     pub budget: Budget,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fixed_cells_never_become_enumeration_components() {
+        let object = Object::parse(include_str!(
+            "../../../conformance/fixtures/accepted-k85-09/image-0102.bisa"
+        ))
+        .unwrap();
+        let certificate = object.section("certificate").unwrap();
+        let closure = certificate
+            .get("bindings")
+            .unwrap()
+            .get("closure_hash")
+            .unwrap()
+            .string()
+            .unwrap();
+        let claim = &certificate
+            .get("regions")
+            .unwrap()
+            .get(closure)
+            .unwrap()
+            .get("claims")
+            .unwrap()
+            .array()
+            .unwrap()[0];
+        let domain = object.domain09(claim, &object.functions["lookup"]).unwrap();
+        // Only t,f,a enumerate. db[0],db[1] fill the tuple independently.
+        assert_eq!(domain.domain.components.len(), 3);
+        assert!(domain
+            .domain
+            .components
+            .iter()
+            .all(|(c, ..)| !matches!(c, Component::Cell(..))));
+    }
+}
+
 struct ResolvedDomain {
     domain: Domain,
     relative_to_image: bool,
     images: Vec<FixedRegionBinding>,
+    fixed_cells: Vec<(Component, BitVector)>,
 }
 pub(super) struct Outcome {
     pub verdict: ClaimVerdict,
@@ -193,16 +232,16 @@ impl Object {
         let inherited = bundles.drain(..controls).collect::<Vec<_>>();
         let images = self.image_domains09(claim.get("domain")?, f)?;
         let mut unrestricted = source.clone();
-        for (value, full) in [(&mut source, false), (&mut unrestricted, true)] {
-            let Json::Object(fields) = value else {
-                unreachable!()
-            };
-            let Json::Array(regions) = fields.get_mut("regions").unwrap() else {
-                unreachable!()
-            };
-            for image in &images {
-                regions.push(image.entry(full)?);
-            }
+        let Json::Object(fields) = &mut unrestricted else {
+            unreachable!()
+        };
+        let Json::Array(regions) = fields.get_mut("regions").unwrap() else {
+            unreachable!()
+        };
+        let mut fixed_cells = Vec::new();
+        for image in &images {
+            regions.push(image.unrestricted_entry()?);
+            image.append_cells(&mut fixed_cells)?;
         }
         let mut domain = self.domain(f, &source)?;
         let mut relative_to_image = !images.is_empty() && self.domain(f, &unrestricted)?.covers_d;
@@ -223,6 +262,7 @@ impl Object {
             domain,
             relative_to_image,
             images: images.into_iter().map(|i| i.binding).collect(),
+            fixed_cells,
         })
     }
 
@@ -433,12 +473,21 @@ impl Object {
             .filter(|(c, ..)| matches!(c, Component::Borrowed(..)))
             .count();
         for (row, values) in elements.iter().enumerate() {
-            let element = domain
+            let mut element = domain
                 .components
                 .iter()
                 .map(|c| c.0.clone())
                 .zip(values.iter().cloned())
                 .collect::<Vec<_>>();
+            // K85: fixed cells fill complete tuples but never add an
+            // enumeration component or consume sampler generator words.
+            crate::reserve_more(
+                &mut element,
+                resolved.fixed_cells.len(),
+                "§12.2 K85",
+                "replay fixed cells",
+            )?;
+            element.extend(resolved.fixed_cells.iter().cloned());
             let before = self.entry09(f, &element, controls)?;
             invocation.controls = before[..controls].to_vec();
             let after = self.execute_element_bound(
@@ -481,22 +530,7 @@ impl Object {
                 elements: elements.len() as u128,
             }
         };
-        if claim.object()?.get("label") == Some(&Json::String("proof".into()))
-            && verdict != ClaimVerdict::Proof
-        {
-            return err(
-                "§12.2 K74",
-                "requested proof but replay covers only a slice of D",
-            );
-        }
-        if claim.object()?.get("label") == Some(&Json::String("proof_relative_to_image".into()))
-            && verdict != ClaimVerdict::ProofRelativeToImage
-        {
-            return err(
-                "§12.2 K85",
-                "requested proof_relative_to_image without complete remaining domain",
-            );
-        }
+        check_requested_label(claim, &verdict)?;
         Ok(Outcome {
             verdict,
             coverage: Some(coverage(f, controls, &resolved, elements.len())?),

@@ -1,0 +1,17 @@
+{
+  "id": "D-k85-sampled-full-d",
+  "suite": "D",
+  "spec": "ISA0.9 §12.2 K85",
+  "derivation": "Two xoshiro256** draws from seed (2^57,0,0,0) are 0 and 45; low bits cover both values; sampling remains evidence. CLI check covers admission; portable checker APIs cover replay.",
+  "object": "../../../fixtures/accepted-k85-09/sampled-full-d.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "status": "ok"
+    }
+  }
+}

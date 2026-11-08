@@ -1,0 +1,17 @@
+{
+  "id": "D-k85-external-reference",
+  "suite": "D",
+  "spec": "ISA0.9 §12.2 K85",
+  "derivation": "The two one-bit cells are (1,0); output t XOR (control AND NOT a). Dirty/reference systems are restored. 256/1024=1/4. CLI check covers admission; portable checker APIs cover replay.",
+  "object": "../../../fixtures/accepted-k85-09/external-reference.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "status": "ok"
+    }
+  }
+}

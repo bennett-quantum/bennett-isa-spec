@@ -1,0 +1,17 @@
+{
+  "id": "D-k85-packing",
+  "suite": "D",
+  "spec": "ISA0.9 §12.2 K85",
+  "derivation": "0x011f = 31 + (8<<5); two 5-bit cells straddle a byte. Padding is zero. 64/2^16=1/1024. CLI check covers admission; portable checker APIs cover replay.",
+  "object": "../../../fixtures/accepted-k85-09/packing.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "status": "ok"
+    }
+  }
+}

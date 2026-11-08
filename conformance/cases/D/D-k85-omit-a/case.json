@@ -1,0 +1,17 @@
+{
+  "id": "D-k85-omit-a",
+  "suite": "D",
+  "spec": "ISA0.9 §12.2 K85",
+  "derivation": "Omitted a is zero by the existing slice rule; its full range has more than one value. CLI check covers admission; portable checker APIs cover replay.",
+  "object": "../../../fixtures/accepted-k85-09/omit-a.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "status": "ok"
+    }
+  }
+}

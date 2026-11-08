@@ -4,6 +4,8 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FixedRegionBinding {
+    /// §12.2 K85: signature mem slot, independent of local region spelling.
+    pub id: String,
     pub group: usize,
     pub slot: usize,
     pub address_width: u64,
@@ -18,14 +20,10 @@ pub(super) struct ImageDomain {
 }
 
 impl ImageDomain {
-    pub fn entry(&self, unrestricted: bool) -> Result<Json> {
+    pub fn unrestricted_entry(&self) -> Result<Json> {
         let mut cells = crate::reserved(self.values.len(), "§12.2 K85", "fixed region cells")?;
         for (index, value) in self.values.iter().enumerate() {
-            let (lo, hi) = if unrestricted {
-                (BitVector::zero(value.width())?, ones(value.width())?)
-            } else {
-                (value.clone(), value.clone())
-            };
+            let (lo, hi) = (BitVector::zero(value.width())?, ones(value.width())?);
             cells.push(Json::Object(BTreeMap::from([
                 ("index".into(), Json::Number(index.to_string())),
                 ("lo".into(), decimal_json(&lo)),
@@ -36,6 +34,17 @@ impl ImageDomain {
             ("name".into(), Json::String(self.name.clone())),
             ("cells".into(), Json::Array(cells)),
         ])))
+    }
+
+    pub fn append_cells(&self, cells: &mut Vec<(Component, BitVector)>) -> Result<()> {
+        crate::reserve_more(cells, self.values.len(), "§12.2 K85", "fixed cells")?;
+        cells.extend(self.values.iter().enumerate().map(|(index, value)| {
+            (
+                Component::Cell(self.binding.group, self.binding.slot, index),
+                value.clone(),
+            )
+        }));
+        Ok(())
     }
 }
 
@@ -132,6 +141,7 @@ impl Object {
                 (group, slot),
                 ImageDomain {
                     binding: FixedRegionBinding {
+                        id: format!("mem:{slot}"),
                         group,
                         slot,
                         address_width: a,
