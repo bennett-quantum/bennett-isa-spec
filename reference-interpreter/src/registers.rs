@@ -15,7 +15,8 @@ enum Status {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Handle {
     wires: Vec<Wire>,
-    classes: Vec<String>,
+    // Labels never change after handle creation; snapshots and undo share them.
+    classes: Arc<Vec<String>>,
     status: Status,
     parent: Option<u64>,
 }
@@ -163,7 +164,7 @@ impl QuantumRegisters {
             id,
             Handle {
                 wires,
-                classes,
+                classes: Arc::new(classes),
                 status: Status::Live,
                 parent,
             },

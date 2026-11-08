@@ -1121,7 +1121,8 @@ A `qloop` body is threaded like a block: each visit resolves linear
 names against the bindings live at its entry, and its exit bindings
 supply the next visit's entry bindings; the entry and exit live names
 and their types MUST agree, with consumed body-local names absent from
-both. [deps: ISA-3.3-P3, ISA-4.6-P8, ISA-4.6-P9]
+both. A loop body leaves the predicate stack exactly as at body entry.
+See §3.5. [deps: ISA-3.3-P3, ISA-4.6-P8, ISA-4.6-P9]
 
 ### 4.7 Region calls (structured code, CC and R)
 
