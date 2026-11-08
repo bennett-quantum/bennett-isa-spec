@@ -9,6 +9,7 @@ pub(super) struct Invocation {
     pub controls: Vec<BitVector>,
     pub adjoint: bool,
     pub budget: Budget,
+    pub borrowed_widths: Vec<usize>,
 }
 
 #[cfg(test)]
@@ -88,12 +89,10 @@ fn coverage(
                 })?;
         }
     }
-    for (c, width, ..) in &domain.domain.components {
-        if matches!(c, Component::Borrowed(..)) {
-            bits = bits.checked_add(*width).ok_or_else(|| {
-                crate::resource_error("§12.2 K74", "borrowed width exceeds usize")
-            })?;
-        }
+    for width in &domain.domain.borrowed_widths {
+        bits = bits
+            .checked_add(*width)
+            .ok_or_else(|| crate::resource_error("§12.2 K74", "borrowed width exceeds usize"))?;
     }
     let power = |exponent: usize| -> Result<String> {
         let width = exponent
@@ -211,6 +210,11 @@ impl Object {
             controls: Vec::new(),
             adjoint: false,
             budget,
+            borrowed_widths: self.checked_borrow_lifetimes(&f.name)?.ok_or_else(|| {
+                Error::new(
+                    "§12.2 K70: checked borrow lifetime inventory requires linked actions".into(),
+                )
+            })?,
         })
     }
 
@@ -273,7 +277,7 @@ impl Object {
         f: &Function,
         flat: &[BitVector],
         controls: usize,
-        borrowed: usize,
+        borrowed_widths: &[usize],
     ) -> Result<Json> {
         let bundle_count = controls
             + f.params
@@ -300,8 +304,18 @@ impl Object {
                 offset = end;
             }
         }
-        if flat.len() != offset + borrowed {
+        if flat.len() != offset + borrowed_widths.len() {
             return err("§12.1 K13", "executor tuple length differs from interface");
+        }
+        if flat[offset..]
+            .iter()
+            .zip(borrowed_widths)
+            .any(|(value, width)| value.width() != *width)
+        {
+            return err(
+                "§12.1 K13",
+                "executor borrowed tuple width differs from checked lifetime",
+            );
         }
         Ok(Json::Object(BTreeMap::from([
             (
@@ -321,6 +335,7 @@ impl Object {
         f: &Function,
         element: &[(Component, BitVector)],
         controls: usize,
+        borrowed_widths: &[usize],
     ) -> Result<Vec<BitVector>> {
         let find = |component: Component, width| {
             element
@@ -329,6 +344,7 @@ impl Object {
                     (match (&component, c) {
                         (Component::Control(a), Component::Control(b)) => a == b,
                         (Component::Bundle(a, b), Component::Bundle(c, d)) => (a, b) == (c, d),
+                        (Component::Borrowed(a, _), Component::Borrowed(b, _)) => a == b,
                         (Component::Cell(a, b, c), Component::Cell(d, e, f)) => {
                             (a, b, c) == (d, e, f)
                         }
@@ -366,11 +382,9 @@ impl Object {
                 }
             }
         }
-        out.extend(
-            element
-                .iter()
-                .filter_map(|(c, v)| matches!(c, Component::Borrowed(..)).then_some(v.clone())),
-        );
+        for (ordinal, width) in borrowed_widths.iter().copied().enumerate() {
+            out.push(find(Component::Borrowed(ordinal, String::new()), width)?);
+        }
         Ok(out)
     }
 
@@ -381,6 +395,24 @@ impl Object {
         claim: &Json,
         f: &Function,
     ) -> Result<Outcome> {
+        let result = self.replay09(closure, index, claim, f);
+        match result {
+            Err(error)
+                if error.kind() == crate::ErrorKind::HostResource
+                    && claim.get("expected")? != &Json::String("inverse_pair".into()) =>
+            {
+                Ok(Outcome {
+                    verdict: ClaimVerdict::Unverified(format!(
+                        "§12.2 K75: unchecked (host limit): {error}"
+                    )),
+                    coverage: None,
+                })
+            }
+            result => result,
+        }
+    }
+
+    fn replay09(&self, closure: &str, index: usize, claim: &Json, f: &Function) -> Result<Outcome> {
         if claim.get("expected")? == &Json::String("inverse_pair".into()) {
             return Ok(Outcome {
                 verdict: self.verify_inverse_pair_claim09(f, index, claim)?,
@@ -395,6 +427,14 @@ impl Object {
             return Ok(Outcome {
                 verdict: ClaimVerdict::Unverified(
                     "scheduled subject needs realised target/schedule execution".into(),
+                ),
+                coverage: None,
+            });
+        }
+        if self.checked_borrow_lifetimes(&f.name)?.is_none() {
+            return Ok(Outcome {
+                verdict: ClaimVerdict::Unverified(
+                    "§12.2 K70: checked borrow lifetime inventory requires linked actions".into(),
                 ),
                 coverage: None,
             });
@@ -467,11 +507,7 @@ impl Object {
                 "expected program has an incompatible signature",
             );
         }
-        let borrowed = domain
-            .components
-            .iter()
-            .filter(|(c, ..)| matches!(c, Component::Borrowed(..)))
-            .count();
+        let borrowed_widths = &domain.borrowed_widths;
         for (row, values) in elements.iter().enumerate() {
             let mut element = domain
                 .components
@@ -488,7 +524,7 @@ impl Object {
                 "replay fixed cells",
             )?;
             element.extend(resolved.fixed_cells.iter().cloned());
-            let before = self.entry09(f, &element, controls)?;
+            let before = self.entry09(f, &element, controls, borrowed_widths)?;
             invocation.controls = before[..controls].to_vec();
             let after = self.execute_element_bound(
                 f,
@@ -499,8 +535,8 @@ impl Object {
             )?;
             if let Some(table) = table {
                 let entry = &table[row];
-                if entry.get("before")? != &self.tuple09(f, &before, controls, borrowed)?
-                    || entry.get("after")? != &self.tuple09(f, &after, controls, borrowed)?
+                if entry.get("before")? != &self.tuple09(f, &before, controls, borrowed_widths)?
+                    || entry.get("after")? != &self.tuple09(f, &after, controls, borrowed_widths)?
                 {
                     return err(
                         "§12.1 K13",

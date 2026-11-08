@@ -112,6 +112,7 @@ enum Component {
     Cell(usize, usize, usize),
 }
 struct Domain {
+    borrowed_widths: Vec<usize>,
     components: Vec<(Component, usize, BitVector, BitVector)>,
     covers_d: bool,
 }
@@ -204,6 +205,7 @@ pub(crate) fn r21_resource_cases() {
     for width in [1, 2, 3, 62, 63, 64, 127, 128] {
         for count in [1, 2] {
             let d = Domain {
+                borrowed_widths: Vec::new(),
                 covers_d: true,
                 components: (0..count)
                     .map(|i| {
@@ -317,6 +319,11 @@ impl Object {
             .ok_or_else(|| Error::new(format!("§12: closure {closure} is not a function")))
     }
     fn domain(&self, f: &Function, d: &Json) -> Result<Domain> {
+        let borrowed_widths = self.checked_borrow_lifetimes(&f.name)?.ok_or_else(|| {
+            Error::new(
+                "§12.2 K70: checked borrow lifetime inventory requires linked actions".into(),
+            )
+        })?;
         let mut components = Vec::new();
         let mut bundles = BTreeSet::new();
         let mut regions = BTreeSet::new();
@@ -326,6 +333,12 @@ impl Object {
                 let name = b.get("name")?.string()?.to_string();
                 let width = usize::try_from(b.get("width")?.uint()?)
                     .map_err(|_| Error::host_resource("§12.2: host limit: domain width".into()))?;
+                if borrowed && borrowed_widths.get(ordinal) != Some(&width) {
+                    return err(
+                        "§12.2 K70/K72",
+                        "borrowed position or width differs from checked lifetime inventory",
+                    );
+                }
                 let lo = json_bits(b.get("lo")?, width)?;
                 let hi = json_bits(b.get("hi")?, width)?;
                 full &= lo.is_zero() && hi == ones(width)?;
@@ -390,6 +403,7 @@ impl Object {
                 }
             }
         }
+        full &= d.get("borrowed")?.array()?.len() == borrowed_widths.len();
         // D: every interface bundle and every region in the region's input
         // domain (§5.2, §5.3; tgt/fault included for oracles).
         let groups = if f.kind == "oracle" { 4 } else { 3 };
@@ -404,6 +418,7 @@ impl Object {
                     })
                 });
         Ok(Domain {
+            borrowed_widths,
             components,
             covers_d,
         })
@@ -605,17 +620,43 @@ impl Object {
                 },
             );
         }
-        let mut borrowed = Vec::new();
-        for (c, v) in element {
-            if let Component::Borrowed(ordinal, _) = c {
-                if *ordinal != borrowed.len() {
-                    return err("§12.2", "borrowed component position mismatch");
+        let borrowed_widths = if let Some(context) = context {
+            context.borrowed_widths.clone()
+        } else {
+            self.checked_borrow_lifetimes(&f.name)?.ok_or_else(|| {
+                Error::new(
+                    "§12.2 K70: checked borrow lifetime inventory requires linked actions".into(),
+                )
+            })?
+        };
+        let mut borrowed = crate::reserved(
+            borrowed_widths.len(),
+            "§12.2 K70",
+            "borrowed replay systems",
+        )?;
+        for (ordinal, width) in borrowed_widths.iter().copied().enumerate() {
+            let value = element.iter().find_map(|(component, value)| {
+                matches!(component, Component::Borrowed(position, _) if *position == ordinal)
+                    .then_some(value)
+            });
+            let zero;
+            let value = match value {
+                Some(value) if value.width() == width => value,
+                Some(_) => {
+                    return err(
+                        "§12.2 K72",
+                        "borrowed replay width differs from checked lifetime",
+                    )
                 }
-                let wires = q.allocate(v.width())?;
-                set(&mut q, &wires, v)?;
-                borrowed.push(wires.clone());
-                b.borrowed.push(wires);
-            }
+                None => {
+                    zero = BitVector::zero(width)?;
+                    &zero
+                }
+            };
+            let wires = q.allocate(width)?;
+            set(&mut q, &wires, value)?;
+            borrowed.push(wires.clone());
+            b.borrowed.push(wires);
         }
         if audit.is_some() {
             q.start_borrow_audit()?;
@@ -1100,7 +1141,7 @@ impl Object {
                 .filter(|(c, _)| matches!(c, Component::Borrowed(..)))
                 .map(|(_, v)| v.to_decimal())
                 .collect();
-            let k = borrowed_in.len();
+            let k = domain.borrowed_widths.len();
             let split = out
                 .len()
                 .checked_sub(k)
@@ -1150,6 +1191,7 @@ mod r20_tests {
             u64::MAX as u128,
         ] {
             let d = Domain {
+                borrowed_widths: Vec::new(),
                 covers_d: false,
                 components: vec![(
                     Component::Bundle(0, 0),

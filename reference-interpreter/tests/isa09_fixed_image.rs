@@ -50,6 +50,184 @@ fn claim(record: &mut Json) -> &mut Json {
     &mut claims[0]
 }
 
+fn program_relation(c: &mut Json) {
+    let hash = c
+        .get("subject")
+        .unwrap()
+        .get("closure_hash")
+        .unwrap()
+        .clone();
+    fields(c).insert(
+        "expected".into(),
+        Json::Object(BTreeMap::from([("program".into(), hash)])),
+    );
+}
+
+#[test]
+fn council_ghost_borrowed_position_rejects_admission() {
+    let text = mutate(&fixture("image-0102"), |record| {
+        let c = claim(record);
+        program_relation(c);
+        fields(fields(c).get_mut("domain").unwrap()).insert(
+            "borrowed".into(),
+            support::json(r#"[{"name":"ghost","width":1,"lo":0,"hi":1}]"#),
+        );
+    });
+    let error =
+        Object::parse(&text).expect_err("a source without qborrow cannot acquire a ghost lifetime");
+    assert!(error.to_string().contains("§12.2"), "{error}");
+}
+
+#[test]
+fn council_borrowed_width_two_rejects_one_bit_lifetime() {
+    let text = mutate(&fixture("controlled-dirty"), |record| {
+        let c = claim(record);
+        program_relation(c);
+        fields(fields(c).get_mut("domain").unwrap()).insert(
+            "borrowed".into(),
+            support::json(r#"[{"name":"b","width":2,"lo":0,"hi":3}]"#),
+        );
+    });
+    let error = Object::parse(&text).expect_err("the checked lifetime has exactly one bit");
+    assert!(error.to_string().contains("§12.2"), "{error}");
+}
+
+fn omitted_borrowed_slice(program: bool, label: Option<&str>) -> String {
+    mutate(&fixture("controlled-dirty"), |record| {
+        let c = claim(record);
+        fields(fields(c).get_mut("domain").unwrap()).insert("borrowed".into(), support::json("[]"));
+        if program {
+            program_relation(c);
+        } else {
+            let Json::Array(rows) = fields(fields(c).get_mut("expected").unwrap())
+                .get_mut("table")
+                .unwrap()
+            else {
+                panic!("table");
+            };
+            // K71 holds the omitted lifetime at zero. The original complete
+            // tuples already include that unchanged borrowed system.
+            rows.retain(|row| {
+                row.get("before").unwrap().get("borrowed").unwrap() == &support::json(r#"["0"]"#)
+            });
+            assert_eq!(rows.len(), 128);
+        }
+        if let Some(label) = label {
+            fields(c).insert("label".into(), Json::String(label.into()));
+        }
+    })
+}
+
+fn check_omitted_borrowed_slice(program: bool) {
+    for label in [None, Some("evidence")] {
+        let object = Object::parse(&omitted_borrowed_slice(program, label)).unwrap();
+        object.check_hashes().unwrap();
+        let expected = ClaimVerdict::Evidence { elements: 128 };
+        assert_eq!(object.verify_claim(root(&object), 0).unwrap(), expected);
+        let report = object.verify_certificate().unwrap().claims.remove(0);
+        assert_eq!(report.verdict, expected);
+        let coverage = report.coverage.unwrap();
+        // 1 control + 1 target + 4 fault + 1 address + 16 image + 1 borrow
+        // = 24 unrestricted bits; 2*2*16*2 = 128 replayed zero-borrow tuples.
+        assert_eq!(coverage.elements, 128);
+        assert_eq!(coverage.full_domain_elements, "16777216");
+        assert_eq!(coverage.covered_fraction, "1/131072");
+        assert_eq!(coverage.fixed_regions.len(), 1);
+        assert_eq!(
+            coverage.fixed_regions[0].sha256,
+            bennett_isa_ref::sha256_hex(&[1, 2])
+        );
+    }
+    for label in ["proof", "proof_relative_to_image"] {
+        let object = Object::parse(&omitted_borrowed_slice(program, Some(label))).unwrap();
+        assert!(object.verify_claim(root(&object), 0).is_err(), "{label}");
+        assert!(object.verify_certificate().is_err(), "{label}");
+    }
+}
+
+#[test]
+fn council_omitted_borrowed_program_is_zero_slice_evidence() {
+    check_omitted_borrowed_slice(true);
+}
+
+#[test]
+fn council_omitted_borrowed_complete_table_is_zero_slice_evidence() {
+    check_omitted_borrowed_slice(false);
+}
+
+#[test]
+fn checked_borrowed_output_is_part_of_the_complete_relation() {
+    let text = mutate(&fixture("controlled-dirty"), |record| {
+        let c = claim(record);
+        let Json::Array(rows) = fields(fields(c).get_mut("expected").unwrap())
+            .get_mut("table")
+            .unwrap()
+        else {
+            panic!("table");
+        };
+        fields(fields(&mut rows[0]).get_mut("after").unwrap())
+            .insert("borrowed".into(), support::json(r#"["1"]"#));
+    });
+    let object = Object::parse(&text).unwrap();
+    for result in [
+        object.verify_claim(root(&object), 0).map(|_| ()),
+        object.verify_certificate().map(|_| ()),
+    ] {
+        let error = result.unwrap_err().to_string();
+        assert!(error.contains("full tuple mismatch"), "{error}");
+    }
+}
+
+#[test]
+fn council_host_limited_claim_retains_later_claim_and_no_coverage() {
+    for label in [None, Some("proof"), Some("proof_relative_to_image")] {
+        let text = mutate(&fixture("image-0102"), |record| {
+            let original = claim(record).clone();
+            let c = claim(record);
+            fields(c).insert("kind".into(), Json::String("sampled".into()));
+            program_relation(c);
+            fields(c).insert("sampler".into(),support::json(r#"{"algorithm":"xoshiro256**","seed":["1","0","0","0"],"count":"18446744073709551615"}"#));
+            if let Some(label) = label {
+                fields(c).insert("label".into(), Json::String(label.into()));
+            }
+            let Json::Array(claims) = fields(record).get_mut("claims").unwrap() else {
+                panic!("claims");
+            };
+            claims.push(original);
+        });
+        let object = Object::parse(&text).unwrap();
+        object.check_hashes().unwrap();
+        let direct = object
+            .verify_claim(root(&object), 0)
+            .expect("legal host-limited claims have a verdict");
+        let ClaimVerdict::Unverified(reason) = &direct else {
+            panic!("host limit discharged a claim: {direct:?}");
+        };
+        assert!(
+            reason.contains("§12.2")
+                && reason.contains("unchecked (host limit)")
+                && reason.contains("18446744073709551615"),
+            "{reason}"
+        );
+        let reports = object
+            .verify_certificate()
+            .expect("later independent claims survive")
+            .claims;
+        assert_eq!(reports.len(), 2);
+        assert_eq!(reports[0].verdict, direct);
+        assert_eq!(reports[0].closure_hash, root(&object));
+        assert_eq!(reports[0].index, 0);
+        assert_eq!(reports[0].context_key, support::json("[]"));
+        assert!(reports[0].coverage.is_none());
+        assert_eq!(reports[1].index, 1);
+        assert_eq!(reports[1].verdict, ClaimVerdict::ProofRelativeToImage);
+        let coverage = reports[1].coverage.as_ref().unwrap();
+        assert_eq!(coverage.elements, 64);
+        assert_eq!(coverage.full_domain_elements, "4194304");
+        assert_eq!(coverage.covered_fraction, "1/65536");
+    }
+}
+
 #[test]
 fn published_fixed_image_vectors_replay_with_exact_coverage_and_bindings() {
     let manifest = Json::parse(include_str!(
