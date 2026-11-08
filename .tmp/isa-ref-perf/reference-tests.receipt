@@ -1,0 +1,94 @@
+   Compiling bennett-isa-conformance v0.0.0 (/home/tobias/Projects/bennett-workspace/bennett-isa-spec-job-perf/.tmp/isa-ref-perf/verify-source/conformance)
+   Compiling bennett-isa-ref v0.0.0 (/home/tobias/Projects/bennett-workspace/bennett-isa-spec-job-perf/.tmp/isa-ref-perf/verify-source/reference-interpreter)
+    Finished `test` profile [optimized + debuginfo] target(s) in 1m 38s
+     Running unittests src/lib.rs (.tmp/isa-ref-perf/target/debug/deps/bennett_isa_ref-7b123cc7c8b31f8d)
+     Running unittests src/main.rs (.tmp/isa-ref-perf/target/debug/deps/bennett_isa_ref-4392c92827f67649)
+     Running tests/bitvectors.rs (.tmp/isa-ref-perf/target/debug/deps/bitvectors-75af319db5240b7e)
+     Running tests/borrow.rs (.tmp/isa-ref-perf/target/debug/deps/borrow-f0f01fb2014fe4f6)
+     Running tests/classical.rs (.tmp/isa-ref-perf/target/debug/deps/classical-2bf4e15b88575fa7)
+     Running tests/cleanup_ownership.rs (.tmp/isa-ref-perf/target/debug/deps/cleanup_ownership-91619ff5ddc21ae3)
+     Running tests/cleanup_partition.rs (.tmp/isa-ref-perf/target/debug/deps/cleanup_partition-31125ea3a2257b2f)
+     Running tests/cli.rs (.tmp/isa-ref-perf/target/debug/deps/cli-b7f346bee3433092)
+     Running tests/cli_xam.rs (.tmp/isa-ref-perf/target/debug/deps/cli_xam-860c7019aee8195f)
+     Running tests/discipline.rs (.tmp/isa-ref-perf/target/debug/deps/discipline-726815dc877cacc4)
+     Running tests/frame_domain.rs (.tmp/isa-ref-perf/target/debug/deps/frame_domain-38743513a7c3f03d)
+     Running tests/frame_identity.rs (.tmp/isa-ref-perf/target/debug/deps/frame_identity-902dcc5e807bf3e6)
+     Running tests/identity.rs (.tmp/isa-ref-perf/target/debug/deps/identity-a34a793fa1978a34)
+     Running tests/isa09_adjoint_table.rs (.tmp/isa-ref-perf/target/debug/deps/isa09_adjoint_table-07863d28d9723699)
+     Running tests/isa09_budget_mint.rs (.tmp/isa-ref-perf/target/debug/deps/isa09_budget_mint-93b444ccd0ce56a7)
+     Running tests/isa09_certificate.rs (.tmp/isa-ref-perf/target/debug/deps/isa09_certificate-868d15e15c941a13)
+     Running tests/isa09_claim_replay.rs (.tmp/isa-ref-perf/target/debug/deps/isa09_claim_replay-5a0bba4d48e76869)
+     Running tests/isa09_cleanup.rs (.tmp/isa-ref-perf/target/debug/deps/isa09_cleanup-ca14faf9ddd18ebd)
+     Running tests/isa09_forwarding.rs (.tmp/isa-ref-perf/target/debug/deps/isa09_forwarding-3aa7d18fe97771f8)
+     Running tests/isa09_lifted_cleanup.rs (.tmp/isa-ref-perf/target/debug/deps/isa09_lifted_cleanup-3d693c0620bf81f7)
+     Running tests/isa09_memory_address.rs (.tmp/isa-ref-perf/target/debug/deps/isa09_memory_address-565060b54ac4d3df)
+     Running tests/isa09_pinned_free.rs (.tmp/isa-ref-perf/target/debug/deps/isa09_pinned_free-19fc4ad40884bbc1)
+     Running tests/isa09_qinplace.rs (.tmp/isa-ref-perf/target/debug/deps/isa09_qinplace-870d24450206ef46)
+     Running tests/isa09_registers.rs (.tmp/isa-ref-perf/target/debug/deps/isa09_registers-d8b7defbfe0e500c)
+     Running tests/isa09_review.rs (.tmp/isa-ref-perf/target/debug/deps/isa09_review-2ac6e981af141cdb)
+     Running tests/isa09_source_schedule.rs (.tmp/isa-ref-perf/target/debug/deps/isa09_source_schedule-d2a3f1042db92ad5)
+     Running tests/isa09_tape_replay.rs (.tmp/isa-ref-perf/target/debug/deps/isa09_tape_replay-e5c4320bb2d71f48)
+     Running tests/isa09_token_aliases.rs (.tmp/isa-ref-perf/target/debug/deps/isa09_token_aliases-929e39a0235bcbe5)
+     Running tests/k77_adapter.rs (.tmp/isa-ref-perf/target/debug/deps/k77_adapter-2f1308de7c77824f)
+     Running tests/k83_source_support.rs (.tmp/isa-ref-perf/target/debug/deps/k83_source_support-67112827d123031e)
+     Running tests/k84_diagnostics.rs (.tmp/isa-ref-perf/target/debug/deps/k84_diagnostics-db56f942daab57cd)
+     Running tests/k91_vectors.rs (.tmp/isa-ref-perf/target/debug/deps/k91_vectors-12b7b96f5c452cc0)
+     Running tests/linking.rs (.tmp/isa-ref-perf/target/debug/deps/linking-e37380cf6303e989)
+     Running tests/memory_address.rs (.tmp/isa-ref-perf/target/debug/deps/memory_address-eb51e0f204b2ce06)
+     Running tests/metadata.rs (.tmp/isa-ref-perf/target/debug/deps/metadata-b5c4c324c115f87c)
+     Running tests/oracle.rs (.tmp/isa-ref-perf/target/debug/deps/oracle-6e39b722739d6a2a)
+     Running tests/parser.rs (.tmp/isa-ref-perf/target/debug/deps/parser-eda080b62ece378e)
+     Running tests/quantum.rs (.tmp/isa-ref-perf/target/debug/deps/quantum-28297bcd99290713)
+     Running tests/quantum_control.rs (.tmp/isa-ref-perf/target/debug/deps/quantum_control-6af83c4f36325cf9)
+     Running tests/r1_borrow.rs (.tmp/isa-ref-perf/target/debug/deps/r1_borrow-4d4f816bdd690e4e)
+     Running tests/r1_certificates.rs (.tmp/isa-ref-perf/target/debug/deps/r1_certificates-8dc29af79987173c)
+     Running tests/r1_discipline.rs (.tmp/isa-ref-perf/target/debug/deps/r1_discipline-a531cad84ba2f15a)
+     Running tests/r1_exact.rs (.tmp/isa-ref-perf/target/debug/deps/r1_exact-d25e087a1768211d)
+     Running tests/r1_fixtures.rs (.tmp/isa-ref-perf/target/debug/deps/r1_fixtures-5ef3407f0412592c)
+     Running tests/r1_fuzz_discipline.rs (.tmp/isa-ref-perf/target/debug/deps/r1_fuzz_discipline-be630318ffe7e6db)
+     Running tests/r1_gates.rs (.tmp/isa-ref-perf/target/debug/deps/r1_gates-ff5f58a2e981b2f0)
+     Running tests/r1_linking.rs (.tmp/isa-ref-perf/target/debug/deps/r1_linking-e82d69347cda9cbd)
+     Running tests/r1_literals.rs (.tmp/isa-ref-perf/target/debug/deps/r1_literals-ae27ca393cd68077)
+     Running tests/r1_qinplace.rs (.tmp/isa-ref-perf/target/debug/deps/r1_qinplace-da658e4d33571a1b)
+     Running tests/r1_rules.rs (.tmp/isa-ref-perf/target/debug/deps/r1_rules-1a6016cd38f324ed)
+     Running tests/r1_widths.rs (.tmp/isa-ref-perf/target/debug/deps/r1_widths-27312a2f4f7ae00c)
+     Running tests/r21_resources.rs (.tmp/isa-ref-perf/target/debug/deps/r21_resources-b3e094c29571cfbf)
+     Running tests/r22_coverage.rs (.tmp/isa-ref-perf/target/debug/deps/r22_coverage-752a70d610ba55ce)
+     Running tests/r22_retention.rs (.tmp/isa-ref-perf/target/debug/deps/r22_retention-8dcbc36f12e0296d)
+     Running tests/r23_transaction.rs (.tmp/isa-ref-perf/target/debug/deps/r23_transaction-9866cea79266cb11)
+     Running tests/r2_validation.rs (.tmp/isa-ref-perf/target/debug/deps/r2_validation-7fc79064a40c2371)
+     Running tests/ref_library.rs (.tmp/isa-ref-perf/target/debug/deps/ref_library-d34b29af97061751)
+     Running tests/register_snapshot_work.rs (.tmp/isa-ref-perf/target/debug/deps/register_snapshot_work-be1f93fbb0697b26)
+     Running tests/registers.rs (.tmp/isa-ref-perf/target/debug/deps/registers-4338b25cf412b278)
+     Running tests/source_addressing.rs (.tmp/isa-ref-perf/target/debug/deps/source_addressing-91e6a26bd82f9dc4)
+     Running tests/source_constructor.rs (.tmp/isa-ref-perf/target/debug/deps/source_constructor-726cc6c523a8170c)
+     Running tests/step_machine.rs (.tmp/isa-ref-perf/target/debug/deps/step_machine-ae99ed6a246a7d9b)
+     Running tests/structured.rs (.tmp/isa-ref-perf/target/debug/deps/structured-fae4d844cd4af8d8)
+     Running tests/tape_replay.rs (.tmp/isa-ref-perf/target/debug/deps/tape_replay-6733804d52d410d8)
+     Running tests/typed_faults.rs (.tmp/isa-ref-perf/target/debug/deps/typed_faults-fd07269e77888df5)
+     Running tests/versions.rs (.tmp/isa-ref-perf/target/debug/deps/versions-56db6e185491d96a)
+     Running tests/wide_oracle.rs (.tmp/isa-ref-perf/target/debug/deps/wide_oracle-b6deb755fe96c1c9)
+   Doc-tests bennett_isa_ref
+	Command being timed: "timeout 1800 cargo test --offline -j3 --manifest-path /home/tobias/Projects/bennett-workspace/bennett-isa-spec-job-perf/.tmp/isa-ref-perf/verify-source/reference-interpreter/Cargo.toml -- --test-threads=4"
+	User time (seconds): 529.03
+	System time (seconds): 29.50
+	Percent of CPU this job got: 178%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 5:13.62
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 1591428
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 16759
+	Minor (reclaiming a frame) page faults: 9698162
+	Voluntary context switches: 64632
+	Involuntary context switches: 18274
+	Swaps: 0
+	File system inputs: 5488
+	File system outputs: 7773416
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

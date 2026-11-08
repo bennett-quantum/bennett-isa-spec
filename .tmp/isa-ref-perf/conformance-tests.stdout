@@ -1,0 +1,337 @@
+
+running 2 tests
+test tests::version_is_draft ... ok
+test ref_integer::tests::signed_euclidean_arithmetic ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test adjoint_table_published_and_malformed_witness_cases ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+
+running 4 tests
+test all_suites_present_and_cases_well_formed ... ok
+test staged_cases_have_structured_inputs_and_expected_outcomes ... ok
+test acceptance_rule_witnesses_exist ... ok
+test small_t3_domains_are_exhaustive ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+
+running 1 test
+test published_ctl_leaf_and_every_exact_matrix_column ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.39s
+
+
+running 1 test
+test draft_contract_witnesses ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.48s
+
+
+running 2 tests
+test empty_case_directory_is_an_error ... ok
+test unavailable_is_a_nonzero_counted_outcome ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test staged_alternative_must_be_an_explicit_refusal ... ok
+test fake_bin_pass_fail_and_unavailable_probe ... ok
+test precise_probe_errors_and_staging_are_scoped ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+
+running 5 tests
+test bennett_launch_h_compiles ... ok
+test bennett_sched_h_compiles ... ok
+test every_launch_symbol_matches_section_10 ... ok
+test both_headers_in_one_tu ... ok
+test every_sched_symbol_matches_section_11 ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+
+running 6 tests
+test exact_diff_rejects_extra_keys ... ok
+test numbers_compare_by_value_integers_and_floats ... ok
+test mismatches_are_reported ... ok
+test object_subset_ignores_extra_fields ... ok
+test parser_handles_escapes_and_nested ... ok
+test rejects_invalid_json_output ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test all_published_k91_case_commands_pass_the_portable_cli_harness ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.00s
+
+
+running 3 tests
+test measurement_fifo_and_lexicographic_cdf_ties ... ok
+test grid_topology_bytes_hash_and_adjacency ... ok
+test typed_frame_bytes_widths_and_disjoint_lifetimes ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test heterogeneous_recursive_activation_full_symbolic_domains ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.99s
+
+
+running 1 test
+test allocator_four_slot_order_full_domains ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.06s
+
+
+running 3 tests
+test clean_allocation_source_rows_preserve_class_without_controls ... ok
+test borrowed_output_restores_all_basis_columns_with_external_reference ... ok
+test allocation_output_copy_and_load_full_domains ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.92s
+
+
+running 2 tests
+test exact_domain_counts_include_skipped_variables_and_reject_overflow ... ok
+test bdd_truth_tables_and_canonical_equalities ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test general_call_records_and_exact_example_counter_widths ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.72s
+
+
+running 1 test
+test complete_call_interfaces_preserve_values_regions_and_callee_domains has been running for over 60 seconds
+test complete_call_interfaces_preserve_values_regions_and_callee_domains ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 92.73s
+
+
+running 12 tests
+test casts_and_select_full_domain ... ok
+test allocation_and_call_flags_full_domain ... ok
+test address_dispatch_full_domain ... ok
+test copy_exchange_full_domain ... ok
+test invoke_inverse_and_closed_schema_boundaries ... ok
+test catalog_checkpoint_exists_and_is_canonical ... ok
+test native_permutations_full_domain ... ok
+test linear_scan_full_domain ... ok
+test other_arithmetic_full_domain ... ok
+test independent_canonical_bytes_and_envelope_hashes ... ok
+test expander_rejects_unknown_constructors_and_unbound_parameters ... ok
+test ripple_full_domain ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.13s
+
+
+running 5 tests
+test image_bits_are_bound_unconditional_lsb_ordered_and_adjointed ... ok
+test complete_symbol_arguments_forward_heterogeneous_wires_values_and_tokens ... ok
+test indexed_templates_bind_explicit_frame_and_preserve_capture ... ok
+test template_capture_is_not_rebound_by_legacy_integer_formals_or_cross_type_names ... ok
+test unused_template_shapes_and_types_are_rejected ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test oracle_construction_complete_lifetimes_bounded_steps_commit_and_reverse ... ok
+test whole_source_constructor_inverse_retains_support_row_and_step_identities ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.19s
+
+
+running 3 tests
+test effective_causes_and_wide_code_registers ... ok
+test function_local_indirect_jump_intervals ... ok
+test canonical_branches_and_successor_fragments ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.68s
+
+
+running 11 tests
+test activation_records_bind_low_cell_slices_in_global_id_order ... ok
+test declaration_capture_and_adjoint_keep_class_state_and_lifetimes ... ok
+test declaration_handles_cannot_bypass_declared_library_scratch_lifo ... ok
+test acquired_record_handles_retain_recipe_scratch_classification ... ok
+test initializer_records_share_image_binding_and_shadow_across_types ... ok
+test record_actual_wires_resolve_at_capture_before_any_field_binding ... ok
+test declared_outputs_share_lifetime_identity_across_invokes_and_captures ... ok
+test record_widths_use_earlier_recipe_integers_and_actuals_keep_capture ... ok
+test region_vectors_are_closure_bound_and_shape_checked_even_without_call ... ok
+test regions_preserve_shape_role_origin_and_forward_cells ... ok
+test ordered_records_bind_heterogeneous_fields_lexically_and_reverse ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test wider_fault_entries_factor_as_identity_on_high_bits ... ok
+test division_rows_preserve_arbitrary_destinations_and_fault_entries ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.65s
+
+
+running 4 tests
+test inc8_and_sum_db_arithmetic_cast_and_successor_widths ... ok
+test example_literal_pointer_bases_and_byte_constants ... ok
+test example_pinned_layout_full_pointer_domain ... ok
+test example_byte_region_dispatch_full_domain ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.03s
+
+
+running 2 tests
+test inverse_trace_rejects_irreversible_events_before_mutating_any_leaf ... ok
+test k83_published_coordinates_reverse_without_renumbering_and_preserve_every_basis_state ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 16 tests
+test bodies_are_lexical_and_calls_keep_ordinal_spaces ... ok
+test cyclic_typed_invokes_and_nonfinite_angles_reject ... ok
+test direct_empty_registry_entry_uses_its_explicit_bundle_map_and_nested_calls_stay_closed ... ok
+test each_restores_bindings_and_invalid_documents_fail_loudly ... ok
+test effective_controls_are_disjoint_from_diagonal_and_swap_targets ... ok
+test full_basis_h_and_phase_witnesses_are_exact ... ok
+test library_scratch_requires_reverse_release_and_balanced_lifetimes ... ok
+test nested_body_captures_share_lexical_snapshots_and_preserve_free_wires ... ok
+test raw_inverse_retains_the_complete_forward_source_tree_and_leaf_identities ... ok
+test source_leaf_budget_fails_explicitly_resets_and_leaves_plain_catalogs_unchanged ... ok
+test typed_binding_capture_paths_angles_and_lists ... ok
+test unused_recipe_constructor_and_formal_shapes_are_still_closed ... ok
+test variadic_controls_and_rejections ... ok
+test canonical_integer_literal_has_only_lsb_ordered_x_leaves ... ok
+test nested_allocation_scopes_use_the_default_stack_and_keep_lifetime_order ... ok
+test bound_classical_catalog_preserves_every_event_operand_byte ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.80s
+
+
+running 2 tests
+test memory_fault_write_ordinals_follow_all_assignment_exchanges ... ok
+test lifted_layout_memory_full_symbolic_domains ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 45.25s
+
+
+running 2 tests
+test generic_dispatch_full_symbolic_domains ... ok
+test generic_scans_full_symbolic_domains ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.29s
+
+
+running 5 tests
+test named_interface_release_respects_a_live_declarations_ownership ... ok
+test named_interface_keeps_body_order_and_requires_an_exact_root_map ... ok
+test published_k82_binding_cases ... ok
+test published_k82_edges_keep_all_86_leaf_digests ... ok
+test published_k82_all_54_interfaces_are_exact ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.17s
+
+
+running 4 tests
+test binary64_angles_round_trip_and_numerical_adjoint_matrices ... ok
+test typed_native_permutation_ports_and_environments ... ok
+test variadic_mcx_full_domain_including_zero_and_large_arity ... ok
+test native_phase_and_hadamard_full_basis_matrices ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.48s
+
+
+running 2 tests
+test qinplace_full_domains_short_and_complete_interfaces_both_orientations ... ok
+test exact_section_16_3_example_7_addya_and_adjoint has been running for over 60 seconds
+test exact_section_16_3_example_7_addya_and_adjoint ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 100.97s
+
+
+running 2 tests
+test k28_preserves_instruction_release_sequence_and_row_ordinals ... ok
+test scheduled_action_adj_consumes_source_adjoint_with_fresh_ordinals ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.58s
+
+
+running 2 tests
+test sparse_and_dense_exact_columns_agree_on_entangled_clifford_t_states ... ok
+test arbitrary_image_scopes_are_unconditional_and_restore_clean_allocation ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.33s
+
+
+running 6 tests
+test fault_rows_full_domain ... ok
+test cast_select_mov_and_parallel_alias_rows ... ok
+test assignment_rows_full_domain ... ok
+test all_assignment_comparators_and_constants ... ok
+test positional_copy_exchange_bindings_full_domains ... ok
+test repeated_location_sources_and_destination_aliases ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.81s
+
+
+running 2 tests
+test heterogeneous_step_full_domains_and_idle_frames ... ok
+test repeated_step_templates_use_distinct_frames_through_static_fixpoint ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.23s
+
+
+running 4 tests
+test coherent_scopes_qif_and_adjoint_full_matrix_columns ... ok
+test structured_bounds_and_full_domains ... ok
+test hadamard_loop_matrix_columns_at_static_bounds ... ok
+test qif_and_nested_bodies_are_lexical ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.67s
+
+
+running 1 test
+test literal_construction_keeps_bits_above_machine_words ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.81s
+
+
+running 1 test
+test suite_against_reference_binary ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 26.95s
+
+
+running 2 tests
+test exact_and_forbidden_epsilon_witnesses_are_distinct ... ok
+test canonical_target_bytes_and_hash ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
