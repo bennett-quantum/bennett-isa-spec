@@ -12,7 +12,7 @@ Normative text: `spec/Bennett-ISA-Spec.md`, ISA 0.8, council-accepted 2026-10-28
 
 0. **Worklog, kept by whoever commits the session.** Each working session that changes the repo leaves one `## Session log - YYYY-MM-DD - ...` block at the top of the highest-numbered chunk under `worklog/` (`ls worklog/ | sort -r | head -1`; past ~280 lines start the next `NNN_` chunk): what changed, gotchas, surprises and root causes. When an orchestrator runs subagents, the orchestrator writes it; subagents keep their job's progress file, put surprises in bd (`bd note` / `bd create`), and never need to write outside their owned paths. A session that changes nothing writes nothing.
 1. **Fail fast, fail loud.** Assertions and explicit errors, never silent returns or quiet fallbacks.
-2. **One implementer per change.** Code review is batched over accumulated diffs, not per change. Review policy: bennett/docs/decisions/2026-11-02-code-quality-policy.md (in force 2026-11-03).
+2. **One writer per path set: parallel writers only on disjoint owned paths named in both briefs; whoever merges second gets the shared lines reviewed.** Code review is batched over accumulated diffs, not per change. Review policy: bennett/docs/decisions/2026-11-02-code-quality-policy.md (in force 2026-11-03).
 3. **Red-green TDD.** Write the test, watch it fail, make it pass, then refactor.
 4. **Exhaustive verification** against the spec's conformance suite for the spec versions declared in `SPEC_VERSIONS.toml` (where present). "Runs without errors" is not a pass.
 5. **Coupled to other repos ONLY through published specs.** Never share code across a contract boundary; if you need to, the boundary is wrong.
