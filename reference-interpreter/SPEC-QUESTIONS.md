@@ -332,3 +332,33 @@ changed in response to the council's round-1 review
     cli_xam::r18_cli_literal_nested_budget_check_hash_defer_and_run_reject,
     metadata::r18_nested_specificity_family_matches_brute_force. The orchestrator
     owns bead b-isa-spec-6hs; the interpreter's full-ISA bead remains active.
+
+34. **Requested labels across claim kinds (§12.2 K85/K75)**
+    (bead `bennett-isa-spec-b7k`; council `isa-k85-2026-11-08`, round 1,
+    Muse spec gap **B-K85-2**). The coverage paragraph defines its exclusive
+    replay outcomes for exhaustive and sampled claims, but its label rejection
+    sentences do not explicitly limit the claim kinds they govern.
+
+    Reading **(A)**, retained without a behaviour change: labels are a common
+    claim field, and “Requested proof rejects unless the computed outcome is
+    proof” and the corresponding image-relative rejection are kind-independent.
+    An established structural theorem can satisfy `proof`; it cannot satisfy
+    `proof_relative_to_image`. A producer label never upgrades the checker's
+    independently computed result.
+
+    `Unverified` and K75 unchecked outcomes are exempt from label rejection and
+    never satisfy a requested label. K75 explicitly retains an unchecked
+    obligation “including when a producer requested a label”. Applying a proof
+    request cannot convert missing checking machinery or a host limit into
+    either proof or a producer error. This also preserves the closed common
+    claim-field grammar and the existing kind-independent rejection wording.
+    Reading (B), treating labels as replay-only or rejecting an uncheckable
+    claim solely for its label, would contradict that unchecked exemption.
+
+    Proposed clarification of §12.2: “A label may accompany any claim kind.
+    A requested successful label must match the independently computed
+    successful outcome. An unchecked (host limit) or otherwise unestablished
+    outcome is reported as such; requesting a label neither upgrades that
+    outcome nor causes rejection solely because checking is unavailable.”
+    This records the interpreter's reading; it does not amend the published
+    ISA text or claim completion of staged numerical/channel verification.
