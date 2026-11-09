@@ -2719,8 +2719,11 @@ it adds no field to objects, schedules or certificates and records no
 negotiated feature list there. Producers and readers MUST retain the K91
 partition in schedule/certificate bindings, proof scope and cache matching
 (§11, §12.3); no process-local handle or manifest pointer is serialized.
-Changing alias-bearing artifact bytes changes their hashes as before;
-querying or selecting another conforming provider alone changes none.
+Changing alias-bearing artifact bytes changes their hashes as before.
+Querying adds no artifact fields or hashes, and selecting a provider to
+consume unchanged artifacts does not rewrite them. Regenerating schedules
+or certificates with a different scheduler identity or scheduling decisions
+follows the existing binding and hash rules of §§9.2, 10.1 and 11.
 With unchanged envelopes, args/params_hash, source/interface/closure/object
 and ref catalog identities remain unchanged.
 
@@ -5203,10 +5206,13 @@ The vectors record source admission, complete output tuples and expanded source 
    only the consistent partition: a mismatched bound schedule is not
    applied (§11 defaults), a wrong-partition certificate rejects, and
    cache keys distinguish the requests. Changed alias-bearing schedule
-   and certificate bytes change their hashes. Querying or changing only
-   the conforming provider changes no artifact bytes/hashes and inserts
-   no manifest/feature-list fields; unchanged source/header/catalog
-   envelopes preserve their identities.
+   and certificate bytes change their hashes. Compare fixed input artifacts
+   before and after queries and consumption by another conforming provider:
+   no artifact bytes/hashes change and no manifest/feature-list fields are
+   inserted. Regenerated artifacts retain their actual scheduler identity
+   and scheduling decisions and are hashed under the existing rules;
+   provider substitution does not imply byte-identical production.
+   Unchanged source/header/catalog envelopes preserve their identities.
 9. **Mixed-object boundary.** Select two embedded device roots with
    separate bindings; observe driver/shim negotiation against their
    actual providers, object/closure associations and valid token-handle
