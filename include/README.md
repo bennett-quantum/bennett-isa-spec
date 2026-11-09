@@ -1,5 +1,77 @@
 # Published C ABI
 
+## Family selection and 0.9 headers
+
+The original `bennett_launch.h` and `bennett_sched.h` always select **0.8**
+and remain byte-identical to their published versions. Existing include paths
+and callers keep that family. For new code, `bennett_abi.h` includes both
+roles and defaults to 0.8; select 0.9 explicitly before its first inclusion:
+
+```c
+#define BENNETT_ABI_FAMILY 9
+#include "bennett_abi.h"
+```
+
+`BENNETT_ABI_FAMILY` accepts only `8` or `9`. Alternatively, include
+`bennett_launch_0_9.h` or `bennett_sched_0_9.h` directly to select a 0.9
+role. The 0.9 sched header includes the 0.9 launch header for shared types.
+When combining direct 0.9 includes with the selector, define the family as
+`9` before including either. The macro does not redirect the original
+0.8 headers. Repeated includes and either order within a family work;
+combining 0.8 and 0.9 in one translation unit, or changing the selector's
+family after inclusion, fails compilation. Use separate translation units
+when a loader must support both families.
+
+The 0.9 declarations render [ISA 0.9](../spec/Bennett-ISA-Spec-0.9.md)
+§10, §10.1 and §11, with a clause citation on each declaration:
+
+| Header | Functions | Typedefs (including enums) | Enum constants |
+|---|---:|---:|---:|
+| `bennett_launch_0_9.h` | 43 | 12 | 17 |
+| `bennett_sched_0_9.h` | 17 | 3 | 3 |
+
+Counts exclude declarations imported from launch. In particular, the 0.9
+legacy `bennett_estimate_run` has **eight arguments**, and
+`bennett_estimate_run_with_token_aliases` has **ten** (§10, §10.1).
+`bennett_launch_features` is declared in launch and
+`bennett_sched_features` in sched (§10.1 K91); the sched partition setter
+is declared in §11. Objects and document buffers retain the published
+opaque types; the headers add no implementation or unpublished ABI.
+
+Header selection selects declarations only. It does **not** select or
+rename linker symbols, negotiate features, or make a provider conformant.
+Link or resolve the selected family's symbols from a provider independently
+established to implement that family (§10.1, Legacy compatibility). Keep
+0.8 and 0.9 providers separately selectable in packaging or loader
+namespaces: the 0.8 four-argument `bennett_estimate_run` must retain its
+meaning, and must never resolve to the 0.9 eight-argument implementation.
+Do not infer the C family from an ISA object's version. Neither role
+requires the other role's exports in its provider. Before alias-aware
+dispatch, negotiate each selected role's query and validate its manifest,
+`token_aliases/1` advertisement and required symbols in that same provider
+as §10.1 requires. Including either header advertises no runtime support.
+
+`conformance/tests/headers_09.rs` registers the independent
+`headers_09.py` checks in the Cargo test suite. They extract all 0.9 C
+declarations from the spec (including §10.1's queries), compare exact
+inventories and parameter order, check the original headers' SHA-256
+fingerprints against `6443493`, and compile each header's complete contract
+with LLVM 18 and 23 clang under C11 and C++17. C11 probes exercise default
+and explicit family selection, repeated includes, both include orders,
+invalid selections and cross-family rejection. Run headlessly with a
+project-local `TMPDIR`:
+
+```sh
+python3 -I conformance/tests/headers_09.py
+# Or the registered test:
+cargo test --offline --manifest-path conformance/Cargo.toml --test headers_09
+```
+
+These checks certify declaration and selection contracts; provider
+implementation and downstream library packaging require their own tests.
+
+## 0.8 family (default)
+
 These headers render the C declarations in the council-accepted ISA 0.8:
 `bennett_launch.h` is **launch 0.8**, §10; `bennett_sched.h` is **sched 0.8**,
 §11. The earlier task description's “launch 0.3” is not the accepted version.
