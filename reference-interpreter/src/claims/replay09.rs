@@ -173,6 +173,48 @@ fn same_interface(subject: &Function, expected: &Function) -> Result<bool> {
 }
 
 impl Object {
+    fn expected_program09(&self, subject: &Function, hash: &str) -> Result<Option<&Function>> {
+        let identity = self.identity()?;
+        if identity
+            .closure_hashes
+            .values()
+            .any(|h| h.as_deref() == Some(hash))
+        {
+            let program = self.region_function(hash)?;
+            if !same_interface(subject, program)? {
+                return err(
+                    "§12.1 K73",
+                    "expected program has an incompatible ordered interface",
+                );
+            }
+            return Ok(Some(program));
+        }
+        if let Some(imports) = self.section("imports") {
+            for (name, import) in imports.object()? {
+                if import
+                    .object()?
+                    .get("pinned_closure_hash")
+                    .map(Json::string)
+                    .transpose()?
+                    == Some(hash)
+                {
+                    let declaration = Function::from_signature(name, import.get("signature")?)?;
+                    if !same_interface(subject, &declaration)? {
+                        return err(
+                            "§12.1 K73",
+                            "expected program has an incompatible ordered interface",
+                        );
+                    }
+                    return Ok(None);
+                }
+            }
+        }
+        err(
+            "§12.1 K73",
+            "expected program closure is neither local nor imported by pin",
+        )
+    }
+
     fn invocation09(&self, claim: &Json, f: &Function, closure: &str) -> Result<Invocation> {
         let subject = claim.get("subject")?;
         if subject.get("closure_hash")?.string()? != closure {
@@ -485,18 +527,20 @@ impl Object {
             .get("table")
             .map(Json::array)
             .transpose()?;
-        let program = expected
-            .object()?
-            .get("program")
-            .map(|p| self.region_function(p.string()?))
-            .transpose()?;
+        let program = if let Some(hash) = expected.object()?.get("program") {
+            let Some(program) = self.expected_program09(f, hash.string()?)? else {
+                return Ok(Outcome {
+                    verdict: ClaimVerdict::Unverified(
+                        "§12.1 K73: expected program requires a linked body".into(),
+                    ),
+                    coverage: None,
+                });
+            };
+            Some(program)
+        } else {
+            None
+        };
         let mut expected_invocation = if let Some(program) = program {
-            if !same_interface(f, program)? {
-                return err(
-                    "§12.1 K73",
-                    "expected program has an incompatible ordered interface",
-                );
-            }
             let Some(widths) = self.checked_borrow_lifetimes(&program.name)? else {
                 return Ok(Outcome {
                     verdict: ClaimVerdict::Unverified(

@@ -140,6 +140,10 @@ fn k73_pair(a: &str, a_bounds: &[u64], b: &str, borrowed: &str) -> Object {
     let expected = object.identity().unwrap().closure_hashes["b"]
         .clone()
         .unwrap();
+    k73_relation(&object, &expected, borrowed)
+}
+
+fn k73_relation(object: &Object, expected: &str, borrowed: &str) -> Object {
     let claim = support::json(&format!(
         r#"{{
         "kind":"exhaustive","subject":{{"closure_hash":"","variant":"forward","inherited_controls":0}},
@@ -149,11 +153,226 @@ fn k73_pair(a: &str, a_bounds: &[u64], b: &str, borrowed: &str) -> Object {
     }}"#
     ));
     with_certificate(
-        &object,
+        object,
         "a",
         claim,
         support::json(r#"[{"id":"mut:0","role":"mut","width":1,"class":"fast"}]"#),
     )
+}
+
+#[test]
+fn k73_unavailable_expected_body_stays_unverified() {
+    let signature = r#"{"abi":"0.9","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}"#;
+    let pin = "a".repeat(64);
+    let imports = format!(r#"{{"b":{{"signature":{signature},"pinned_closure_hash":"{pin}"}}}}"#);
+    let source = support::object(
+        &[(
+            "a",
+            signature,
+            "perm_action @a (t:wire mut) () () () ()\n^entry():\nx t\nx t",
+        )],
+        &imports,
+        "",
+    )
+    .replace("=0.8", "=0.9");
+    let object = k73_relation(&support::rehash(&source), &pin, "[]");
+    object.check_hashes().unwrap();
+    let direct =
+        verify_root(&object).expect("an imported expected body is unavailable, not invalid");
+    let ClaimVerdict::Unverified(reason) = &direct else {
+        panic!("missing expected body discharged a claim: {direct:?}");
+    };
+    assert!(
+        reason.contains("K73") && reason.contains("linked"),
+        "{reason}"
+    );
+    let report = object.verify_certificate().unwrap().claims.remove(0);
+    assert_eq!(report.verdict, direct);
+    assert!(report.coverage.is_none());
+    let unknown = changed(&object.text, |claim| {
+        fields(claim).insert(
+            "expected".into(),
+            support::json(&format!(r#"{{"program":"{}"}}"#, "b".repeat(64))),
+        );
+    });
+    assert!(verify_root(&unknown).is_err());
+    assert!(unknown.verify_certificate().is_err());
+}
+
+#[test]
+fn k73_checked_lifetime_order_is_part_of_correspondence() {
+    let object = k73_pair(
+        "d = qborrow any 1\nqreturn d\ne = qborrow any 2\nqreturn e",
+        &[],
+        "d = qborrow any 2\nqreturn d\ne = qborrow any 1\nqreturn e",
+        "[]",
+    );
+    assert_k73_rejection(&object);
+}
+
+#[test]
+fn k73_repeated_lifetimes_correspond_to_sequential_lifetimes() {
+    let object = k73_pair(
+        "qloop 2 {\nd = qborrow any 1\nqreturn d\n}",
+        &[2],
+        "d = qborrow any 1\nqreturn d\ne = qborrow any 1\nqreturn e",
+        "[]",
+    );
+    object.check_hashes().unwrap();
+    assert_eq!(
+        verify_root(&object).unwrap(),
+        ClaimVerdict::Evidence { elements: 2 }
+    );
+    let report = object.verify_certificate().unwrap().claims.remove(0);
+    assert_eq!(report.verdict, ClaimVerdict::Evidence { elements: 2 });
+    let coverage = report.coverage.unwrap();
+    assert_eq!(coverage.elements, 2);
+    assert_eq!(coverage.full_domain_elements, "8");
+    assert_eq!(coverage.covered_fraction, "1/4");
+}
+
+#[test]
+fn k73_interface_roles_widths_and_argument_types_are_checked() {
+    let subject_signature = r#"{"abi":"0.9","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}"#;
+    for (signature, header, body, compatible) in [
+        (
+            subject_signature.to_string(),
+            "(renamed:wire mut) () () () ()",
+            "x renamed\nx renamed",
+            true,
+        ),
+        (
+            subject_signature.replace("perm_action", "action"),
+            "(renamed:wire mut) () () () ()",
+            "x renamed\nx renamed",
+            true,
+        ),
+        (
+            subject_signature.replace("\"mut\":[1]", "\"mut\":[2]"),
+            "(renamed:wire[2] mut) () () () ()",
+            "x renamed[0]\nx renamed[0]",
+            false,
+        ),
+        (
+            subject_signature
+                .replace("\"mut\":[1]", "\"mut\":[]")
+                .replace("\"in\":[]", "\"in\":[1]"),
+            "() (renamed:wire in) () () ()",
+            "qpred renamed\nqunpred renamed",
+            false,
+        ),
+        (
+            subject_signature.replace("\"args\":[]", "\"args\":[\"i1\"]"),
+            "(renamed:wire mut) () () (arg:i1) ()",
+            "x renamed\nx renamed",
+            false,
+        ),
+    ] {
+        let kind = support::json(&signature)
+            .get("kind")
+            .unwrap()
+            .string()
+            .unwrap()
+            .to_string();
+        let source = support::object(
+            &[
+                (
+                    "a",
+                    subject_signature,
+                    "perm_action @a (t:wire mut) () () () ()\n^entry():\nx t\nx t",
+                ),
+                (
+                    "b",
+                    &signature,
+                    &format!("{kind} @b {header}\n^entry():\n{body}"),
+                ),
+            ],
+            "{}",
+            "",
+        )
+        .replace("=0.8", "=0.9");
+        let object = support::rehash(&source);
+        let hash = object.identity().unwrap().closure_hashes["b"]
+            .clone()
+            .unwrap();
+        let object = k73_relation(&object, &hash, "[]");
+        if compatible {
+            object.check_hashes().unwrap();
+            assert_eq!(verify_root(&object).unwrap(), ClaimVerdict::Proof);
+            assert_eq!(
+                object.verify_certificate().unwrap().claims[0].verdict,
+                ClaimVerdict::Proof
+            );
+        } else {
+            assert_k73_rejection(&object);
+        }
+    }
+}
+
+#[test]
+fn k73_adjoint_transitive_lifetimes_keep_their_own_order_and_zero_tail() {
+    let signature = r#"{"abi":"0.9","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}"#;
+    let source = support::object(&[
+        ("a", signature, "perm_action @a (t:wire mut) () () () ()\n^entry():\nadj action_call @b (t) () () ()"),
+        ("b", signature, "perm_action @b (t:wire mut) () () () ()\n^entry():\nd = qborrow any 2\nqreturn d\ne = qborrow any 1\nqreturn e"),
+        ("c", signature, "perm_action @c (renamed:wire mut) () () () ()\n^entry():\nfirst = qborrow any 1\nqreturn first\nlast = qborrow any 2\nqreturn last"),
+    ], "{}", "").replace("=0.8", "=0.9");
+    let object = support::rehash(&source);
+    assert_eq!(
+        object.checked_borrow_lifetimes("a").unwrap(),
+        Some(vec![1, 2])
+    );
+    assert_eq!(
+        object.checked_borrow_lifetimes("c").unwrap(),
+        Some(vec![1, 2])
+    );
+    let hash = object.identity().unwrap().closure_hashes["c"]
+        .clone()
+        .unwrap();
+    let object = k73_relation(
+        &object,
+        &hash,
+        r#"[{"name":"label","width":1,"lo":0,"hi":1}]"#,
+    );
+    object.check_hashes().unwrap();
+    // Two t values * two first-borrow values; the two-bit tail stays zero.
+    assert_eq!(
+        verify_root(&object).unwrap(),
+        ClaimVerdict::Evidence { elements: 4 }
+    );
+    let report = object.verify_certificate().unwrap().claims.remove(0);
+    assert_eq!(report.verdict, ClaimVerdict::Evidence { elements: 4 });
+    let coverage = report.coverage.unwrap();
+    assert_eq!(coverage.elements, 4);
+    assert_eq!(coverage.full_domain_elements, "16");
+    assert_eq!(coverage.covered_fraction, "1/4");
+}
+
+#[test]
+fn k73_host_limited_expected_inventory_has_no_proof_or_coverage() {
+    let signature = r#"{"abi":"0.9","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}"#;
+    let repeated = signature.replace("\"bounds\":[]", "\"bounds\":[\"18446744073709551615\"]");
+    let source = support::object(&[
+        ("a", signature, "perm_action @a (t:wire mut) () () () ()\n^entry():\nx t\nx t"),
+        ("b", &repeated, "perm_action @b (t:wire mut) () () () ()\nregs {  } bounds {18446744073709551615}\n^entry():\nqloop 18446744073709551615 {\nd = qborrow any 1\nqreturn d\n}"),
+    ], "{}", "").replace("=0.8", "=0.9");
+    let object = support::rehash(&source);
+    let hash = object.identity().unwrap().closure_hashes["b"]
+        .clone()
+        .unwrap();
+    let object = k73_relation(&object, &hash, "[]");
+    object.check_hashes().unwrap();
+    let direct = verify_root(&object).unwrap();
+    let ClaimVerdict::Unverified(reason) = &direct else {
+        panic!("host-limited expected inventory discharged a claim: {direct:?}");
+    };
+    assert!(
+        reason.contains("K75") && reason.contains("unchecked (host limit)"),
+        "{reason}"
+    );
+    let report = object.verify_certificate().unwrap().claims.remove(0);
+    assert_eq!(report.verdict, direct);
+    assert!(report.coverage.is_none());
 }
 
 fn assert_k73_rejection(object: &Object) {
