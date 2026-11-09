@@ -34,7 +34,7 @@ pub use bits::BitVector;
 pub use borrow::validate_translation_lemma;
 pub use claims::{
     CertificateReport, ClaimCoverage, ClaimReport, ClaimVerdict, FixedRegionBinding,
-    QinplaceApplicability, Xoshiro256,
+    OrderedEntryUnion, QinplaceApplicability, Xoshiro256,
 };
 pub use classical::{
     ClassicalMachine, ClassicalOutcome, ClassicalSnapshot, ClassicalValue, RegisterDelta,

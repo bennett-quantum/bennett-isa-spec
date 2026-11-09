@@ -19,10 +19,12 @@ use crate::{
 use std::collections::{BTreeMap, BTreeSet};
 mod adjoint09;
 mod angles09;
+mod entry_union09;
 mod images09;
 mod pairs09;
 mod qinplace09;
 mod replay09;
+pub use entry_union09::OrderedEntryUnion;
 pub use images09::FixedRegionBinding;
 
 /// §17 item 13: an explicitly sampled claim defaults to 2^16 samples.
