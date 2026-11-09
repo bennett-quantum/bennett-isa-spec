@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 /// reading this document never establishes an executable certificate.
 #[derive(Debug)]
 pub struct NativeTarget {
-    document: Json,
+    pub(super) document: Json,
     hash: String,
     gates: Vec<NativeEntry>,
     tables: BTreeMap<String, Vec<Rational>>,

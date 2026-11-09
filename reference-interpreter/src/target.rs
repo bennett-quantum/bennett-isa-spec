@@ -29,3 +29,6 @@ mod document;
 #[path = "target_model/document_schema.rs"]
 mod document_schema;
 pub use document::{NativeTarget, ResolvedNativeEntry};
+#[path = "target_model/frames.rs"]
+mod frames;
+pub use frames::frame_slot_classes;

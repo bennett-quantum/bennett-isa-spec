@@ -240,6 +240,7 @@ fn frame09(value: &Json, f: &Function, contexts: &[u128]) -> Result<()> {
             if frame_width(slot.get("width")?, *c)? != width {
                 return err("§9.4", "frame interface width mismatch");
             }
+            crate::target::frame_slot_classes(slot, *c)?;
         }
     }
     if let Some(ranges) = value.object()?.get("live_ranges") {
