@@ -64,6 +64,68 @@ fn program_relation(c: &mut Json) {
 }
 
 #[test]
+fn k73_fixed_image_expected_program_without_subject_borrow_rejects() {
+    // SOL witness: the same controlled lookup relation, with the expected
+    // body omitting the subject's cancelling dirty-borrow segment. K73's
+    // interface precondition rejects even though their permutations agree.
+    let source = fixture("controlled-dirty");
+    let (base, certificate) = source.split_once("section certificate\n").unwrap();
+    let mut certificate = Json::parse(certificate.trim()).unwrap();
+    let mut lines = base.lines().map(str::to_string).collect::<Vec<_>>();
+    let symbols_line = lines.iter().position(|s| s == "section symbols").unwrap() + 1;
+    let mut symbols = Json::parse(&lines[symbols_line]).unwrap();
+    let mut clean = symbols.get("0").unwrap().clone();
+    fields(&mut clean).insert("name".into(), Json::String("clean".into()));
+    fields(&mut symbols).insert("1".into(), clean);
+    lines[symbols_line] = symbols.canonical();
+    let layout = lines.iter().position(|s| s == "section layout").unwrap();
+    lines.insert(layout - 1, "perm_action @clean (t:wire mut, f:wire[4] mut) (a:wire in) (db:region[1,8] in) () ()\n^entry():\nv = qload db a\ncx v[0] t\nqunload db a v".into());
+    let object = support::rehash(&(lines.join("\n").trim_end().to_string() + "\n"));
+    let identity = object.identity().unwrap();
+    fields(fields(&mut certificate).get_mut("bindings").unwrap()).insert(
+        "object_hash".into(),
+        Json::String(identity.object_hash.clone()),
+    );
+    let record = fields(fields(&mut certificate).get_mut("regions").unwrap())
+        .values_mut()
+        .next()
+        .unwrap();
+    fields(claim(record)).insert(
+        "expected".into(),
+        support::json(&format!(
+            r#"{{"program":"{}"}}"#,
+            identity.closure_hashes["clean"].as_ref().unwrap()
+        )),
+    );
+    let object = Object::parse(&format!(
+        "{}\nsection certificate\n{}\n",
+        object.text,
+        certificate.canonical()
+    ))
+    .unwrap();
+    object.check_hashes().unwrap();
+    assert_eq!(
+        object.checked_borrow_lifetimes("lookup").unwrap(),
+        Some(vec![1])
+    );
+    assert_eq!(
+        object.checked_borrow_lifetimes("clean").unwrap(),
+        Some(vec![])
+    );
+    for result in [
+        object.verify_claim(root(&object), 0),
+        object
+            .verify_certificate()
+            .map(|report| report.claims[0].verdict.clone()),
+    ] {
+        let error = result
+            .expect_err("K73 incompatible fixed-image relation must reject")
+            .to_string();
+        assert!(error.contains("K73"), "{error}");
+    }
+}
+
+#[test]
 fn council_ghost_borrowed_position_rejects_admission() {
     let text = mutate(&fixture("image-0102"), |record| {
         let c = claim(record);

@@ -81,6 +81,10 @@ fn with_certificate(object: &Object, name: &str, mut claim: Json, slots: Json) -
         "kind".into(),
         Json::String(object.functions[name].kind.clone()),
     );
+    fields(&mut region).insert(
+        "bounds".into(),
+        support::json(&format!("{:?}", object.functions[name].bounds)),
+    );
     fields(&mut region).insert("claims".into(), Json::Array(vec![claim]));
     fields(fields(&mut region).get_mut("frame").unwrap()).insert("slots".into(), slots);
     regions.clear();
@@ -93,6 +97,153 @@ fn with_certificate(object: &Object, name: &str, mut claim: Json, slots: Json) -
         certificate.canonical()
     ))
     .unwrap()
+}
+
+fn k73_pair(a: &str, a_bounds: &[u64], b: &str, borrowed: &str) -> Object {
+    let signature = |bounds: &[u64]| {
+        format!(
+            r#"{{"abi":"0.9","args":[],"bounds":{bounds:?},"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}}"#
+        )
+    };
+    let source = support::object(
+        &[
+            (
+                "a",
+                &signature(a_bounds),
+                &format!(
+                    "perm_action @a (t:wire mut) () () () ()\n{}^entry():\n{a}",
+                    if a_bounds.is_empty() {
+                        String::new()
+                    } else {
+                        format!(
+                            "regs {{  }} bounds {{{}}}\n",
+                            a_bounds
+                                .iter()
+                                .map(u64::to_string)
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )
+                    }
+                ),
+            ),
+            (
+                "b",
+                &signature(&[]),
+                &format!("perm_action @b (t:wire mut) () () () ()\n^entry():\n{b}"),
+            ),
+        ],
+        "{}",
+        "",
+    )
+    .replace("=0.8", "=0.9");
+    let object = support::rehash(&source);
+    let expected = object.identity().unwrap().closure_hashes["b"]
+        .clone()
+        .unwrap();
+    let claim = support::json(&format!(
+        r#"{{
+        "kind":"exhaustive","subject":{{"closure_hash":"","variant":"forward","inherited_controls":0}},
+        "invocation":{{"args":[],"budget":["0","0","0","0"]}},
+        "domain":{{"bundles":[{{"name":"t","width":1,"lo":0,"hi":1}}],"borrowed":{borrowed},"regions":[]}},
+        "expected":{{"program":"{expected}"}}
+    }}"#
+    ));
+    with_certificate(
+        &object,
+        "a",
+        claim,
+        support::json(r#"[{"id":"mut:0","role":"mut","width":1,"class":"fast"}]"#),
+    )
+}
+
+fn assert_k73_rejection(object: &Object) {
+    object.check_hashes().unwrap();
+    for result in [
+        verify_root(object),
+        object
+            .verify_certificate()
+            .map(|report| report.claims[0].verdict.clone()),
+    ] {
+        let error = result
+            .expect_err("K73 incompatible borrow interfaces must reject")
+            .to_string();
+        assert!(error.contains("K73"), "{error}");
+    }
+}
+
+#[test]
+fn k73_missing_expected_lifetime_rejects() {
+    // Council witness: both bodies are identity, but [1] and [] are not
+    // compatible interfaces. The old checker incorrectly proved all 4 tuples.
+    let object = k73_pair(
+        "d = qborrow any 1\nqreturn d",
+        &[],
+        "x t\nx t",
+        r#"[{"name":"dirty","width":1,"lo":0,"hi":1}]"#,
+    );
+    assert_eq!(object.checked_borrow_lifetimes("a").unwrap(), Some(vec![1]));
+    assert_eq!(object.checked_borrow_lifetimes("b").unwrap(), Some(vec![]));
+    assert_k73_rejection(&object);
+}
+
+#[test]
+fn k73_narrower_expected_lifetime_rejects() {
+    // The subject's two-bit pool must not pad the expected one-bit lifetime.
+    let object = k73_pair(
+        "d = qborrow any 2\nqreturn d",
+        &[],
+        "d = qborrow any 1\nqreturn d",
+        r#"[{"name":"dirty","width":2,"lo":0,"hi":3}]"#,
+    );
+    assert_eq!(object.checked_borrow_lifetimes("a").unwrap(), Some(vec![2]));
+    assert_eq!(object.checked_borrow_lifetimes("b").unwrap(), Some(vec![1]));
+    assert_k73_rejection(&object);
+}
+
+#[test]
+fn k73_different_body_bounds_preserve_full_domain_proof() {
+    // Codex witness X^2 versus XX, and SOL witness (XX)^2 versus XX.
+    // Each independently denotes identity on t=0 and t=1.
+    for loop_body in ["x t", "x t\nx t"] {
+        let object = k73_pair(
+            &format!("qloop 2 {{\n{loop_body}\n}}"),
+            &[2],
+            "x t\nx t",
+            "[]",
+        );
+        object.check_hashes().unwrap();
+        assert_eq!(
+            verify_root(&object).expect("K73 permits different internal bounds"),
+            ClaimVerdict::Proof
+        );
+        let report = object.verify_certificate().unwrap().claims.remove(0);
+        assert_eq!(report.verdict, ClaimVerdict::Proof);
+        let coverage = report.coverage.unwrap();
+        assert_eq!(coverage.elements, 2);
+        assert_eq!(coverage.full_domain_elements, "2");
+        assert_eq!(coverage.covered_fraction, "1/1");
+    }
+}
+
+#[test]
+fn k73_matching_sequential_lifetimes_preserve_omission_evidence() {
+    let object = k73_pair(
+        "d = qborrow any 1\nqreturn d\ne = qborrow any 2\nqreturn e",
+        &[],
+        "other = qborrow any 1\nqreturn other\nlast = qborrow any 2\nqreturn last",
+        "[]",
+    );
+    object.check_hashes().unwrap();
+    assert_eq!(
+        verify_root(&object).unwrap(),
+        ClaimVerdict::Evidence { elements: 2 }
+    );
+    let report = object.verify_certificate().unwrap().claims.remove(0);
+    assert_eq!(report.verdict, ClaimVerdict::Evidence { elements: 2 });
+    let coverage = report.coverage.unwrap();
+    assert_eq!(coverage.elements, 2);
+    assert_eq!(coverage.full_domain_elements, "16");
+    assert_eq!(coverage.covered_fraction, "1/8");
 }
 
 fn typed_oracle(argument: &str, steps: u64) -> Object {
