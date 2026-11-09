@@ -2928,16 +2928,254 @@ names or object header `0.9` alone do not establish it. In particular a
 0.8 estimate signature is never called as 0.9, and old callers retain
 their actual ABI family. Neither a query nor feature absence changes this.
 
-**Mixed launch.** The driver owns negotiation in the actual startup/shim
-path for each selected marked device object/root; the runtimes own the
-native layout and its preservation at that boundary. The driver and
-runtimes MUST preserve that root's object/closure association, valid
-handle lifetimes and token equality mapping through the shim, under the
-existing §12.3 mixed-launch boundary obligations. Native entry points,
-argv/envp and host-only libc require no device alias records or whole-binary
-lowering. This query contract leaves the mixed-container/host-memory ABI,
-budget/handle and tape/run association work named in §12.3 required; it
-does not equate a native layout version with a launch/sched feature.
+**Mixed launch.** The versioned native boundary below transports each
+selected marked device root independently. The driver owns provider
+selection, symbol resolution and the generated host launch site; the
+runtimes own marshalling and preservation of the native boundary layout.
+The ordinary native executable remains the container. Only marked modules
+and their required transitive device closures are ISA objects. A host
+launch site selects a device CC entry; it is not the native process entry.
+
+**Mixed transport bytes (mixed-launch/1).** The closed sidecar productions
+are:
+
+```text
+Container = {"version":"bennett.mixed-launch/1","roots":[Root, ...]}
+Root = {"id":label,"host_binding":label,"object_hash":hash,
+        "entry":name,"interface_hash":hash,"closure_hash":hash,
+        "target_hash":hash|null,"certificates":[Artifact, ...]}
+Artifact = {"sha256":hash,"bytes":hex}
+Call = {"version":"bennett.mixed-call/1","images":[ImageLaunch, ...]}
+```
+
+`ImageLaunch` is the complete `bennett.image-launch/1` object in §12.3,
+not a pointer, filename or abbreviated image hash. `hash` is exactly 64
+lowercase hexadecimal ASCII digits. `hex` is an even-length lowercase
+hexadecimal string encoding the exact artifact bytes, two digits per byte,
+with no prefix. `label` is a nonempty ASCII string using only letters,
+digits, `_`, `-` and `.`; `name` is a §9.1 NAME without `@`. Root `id`
+is local to this container; `host_binding` identifies the generated native
+launch site and is not an ISA symbol or a host address. Several launch
+sites may select the same device entry using distinct root ids. `entry`
+is the loaded object's exported CC entry name; `interface_hash` and
+`closure_hash` are that entry's §9.2 identities, not host-binary hashes.
+`object_hash` is the §9.2 semantic object hash. `target_hash` is the selected
+§8 target hash, or null exactly for a target-free load. Artifact `sha256`
+is SHA-256 of its decoded bytes, not of its hex spelling; each artifact is
+one complete cert 0.9 UTF-8 JCS certificate. A certificate can bind a
+reached region's closure rather than the CC wrapper; its owner records
+and invocation contexts still resolve relative to its own bound root.
+
+The driver MUST emit Container and Call as UTF-8 JCS without BOM, terminal
+NUL or LF, with exactly the fields of the selected productions. Object key
+order is JCS order; array order is significant. roots is sorted uniquely
+by id bytes, with unique host_binding values; certificates is sorted
+uniquely by sha256 bytes; images is sorted uniquely by the SHA-256 of each
+ImageLaunch's JCS bytes. Empty arrays are legal. Root selection is the
+zero-based index in roots, transported as uint64_t, not a native pointer.
+Container/call identities are SHA-256 of their complete JCS bytes. Existing
+Invocation, ContextKey, image packing and integer productions inside
+ImageLaunch retain §12.3 encodings, including decimal-string budgets and
+canonical first-occurrence token_aliases. No live id is put in those bytes.
+For example, a call with no image inputs has these exact bytes:
+
+```json
+{"images":[],"version":"bennett.mixed-call/1"}
+```
+
+The sidecar travels as an explicit byte pointer/count pair through the
+native launch site; its placement in an ELF/COFF/Mach-O container does not
+change its bytes or require treating that container as a device object.
+
+The mixed launch provider MUST dispatch on the exact version strings and
+validate canonical bytes, field sets/types, array order and all selected
+root bindings against the actual loaded program before publishing a
+binding. Recognized-version malformed records, out-of-range root_index,
+wrong CC entry/kind, stale object/interface/closure/target hashes or
+corrupt artifact bytes return `BENNETT_E_ARG`, with no published binding.
+Other roots receive structural validation; their object contents are
+validated against their own loaded programs when selected, never against
+the current program. The provider copies the complete sidecar on success;
+caller buffers may then be changed or freed. Valid but unavailable
+mechanics are deployment gaps, not malformed bindings.
+
+**Native calls and live annex.** These additive C entry points are resolved
+in the same launch provider that created program. The driver loads the
+selected ISA object's bytes and target with that provider's bennett_load,
+then binds the selected Container row to the returned live program; it
+never passes the native executable's bytes as the ISA object. Schedules
+come from that loaded object's §11 section, with effective schedule/default
+selection and certificate matching under §§10.1–12.3 unchanged:
+
+```c
+typedef struct bennett_mixed_t bennett_mixed_t;
+bennett_status bennett_mixed_bind_v1(
+    bennett_program_t* program, const uint8_t* container_jcs,
+    size_t container_len, uint64_t root_index, bennett_mixed_t** out);
+bennett_status bennett_mixed_run_v1(
+    bennett_mixed_t* binding, const bennett_args_t* args,
+    const uint8_t* entropy, size_t entropy_len,
+    const uint8_t* call_jcs, size_t call_len, bennett_run_id* out);
+bennett_status bennett_mixed_unbind_v1(bennett_mixed_t* binding);
+```
+
+The launch provider MUST implement mixed_bind_v1 as a binding to the actual
+live program, and mixed_run_v1 as §10 bennett_run of the selected entry,
+with the same positional argument, copying, state, fault and ownership
+rules, plus validation/association of Call. The provider validates and
+copies Call, args and entropy before returning a successful run id;
+zero-length entropy permits a NULL pointer. Other byte inputs are nonempty
+valid readable spans. NULL required arguments or output pointers are
+`BENNETT_E_ARG`; with valid output pointers every bind/run failure writes
+NULL/0 respectively and creates no binding/run or effect. Allocation
+failure is `BENNETT_E_NOMEM`. A successful bind performs no device run,
+image preparation, mint or effect; it does not attest a certificate proof.
+Call images are classical preparation inputs, not implicit CC arguments.
+
+The runtimes MUST preserve the positional C types above and the exact
+counted bytes across the host launch site, and retain an internal live
+annex associating (selected provider instance, live program, binding,
+container hash, root_index) with every returned run. Pointer arguments
+are native C pointers under the platform's declared C ABI, size_t is its
+unsigned byte-count type, uint64_t is exactly 64 bits, and statuses and
+opaque handle types are §10's. There is no packed C struct, padding,
+native-endian integer blob or pointer-to-integer encoding in the sidecar.
+Cross-process transport requires reconstruction through these calls,
+never copying pointers. The runtime keeps program and run ownership in
+the annex; native application code neither dereferences opaque handles
+nor uses them as memory addresses. An R entry is reached through its
+bound device CC wrapper under §10; the host trampoline does not change
+call tiers or invent a host R execution model.
+
+The driver MUST establish launch/0.9 and both mixed_launch/1 and
+token_aliases/1 using bennett_launch_features, and resolve all three mixed
+entry points and every §10 entry point it uses in that same selected
+provider before a mixed bind/run request. A complete provider's manifest is, for example,
+`{"abi":"launch/0.9","features":["mixed_launch/1","token_aliases/1"],"schema":"bennett.abi-features/1"}`.
+The feature spelling is `mixed_launch/1` (underscore); advertising it pledges the complete mixed
+transport and lifecycle in this clause, including image association.
+The mixed launch provider MUST omit mixed_launch/1 while any required
+transport or lifecycle mechanics are missing. Existing launch/sched
+layouts and token_aliases/1 meanings remain unchanged; neither an object
+header nor native comparison layout revision 1 establishes either feature.
+The driver MUST negotiate each participating scheduler independently by
+§10.1 and keep each selected provider instance loaded until its last
+binding, program, run, request, response, result, estimate, tape iterator
+and borrowed buffer/function pointer has been released. Static binding
+is allowed with the same role pledges; resolving through an unrelated
+process-global symbol of the same name is not provider selection.
+
+The driver MUST invalidate cached advertisements and function pointers
+at provider unload, re-query a reloaded instance, and report missing
+features/exports, wrong base ABI, unsupported transport versions or
+unavailable required mechanics as a pre-request compatibility diagnostic
+corresponding to `BENNETT_E_VERSION`, naming role, selected provider,
+container/root and missing obligation. Existing query failures propagate
+their original status as above. A version unsupported by the selected
+provider is distinguished before decoding that version's fields. The
+runtimes MUST retain the original request, args, partition and image
+bytes on compatibility failure and issue no device request, preparation,
+effect, partition-erasing retry or successful estimate. Ordinary specified
+argument, target and feasibility errors remain distinct. A missing static
+symbol fails explicitly at link time; it cannot return a C status.
+Unsupported versions/mechanics require a conforming deployment, never
+source rejection, partition restriction, tuple interning or a bound
+substituted for an exact estimate.
+
+**Ownership, reversal and release.** The launch provider MUST scope each
+binding to its actual loaded program and each run to its creating binding,
+while validating token/qreg arguments in that program's live namespace.
+Two loads of identical bytes are distinct program instances; equal numeric
+handle bits or equal tuples do not transfer ownership between them. Several
+roots may bind one live program; its valid host-minted tokens remain usable
+across those roots under §5.4, without becoming new tokens. Distinct live
+programs require their own mints. Neither root id nor object hash substitutes
+for live program ownership. The provider uses the existing §5.4 token
+validity rules, without introducing an extra root-local token namespace.
+
+The runtimes MUST preserve resolved token identities through marshalling,
+forwarding, captures and inverse traversal, and derive each actual
+invocation's token_aliases from those identities in §12.3 order. Repeated
+uses of one live identity remain equal; fresh mints of an equal tuple remain
+distinct. A tuple-only estimate/schedule request still supplies its explicit
+partition. The shim does not manufacture an identity from a tuple, integer,
+serialized equality label or earlier run. The reference interpreter's
+fresh-identity, program ownership, retained mapping and mint-revocation
+behavior is the default reading here (§5.4, §7.4), not an alternative
+transport policy; no reference C mixed provider is claimed.
+
+The launch provider MUST preserve the complete run tree, device-memory
+ownership, register ledger and tape/run association through wait, reply,
+suspend, resume, reverse and close using the same program/run pair and
+selected provider. Tape iterators and results remain associated with that
+run; another root's run/tape cannot be substituted. Effect args remain
+§10's ordered 8-byte little-endian fields; host argv/envp or host libc
+activity is not appended to a device effect tape. All §10 state and reverse
+eligibility checks remain in force, including FAILED-run reversal, fault
+records, irreversible measurement and exclusive ownership while not CLOSED.
+
+The launch provider MUST revoke a device-minted token when its defining
+frame is reversed or its owning run is CLOSED, retain forwarded identities
+while valid, and never revive a revoked mint by replaying its tuple. CC
+uncall and Q matched inversion use the retained identity mapping exactly
+once under §7.4. A later fresh mint is distinct even at the same source
+point and tuple. Launch arguments with stale/foreign tokens or qregs return
+`BENNETT_E_ARG` before effects; in-device invalid-token uses retain §5.4's
+trap/fault. Immutable estimates already returned retain their copied
+invocation even after revocation; they do not grant executable token rights.
+
+The launch provider MUST return `BENNETT_E_INVALID_STATE` without releasing
+anything on mixed_unbind_v1 while any run of that binding is not CLOSED,
+and on bennett_unload while any mixed binding remains. After every such run
+is CLOSED, unbind succeeds, frees the binding and releases its program
+retention without closing other bindings or revoking their program's
+host-minted tokens. A later successful unload destroys that program's
+host tokens; old ids never become valid in a new program instance. Closing
+one run revokes its device mints and releases its history/exclusive touches,
+without consuming unrelated host tokens or registers that §10 keeps live.
+The runtimes MUST serialize release against dispatch and retain provider
+and program associations until release completes; no copied sidecar or
+stale numeric id keeps a released live object usable.
+
+**Images, readers and remaining memory boundary.** The mixed launch provider
+MUST validate each Call image manifest against the selected program,
+reached subject and resolved invocation, and establish §12.3's actual fresh
+factor, copy, packing, context/handle association and mutation exclusion
+before its claimed use. A merely hash-matching old handle is insufficient.
+Image manifests for an unrelated root/closure/target/schedule/invocation
+return `BENNETT_E_ARG` before a run; an unresolved applicability premise
+never becomes an established proof. An image whose binding is only
+resolvable at a nested invocation is checked before that invocation's
+image-dependent use; it is not guessed from the CC root's arguments.
+
+Independent readers/checkers MUST validate each certificate's own object,
+subject closure, invocation/partition, context inventory and preparation
+bindings before using it, reporting unsupported versions or missing
+mechanics as unchecked/unestablished under §12.3. A successful bind, driver
+advertisement or launch manifest is no proof verdict. Runtime association
+is additionally required for each actual launch_copy use. Changing sidecar
+bytes changes its own hash/cache identity; source/object, target, schedule
+and certificate hashes change only when their respective hashed bytes or
+semantic envelopes change. No sidecar field is inserted in their closed
+schemas. Certificate inventories cover selected device closures, including
+required linked owner records, independently per root; [] is relative to
+each certificate's device root, never native main.
+
+This revision transports §10's by-value arguments/entropy and §12.3's
+classical image copies. A ptr argument still denotes a device §7.1
+address; it never implicitly grants access to a host allocation. General
+host-memory-by-reference remains required boundary work: address/layout
+mapping, range/liveness, aliasing, ownership/synchronisation, writeback and
+reversal need their own published versioned contract preserving dialect
+§§6.6, 8.5, 19.4–19.5. The driver and runtimes MUST report an unavailable
+required host-memory mapping as a deployment gap before dispatch while
+preserving the request; they cannot cast a host pointer into device memory
+or reject the source program to conceal it. Native main, argv/envp and
+host-only libc need no device alias/frame/certificate entries. Native
+comparison selects the corresponding materialised marked entry and its
+complete materialised callee closure with its prescribed runtimes, arithmetic
+libraries and build configuration; it does not compare the whole native
+binary as if it were the device root.
 
 **Artifact identity.** Negotiation is provider-local deployment metadata;
 it adds no field to objects, schedules or certificates and records no
@@ -4829,23 +5067,28 @@ an action region[63,1] with `cells: "all"` and `count: 1` remains legal but has
 
 A mixed fat object retains an ordinary native host binary and embeds ISA
 objects for marked device modules and their linked device closures (North
-Star §§2, 3.3, 4.4). ISA §§9.1–9.3 identify each device object and selected
-root; §12.3 certificates, owner records and reports cover that closure,
-with a separate binding/context set per device root and [] relative to
-that root (§12.1). Native entry, argv/envp and host-only libc need no ISA
-region, frame or certificate record; native comparison binds the selected
-materialised closure, not the whole host. Today §10 launches a device CC
-entry with copied arguments/entropy; §5.4 budgets bind device invocations,
-§3.3/§10 handles belong to a loaded program/run, and §7.3/§10 tapes cover
-device R effects. These require explicit container-to-object/root/certificate
-association, host-entry-to-device-entry bindings, budget/handle lifetime
-negotiation and tape/run association in a versioned mixed-launch contract.
-ISA §7.1 defines device memory but §10 defines no general host-memory-by-reference
-launch ABI: that contract must add address/layout mapping, range/liveness,
-aliasing, ownership/synchronisation, writeback and reversal rules, preserving
-dialect §§6.6, 8.5, 19.4–19.5. Until published, these are explicit
-bennett-4ht boundary obligations, not grounds to require whole-binary
-lowering or omit mixed execution.
+Star §§2, 3.3, 4.4). The versioned §10.1 mixed-launch/1 transport binds
+native launch sites to selected device CC entries without replacing the
+§9.2 identity of any ISA object. Its counted Container/Call bytes and live
+annex have the following separate associations:
+
+| Association | Transport and required observation |
+|---|---|
+| container/root | Container.roots in canonical id order; selected root_index binds host_binding, exported CC entry, object_hash, interface_hash and closure_hash to the actual loaded object. Other native entry points are outside this inventory. |
+| target/certificate | Root.target_hash selects that program's target or null for a target-free load; certificates carry exact bytes and their decoded-byte SHA-256. Each certificate's own root, reached linked owner records, invocation/partition, schedule and complete contexts are independently checked. [] denotes that certificate's device root. |
+| program/token | The live annex binds the selected provider instance and actual program to the root binding and returned runs. Host tokens belong to that program; device mints also retain defining-frame/run ownership and revocation. No pointer or process-local handle id is serialized in a sidecar or certificate. |
+| tape/run | Each run retains its creating binding and provider/program/run pair through effects, wait/reply, reversal and close. Device tapes cover device R effects, not native process/libc activity. |
+| image/handle | Call.images transports complete §12.3 ImageLaunch objects; each launch_copy use additionally establishes its actual fresh factor, packing, resolved context and live handle association. Static manifest validity alone is conditional evidence. |
+| independent readers | Each checker/reader validates its own supported schemas and complete bindings; driver negotiation, successful mixed bind and provider advertisements cannot substitute for its checks. |
+| native comparison | Compare the corresponding materialised marked entry and complete materialised callee closure under the prescribed runtimes, arithmetic libraries and recorded configuration. Native main, argv/envp and host-only libc need no device frame, alias or certificate entries. |
+
+The copied-argument/entropy/image transport and live lifecycle are defined
+in §10.1. General host-memory-by-reference remains explicit boundary work:
+address/layout mapping, range/liveness, aliasing, ownership/synchronisation,
+writeback and reversal require a further versioned contract preserving
+dialect §§6.6, 8.5, 19.4–19.5. Missing mechanics are reported as deployment
+gaps before dispatch, never grounds for whole-binary lowering, source
+rejection, alias erasure or omitted mixed execution.
 
 **Fixed-image mixed-object binding (K85; §§9–10).**
 
@@ -5308,10 +5551,10 @@ device root has its own object/root bindings and complete context set;
 [] denotes that device root, never the native executable entry. Native
 host functions, process argv/envp and host-only libc need no frame
 records. Shared linked closures retain separate root-relative contexts.
-A host may reach the device through §10's device CC entry; the general
-mixed-container launch shim remains the explicit boundary work described
-in the shared scope statement. Native comparison binds the corresponding
-materialised device region and callee closure under its recorded configuration.
+A host reaches the device through §10.1's bound device CC entry;
+mixed-launch/1 preserves this root association. General host-memory sharing
+retains the explicit mapping obligations in the shared scope statement.
+Native comparison binds the corresponding materialised device region and callee closure under its recorded configuration.
 
 **Frame-context witnesses (K90).** Pair(t,u) calls flip(t), then flip(u), where flip is X. For H_pair=b98f9111e8533f00a8e5ac195e1b335678d14efcabb653d754d9999e21297c16, keys have symbol H_pair, iteration=[], instance=[], call_index=0 and respectively point entry:0 and entry:1. Entry:0 selects {slots:[{id:"mut:0",role:"mut",class:"A",width:1}],scratch:[],history:[],borrow:[],ancillae:[]}; entry:1 has the same five arrays with class B.
 
@@ -5378,8 +5621,10 @@ supply equality partitions explicitly. Serialization contains equality
 classes, never host pointers or process-local handle ids. Alias-bearing
 schedules and certificates bind that device object/root and invocation.
 Native entry points, argv/envp and host-only libc need no device-alias
-entries. The future mixed launch shim negotiates the alias-binding ABI
-feature; §10 alone does not specify that shim or container interface.
+entries. The §10.1 mixed-launch/1 shim negotiates the actual selected
+provider and preserves the live program/token annex independently per
+root binding. Several roots of one live program may share its valid host
+tokens; equal object hashes across different loads do not share ownership.
 
 **Action and inverse-pair witnesses (K91).**
 
@@ -5718,6 +5963,91 @@ The vectors record source admission, complete output tuples and expanded source 
    inherits another's alias binding. Native entry, argv/envp and host-only
    libc need no fabricated device alias entries. A native layout version
    alone cannot authorize an alias-aware launch/sched request.
+
+**Mixed native-boundary conformance (mixed-launch/1; suites G/H).**
+
+1. **Canonical transport (driver/runtime/provider).** Round-trip Container,
+   Root, Artifact and Call with exact JCS bytes/lengths, empty arrays,
+   multi-root order and byte hex. Reject duplicate/unknown/missing fields,
+   duplicate ids/host bindings, reordered roots/certificates/images, wrong
+   types, odd/uppercase hex, BOM/NUL/LF and stale decoded-byte SHA-256 with
+   E_ARG and NULL/0 outputs. Unsupported versions produce E_VERSION before
+   dispatch, with the original request retained. Exercise root_index 0,
+   the last valid index and the first out-of-range index. A valid huge
+   sidecar on an unable implementation reports its deployment/resource gap;
+   no reduced inventory is accepted as equivalent.
+2. **Two roots and loaded objects (driver/provider).** Bind two marked
+   modules in one native binary, two CC entries of one object, and two loads
+   of identical object bytes. Validate the selected entry's interface and
+   closure independently; change each object/root/entry/kind/target binding
+   in turn and observe E_ARG before publishing a binding. The unselected
+   root is not checked against the selected root's program. Several host
+   sites for one entry retain distinct id/site bindings. Native main,
+   argv/envp, host-only libc and an unrelated unmarked function require no
+   ISA entries or certificate inventory. Compare the selected materialised
+   entry and its full materialised callee closure under the recorded build.
+3. **Provider selection and lifetime (driver/runtime).** Supply launch
+   providers with only token_aliases/1, only mixed_launch/1, both, a missing
+   mixed export and a misleading process-global export. Only the selected
+   instance with the complete pledges permits dispatch. Exercise separately
+   selected schedulers/readers, a 0.8 base ABI, wrong transport version,
+   native layout revision 1 and missing required mechanics: explicit
+   pre-request E_VERSION, no prepare/run/effect or legacy retry. Propagate
+   a query's original non-OK status. Retain the provider across outstanding
+   bindings/programs/runs/results/requests/estimates/tape iterators and
+   borrowed buffers; after final release unload/reload re-queries and never
+   reuses cached function/manifest pointers. Static missing-symbol failure
+   is explicit. No unavailable provider advertises completed support.
+4. **Copied bytes and live annex (runtime/provider).** Mutate/free caller
+   sidecar, Call, args and entropy buffers after successful calls; retained
+   bindings/runs preserve original bytes and actual handles. Same numeric
+   token/qreg/run bits from another program do not identify an owned object.
+   Check provider/program/binding/root/run association on wait/reply/tape
+   access. An R call passes through a CC wrapper; ordinary host addresses
+   cannot substitute for opaque handles. Failure leaves NULL/0 and no new
+   binding/run/effect. Test empty entropy with NULL, NULL required inputs,
+   allocation failure and concurrent dispatch/release.
+5. **Every partition, forwarding and fresh mint (runtime/provider).** For
+   three equal-tuple token positions preserve all five partitions
+   [0,0,0], [0,0,1], [0,1,0], [0,1,1], [0,1,2] through the mixed boundary,
+   source captures and nested calls. Include oracle primary/args, action
+   args and a CC wrapper with no invented primary identity. Several roots
+   of one live program can share a valid host token; a separate load cannot.
+   Foreign/stale token launch arguments yield E_ARG before effects.
+   Tuple-only requests retain explicit partitions; changing only partition
+   changes matching/cache/proof applicability despite equal params_hash.
+6. **Reversal, close and unload (provider/runtime).** Reverse completed
+   and FAILED runs, CC uncall and Q matched pairs, comparing complete T4
+   state, token identity mapping, register ledger and ordered tape before
+   and after. Reversing a mint revokes it; reminting the same tuple/source
+   point is fresh. Closing revokes that run's device tokens while retaining
+   unrelated host tokens and §10-surviving registers. Unbind with a non-CLOSED
+   run and unload with a binding return E_INVALID_STATE without release;
+   closed-run unbind then unload succeeds. A binding under another root is
+   unaffected. No old token becomes live in a new load. Measurement and
+   unverified free retain E_NOT_REVERSIBLE; no shim-induced reversal bypass.
+7. **Images and independent readers (provider/checker).** Carry two roots'
+   distinct ImageLaunch records and cert Artifact bytes; verify SHA-256
+   over decoded bytes independently, with no host ids serialized. A fresh
+   factor receives the declared packing/image and remains associated with
+   the actual invocation and handle through completion. Wrong root, context,
+   target, schedule, partition, copy index or stale handle fails the
+   corresponding association; a conditional theorem or static hash alone
+   never establishes actual preparation. Include a nested invocation whose
+   own args differ from the CC root. A launch pledge cannot authorize an
+   unsupported independent reader; absent mechanics leave its obligation
+   unchecked/unestablished. Root-relative [] and reached owner inventories
+   stay separate; a certificate for one partition/root cannot cover another.
+8. **Identity and remaining host memory (driver/runtime/reader).** Hold
+   existing artifacts fixed, vary only the sidecar/site/provider, and verify
+   unchanged object/source/target/schedule/certificate identities alongside
+   the sidecar's own hash changes when its bytes change. No feature-list or
+   live handle fields appear in those artifacts. Distinguish program-token
+   ownership from equal object hashes. A ptr still denotes a device address;
+   unavailable required host-memory mapping yields a named deployment gap
+   before dispatch with unchanged request, never a host-pointer cast, smaller
+   alias partition or source rejection. Ordinary by-value launch and native
+   host libc remain reachable without fake host alias/certificate/tape rows.
 
 **Native representation conformance (K86; suites D/F).**
 
