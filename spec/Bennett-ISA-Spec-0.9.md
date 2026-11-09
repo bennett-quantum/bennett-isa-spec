@@ -251,7 +251,7 @@ north star §3.1 requires).
 | K88 | §3.2–§3.3, §7.4, §9.4, §10, §12.3 | **4TA**. Ordered per-wire register class vectors, reversible heterogeneous concat/slice and canonical B5 slot fragments preserve one source slot. S1: all ledger references, atomic class/placement preflight, failed-view reversal, upgraded readers and zero-width runtime vectors binding no slot. Certificate bytes change; unchanged source/signature/closure/object, target, schedule, ref recipes/ordinals/catalog identities. | 4ta; council pass2-4ta-2026-11-02 round 2; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | – |
 | K89 | §12.1–§12.3 | **7S0**. Selected maximal borrow_frame relations, workspace entry components and entry_products express existing K76/K78 D_F without changing it; union-rank sampling and B-fiber checks fix coverage. S1: K69 positional inherited controls, evidence versus requested-proof rejection, causal-stack/seed witnesses and Cartesian sampler cross-reference. Certificate bytes change; source/closure/object, target/schedule leaves, K78 and ref catalog identities stay unchanged. | 7s0; council pass2-7s0-2026-11-02 round 2; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | – |
 | K90 | §12.3 | **V2V**. Exclusive uniform frame or complete canonical frame_contexts, validated against each resolved invocation and its allocation/lifetime metadata. S1: pair/two-root/singleton fixtures, truthful legacy migration and checked scope uniformity. Certificate bytes change; no callee clone, source/interface/closure/object, target/schedule, call edge or ref catalog identity change. Narrow reading: future fault-context arrays are not presumed; existing published context obligations stand. | v2v; council pass2-v2v-2026-11-02 round 2; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | – |
-| K91 | §5.4, §7.4, §10.1, §11, §12.3 | **YSW**. Canonical token_aliases equality partitions preserve actual identities through calls, source builders and reversal; only oracle invocations prepend a primary token. S1: universal partition encoding, schedule matching/history, identity-call carrier and self-adjoint wording. Additive launch/sched token_aliases/1 feature with explicit loader negotiation, preserving legacy symbols; legacy token-argument requests need an alias binding. Alias-bearing schedule/certificate hashes change; args/params_hash, source/interface/closure/object and ref catalog identities stay fixed under unchanged envelopes. Narrow choice: versioned ABI feature rather than a header-version bump. Editor's note (advisor R21, 2026-11-03): the loader capability negotiation this row invokes (feature-query entry point, defined absent-feature behaviour, version field) is not yet defined in 0.9 text; it is pending b-isa-spec-b3ui (note, sol+astra round, editorial completion of K91). Do not implement against an undefined negotiation. | ysw; council pass2-ysw-2026-11-02 round 2; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | +schedule/certificate bytes |
+| K91 | §5.4, §7.4, §10.1, §11, §12.3 | **YSW**. Canonical token_aliases equality partitions preserve actual identities through calls, source builders and reversal; only oracle invocations prepend a primary token. S1: universal partition encoding, schedule matching/history, identity-call carrier and self-adjoint wording. Additive launch/sched token_aliases/1 feature negotiated independently per role through bennett_launch_features / bennett_sched_features and bennett.abi-features/1 manifests (§10.1), preserving legacy symbols; legacy token-argument requests need an alias binding. Missing or inconsistent support gives a pre-request BENNETT_E_VERSION loader diagnostic. Alias-bearing schedule/certificate hashes change; negotiation adds no artifact fields or hashes, and args/params_hash, source/interface/closure/object and ref catalog identities stay fixed under unchanged envelopes. Narrow choice: versioned ABI feature rather than a header-version bump. | ysw; council pass2-ysw-2026-11-02 round 2; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | +schedule/certificate bytes |
 | K92 | §4.5, §12.3 | **2QC**. QINPLACE-CHECKER-COVERAGE: owner-local exact pair presence and all reached bound transitive contexts, explicit unestablished applicability outcome, executor pre-effect coverage retained. S1: correct insertion before CLAIM-BINDING, literal reference-Q traversal including disabled predicates/zero-trip distinction and nested fixture. Compatibility: incorrect executable packets now reject or remain incomplete; correcting missing entries changes certificate bytes/digests. No executor/source/interface/closure/object, target/schedule, expansion or ref catalog identity changes. Narrow reading: owner-local requirements follow existing §4.5 and this K only; held 0jq is not presumed. | 2qc; council derive3-2qc-2026-11-02 round 1; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | – |
 | K93 | §3.3, §4.4, §11.1, §15 | **SQR**. MCX-BUNDLE-CONTROLS: ordered bundle expansion, wire distinctness, flattened k and scalar target. S1: mixed-list order/arity, phase-sensitive external-reference witness, wire[1] target and active-predicate count. Route taken: in-version 0.9 K by maintainer D2 explicitly naming sqr (Muse sqr-S1); witness object/interface/closure hashes unchanged. Existing ref recipes/catalog bytes stay unchanged; wrong-arity adapter leaf hashes, schedules and cached execution/validation require regeneration and certificates rechecking. | sqr; council derive3-sqr-2026-11-02 round 1; Muse accept-muse-batch2-2026-11-02 round 1; in-version 0.9 K, maintainer D2 2026-11-03 | S | – |
 | K94 | §12.1, §16.3 example 3 | **ADJOINT-TABLE-PREMISES**. Defines the reference-action adjoint theorem, full-D/control scope, optional conjunctive subclaims and decidable syntactic premises; distinguishes established proof, named unchecked premises and malformed/refuted rejection. Compatibility: formerly Unverified adjoint_table claims become established or rejected when checkable; unavailable premises remain Unverified. No grammar or envelope changes: unchanged source/interface/closure/object, target/schedule/certificate and ref recipe/catalog bytes and hashes stay fixed; checker verdicts and validation caches require rechecking. Narrow reading: generated adjoint, no self-adjointness or variant-name inference, no mandatory replay subclaim. | in-version 0.9 K, advisor R34 2026-11-07; council pending | S | – |
@@ -2592,21 +2592,137 @@ The 0.9 request carries the complete resolved parameter vector.
 
 **Token-alias ABI feature (K91).**
 
-Both `bennett_estimate_run_with_token_aliases` and `bennett_sched_request_set_token_aliases` copy and validate the JCS array. Keep the old ABI callable; with no
-token args infer [0] for an oracle and [] for an action/perm_action.
-A legacy request with token arguments and no alias binding returns E_ARG;
-the additive alias-aware function admits every consistent partition and
-provides exact estimates of each resolved request. A bound over partitions
-is not a K12 exact result. This request diagnostic does not make any valid
-program or alias pattern illegal, and does not replace implementing the
-full alias-aware capability. Publish
-the extension under an explicit launch/sched ABI revision or feature
-contract, including loader capability negotiation; do not change the
-published C argument layout/symbol meaning silently.
+Launch and sched providers MUST copy and validate the JCS partition array
+at `bennett_estimate_run_with_token_aliases` and
+`bennett_sched_request_set_token_aliases`, respectively, according to
+§12.3. Both providers admit every consistent partition. The launch provider's
+alias-aware estimate is exact for the resolved request under K12; a bound
+over partitions is not an exact result. Invalid bindings return
+`BENNETT_E_ARG` before an estimate or effect. These request diagnostics
+do not make a valid program or partition illegal or replace implementing
+the full capability.
 
-The additive symbols and binding rules above define the launch/sched 0.9 feature `token_aliases/1`. Loader capability negotiation establishes support for both additive symbols and the token_aliases metadata contract before issuing an alias-aware request; symbol availability alone does not authorize silently dropping the partition. This feature retains the existing C argument layouts and symbol meanings.
+The shared feature identifier is `token_aliases/1`, with the role-specific
+obligations below. The following additive exports define its negotiation
+for launch/sched 0.9; neither takes a program or request handle:
 
-*Editor's note (advisor R21, 2026-11-03).* The loader capability negotiation named above (its query entry point, absent-feature behaviour and version field) is not yet defined by this draft; the text is pending b-isa-spec-b3ui and completes K91 editorially. Implementations MUST NOT invent a negotiation in the meantime.
+```c
+bennett_status bennett_launch_features(const uint8_t** jcs_out, size_t* len_out);
+bennett_status bennett_sched_features(const uint8_t** jcs_out, size_t* len_out);
+```
+
+**Query results.** On success, each provider MUST return `BENNETT_OK` with
+`*jcs_out` pointing to its immutable, provider-owned UTF-8/JCS manifest and
+`*len_out` equal to its byte length, excluding any NUL terminator. The bytes remain
+valid and unchanged until that provider is unloaded; the caller neither
+modifies nor frees them. Each provider MUST make repeated and concurrent
+queries return identical manifest bytes without changing program, request,
+run or device state; querying requires no program, target or run creation.
+Each provider MUST return `BENNETT_E_ARG` if either output pointer is NULL,
+without writing either output; otherwise any query failure with a non-OK
+status sets `*jcs_out=NULL` and `*len_out=0`. Callers MUST keep the selected
+provider loaded while querying, reading its manifest or using its resolved
+entry points, and discard cached pointers and advertisements at unload.
+
+**Manifest validation.** Each provider MUST encode its successful manifest
+with exactly three fields: `schema`, the string `"bennett.abi-features/1"`;
+`abi`, the string `"launch/0.9"` for the launch query or `"sched/0.9"` for
+the sched query; and `features`, a bytewise-sorted unique array of nonempty
+ASCII feature identifiers. An empty array advertises no extensions.
+The `abi` field identifies the C ABI family, independently of an object's
+header versions. The examples for providers supporting this feature are:
+
+```json
+{"abi":"launch/0.9","features":["token_aliases/1"],"schema":"bennett.abi-features/1"}
+```
+
+```json
+{"abi":"sched/0.9","features":["token_aliases/1"],"schema":"bennett.abi-features/1"}
+```
+
+The loader MUST compare `schema`, the selected role's `abi` and each
+required feature identifier by exact string equality. A feature version
+is part of its identifier: `token_aliases/2` alone does not establish
+`token_aliases/1`. Unknown feature identifiers may be ignored and confer
+no support for known identifiers; duplicate or unsorted entries, empty or
+non-ASCII identifiers, duplicate/unknown/missing fields, wrong field types,
+invalid UTF-8 or non-JCS bytes are malformed manifests, not empty lists.
+
+**Role obligations.** A provider advertising `token_aliases/1` MUST
+implement its declared base C ABI and the following applicable obligations:
+
+| Advertised role | Required entry point and behavior |
+|---|---|
+| `launch/0.9` | `bennett_estimate_run_with_token_aliases`; exact resolved estimates (§10.1), live-handle identity and reversal (§5.4, §7.4), and partition-sensitive schedule, certificate and source-binding metadata (§11, §12.3) on its launch/estimate paths |
+| `sched/0.9` | `bennett_sched_request_set_token_aliases` and `bennett_sched_schedule`; partition validation and preservation in requests, schedule selection/production and certificate bindings (§11, §12.3) |
+
+Neither role requires the other role's exports in the same library.
+An unavailable-estimate stub does not meet the launch pledge: a VM or
+other launch provider MUST omit `token_aliases/1` until its alias-aware
+estimate and the other launch obligations work. For a VM, this condition
+applies to each role manifest it exposes: its feature lists remain empty
+until its alias-aware estimate works. A sched provider MUST
+omit it while its required scheduling/metadata mechanics remain
+unimplemented. Ordinary specified argument and feasibility errors remain
+distinct from missing mechanics; withholding an advertisement does not
+discharge the promised capability or permit rejecting a valid source
+program or consistent partition.
+
+**Loader behavior.** Before any alias-aware request, the loader MUST
+resolve the applicable query on the selected provider, validate its
+manifest, find `token_aliases/1` and resolve the role's required entry
+points in that same provider. The loader MUST negotiate each participating
+launch/sched provider independently; one role's advertisement is no evidence
+for another provider or for an independent checker or metadata reader.
+Independent checkers and schedule/certificate readers MUST implement and
+validate the applicable K91 bindings before using alias-bearing artifacts;
+the launch/sched manifests do not attest to those independent consumers.
+
+The loader MUST report a compatibility diagnostic corresponding to
+`BENNETT_E_VERSION` before any alias-aware request or effect for a missing
+query, missing feature, unsupported schema or base ABI, malformed manifest,
+or advertisement whose required entry point is missing. A missing symbol
+cannot return a C status: the loader synthesizes this diagnostic; a static
+link requiring an absent symbol fails explicitly at link time. On a query
+failure the loader MUST propagate its non-OK status and stop negotiation
+without retrying the request. On either failure path the loader MUST retain
+the unresolved request and its partition, require a conforming provider,
+and issue no alias-aware work, partition-erasing legacy retry or successful
+estimate. Deployment incompatibility is not an illegal program/partition;
+a cross-partition bound is never substituted as an exact estimate.
+
+**Legacy compatibility.** Providers MUST retain the published C layouts
+and symbol meanings of their declared ABI family and keep its legacy
+entry points callable. For tuple-only requests with no token arguments,
+launch/sched providers MUST retain inference of `[0]` for an oracle and
+`[]` for an action/perm_action; a legacy request with token arguments and
+no alias binding returns `BENNETT_E_ARG`. Live-handle execution still
+derives actual identities under §12.3. A loader using a token-free legacy
+path MUST independently establish its base C ABI before dispatch; symbol
+names or object header `0.9` alone do not establish it. In particular a
+0.8 estimate signature is never called as 0.9, and old callers retain
+their actual ABI family. Neither a query nor feature absence changes this.
+
+**Mixed launch.** The driver owns negotiation in the actual startup/shim
+path for each selected marked device object/root; the runtimes own the
+native layout and its preservation at that boundary. The driver and
+runtimes MUST preserve that root's object/closure association, valid
+handle lifetimes and token equality mapping through the shim, under the
+existing §12.3 mixed-launch boundary obligations. Native entry points,
+argv/envp and host-only libc require no device alias records or whole-binary
+lowering. This query contract leaves the mixed-container/host-memory ABI,
+budget/handle and tape/run association work named in §12.3 required; it
+does not equate a native layout version with a launch/sched feature.
+
+**Artifact identity.** Negotiation is provider-local deployment metadata;
+it adds no field to objects, schedules or certificates and records no
+negotiated feature list there. Producers and readers MUST retain the K91
+partition in schedule/certificate bindings, proof scope and cache matching
+(§11, §12.3); no process-local handle or manifest pointer is serialized.
+Changing alias-bearing artifact bytes changes their hashes as before;
+querying or selecting another conforming provider alone changes none.
+With unchanged envelopes, args/params_hash, source/interface/closure/object
+and ref catalog identities remain unchanged.
 
 **Resolved request.** `bennett_estimate_run` MUST copy and
 validate `params_jcs`, the JCS array of **all** classical arguments in
@@ -5025,6 +5141,79 @@ The vectors record source admission, complete output tuples and expanded source 
 | F | Producer | versioning, disjointness incl. control context; operand schema; row classes and frame sizing; index-space flattening; terminators; name resolution; permutation-only oracles; §6 transfer and windows; adjoint table; translation lemma side conditions with the four negative tests; `in`-wire use; acyclic action graphs; grammar; schemas; the §3.1 call-tier table (R → CC rejected); envelope and hashes, acyclic (inc8, zero, sum_db) and cyclic (sum, and a mutual SCC); SCC placement in the index space (mutual f, g whose member hashes order opposite to their names); empty data lines (`NAME SP LF` accepted, two spaces rejected); canonical `INT`/`FLOAT` at every literal site; const literal ranges; the region call graph with lifted calls and `qinplace`; `call` operand spelling; param role suffixes; interface-region names; local regions as call operands; the widened `in`-wire uses of §5.1; LIFO matched uncalls and an unmatched uncall rejected; the static view rule of §3.3 (a view passed through `br`, used twice, or left unconsumed is rejected); lifted-call `args` that are locations rejected; lproc header groups and `token`/`classical` suffixes (a suffix in the wrong group rejected), exact argument counts/types/region roles, missing nonempty lists and location-as-token/classical rejected, forwarding `iN ptr f64 token` without bit conversion, empty-list short form, fixed-binding closure and instance ordering (§3.7), lproc signatures including empty arrays and changed interface/closure hashes; `qreg[*]` typing, the `measure.iN` form and width checks; `budget.mint` rejected in regions; CC/R block terminators; `qinplace` signature compatibility, its short form exactly when the three lists are empty, and its §6.1 transfer (cleaning a value that depends on x after changing an `ins` wire is rejected); CC/R `fault` literal range; linking; frame-descriptor live ranges |
 | G | Launch | every §10 entry point, state transition, binding rule, ownership rule; HOST_REQUEST/reply (a reply whose length does not fit `ptr_width` bits is `E_ARG`); reverse eligibility and tree order; `QREG` bound to `qreg[*]`; `FAILED → REVERSED` (example 8) and `E_NOT_REVERSIBLE` after a `measure` or an unverified free; exactly one fault record per `FAILED` run; an R `fault C` returns `OK` from `bennett_wait` with a result and no request, zero values and the exact nonzero 64-bit C (including 2^64 − 1) from `bennett_result_fault(result, 0)`; a device-minted token used after its run is CLOSED is `E_ARG` |
 | H | Scheduler | §6 validity; capacity; reproducibility; specificity resolution; verbatim execution; INFEASIBLE/UNSUPPORTED; invocation contexts covering default-only invocations (an action calling one region twice, one call scheduled explicitly: a claim with one witness rejects, two passing witnesses accept); a device-minted tuple binds the schedule (a schedule bound to B = 3 is not applied to an invocation minted with B = 2, which runs under the defaults) |
+
+**Loader-capability conformance (K91; suites G/H).**
+
+1. **Query ownership and state.** For each role, compare the exact manifest
+   bytes and byte length on repeated and concurrent successful queries,
+   including queries before any program/request creation. Read them after
+   unrelated program/request frees while the provider remains loaded; the
+   caller never frees the buffer. Observe unchanged program, request, run
+   and device state. With either output pointer NULL observe
+   `BENNETT_E_ARG` and no output writes; inject a query failure with valid
+   outputs and observe NULL/0. Unload/reload invalidates the loader cache;
+   no old buffer or function pointer is reused.
+2. **Manifest grammar and versions.** Accept both exact §10.1 example
+   manifests and a role-correct empty `features` array as valid manifests;
+   an empty array still lacks the required feature. Reject invalid UTF-8,
+   non-JCS JSON, duplicate/unknown/missing fields, wrong types, empty or
+   non-ASCII identifiers and duplicate/unsorted features with loader
+   `BENNETT_E_VERSION`. Exercise unsupported schema/base ABI, the wrong
+   role's ABI and `token_aliases/2` without `/1`: none authorizes the
+   request. An unknown feature alongside `/1` leaves `/1` support intact.
+3. **Failure before dispatch.** Exercise a missing query with an additive
+   export present, a query advertising `/1` with its required export
+   absent, and a manifest without `/1`. Observe loader
+   `BENNETT_E_VERSION`, no request/effect and no legacy retry. For a query
+   failure, observe its original non-OK status and the same absence of
+   dispatch. Verify explicit static-link failure when a required symbol
+   is absent, and preservation of the unresolved request and partition
+   on all loader failures.
+4. **Independent roles and readers.** Use distinct launch/sched providers
+   with support present on only one, then support on both. Only the
+   independently validated roles permit their requests. A scheduler-only
+   provider needs no launch export, and conversely. A checker or artifact
+   reader without K91 binding support cannot consume alias-bearing output
+   by relying on either manifest; wrong-partition proof reuse rejects.
+5. **Truthful support and full partitions.** An unavailable alias-aware
+   estimator or unimplemented required scheduler/metadata path cannot
+   advertise `/1`; a VM's role manifests have empty feature lists until its
+   alias-aware estimate works. With support advertised, exercise all five partitions
+   `[0,0,0]`, `[0,0,1]`, `[0,1,0]`, `[0,1,1]`, `[0,1,2]` on three
+   equal-tuple token positions, for action arguments and oracle
+   primary/arguments. Compare exact estimates to independent aggregation
+   of each resolved realisation, not a bound over partitions. Exercise
+   forwarding/capture, repeated fresh mints of the same tuple and reversal:
+   live identities, history and revocation follow §5.4/§7.4/§12.3,
+   irrespective of the query result. Ordinary argument/feasibility errors
+   retain their specified statuses after successful negotiation.
+6. **Partition validation and copying.** `[1,1]`, `[0,2]`, negative labels,
+   wrong arity and equal labels with unequal tuples return
+   `BENNETT_E_ARG` before an estimate/effect. Mutate/free the caller's
+   partition buffer after a successful setter or estimate call; the
+   stored request or returned estimate retains the original binding.
+7. **Legacy ABI safety.** Old callers/new providers retain callable
+   signatures in their actual ABI family. Observe token-free oracle `[0]`
+   and action/perm_action `[]`, and `BENNETT_E_ARG` for tuple-only token
+   arguments without aliases. A new loader detects an unknown/mismatched
+   base ABI before any legacy call, even with matching symbol names or
+   an object header saying 0.9; a 0.8 estimate address is never dispatched
+   through the 0.9 signature.
+8. **Bindings and hashes.** Hold args and `params_hash` fixed and change
+   only the consistent partition: a mismatched bound schedule is not
+   applied (§11 defaults), a wrong-partition certificate rejects, and
+   cache keys distinguish the requests. Changed alias-bearing schedule
+   and certificate bytes change their hashes. Querying or changing only
+   the conforming provider changes no artifact bytes/hashes and inserts
+   no manifest/feature-list fields; unchanged source/header/catalog
+   envelopes preserve their identities.
+9. **Mixed-object boundary.** Select two embedded device roots with
+   separate bindings; observe driver/shim negotiation against their
+   actual providers, object/closure associations and valid token-handle
+   equality/lifetimes across the runtime native layout boundary. No root
+   inherits another's alias binding. Native entry, argv/envp and host-only
+   libc need no fabricated device alias entries. A native layout version
+   alone cannot authorize an alias-aware launch/sched request.
 
 **Suite H / §11.1 K77 adapter vector.** Captured `oracle_invocation`
 follows the source call's arguments and body/template capture, irrespective
