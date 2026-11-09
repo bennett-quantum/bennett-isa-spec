@@ -2134,7 +2134,9 @@ Closed-schema target readers MUST be upgraded for realisation_model; missing or 
 The following productions complete the version named above. A model producer
 MUST emit UTF-8 JCS, without a trailing LF in hashed bytes, using exactly the
 fields of the selected production; a model reader MUST reject duplicate,
-unknown or missing fields, wrong types and malformed known-version data.
+unknown or missing fields, wrong types and malformed data in a recognized
+version. Readers dispatch on version before checking that version's fields;
+an unknown version receives unsupported-model reporting, not guessed decoding.
 `?` means optional, `...` means repetition, and alternatives below are
 discriminated by their printed fields, never by a guessed matrix dimension.
 Object field order is JCS order; array order is significant. A `uint` is a
@@ -2263,7 +2265,8 @@ Its matrix W acts on logical bits first, then environment bits; both factors
 use the most-significant-first convention. The environment is initially
 factorised from every logical/external system. The checker MUST check state
 Hermitian positive semidefinite with trace 1, W†W=I, and the map
-Tr_env(W(rho tensor state)W†); e=0 is legal and has state [[1]]. Environment
+Tr_env(W(rho tensor state)W†); e=0 is legal and has state [[1]] in mathematical
+notation, encoded with the same Complex/Rat productions. Environment
 outputs are traced, never omitted logical outputs. A mixed state is allowed;
 no assumption of a pure zero environment is implicit.
 
@@ -4708,6 +4711,8 @@ systems and all mut-role cells. No replay omission-at-zero rule applies to
 this process production. Absent domain and an explicit domain with an empty
 fixed_regions array both mean the full original D. Additional fields, including
 bundle slices, are malformed in this version, not ignored restrictions.
+An unsupported process-domain version leaves the claim Unverified; the reader
+never interprets it as an empty or unrestricted domain.
 
 For each context, remove the fixed cell bits from the ordered input basis;
 J_I inserts their declared basis values at those same positions, together
@@ -4754,6 +4759,12 @@ Restoration = {"kind":"matrix_units"}
 Occurrence = {"context_key":ContextKey,"point":string}
 ```
 
+Preparation descriptors and the launch manifest below are UTF-8 JCS with
+exactly the selected production's fields and significant array order;
+duplicate/unknown/missing fields, noncanonical bytes and wrong types are
+malformed for a recognized version. Version dispatch precedes field decoding.
+An absent bindings.preparation or empty entries array supplies no attachment.
+
 Here hash/uint have §8.3's canonical encodings; `hex` is lowercase raw-byte
 hex with exactly the length and padding of §12.2. `label` in Image/regions
 is the subject's interface-region local name (the existing NAME repertoire,
@@ -4767,7 +4778,9 @@ indexes the named closure's claims array in this certificate. Attachments
 are sorted by closure_hash, then claim numerically, then JCS context_key
 bytewise, with no duplicate triple. Images and logical regions are nonempty
 and in subject interface mem-slot order. Preparation occurrences are in actual
-semantic execution order, with no duplicate occurrence.
+semantic execution order, with no duplicate occurrence. A logical witness's
+regions list contains exactly one entry for each attachment image, with no
+other region; copy_indices likewise has exactly one index per image.
 
 The certificate reader MUST reject malformed known-version records and
 attachments whose claim, images, invocation or context conflict with their
@@ -4784,7 +4797,8 @@ does not establish this use. No process-local handle is serialized.
 For a logical witness, the checker MUST resolve every listed allocation
 and preparation occurrence to the actual linked logical program, prove that
 the allocated cells begin in the prescribed clean zero factor, and reconstruct
-the declared classical image from those operations. It then tracks the
+the declared classical image from those operations, including any literal
+image initialisation prescribed by the allocation itself. It then tracks the
 allocation and call-operand mappings to the subject's in-role mem slot at the
 selected invocation's entry. It checks the complete intervening operation
 sequence, including operations not listed in prepare, to establish the exact
@@ -4864,6 +4878,14 @@ actual launch still needs checked fresh preparation/association. Retaining
 only a raw image hash or copying an old attachment to a new handle is
 insufficient. Absence of applicability never turns a conditional bound into
 an unrestricted proof or discharges a full-D borrow-frame/inverse obligation.
+
+The composition checker MUST establish the required image/preparation and
+restoration bindings at every callee use before including a conditional bound
+in local/inclusive error or multiplicity composition. It propagates mem-slot
+identities through actual call operands and verifies the relevant entry images;
+one callee's conditional bound cannot cover an unrelated image or another
+context by sharing a closure hash. Missing applicability leaves that composed
+obligation unestablished, even if every isolated conditional claim passed.
 
 Producers and readers MUST include the new domain/preparation bytes in the
 ordinary certificate hash/cache identity. Manifest bytes have their own hash
@@ -5480,6 +5502,8 @@ The vectors record source admission, complete output tuples and expanded source 
    invocation with the stale result. Unchanged conditional theorems may be
    reused, but a new launch still establishes fresh preparation/association;
    restoration of the original image is checked before any valid reuse.
+   A callee with a different mapped image leaves the parent's composed error
+   obligation unestablished even when the callee's isolated image bound passed.
 7. **Verdicts, identity and mixed scope (reader/checker/provider).** Without
    preparation, retain the successful conditional theorem/bound and report
    applicability unestablished; unavailable target/interval mechanics remain
