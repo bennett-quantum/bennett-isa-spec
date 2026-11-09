@@ -2129,6 +2129,179 @@ At c=1 the model reconstructs diag(I2,X); adding model bytes changes target_hash
 
 Closed-schema target readers MUST be upgraded for realisation_model; missing or unsupported models follow the reporting rules above and MUST NOT be silently substituted by ideal operations.
 
+**Closed native-model/1 productions.**
+
+The following productions complete the version named above. A model producer
+MUST emit UTF-8 JCS, without a trailing LF in hashed bytes, using exactly the
+fields of the selected production; a model reader MUST reject duplicate,
+unknown or missing fields, wrong types and malformed known-version data.
+`?` means optional, `...` means repetition, and alternatives below are
+discriminated by their printed fields, never by a guessed matrix dimension.
+Object field order is JCS order; array order is significant. A `uint` is a
+nonnegative integer, encoded as a JSON number below 2^53 and otherwise a
+canonical unsigned decimal string (§9.1); a positive integer excludes zero.
+A `label` is a nonempty ASCII string. A `hash` is 64 lowercase hexadecimal
+digits. No numerical string has whitespace, a leading `+` or a leading zero
+except the single digit `0`; negative zero is not a rational spelling.
+
+```text
+Model = {"version":"bennett.native-model/1","kind":"unitary",
+         "arity":Size,"basis":Basis,"parameter_bindings":Bindings,
+         "operand_map":Map,"control_models":Control,"data":Data}
+Bindings = { <label>: "k" | "c" | "eps" | "theta", ... }
+Control = {"kind":"controlled_U","controls":"c","disabled":"identity"}
+        | {"kind":"explicit","controls":"c"}
+Data (controlled_U) = Operation
+Data (explicit) = {"contexts":[
+  {"controls":{"min":uint,"max":uint|"unbounded"},"data":Operation}, ...]}
+Operation = {"matrix":Mat,"representation"?:Representation,
+             "certificates"?:Certificates}
+Representation = {"kind":"kraus","operators":[Mat, ...]}
+               | {"kind":"instrument","outcomes":[
+                   {"label":label,"operators":[Mat, ...]}, ...]}
+               | {"kind":"environment","arity":Size,
+                  "state":Mat,"matrix":Mat}
+Basis = [label, ...] | {"controls":"c","targets":[label, ...]}
+Map = [uint, ...] | {"kind":"entry_to_allocation"}
+Size = uint | {"var":"k"|"c"}
+     | {"op":"+"|"-"|"*","args":[Size,Size]}
+     | {"op":"pow2","args":[Size]}
+Rat = ["<signed numerator>","<positive denominator>"]
+Expr = Rat | {"var":label}
+     | {"op":"pi"|"i","args":[]}
+     | {"op":"+"|"-"|"*"|"/","args":[Expr,Expr]}
+     | {"op":"sqrt"|"exp"|"sin"|"cos","args":[Expr]}
+Complex = [Expr,Expr]
+Mat = [[Complex, ...], ...]
+    | {"kind":"identity","dimension":Size}
+    | {"kind":"zero","rows":Size,"columns":Size}
+    | {"kind":"diagonal","entries":[Complex, ...]}
+    | {"kind":"adjoint","matrix":Mat}
+    | {"kind":"scale","scalar":Complex,"matrix":Mat}
+    | {"kind":"sum"|"product"|"tensor"|"block_diagonal",
+       "matrices":[Mat, ...]}
+    | {"kind":"controlled","controls":Size,"matrix":Mat}
+    | {"kind":"tensor_power","count":Size,"matrix":Mat}
+Certificates = {"unitarity"?:
+  {"version":"bennett.unitarity/1","gram":Mat},
+  "enclosure"?:{"version":"bennett.enclosure/1","precision_bits":uint,
+                "matrix":[[[Rat,Rat,Rat,Rat], ...], ...]}}
+```
+
+All lists printed with `...` may be empty only where their meaning below
+permits it. The reader MUST validate expression nodes and dimensions before
+using a model: rational leaves are reduced with strictly positive denominator
+and zero exactly `["0","1"]`; every expression is finite; divisions by zero,
+unbound variables and negative Size results reject. `Expr` has the ordinary
+complex analytic meanings, using the principal complex square root (on the
+negative real axis its imaginary part is positive). `[a,b]` denotes a + i b,
+including when either expression is complex. Bindings may alias the four
+resolved sources, but a key named k, c, eps or theta retains that same source.
+Only declared aliases occur in Expr; Size uses the resolved k and c directly.
+An unavailable source rejects that context. In particular eps is available
+only at positive achieved epsilon, theta only for a parametric opcode and as
+the exact finite binary64 rational; k and c always retain §8.1's meanings.
+
+Dense matrices have at least one row and column and equal row lengths.
+Rows index outputs and columns inputs. Matrix constructors have their usual
+linear-algebra meanings: sum/product lists are nonempty, sums have equal
+shapes, products multiply left to right and adjacent dimensions agree;
+tensor/block_diagonal lists are nonempty and preserve list order. Identity
+and zero dimensions are positive. A diagonal list is nonempty. Controlled
+has a square matrix M and denotes diag(I,...,I,M), with 2^controls blocks;
+tensor_power repeats its matrix in tensor order, with count zero denoting
+the 1-by-1 identity. The checker MUST reject incompatible shapes rather than
+pad, truncate or transpose matrices. These constructors permit symbolic
+generation without a materialised-dimensional cap; they do not add cost
+expression operators to §8.1.
+
+For controlled_U, arity is the opcode's target count (one, or two for
+swap/cz); basis is an array containing exactly t, or exactly t and t2, in
+any order. For explicit, arity is c plus that target count; basis lists
+each c[0] through c[c-1] and every target exactly once. The template Basis
+expands to c[0],...,c[c-1] followed by its targets array and is available
+only in explicit form. Size and Basis are resolved anew at each context.
+The model reader MUST reject any arity/basis disagreement or non-permutation
+operand_map. Matrix basis bit 0 is the first listed bit and is the
+most-significant bit of a row/column index. This orders individual wires;
+the bits within a source bundle are still enumerated least-significant first.
+
+For controlled_U the complete model order is the entry's own controls,
+then effective controls, then the listed base basis. For explicit it is
+the expanded full basis; c[j] names the same §8.3 entry-order control j.
+operand_map maps each bit of this complete order to its allocation-order
+position among these operands, with inherited controls first. The generated
+entry_to_allocation Map denotes exactly this permutation, derived from
+resolved operand identities, including target-basis permutations. The checker
+MUST compare a supplied permutation to those identities and apply it to both
+row and column indices of every logical matrix, never to environment bits.
+
+In explicit form the contexts list is nonempty, sorted by increasing min,
+with disjoint inclusive ranges and max >= min. The reader MUST select exactly
+one row for each admitted resolved c and reject a missing or overlapping
+selection; an unbounded range is last. The row's expressions may depend on
+all its declared bindings, including k and theta. Its Operation describes
+the actual full context, including disabled branches and relative phase;
+it is not controlled again. In controlled_U form, each Operation describes
+the base operation and the target author binds diag(I,...,I,U) as the actual
+implementation, with no independent per-Kraus control construction. These
+rules apply to every admitted context, including c=0 and zero epsilon.
+
+In either form `matrix` supplies the phase-bearing U of the represented
+logical dimension. An omitted representation denotes precisely Ad_U.
+Kraus operators are a nonempty ordered list of square matrices on that same
+logical basis. Their map is sum_a K_a rho K_a†; no extra environment input
+is inferred. Instrument outcomes are a nonempty list with distinct labels
+in bytewise order and nonempty ordered Kraus lists per outcome. Their
+classical outcome is discarded in the reduced logical map; neither an
+outcome nor a Kraus index becomes a logical wire or a coherent control.
+Permutation of a Kraus list changes bytes, even when it preserves the map.
+
+An environment representation has e=arity environment qubits, basis e[0]
+through e[e-1] in that order, and an exact density matrix state of size 2^e.
+Its matrix W acts on logical bits first, then environment bits; both factors
+use the most-significant-first convention. The environment is initially
+factorised from every logical/external system. The checker MUST check state
+Hermitian positive semidefinite with trace 1, W†W=I, and the map
+Tr_env(W(rho tensor state)W†); e=0 is legal and has state [[1]]. Environment
+outputs are traced, never omitted logical outputs. A mixed state is allowed;
+no assumption of a pure zero environment is implicit.
+
+For either Kraus or instrument representation the checker MUST check
+sum_a K_a†K_a=I, then, for every pair of logical basis indices i,j, check
+that its reduced map on the matrix units |i><j| equals U|i><j|U†. The same
+matrix-unit equivalence applies to an environment representation. All these
+checks include off-diagonal units and arbitrary external references by
+linearity. The checker MUST separately establish U†U=I and the existing
+phase-sensitive native epsilon obligation; a valid CPTP representation
+does not prove either one. With controlled_U these representation checks
+are base checks plus the explicit actual-controlled-unitary binding, while
+explicit rows check their full-context representation directly.
+
+Optional certificates assert facts about this Operation's U, not a substitute
+operation. The enclosure matrix has U's dense shape; an entry
+[re_lo,re_hi,im_lo,im_hi] uses exact reduced rational endpoints with ordered
+closed intervals. precision_bits is positive. The checker MUST independently
+enclose each exact U entry using §12.1's outward interval arithmetic at that
+precision and verify containment in the supplied box; a disjoint or
+inconclusive containment check does not pass. The unitarity certificate's
+gram has U's shape. The checker MUST establish exactly both gram=U†U and
+gram=I, not merely that each interval contains the identity. No enclosure
+width, claimed Gram matrix or producer success flag establishes an exact
+identity. Exact rational evaluation or a checked symbolic equality may
+discharge it; unsupported exact identities remain unchecked. Certificate
+fields, matrices and expression trees are hashed as part of the target.
+
+For a well-formed but unimplemented representation, constructor or certificate
+version, the checker MUST report the affected obligation unchecked with an
+unsupported-model diagnostic, never silently ignore supplied data or compare
+the ideal opcode to itself. A malformed known production or a refuted
+obligation rejects. An unresolved symbolic identity or host checking limit
+retains the existing unchecked outcome and discharges no executable claim.
+These are checking outcomes, not restrictions on source programs or admitted
+algorithm dimensions. All previous zero/positive-epsilon compatibility and
+target/schedule/source identity rules above remain in force.
+
 ### 8.4 Space budget
 
 The capacity constraint is peak live qubits per class.
@@ -3837,8 +4010,8 @@ Witness envelope SHA-256: `299510fd67cc626fdcbcc10adcd40730f9af294ba596d86fb25fd
 | `exhaustive` | `domain` (§12.2); `expected`: `"oracle"` \| `{ "table": [...] }` \| `{ "program": closure_hash }` \| `"inverse_pair"` | re-execute every domain element on the reference interpreter / expected program; compare full tuples. For `"inverse_pair"` (the claim of an `inverse_pairs` entry, §12.3): for every element (x, ins, mem cells, args) run g and ginv at the entry's tuple, token-typed arguments at their `arg_tokens` tuples, and require both fault-free, ginv(g(x)) = x and g(ginv(x)) = x; the bundles and regions components MUST be the full domain of g's `in` and `mem` slots (the `args` component lists the covered classical values) |
 | `sampled` | `domain`; `expected`: `"oracle"` \| `{ "table": [...] }` \| `{ "program": closure_hash }`; `subject` and invocation binding as below (K13); `sampler`: `{ "algorithm": "xoshiro256**", "seed": [4 decimal strings, not all zero], "count": n }` | independently replay both sides of the declared relation on every sampled element; compare full tuples; always **evidence**, even if every element is drawn |
 | `structural` | `{ "rule": "translation_lemma" \| "inverse_pair_library" \| "adjoint_table", "subclaims": [indices], "witness": … }`; for `translation_lemma`: `{ "V": [points], "W": [points], "X": [wires], "B": [wires], "frame": [first point, last point] }`; for `inverse_pair_library`: `{ "library_closure_hash", "claim_index" }`; for `adjoint_table`: `{}` | check the rule's side conditions syntactically against the object and the subclaims' results |
-| `numerical` | `{ "subject": { "closure_hash", "variant", "inherited_controls", "schedule_hash" }, "metric": "operator_norm", "precision_bits": n, "bound": decimal }` | **checker-computed, for every invocation context of the subject** (below): build the realised unitary U of that invocation (the region's realisation under the root schedule at that path, with its resolved classical arguments, budget, epsilon shares and cleanup choices, and `inherited_controls` control wires prepended) and the reference unitary V (the region's §5.3 semantics with the same arguments, controlled on the same wires) at the subject's signature widths in interval arithmetic at `precision_bits` (basis order = allocation order, controls first), form interval enclosures of `V†U − I` entrywise, derive the operator-norm bound as the Frobenius-norm upper bound in interval arithmetic, and verify it is ≤ `bound`; the claim holds iff it holds for every context |
-| `channel` | `{ "subject": as above, "metric": "diamond", "precision_bits", "bound", "dual": [ { "Y": interval Hermitian matrix, "mu": decimal } … ] }` | for every invocation context of the subject, in enumeration order, verify its dual witness for the **diamond-norm SDP** below in interval arithmetic and `mu` ≤ `bound` (one witness per context; too few witnesses: reject) |
+| `numerical` | `{ "subject": { "closure_hash", "variant", "inherited_controls", "schedule_hash" }, "metric": "operator_norm", "precision_bits": n, "bound": decimal, "domain"?: { "version": "bennett.process-domain/1", "fixed_regions": [ { "name", "A", "W", "image", "sha256" } … ] } }`; domain production/binding: §12.3 | **checker-computed, for every invocation context of the subject** (below): the checker MUST build the realised unitary U and reference unitary V at that context's resolved arguments, budget, shares, cleanup choices and inherited controls, in allocation basis, controls first; with absent/empty fixed_regions, enclose `V†U − I`, otherwise enclose `(U−V)J_I` with the reduced input and complete output (§12.3); compute the interval Frobenius upper bound at positive `precision_bits` and verify it is ≤ the nonnegative finite `bound`. The checker MUST report a bound only if every context passes, retaining its full-domain or conditional-image scope and separate preparation applicability; inconclusive interval checks do not pass |
+| `channel` | `{ "subject": as above, "metric": "diamond", "precision_bits": n, "bound": decimal, "domain"?: { "version": "bennett.process-domain/1", "fixed_regions": [ { "name", "A", "W", "image", "sha256" } … ] }, "dual": [ { "Y": interval Hermitian matrix, "mu": decimal } … ] }`; domain production/binding: §12.3 | the checker MUST verify exactly one dual witness per invocation context in enumeration order (too few or too many reject), for the **diamond-norm SDP** below applied to `(E_real−E_ref) ∘ Ad_J_I` when fixed_regions is nonempty and to the unrestricted maps otherwise. Y has dimension `(d_in*d_out)` square, with reduced d_in and complete d_out for an image; the last SDP matrix has dimension d_in and traces d_out. The checker MUST apply the existing strict interval-pivot procedure at positive `precision_bits`, check nonnegative finite mu ≤ nonnegative finite `bound`, and report only the scope actually checked; a process bound does not itself establish image preparation or exact exit restoration (§12.3) |
 
 **Adjoint-table side conditions (K94).** A `structural` claim with
 `rule:"adjoint_table"` asserts that the §5.3 adjoint construction of its
@@ -4470,7 +4643,7 @@ an action region[63,1] with `cells: "all"` and `count: 1` remains legal but has
 ### 12.3 Schema and composition
 
 ```
-  versions; bindings { object_hash, interface_hash, closure_hash (required), reference_program_hash, dialect_mapping_version, target_hash, schedule_hash?, invocation? (K13) }
+  versions; bindings { object_hash, interface_hash, closure_hash (required), reference_program_hash, dialect_mapping_version, target_hash, schedule_hash?, invocation? (K13), preparation? (K85) }
   producer { name, version, materialisation { llvm_version, pipeline, normaliser_version } }
   regions { <closure_hash>: { kind, signature, bounds, estimate? (K12), frame?: <§9.4 descriptor>, frame_contexts?: [{context_key:<§12.1 key>, frame:<§9.4 descriptor>}], resources { encoded_row_name: canonical_decimal_string }, resource_contexts?:[{context_key,resources,gates_used,estimate?}], gates_used { gate: { count, scheme?, epsilon? } },
             claims: [ <claim> … ], verification: { oracle: i, borrow_frames: [i], inverse_pairs: [ { g, ginv, claim: i, budget: [B,heap,stack,depth], arg_tokens?: { "<arg>": [B,heap,stack,depth] } } ], unitary: [i], channel: [i],
@@ -4519,6 +4692,186 @@ need not treat the entire binary as the oracle. Runtime shims and build
 configuration are recorded as required by the North Star.
 
 VM objects contain the selected marked entries and their required transitive device closures. Code outside those closures remains native; shared callees may have both host and device variants. Native comparison uses the materialised entry and its entire materialised callee closure with the North Star §3.2 runtimes and arithmetic libraries.
+
+**Process-domain and preparation bindings (K85).**
+
+The optional numerical/channel `domain` is the closed
+`bennett.process-domain/1` production in §12.1's payload rows. Its
+fixed_regions entries use exactly §12.2's name, A, W, little-endian raw image
+and SHA-256 encodings, with nonnegative integer A and positive W under §9.1.
+The certificate producer MUST list them in interface mem-slot order and the
+checker MUST resolve and validate them against that subject, rejecting a
+duplicate, mut-role region, bad shape, nonzero padding or stale raw-byte hash.
+All components other than those fixed in-role cells remain unrestricted,
+including inherited controls, arbitrary initial target/fault, borrowed
+systems and all mut-role cells. No replay omission-at-zero rule applies to
+this process production. Absent domain and an explicit domain with an empty
+fixed_regions array both mean the full original D. Additional fields, including
+bundle slices, are malformed in this version, not ignored restrictions.
+
+For each context, remove the fixed cell bits from the ordered input basis;
+J_I inserts their declared basis values at those same positions, together
+with the prescribed workspace/local initialisations. Remaining input bits
+retain their relative allocation order. Output retains the complete output
+interface, borrowed systems and all workspace/local outputs required to
+observe their restoration; it does not project out the fixed cells or hide
+leakage. Let d_in be the dimension after insertion inputs are removed and
+d_out the complete output dimension. For channel witnesses the input-first
+Choi row index is i*d_out+a (input i, output a); columns use j*d_out+b.
+Tr_out(Y)[i,j] is sum_a Y[i*d_out+a,j*d_out+a]. For numerical claims use the
+rectangular `(U−V)J_I` before taking the Frobenius bound; multiplication by
+V† is only the unrestricted-unitary alternative already in §12.1. In the
+strict-feasibility padding recipe, the trace factor d is d_out and the
+slack identity is I_d_in. These rules encode reduced-input/complete-output
+claims without discarding coherent leakage, relative phase or external
+references.
+
+A successful fixed-image process bound is conditional on I and is reported
+as such with its metric, bound, subject, claim index and ordered resolved
+image bindings. It is neither an unrestricted bound nor an exact permutation
+proof. In particular a nonzero process-error bound does not prove exact image
+restoration. Where an executable use requires preparation, the checker MUST
+report its applicability separately as established or unestablished; without
+a checked attachment below the bound/theorem remains conditional. This also
+applies to §12.2's proof_relative_to_image. Existing reference-interpreter
+Unverified outcomes for unavailable target/interval checks remain Unverified;
+adding domain metadata or a preparation descriptor cannot upgrade them.
+
+The certificate binding extension and its closed records are:
+
+```text
+bindings.preparation = {"version":"bennett.image-preparation/1",
+                       "entries":[Attachment, ...]}
+Attachment = {"closure_hash":hash,"claim":uint,"context_key":ContextKey,
+              "invocation":Invocation,"images":[Image, ...],
+              "witness":Witness,"restoration":Restoration}
+Image = {"name":label,"A":uint,"W":uint,"image":hex,"sha256":hash}
+Witness = {"kind":"logical","regions":[
+  {"name":label,"allocation":Occurrence,"prepare":[Occurrence, ...]}, ...]}
+        | {"kind":"launch_copy","manifest_hash":hash,"copy_indices":[uint, ...]}
+Restoration = {"kind":"matrix_units"}
+            | {"kind":"claim","claim":uint}
+Occurrence = {"context_key":ContextKey,"point":string}
+```
+
+Here hash/uint have §8.3's canonical encodings; `hex` is lowercase raw-byte
+hex with exactly the length and padding of §12.2. `label` in Image/regions
+is the subject's interface-region local name (the existing NAME repertoire,
+not §8.3's ASCII-only model labels). ContextKey is the complete §12.1 key,
+relative to this certificate's root, with [] for that root. Invocation is
+the concrete §12.3 args/budget/token_aliases record, never its `"all"` form.
+An Occurrence's point is the concrete §11 source point in the invocation
+denoted by its key, including nested-body components; it is not a host PC,
+wildcard selector or private generated checker instruction. Attachment.claim
+indexes the named closure's claims array in this certificate. Attachments
+are sorted by closure_hash, then claim numerically, then JCS context_key
+bytewise, with no duplicate triple. Images and logical regions are nonempty
+and in subject interface mem-slot order. Preparation occurrences are in actual
+semantic execution order, with no duplicate occurrence.
+
+The certificate reader MUST reject malformed known-version records and
+attachments whose claim, images, invocation or context conflict with their
+resolved subject: the images equal exactly that claim's fixed_regions,
+not a subset, and its invocation equals the independently resolved nested
+args, budget and token_aliases, not the root's values copied into a callee.
+For reference-only claims the context tree is the bound reference Q
+construction; for realised claims it is §12.1's complete scheduled tree,
+including default-covered and coherently disabled calls. Each executable
+use requires its own attachment for every applicable context. An attachment
+for another device root, claim index, image, variant/control count or context
+does not establish this use. No process-local handle is serialized.
+
+For a logical witness, the checker MUST resolve every listed allocation
+and preparation occurrence to the actual linked logical program, prove that
+the allocated cells begin in the prescribed clean zero factor, and reconstruct
+the declared classical image from those operations. It then tracks the
+allocation and call-operand mappings to the subject's in-role mem slot at the
+selected invocation's entry. It checks the complete intervening operation
+sequence, including operations not listed in prepare, to establish the exact
+image and factorisation from every other system at entry. A producer's
+occurrence list is a selection aid, not permission to omit interfering
+operations or coherent alternatives. A checked general logical preparation is
+permitted; zero allocation followed by X on precisely the set image bits is
+the basic case. Unknown coherent data is never inspected, measured, cloned
+or assumed zero to establish preparation.
+
+For a launch_copy witness the named manifest has this closed JCS production:
+
+```text
+ImageLaunch = {"version":"bennett.image-launch/1",
+  "bindings":{"object_hash":hash,"interface_hash":hash,"closure_hash":hash,
+              "target_hash":hash,"schedule_hash":hash,"invocation":Invocation},
+  "copies":[{"context_key":ContextKey,"mem_slot":uint,"A":uint,"W":uint,
+             "image":hex,"sha256":hash}, ...]}
+```
+
+The manifest hash is SHA-256 of its exact UTF-8 JCS bytes without LF.
+copies are ordered by JCS context_key bytewise then mem_slot numerically,
+with no duplicate pair; mem_slot is the subject's signature mem position.
+copy_indices select, in attachment image order, exactly the matching copies.
+The manifest binds the actual selected device object/root and its root
+invocation; each copy's context resolves that invocation's reached callee,
+never the native host's main or an unrelated marked object. A launch manifest
+may supply several attachments; every use validates its own context/mem slot.
+
+The launch provider MUST independently validate the manifest bindings and
+raw-byte hashes, allocate or establish a fresh clean device factor, and
+perform the declared logical preparation/copy from those classical bytes
+before the selected invocation, with that image factorised from all other
+systems. It binds the resulting in-region and its
+actual opaque handle to this use internally, preserving packing, shape and
+factorisation until entry, without admitting a producer boolean as evidence.
+The provider MUST prevent concurrent mutation/rebinding through completion
+of that invocation; a changed image, mapping, handle lifetime or intervening
+operation invalidates the attachment. An existing unknown coherent region
+cannot be made applicable merely by asserting a matching hash. Native
+database construction/snapshot bytes are allowed; host pointer identity or
+a hash of an unobserved device state is not a preparation witness.
+
+This manifest specifies logical by-value image attachment, not a new C
+entry point, host-memory-by-reference layout or container ABI. The mixed
+boundary contract above still supplies actual root/handle ownership and
+transport. A deployment unable to associate and check this attachment
+reports applicability unestablished; it neither invents an ABI nor rejects
+an otherwise legal program. A static checker alone can validate the template
+but cannot attest that a future launch actually performed the copy. The
+launch provider's checked runtime association is additionally required.
+
+For either witness the checker MUST independently check exact exit restoration
+and factorisation of each fixed in-region. `matrix_units` directs reconstruction
+of the actual map on all matrix units of the remaining input (with arbitrary
+external references), checking that its complete output is supported on the
+same fixed image tensor the other outputs. For a unitary this can equivalently
+check zero amplitude outside that image. A restoration claim names an earlier
+claim in the same closure's claims array, with the same subject, context,
+invocation and image; the checker validates that its established exact full-tuple
+relation proves this restoration. A sampled, approximate, unrelated or
+unverified claim does not suffice. An exhaustive exact permutation relation
+can establish restoration by its full-tuple checks and linearity; a basis
+table cannot establish it for a non-permutation implementation. No circular
+preparation/restoration dependency is allowed. A reference-only theorem
+does not establish restoration of a different realised map.
+
+Readers and checkers MUST report unsupported descriptor versions or unavailable
+preparation/restoration mechanics as unestablished applicability, retaining
+any independently proved conditional theorem; malformed bindings and refuted
+preparation/restoration reject the attachment. The executor MUST use a
+conditional result to discharge an invocation only after matching all object,
+closure, target, schedule, claim/domain, variant/control, concrete invocation
+and context bindings and checking both entry and exit obligations. Reuse of
+the conditional theorem for identical immutable bindings is allowed; each
+actual launch still needs checked fresh preparation/association. Retaining
+only a raw image hash or copying an old attachment to a new handle is
+insufficient. Absence of applicability never turns a conditional bound into
+an unrestricted proof or discharges a full-D borrow-frame/inverse obligation.
+
+Producers and readers MUST include the new domain/preparation bytes in the
+ordinary certificate hash/cache identity. Manifest bytes have their own hash
+as above; a changed manifest requires a changed attachment/hash. These additions
+do not alter source/interface/closure/object identities or target/schedule
+hashes when those artifacts' bytes are unchanged. Regenerated targets,
+schedules, source or headers follow their existing identity rules. The
+descriptors do not waive target/error/resource composition obligations.
 
 **Native-model mixed-object binding (K86; §§9–10).**
 
@@ -5025,6 +5378,118 @@ The vectors record source admission, complete output tuples and expanded source 
 | F | Producer | versioning, disjointness incl. control context; operand schema; row classes and frame sizing; index-space flattening; terminators; name resolution; permutation-only oracles; §6 transfer and windows; adjoint table; translation lemma side conditions with the four negative tests; `in`-wire use; acyclic action graphs; grammar; schemas; the §3.1 call-tier table (R → CC rejected); envelope and hashes, acyclic (inc8, zero, sum_db) and cyclic (sum, and a mutual SCC); SCC placement in the index space (mutual f, g whose member hashes order opposite to their names); empty data lines (`NAME SP LF` accepted, two spaces rejected); canonical `INT`/`FLOAT` at every literal site; const literal ranges; the region call graph with lifted calls and `qinplace`; `call` operand spelling; param role suffixes; interface-region names; local regions as call operands; the widened `in`-wire uses of §5.1; LIFO matched uncalls and an unmatched uncall rejected; the static view rule of §3.3 (a view passed through `br`, used twice, or left unconsumed is rejected); lifted-call `args` that are locations rejected; lproc header groups and `token`/`classical` suffixes (a suffix in the wrong group rejected), exact argument counts/types/region roles, missing nonempty lists and location-as-token/classical rejected, forwarding `iN ptr f64 token` without bit conversion, empty-list short form, fixed-binding closure and instance ordering (§3.7), lproc signatures including empty arrays and changed interface/closure hashes; `qreg[*]` typing, the `measure.iN` form and width checks; `budget.mint` rejected in regions; CC/R block terminators; `qinplace` signature compatibility, its short form exactly when the three lists are empty, and its §6.1 transfer (cleaning a value that depends on x after changing an `ins` wire is rejected); CC/R `fault` literal range; linking; frame-descriptor live ranges |
 | G | Launch | every §10 entry point, state transition, binding rule, ownership rule; HOST_REQUEST/reply (a reply whose length does not fit `ptr_width` bits is `E_ARG`); reverse eligibility and tree order; `QREG` bound to `qreg[*]`; `FAILED → REVERSED` (example 8) and `E_NOT_REVERSIBLE` after a `measure` or an unverified free; exactly one fault record per `FAILED` run; an R `fault C` returns `OK` from `bennett_wait` with a result and no request, zero values and the exact nonzero 64-bit C (including 2^64 − 1) from `bennett_result_fault(result, 0)`; a device-minted token used after its run is CLOSED is `E_ARG` |
 | H | Scheduler | §6 validity; capacity; reproducibility; specificity resolution; verbatim execution; INFEASIBLE/UNSUPPORTED; invocation contexts covering default-only invocations (an action calling one region twice, one call scheduled explicitly: a claim with one witness rejects, two passing witnesses accept); a device-minted tuple binds the schedule (a schedule bound to B = 3 is not applied to an invocation minted with B = 2, which runs under the defaults) |
+
+**Native representation conformance (K86; suites D/F).**
+
+1. **Closed bytes and exact expressions (producer/reader).** Round-trip the
+   existing X fragment completed with operand_map [0], then its negative-X
+   variant. Exercise every dense/generated matrix constructor, zero
+   tensor_power, canonical integer boundaries, reduced rational zero and
+   positive denominator, binary64 theta=0.1 and negative zero. Observe exact
+   context values (theta=3602879701896397/36028797018963968 for 0.1), not a
+   decimal approximation. Unknown/duplicate fields, wrong node arity,
+   undeclared variables, zero divisors, ragged matrices and wrong dimensions
+   reject; legal unmaterialisable dimensions report unchecked host limits.
+2. **Kraus and instruments (checker).** With U=X, two duplicated Kraus
+   operators X/sqrt(2) establish Ad_X; the one-outcome instrument containing
+   them and the two-outcome instrument with one each have the same reduced
+   map. X/sqrt(2), ZX/sqrt(2) are CPTP but send |+><+| to I/2, so reject
+   equivalence to U=X. Include all off-diagonal matrix units, non-TP sums,
+   empty lists, duplicate/unsorted outcome labels and phase-bearing U omitted.
+   Neither a Kraus index nor an outcome adds a logical input.
+3. **Environment (checker).** e=1, state=|0><0| and W=X tensor I reduce to
+   Ad_X; the mixed state I/2 gives the same result. W=SWAP with that zero
+   environment resets a logical input and rejects equivalence to X. Reject
+   a negative eigenvalue in state, nonunit trace, a nonunitary W and swapped
+   tensor factors; include e=0 and an entangled external reference. Observe
+   no environmental output being mistaken for a discarded logical output.
+4. **Explicit controls (reader/checker).** Compare controlled_U X at c=0,1,2
+   with explicit context rows for those counts, and a generated unbounded
+   full-context rule. At c=1 diag(I2,X) passes zero epsilon; diag(I2,-X)
+   has operator error 2 and rejects epsilon 0 or 1, accepting 2 when the
+   requested share permits it. Identity-disabled and phase-sensitive checks
+   use full context matrices, irrespective of equal uncontrolled channels.
+   Missing/overlapping contexts, wrong selected k/theta and double-control
+   reconstruction reject.
+5. **Basis and permutation (checker).** For cx with own control a and
+   inherited q, entry order [a,q,t] maps to [q,a,t] by [1,0,2]; compare its
+   explicit c[0],c[1],t matrix with the base controlled_U model. Reverse
+   t,t2 in a two-target base and transform both rows and columns. Reject a
+   stale map, repeated/missing bit, swapped inherited control or environment
+   bit in operand_map; generated entry_to_allocation agrees with the explicit
+   identity-derived permutation.
+6. **Optional certificates (checker).** Accept exact Gram I for X only after
+   recomputing X†X. Substituting 2X with the same claimed Gram rejects.
+   Enclose X with degenerate rational boxes and a transcendental rotation
+   with independently computed outward boxes. An endpoint outside the box,
+   reversed endpoints, zero precision or wrong shape rejects; an inconclusive
+   enclosure or exact identity never passes. A box containing I does not
+   prove unitarity. Exercise unsupported certificate versions explicitly.
+7. **Compatibility and identity (producer/reader/checker).** Missing positive
+   epsilon models, unsupported versions/representations/constructors and
+   unresolved exact identities leave the affected obligations unchecked,
+   with no ideal self-comparison. Missing zero-epsilon models retain the
+   exact-opcode convention; contradictory supplied models reject. Changing
+   representations, Kraus order, certificates or context rows
+   changes target_hash and dependent schedule_hash, while fixed source/header
+   bytes preserve source identities. No host matrix limit narrows a program.
+
+**Process-image conformance (K85; suites C/D/F/G).**
+
+1. **Domain bytes and scope (producer/reader/checker).** Compare absent
+   process domain, explicit empty fixed_regions and one nonempty image.
+   The first two denote unrestricted D; the last fixes only the named in
+   mem slot, retaining full target/fault/borrowed/control/mut ranges. Exercise
+   multi-cell non-byte-aligned packing and padding, mem-slot order, wrong
+   role/shape/name, duplicate bindings, stale raw-byte hashes and a forbidden
+   bundle slice. Malformed records reject; legal huge images on an unable
+   host report unchecked, never evidence of a smaller D.
+2. **Reduced input, complete output (checker).** Let a two-qubit interface
+   fix the second bit to zero, V=I4 and U=I2 tensor X. Then J_I has shape
+   4-by-2 and `(U−V)J_I` has Frobenius norm 2 (four entries of magnitude 1).
+   A numerical bound below 2 rejects under this procedure; 2 passes exact
+   interval arithmetic. The output fixed-bit leakage remains visible. The
+   channel witness is 8-by-8 and Tr_out is 2-by-2, tracing four output
+   states. Reject a 4-by-4 witness that silently reduced the output too.
+3. **Phase and interval procedures (checker).** With the same isometry and
+   U=-V, induced channels agree, but `(U−V)J_I` has Frobenius norm sqrt(8)
+   and the phase-sensitive numerical claim with bound 0 rejects. Exercise
+   all off-diagonal units with an external reference and strict positive
+   interval pivots. Missing or extra per-context duals reject, and an
+   inconclusive numerical/SDP check never becomes a successful image bound.
+4. **Logical preparation (checker).** Allocate zero cells, apply X on set
+   image bits and forward them to the subject; verify exact factorisation,
+   entry image and exit restoration. Include a checked nontrivial logical
+   preparation. Insert an unlisted intervening entangler, change the mapped
+   mem slot or replace allocation with unknown coherent data: the attachment
+   fails even with unchanged declared bytes/hash. Exercise both matrix_units
+   and an earlier exact restoration claim; sampled, approximate, circular
+   and reference-only substitutes for realised restoration do not suffice.
+5. **Launch-copy association (launch provider/checker).** Use the same bytes
+   from a native database and snapshot to prepare a fresh device factor.
+   Observe copied packing, actual root/context/mem-slot/handle association,
+   lifetime and mutation exclusion through completion. A stale manifest hash,
+   copy index, schedule, actual handle or changed image invalidates the use;
+   a producer boolean or hash of unknown coherent state cannot establish it.
+   A static template without checked runtime association remains conditional.
+6. **Contexts and reuse (checker/executor).** Two calls to one closure,
+   including default-covered, coherently disabled and source-adjoint calls,
+   need their own complete attachments; one copied key cannot cover both.
+   Change nested args, token_aliases, budget, variant, control count, root,
+   target or schedule independently and observe refusal to discharge that
+   invocation with the stale result. Unchanged conditional theorems may be
+   reused, but a new launch still establishes fresh preparation/association;
+   restoration of the original image is checked before any valid reuse.
+7. **Verdicts, identity and mixed scope (reader/checker/provider).** Without
+   preparation, retain the successful conditional theorem/bound and report
+   applicability unestablished; unavailable target/interval mechanics remain
+   Unverified. Malformed/refuted attachments reject; unsupported descriptor
+   versions never confer applicability. No image result proves full-D borrow
+   or inverse obligations. Changing domain, witness or manifest bytes changes
+   the certificate/cache identity (and manifest hash when applicable), with
+   unchanged source/header/target/schedule identities preserved. Two embedded
+   device roots carry separate bindings; native main/libc need no fabricated
+   device certificate and a missing mixed transport reports its actual gap.
 
 **Suite H / §11.1 K77 adapter vector.** Captured `oracle_invocation`
 follows the source call's arguments and body/template capture, irrespective
