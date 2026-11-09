@@ -2956,7 +2956,8 @@ with no prefix. `label` is a nonempty ASCII string using only letters,
 digits, `_`, `-` and `.`; `name` is a §9.1 NAME without `@`. Root `id`
 is local to this container; `host_binding` identifies the generated native
 launch site and is not an ISA symbol or a host address. Several launch
-sites may select the same device entry using distinct root ids. `entry`
+sites may select the same device entry using distinct root ids; one native
+site may select several roots, disambiguated by the selected root_index. `entry`
 is the loaded object's exported CC entry name; `interface_hash` and
 `closure_hash` are that entry's §9.2 identities, not host-binary hashes.
 `object_hash` is the §9.2 semantic object hash. `target_hash` is the selected
@@ -2969,7 +2970,7 @@ and invocation contexts still resolve relative to its own bound root.
 The driver MUST emit Container and Call as UTF-8 JCS without BOM, terminal
 NUL or LF, with exactly the fields of the selected productions. Object key
 order is JCS order; array order is significant. roots is sorted uniquely
-by id bytes, with unique host_binding values; certificates is sorted
+by id bytes; host_binding values may repeat; certificates is sorted
 uniquely by sha256 bytes; images is sorted uniquely by the SHA-256 of each
 ImageLaunch's JCS bytes. Empty arrays are legal. Root selection is the
 zero-based index in roots, transported as uint64_t, not a native pointer.
@@ -3090,7 +3091,13 @@ handle bits or equal tuples do not transfer ownership between them. Several
 roots may bind one live program; its valid host-minted tokens remain usable
 across those roots under §5.4, without becoming new tokens. Distinct live
 programs require their own mints. Neither root id nor object hash substitutes
-for live program ownership. The provider uses the existing §5.4 token
+for live program ownership. Communicating marked modules can be linked into
+one device program and share that program's validated handles. Cross-program
+resource transfer remains required capability work: it needs an explicit
+versioned ledger/state transfer, ownership synchronisation, identity/alias
+mapping and revocation protocol, never reinterpretation of a bare id in
+another ledger. Its absence is a deployment gap, not source illegality.
+The provider uses the existing §5.4 token
 validity rules, without introducing an extra root-local token namespace.
 
 The runtimes MUST preserve resolved token identities through marshalling,
@@ -3098,7 +3105,10 @@ forwarding, captures and inverse traversal, and derive each actual
 invocation's token_aliases from those identities in §12.3 order. Repeated
 uses of one live identity remain equal; fresh mints of an equal tuple remain
 distinct. A tuple-only estimate/schedule request still supplies its explicit
-partition. The shim does not manufacture an identity from a tuple, integer,
+partition. Budgets and estimates bind the selected device invocation; a
+native process has no implicit global B. Nested calls retain their own
+resolved tuples and parameters. Wrapper/replay/helper charges retain their
+existing device units, with native/shim overhead reported separately. The shim does not manufacture an identity from a tuple, integer,
 serialized equality label or earlier run. The reference interpreter's
 fresh-identity, program ownership, retained mapping and mint-revocation
 behavior is the default reading here (§5.4, §7.4), not an alternative
@@ -3113,6 +3123,12 @@ run; another root's run/tape cannot be substituted. Effect args remain
 activity is not appended to a device effect tape. All §10 state and reverse
 eligibility checks remain in force, including FAILED-run reversal, fault
 records, irreversible measurement and exclusive ownership while not CLOSED.
+Reversing or closing a device run does not reverse native main, host libc
+or sibling device runs, or retract already observed external events.
+CC host replies remain in that run's frames, separately from its R effects.
+Saved-journal interchange remains a separately versioned tool profile;
+the active-tape API and live annex do not serialize the native process or
+authorize reissuing external events during recovery.
 
 The launch provider MUST revoke a device-minted token when its defining
 frame is reversed or its owning run is CLOSED, retain forwarded identities
@@ -5969,7 +5985,7 @@ The vectors record source admission, complete output tuples and expanded source 
 1. **Canonical transport (driver/runtime/provider).** Round-trip Container,
    Root, Artifact and Call with exact JCS bytes/lengths, empty arrays,
    multi-root order and byte hex. Reject duplicate/unknown/missing fields,
-   duplicate ids/host bindings, reordered roots/certificates/images, wrong
+   duplicate ids, reordered roots/certificates/images, wrong
    types, odd/uppercase hex, BOM/NUL/LF and stale decoded-byte SHA-256 with
    E_ARG and NULL/0 outputs. Unsupported versions produce E_VERSION before
    dispatch, with the original request retained. Exercise root_index 0,
@@ -5982,7 +5998,8 @@ The vectors record source admission, complete output tuples and expanded source 
    closure independently; change each object/root/entry/kind/target binding
    in turn and observe E_ARG before publishing a binding. The unselected
    root is not checked against the selected root's program. Several host
-   sites for one entry retain distinct id/site bindings. Native main,
+   sites for one entry retain distinct id/site bindings; one site can select
+   several roots without merging their bindings. Native main,
    argv/envp, host-only libc and an unrelated unmarked function require no
    ISA entries or certificate inventory. Compare the selected materialised
    entry and its full materialised callee closure under the recorded build.
@@ -6026,6 +6043,9 @@ The vectors record source admission, complete output tuples and expanded source 
    closed-run unbind then unload succeeds. A binding under another root is
    unaffected. No old token becomes live in a new load. Measurement and
    unverified free retain E_NOT_REVERSIBLE; no shim-induced reversal bypass.
+   Observe a native output and an unrelated sibling run before reversal:
+   neither is rolled back or reissued. CC reply history remains separate
+   from R-effect order.
 7. **Images and independent readers (provider/checker).** Carry two roots'
    distinct ImageLaunch records and cert Artifact bytes; verify SHA-256
    over decoded bytes independently, with no host ids serialized. A fresh
