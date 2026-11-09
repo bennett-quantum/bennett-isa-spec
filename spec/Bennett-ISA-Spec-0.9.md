@@ -3023,12 +3023,15 @@ bennett_status bennett_mixed_unbind_v1(bennett_mixed_t* binding);
 The launch provider MUST implement mixed_bind_v1 as a binding to the actual
 live program, and mixed_run_v1 as §10 bennett_run of the selected entry,
 with the same positional argument, copying, state, fault and ownership
-rules, plus validation/association of Call. The provider validates and
+rules, plus validation/association of Call as specified below. The provider
+validates all Call input requirements decidable before run creation and
 copies Call, args and entropy before returning a successful run id;
 zero-length entropy permits a NULL pointer. Other byte inputs are nonempty
 valid readable spans. NULL required arguments or output pointers are
-`BENNETT_E_ARG`; with valid output pointers every bind/run failure writes
-NULL/0 respectively and creates no binding/run or effect. Allocation
+`BENNETT_E_ARG`; with valid output pointers every synchronous bind/run failure
+(a non-OK return) writes NULL/0 respectively and creates no binding/run or
+effect. Deferred association failure after run creation is a FAILED result
+under the image rules below, not a synchronous bind/run failure. Allocation
 failure is `BENNETT_E_NOMEM`. A successful bind performs no device run,
 image preparation, mint or effect; it does not attest a certificate proof.
 Call images are classical preparation inputs, not implicit CC arguments.
@@ -3158,11 +3161,36 @@ MUST validate each Call image manifest against the selected program,
 reached subject and resolved invocation, and establish §12.3's actual fresh
 factor, copy, packing, context/handle association and mutation exclusion
 before its claimed use. A merely hash-matching old handle is insufficient.
-Image manifests for an unrelated root/closure/target/schedule/invocation
-return `BENNETT_E_ARG` before a run; an unresolved applicability premise
-never becomes an established proof. An image whose binding is only
-resolvable at a nested invocation is checked before that invocation's
-image-dependent use; it is not guessed from the CC root's arguments.
+The mixed launch provider MUST reject an image binding conflict decidable
+before run creation with `BENNETT_E_ARG`, with *out=0 and no run or effects.
+This includes an unrelated root/closure/target/schedule/invocation when
+that conflict is decidable from the launch inputs. The mixed launch provider
+MUST defer any association check that depends on a nested invocation until
+that invocation is resolved, and complete it before image preparation or any
+callee execution. Reply-dependent invocations remain supported; nested
+arguments need not be statically known or equal to the CC root's arguments.
+An unresolved applicability premise never becomes an established proof.
+
+On a deferred association mismatch, the mixed launch provider MUST terminate
+the existing run as FAILED with exactly one terminal fault record,
+FAULT_UB_TRAP (4), and no result values, without performing the mismatched
+preparation or executing the callee or any successor instruction. No attachment
+applicability is established for that use. For that failed run, the launch
+provider MUST return `BENNETT_OK` from bennett_wait with *result_out set and
+*request_out=NULL; bennett_result_nvalues is 0, bennett_result_nfaults is 1
+and bennett_result_fault(result, 0) is 4. A valid bennett_reply still returns
+BENNETT_OK; the mismatch is result data, not a reply error, a non-OK return
+from mixed_run_v1 or `BENNETT_E_ARG` from bennett_wait. Once a run has been
+created, a conflict discovered by that deferred check takes this result path
+even if execution reaches it before mixed_run_v1 returns.
+
+The launch provider MUST retain the prior prefix, including earlier device
+effects, open activation frames and host request/reply history, under the
+ordinary §10 reverse eligibility, ownership and close rules. Reversal first
+removes the terminal fault record and then undoes the retained prefix,
+including open activations; closing the FAILED run without reversal remains
+allowed. Neither reversal nor close retracts or reissues already observed
+external events or reverses native main or unrelated runs.
 
 Independent readers/checkers MUST validate each certificate's own object,
 subject closure, invocation/partition, context inventory and preparation
@@ -6053,8 +6081,41 @@ The vectors record source admission, complete output tuples and expanded source 
    the actual invocation and handle through completion. Wrong root, context,
    target, schedule, partition, copy index or stale handle fails the
    corresponding association; a conditional theorem or static hash alone
-   never establishes actual preparation. Include a nested invocation whose
-   own args differ from the CC root. A launch pledge cannot authorize an
+   never establishes actual preparation. Synchronous conflicts decidable
+   before run creation give BENNETT_E_ARG, *out=0 and no run or effects.
+
+   Include this reply-dependent nested invocation pair: the selected CC entry
+   allocates a one-byte live buffer and issues hostcall with it; the host
+   replies with exactly one byte, 01 or 02, which the entry loads as the i8
+   argument of a reached Q oracle with an in-role image region. Call.images
+   contains an otherwise valid ImageLaunch with invocation.args=["1"] for
+   that reached oracle and the correct tuple, partition, context and image.
+   Keep Container, program, initial arguments, entropy and Call identical;
+   the nested argument is resolved only from the reply, not the CC root.
+   Use sufficient budgets, a fault-free callee and a void-returning CC entry,
+   with no measurement or unverified free. Before hostcall, execute a
+   returning R helper with a reversible effect; include distinguishable
+   callee and successor state changes. For both replies, mixed_run_v1
+   returns BENNETT_OK with a nonzero run id; the first bennett_wait returns
+   BENNETT_OK with *request_out set and *result_out=NULL, and bennett_reply
+   returns BENNETT_OK. Reply 01 matches: preparation and the callee execute,
+   the run is COMPLETED, bennett_result_nfaults is 0 and
+   bennett_result_nvalues is 0. Reply 02 mismatches: the run is FAILED,
+   bennett_result_nvalues is 0, bennett_result_nfaults is 1 and
+   bennett_result_fault(result, 0) is exactly 4. Neither image preparation
+   nor callee/successor effects occur for 02, and its attachment applicability
+   remains unestablished. For either final outcome, bennett_wait returns
+   BENNETT_OK with *result_out set and *request_out=NULL.
+
+   For 02, the allocation, loaded reply, earlier device effects and open
+   activation frames remain in the prefix; bennett_reverse returns BENNETT_OK,
+   transitions FAILED to REVERSED, removes the fault and restores the complete
+   T4 entry state, including memory, ledger and tape. Close then succeeds;
+   the same FAILED run may instead be closed directly. Unbind before close
+   and unload before unbind give BENNETT_E_INVALID_STATE without release;
+   after close, unbind then unload succeed. Both cleanup paths operate
+   without retracting or reissuing the external host interaction or changing
+   native main or unrelated runs. A launch pledge cannot authorize an
    unsupported independent reader; absent mechanics leave its obligation
    unchecked/unestablished. Root-relative [] and reached owner inventories
    stay separate; a certificate for one partition/root cannot cover another.
