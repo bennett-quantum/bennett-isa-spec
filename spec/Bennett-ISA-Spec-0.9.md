@@ -4875,7 +4875,13 @@ Witness = {"kind":"logical","regions":[
         | {"kind":"launch_copy","manifest_hash":hash,"copy_indices":[uint, ...]}
 Restoration = {"kind":"matrix_units"}
             | {"kind":"claim","claim":uint}
-Occurrence = {"context_key":ContextKey,"point":string}
+Occurrence = {"context_key":ContextKey,"symbol":hash,"point":string,
+              "iteration":[uint, ...],"instance":[uint, ...],
+              "step"?:uint,"phase"?:"fwd"|"rev","generated":uint,
+              "allocation"?:Allocation}
+Allocation = {"context_key":ContextKey,"symbol":hash,"point":string,
+              "iteration":[uint, ...],"instance":[uint, ...],
+              "step"?:uint,"phase"?:"fwd"|"rev","generated":uint}
 ```
 
 Preparation descriptors and the launch manifest below are UTF-8 JCS with
@@ -4890,22 +4896,74 @@ is the subject's interface-region local name (the existing NAME repertoire,
 not §8.3's ASCII-only model labels). ContextKey is the complete §12.1 key,
 relative to this certificate's root, with [] for that root. Invocation is
 the concrete §12.3 args/budget/token_aliases record, never its `"all"` form.
-An Occurrence's point is the concrete §11 source point in the invocation
-denoted by its key, including nested-body components; it is not a host PC,
-wildcard selector or private generated checker instruction. Attachment.claim
-indexes the named closure's claims array in this certificate. Attachments
+An Occurrence identifies one concrete public expansion leaf in the invocation
+denoted by context_key. Its symbol is the defining source function's §9.2
+interface hash (including an inlined lproc's own hash); point is that function's
+§11 source point, including nested-body components, or its permitted reserved
+pseudo-point. iteration is the complete vector of enclosing source-qloop
+repetition counts, outermost first; instance is the §3.7 fixed-binding integer
+key, [] outside an lproc instance. Both arrays are present, including when
+empty. The terminal coordinates are independent of those on context_key's
+call edges; lift.call adds no edge. step and phase are both present exactly
+when this terminal leaf has a containing oracle step under §11, with step in
+1..that invocation's B and phase fwd or rev. Both are absent at a level with
+no step, including action support and oracle construction/commit/release;
+outer call-edge step/phase coordinates remain in context_key.
+
+generated is the leaf's public §11 bound-library ordinal at that terminal
+point and coordinates, before target-scheme expansion, not a private checker
+instruction number. A source instruction selects a leaf of its expansion
+only with that ordinal; it never denotes all visits or all leaves at once.
+A realised claim uses its root schedule's bindings.expansion; a reference-only
+claim uses §17 item 7's default ref library for this ISA version. Missing
+expansion/checking mechanics leave applicability unestablished.
+
+Allocation encodes the same coordinates of the leaf acquiring the allocation
+in the forward expanded construction. It has no recursive allocation field.
+This forward acquisition address identifies the allocation lifetime, rather
+than a storage address, declaration name or subject interface name; different
+acquisitions of one declaration have distinct addresses. For every K83
+action-local region support leaf, allocation is required and equals the
+forward acquisition address of that declaration's region storage. Thus all
+allocation, image-preparation, restoration and release leaves for one such
+region carry the same forward acquisition address, while generated still
+distinguishes individual leaves. For these pseudo-points iteration and instance
+are [], and step/phase are absent, as §11 K83 prescribes. Outside K83 support,
+allocation is absent; an allocation occurrence's own complete leaf address
+identifies its lifetime, and operand/lifetime mappings resolve other leaves.
+Raw reversal retains the forward points, ordinals and allocation identities
+under K63/K64/K83; inverse oracle step t has (step:t, phase:rev) under
+§11, distinct from its forward step. Raw inversion of an already expanded
+trace retains that trace's leaf coordinates while adjointing its operations.
+Source adjoints instead use the source-adjoint construction's own §11 addresses.
+
+The certificate reader MUST validate every Occurrence and Allocation against
+the linked construction, rejecting wildcard selectors, missing or stale
+coordinates, a wrong ordinal/allocation identity and any address that does
+not resolve to exactly one leaf and the required allocation lifetime. These
+are public source/expansion coordinates, never a host PC or process-local id.
+Attachment.claim indexes the named closure's claims array in this certificate.
+Attachments
 are sorted by closure_hash, then claim numerically, then JCS context_key
 bytewise, with no duplicate triple. Images and logical regions are nonempty
 and in subject interface mem-slot order. Preparation occurrences are in actual
-semantic execution order, with no duplicate occurrence. A logical witness's
-regions list contains exactly one entry for each attachment image, with no
+semantic execution order, with duplicate detection on the complete resolved
+leaf address (including terminal coordinates and generated), not point alone.
+An inconsistent allocation field rejects rather than creating another leaf.
+A logical witness's regions list contains exactly one entry for each attachment image, with no
 other region; copy_indices likewise has exactly one index per image.
 
 The certificate reader MUST reject malformed known-version records and
 attachments whose claim, images, invocation or context conflict with their
-resolved subject: the images equal exactly that claim's fixed_regions,
-not a subset, and its invocation equals the independently resolved nested
-args, budget and token_aliases, not the root's values copied into a callee.
+resolved subject. Resolve both images and the claim's fixed_regions to
+subject mem-slot identities and compare their complete bindings (identity,
+A, W, raw image bytes and sha256) after canonical ordering by mem slot.
+Equality is independent of the replay claim's original fixed_regions array
+order; Attachment.images remains in canonical mem-slot order. No missing,
+extra, duplicate or unequal binding is accepted. This does not reorder or
+rewrite existing §12.2 replay claims or change their accepted bytes.
+The attachment's invocation equals the independently resolved nested args,
+budget and token_aliases, not the root's values copied into a callee.
 For reference-only claims the context tree is the bound reference Q
 construction; for realised claims it is §12.1's complete scheduled tree,
 including default-covered and coherently disabled calls. Each executable
@@ -4927,6 +4985,22 @@ operations or coherent alternatives. A checked general logical preparation is
 permitted; zero allocation followed by X on precisely the set image bits is
 the basic case. Unknown coherent data is never inspected, measured, cloned
 or assumed zero to establish preparation.
+
+For executable applicability, the checker MUST reconstruct the preparation
+and every intervening operation of the realised prefix from the bound root
+schedule, resolved invocation contexts and actual target realisation models,
+including selected schemes, cleanup choices, shares, default-covered operations
+and coherent control branches, and prove the exact required entry image and
+factorisation on the covered root input domain with arbitrary external
+references. A reference/logical preparation proof can supply this premise
+only after checking that the realised prefix has the same required image and
+factorisation; a source-only preparation proof never establishes a different
+realised prefix. Merely binding a schedule hash or checking restoration on the
+conditional callee image does not prove entry. Missing realisation mechanics
+leave executable applicability unestablished while retaining an independently
+proved conditional theorem. A positive advertised epsilon does not preclude
+an exact image/factorisation proof for the realised prefix; no blanket
+zero-epsilon preparation restriction applies.
 
 For a launch_copy witness the named manifest has this closed JCS production:
 
@@ -5660,7 +5734,12 @@ The vectors record source admission, complete output tuples and expanded source 
    multi-cell non-byte-aligned packing and padding, mem-slot order, wrong
    role/shape/name, duplicate bindings, stale raw-byte hashes and a forbidden
    bundle slice. Malformed records reject; legal huge images on an unable
-   host report unchecked, never evidence of a smaller D.
+   host report unchecked, never evidence of a smaller D. For the existing
+   replay claim whose fixed_regions order is [aux,db], attach images in
+   canonical [db,aux] mem-slot order: the complete resolved bindings agree.
+   Exercise either replay list order with canonical attachment images;
+   comparison does not rewrite either claim's bytes. Missing, extra, duplicate,
+   wrong-slot or unequal shape/bytes/hash bindings reject.
 2. **Reduced input, complete output (checker).** Let a two-qubit interface
    fix the second bit to zero, V=I4 and U=I2 tensor X. Then J_I has shape
    4-by-2 and `(U−V)J_I` has Frobenius norm 2 (four entries of magnitude 1).
@@ -5682,6 +5761,24 @@ The vectors record source admission, complete output tuples and expanded source 
    fails even with unchanged declared bytes/hash. Exercise both matrix_units
    and an earlier exact restoration claim; sampled, approximate, circular
    and reference-only substitutes for realised restoration do not suffice.
+   Round-trip two visits to the same preparation point in one qloop and two
+   fixed-binding instances of one lproc row in the same oracle step: complete
+   addresses differ. Include distinct oracle steps/phases and nested calls;
+   stale terminal coordinates or a mismatched symbol reject. At $construct,
+   address allocation and multiple image-preparation leaves for each of two
+   local qregions by generated ordinal and forward allocation address; all
+   resolve uniquely, including raw reversal with retained forward identities
+   and a reference-only construction. A source point without its complete
+   leaf address, duplicate complete address or mismatched allocation rejects.
+   For realised native X = [[3/5,4/5],[4/5,-3/5]], epsilon 1, source-only
+   zero-then-X preparation declares image 1 but the actual state has probability
+   9/25 outside it. Retain an independently proved conditional identity-callee
+   theorem and its exact image restoration, but grant no executable applicability
+   from that ideal preparation. Check the bound root prefix, including an
+   unlisted scheduled intervening gate. Also accept a positive-epsilon
+   realisation whose realised prefix provably preserves the exact entry image
+   and factorisation; unavailable realisation mechanics leave applicability
+   unestablished without changing source legality.
 5. **Launch-copy association (launch provider/checker).** Use the same bytes
    from a native database and snapshot to prepare a fresh device factor.
    Observe copied packing, actual root/context/mem-slot/handle association,
