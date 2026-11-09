@@ -100,6 +100,14 @@ pub struct SourceLocation {
     pub steps: Vec<SourceStep>,
     pub invocations: Vec<SourceInvocation>,
 }
+/// Non-emitting semantic call observation, including empty source bodies.
+#[derive(Clone, Debug)]
+pub struct SourceInvocationRecord {
+    pub path: Vec<SourceEdge>,
+    pub steps: Vec<SourceStep>,
+    pub invocations: Vec<SourceInvocation>,
+    pub wires: BTreeMap<String, Vec<Wire>>,
+}
 #[derive(Clone, Debug)]
 pub struct SourceBody {
     pub binding: Option<SourceBinding>,
@@ -121,6 +129,7 @@ struct SourceOwner {
 #[derive(Clone, Debug)]
 struct StepPlan {
     leaves: Vec<Leaf>,
+    invocations: Vec<SourceInvocationRecord>,
     arguments: BTreeMap<String, Vec<Wire>>,
 }
 pub trait SourceFactory: std::fmt::Debug + Send + Sync {
@@ -624,6 +633,8 @@ pub struct Expander {
     source_calls: BTreeMap<std::sync::Arc<SourceLocation>, usize>,
     source_serial: usize,
     source_step_plans: BTreeMap<(Vec<usize>, usize), StepPlan>,
+    source_invocation_records: Vec<SourceInvocationRecord>,
+    source_controls: Vec<Wire>,
 
     registry: Registry,
     serial: usize,
@@ -718,6 +729,8 @@ impl Expander {
             source_calls: BTreeMap::new(),
             source_serial: 0,
             source_step_plans: BTreeMap::new(),
+            source_invocation_records: Vec::new(),
+            source_controls: Vec::new(),
             registry,
             serial: 0,
             ordinals: BTreeMap::new(),
@@ -742,10 +755,21 @@ impl Expander {
             source_calls: BTreeMap::new(),
             source_serial: 0,
             source_step_plans: BTreeMap::new(),
+            source_invocation_records: Vec::new(),
+            source_controls: Vec::new(),
             registry,
             serial: 0,
             ordinals: BTreeMap::new(),
         })
+    }
+    /// Bind inherited controls for a root source invocation. These are caller
+    /// wires, not callee slots, and follow the same constructor control path.
+    pub fn with_source_controls(mut self, controls: Vec<Wire>) -> Self {
+        self.source_controls = controls;
+        self
+    }
+    pub fn source_invocations(&self) -> &[SourceInvocationRecord] {
+        &self.source_invocation_records
     }
     pub fn with_source_factory(mut self, factory: std::sync::Arc<dyn SourceFactory>) -> Self {
         self.source_factory = Some(factory);
@@ -795,7 +819,11 @@ impl Expander {
         self.source_calls.clear();
         self.source_serial = 0;
         self.source_step_plans.clear();
-        let mut caller = Context::default();
+        self.source_invocation_records.clear();
+        let mut caller = Context {
+            controls: self.source_controls.clone(),
+            ..Context::default()
+        };
         for (n, w) in bundles {
             if caller
                 .wires
@@ -1296,6 +1324,17 @@ impl Expander {
                 if plan.arguments != c.wires {
                     return Err("inverse source step changed its bound state".into());
                 }
+                for mut record in plan.invocations {
+                    for frame in &mut record.steps {
+                        if frame.invocation == path {
+                            frame.reverse = step.reverse;
+                        }
+                    }
+                    self.source_invocation_records
+                        .try_reserve(1)
+                        .map_err(|e| format!("host limit: source invocation records: {e}"))?;
+                    self.source_invocation_records.push(record);
+                }
                 let mut locations = BTreeMap::new();
                 for mut leaf in plan.leaves.into_iter().rev() {
                     adjoint_leaf(&mut leaf)?;
@@ -1320,6 +1359,7 @@ impl Expander {
                 return Ok(());
             }
             let mut leaves = Vec::new();
+            let invocation_start = self.source_invocation_records.len();
             chain.push(kind.into());
             self.body(a(f(&r, "body")?)?, &mut c, path, false, chain, &mut leaves)?;
             chain.pop();
@@ -1329,6 +1369,7 @@ impl Expander {
                     key,
                     StepPlan {
                         leaves: leaves.clone(),
+                        invocations: self.source_invocation_records[invocation_start..].to_vec(),
                         arguments: c.wires.clone(),
                     },
                 )
@@ -1445,6 +1486,15 @@ impl Expander {
                         .and_then(|s| s.tokens.clone()),
                     symbol: built.symbol.clone(),
                     oracle: built.oracle,
+                });
+                self.source_invocation_records
+                    .try_reserve(1)
+                    .map_err(|e| format!("host limit: source invocation records: {e}"))?;
+                self.source_invocation_records.push(SourceInvocationRecord {
+                    path: c.source_edges.clone(),
+                    steps: c.source_steps.clone(),
+                    invocations: c.source_invocations.clone(),
+                    wires: c.wires.clone(),
                 });
                 c.source_point = if built.oracle {
                     Some(SourcePoint::pseudo(kind, "$construct"))

@@ -1127,6 +1127,15 @@ impl<'a> ClassicalMachine<'a> {
             None
         };
         if self.object.isa_version == crate::IsaVersion::V09 {
+            self.preflight_context_frames(
+                callee,
+                &bindings,
+                &controls,
+                &interface_classes,
+                call.adjoint,
+                budget.map(|b| (b, primary.as_ref())),
+            )
+            .map_err(trap)?;
             if let Some(certificate) = self.object.section("certificate") {
                 let identity = self.object.identity()?;
                 if let Some(closure) = &identity.closure_hashes[name] {
@@ -2136,3 +2145,6 @@ mod checkpoint_tests {
         m.reverse().unwrap();
     }
 }
+
+#[path = "classical/frames09.rs"]
+mod frames09;

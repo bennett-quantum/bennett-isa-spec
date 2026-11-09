@@ -188,7 +188,7 @@ fn frame_width(v: &Json, c: u128) -> Result<u128> {
     }
     Ok((n / d) as u128)
 }
-fn frame09(value: &Json, f: &Function, contexts: &[u128]) -> Result<()> {
+pub(crate) fn frame09(value: &Json, f: &Function, contexts: &[u128]) -> Result<()> {
     let mut ids = BTreeSet::new();
     let mut frames = BTreeSet::new();
     for group in ["slots", "scratch", "history", "borrow", "ancillae"] {
@@ -673,7 +673,27 @@ impl Object {
                     if counts.is_empty() {
                         counts.push(0);
                     }
-                    frame09(r.get("frame")?, f, &counts)?;
+                    match (r.object()?.get("frame"), r.object()?.get("frame_contexts")) {
+                        (Some(frame), None) => frame09(frame, f, &counts)?,
+                        (None, Some(records)) => {
+                            let mut previous = None;
+                            for record in records.array()? {
+                                let key = record.get("context_key")?;
+                                crate::ref_library::validate_context_key(key)?;
+                                let canonical = key.canonical();
+                                if previous.as_ref().is_some_and(|p| p >= &canonical) {
+                                    return err("§12.3", "frame contexts must have unique keys in canonical byte order");
+                                }
+                                previous = Some(canonical);
+                                // The actual inherited count belongs to the resolved
+                                // invocation, never a producer key or error-map guess.
+                                frame09(record.get("frame")?, f, &[])?;
+                            }
+                        }
+                        _ => {
+                            return err("§12.3", "exactly one of frame/frame_contexts is required")
+                        }
+                    }
                 } else {
                     frame(r.get("frame")?)?;
                 }
