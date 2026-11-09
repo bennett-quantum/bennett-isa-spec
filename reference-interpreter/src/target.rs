@@ -19,3 +19,13 @@ pub use matrix::{ComplexInterval, IntervalMatrix};
 pub use process::{
     verify_channel_bound, verify_numerical_bound, verify_restricted_numerical_bound,
 };
+#[path = "target_model/exact_matrix.rs"]
+mod exact_matrix;
+#[path = "target_model/native.rs"]
+mod native;
+pub use native::{verify_native_model, ModelContext, ModelVerification};
+#[path = "target_model/document.rs"]
+mod document;
+#[path = "target_model/document_schema.rs"]
+mod document_schema;
+pub use document::{NativeTarget, ResolvedNativeEntry};

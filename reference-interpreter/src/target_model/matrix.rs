@@ -92,6 +92,12 @@ impl IntervalMatrix {
     pub fn columns(&self) -> usize {
         self.cols
     }
+    pub fn entry(&self, row: usize, col: usize) -> Result<&ComplexInterval> {
+        if row >= self.rows || col >= self.cols {
+            return err("§12.1", "matrix entry outside dimensions");
+        }
+        Ok(self.at(row, col))
+    }
     pub(super) fn zeros(rows: usize, cols: usize, precision: usize) -> Result<Self> {
         let count = rows
             .checked_mul(cols)
