@@ -144,3 +144,4 @@ Run `python3 -I conformance/tools/ref_gate.py` for the headless offline gate.
 |---|---|---|
 | [K81](fixtures/accepted-k81-09/README.md) | Joint inverse / first-release ownership, reversed release order and selector tie | Reference `cleanup_partition::portable_k81_joint_first_release_vectors_exact_bytes` |
 | [K85](fixtures/accepted-k85-09/README.md) | Fixed images, exclusive replay verdicts, exact coverage, malformed bindings, controlled/dirty/reference systems; independent restricted-map data | Reference `isa09_fixed_image`; conformance `ref_k85`; rigorous numerical/preparation checker remains staged |
+| [K86](fixtures/accepted-k86-09/README.md) | Canonical targets, resolved native-unitary models, control permutation, phase/accuracy, exact epsilon and angle bindings, dependent schedule hashes | Reference `isa09_native_vectors`; conformance `k86_vectors`; schedule execution and certificate process dispatch remain staged |
