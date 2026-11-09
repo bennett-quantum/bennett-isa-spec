@@ -5,6 +5,12 @@ pub use rational::Rational;
 #[path = "target_model/interval.rs"]
 mod interval;
 pub use interval::Interval;
+#[path = "target_model/expression.rs"]
+mod expression;
+pub use expression::{CostExpression, ExpressionBindings};
+#[path = "target_model/exact_expression.rs"]
+mod exact_expression;
+pub use exact_expression::{ExactComplex, ModelExpression};
 #[path = "target_model/matrix.rs"]
 mod matrix;
 #[path = "target_model/process.rs"]
