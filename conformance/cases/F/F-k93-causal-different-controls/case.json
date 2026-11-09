@@ -1,0 +1,18 @@
+{
+  "id": "F-k93-causal-different-controls",
+  "suite": "F",
+  "spec": "ISA 0.9 \u00a74.4 K93; \u00a715 MCX operand and phase witnesses",
+  "derivation": "\u00a75.6 K78: omitting scalar s changes the effective control set. Entry analysis cannot prove c=0, so CX(c,d) does not restore arbitrary borrowed d. This is a frame relation failure with well-formed MCX operands.",
+  "object": "../../../fixtures/accepted-k93-09/causal-different-controls.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 1,
+    "stdout_empty": true,
+    "stderr_contains": [
+      "\u00a75.6"
+    ]
+  }
+}

@@ -1,3 +1,30 @@
+## Resume — K91 loader-capability contract
+
+**Done.** §10.1's **Token-alias ABI feature (K91)** now specifies separate
+`bennett_launch_features` / `bennett_sched_features` queries, the
+`bennett.abi-features/1` manifest, exact role/version matching, ownership
+and concurrent-query behavior, and explicit pre-request failure.
+`token_aliases/1` has role-specific identity/metadata obligations; an
+incomplete VM advertises no features until its alias-aware estimate works.
+The K91 ledger matches the clause. §15 adds nine observable conformance
+groups. Driver/shim and runtime native-layout responsibilities retain the
+existing mixed-launch obligations. Negotiation adds no artifact fields.
+
+**Verified.** The job-local text-contract checker failed on the original
+placeholder and passes on the replacement, including seven corrupted-text
+checks, the role/observable audit of all 21 MUST statements and unchanged
+spec bytes outside the owned K91 portions. `python3 -I -B
+conformance/tools/ref_catalog.py --check` passes: 219 recipes and unchanged
+envelope `5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`.
+`git diff --check` passes. These are publication checks, not executable
+provider conformance or a full gate.
+
+**Next.** Contract review/council and the single full gate remain with the
+orchestrator. Regenerate `spec/isa-0.8-to-0.9.diff` from the final text
+before that gate (bennett-isa-spec-zs2); it is outside this edit's owned
+paths. b-isa-spec-b3ui stays open for that review/publication disposition;
+b-isa-spec-8ui / b-isa-spec-8ui.1 retain interpreter/vector/header work.
+
 ## 2026-11-01 Pass XIII — round 9 acceptance and S1 tool/fixture follow-up
 
 **round 9: accepted**, codex seat, zero blocking. Passes XI–XII and

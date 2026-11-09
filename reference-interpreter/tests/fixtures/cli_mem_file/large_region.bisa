@@ -1,0 +1,17 @@
+bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"d0ff3c0310a1631ea70c2fdc2c9172553cf0495336fb9537f5a38493bf82bc1e","kind":"oracle","name":"read","signature":{"abi":"0.8","args":[],"fault":4,"in":[16],"kind":"oracle","mem":[{"A":16,"W":8,"role":"in"}],"tgt":8,"tier":"q"}}}
+
+section functions
+oracle @read (x:wire[16] in) (t:wire[8]) (f:wire[4]) (db:region[16,8] in) ()
+regs { p:reg[32], offset:reg[32], value:reg[8] }
+^entry():
+p = lift.addr @db
+offset = lift.zext.i32 x
+p = lift.add p offset
+value = lift.load.i8 p
+lift.retval value
+
+section layout
+{"A_tab":0,"H":18,"S_cells":0,"globals":{},"heap_base":131072,"heap_limit_max":0,"interface_regions":{"read":{"db":{"base":65536}}},"null_size":1,"ptr_width":32}

@@ -1,0 +1,16 @@
+bennett-object isa=0.8 object=0.8 launch=0.8 sched=0.8 cert=0.8 coverage=0.8 target=0.8 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"0f8edde2ffebcf68ad0a915b3f82ee23fd9c87b56ec022eabc4b3ac187a4fdc1","kind":"cc","name":"read","signature":{"abi":"0.8","kind":"cc","params":["ptr"],"results":["i32"],"tier":"cc"}},"1":{"interface_hash":"389d4bc2fd1b57c07fa243e93d85aa4d8dcb0ac937a5c9c6d287a05c572d4e10","kind":"data","name":"seed","signature":{"abi":"0.8","kind":"data","size":4,"tier":"-"}}}
+
+section functions
+fn cc @read (p:ptr) (value:i32) () () ()
+^entry():
+value = load.i32 p
+ret value
+
+section data
+seed 00000000
+
+section layout
+{"A_tab":0,"H":4,"S_cells":0,"globals":{"seed":{"base":8,"image":"seed","size":4}},"heap_base":16,"heap_limit_max":0,"interface_regions":{},"null_size":1,"ptr_width":32}

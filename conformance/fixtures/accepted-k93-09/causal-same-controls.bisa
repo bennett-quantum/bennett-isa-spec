@@ -1,0 +1,17 @@
+bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=8
+
+section symbols
+{"0":{"interface_hash":"63eae6ffd826b0d99d9f9014f3b41eba22eaed5d71e15761e13db467718536d0","kind":"action","name":"a","signature":{"abi":"0.9","args":[],"bounds":[],"in":[1,2],"kind":"action","mem":[],"mut":[1],"tier":"q"}}}
+
+section functions
+action @a (t:wire mut) (s:wire in, b:wire[2] in) () () ()
+^entry():
+c = qalloc any 1
+mcx (s, b) c
+mcx (b, s) c
+d = qborrow any 1
+cx c d
+qreturn d
+mcx (b, s) c
+mcx (s, b) c
+qfree c

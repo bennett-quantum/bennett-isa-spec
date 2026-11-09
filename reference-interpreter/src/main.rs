@@ -6,7 +6,7 @@ use bennett_isa_ref::{
 };
 use std::collections::VecDeque;
 
-const USAGE:&str="bennett-isa-ref check <object>\nbennett-isa-ref hash <object>\nbennett-isa-ref run-oracle <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value] [--token-aliases '[...]']\nbennett-isa-ref step-check <object> <oracle> (--exhaustive [--max-bits N] | --suite | --samples N) [--seed a,b,c,d] [--budget B[,heap,stack,depth]] [--mem name=hex] [--arg value] [--token-aliases '[...]']\nbennett-isa-ref run-cc <object> <entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--tape-out file] [--replay-tape file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex]\nbennett-isa-ref reverse <object> <entry> [run-cc options] [--steps N]\nbennett-isa-ref reverse <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--steps N] [--mem name=hex] [--arg value] [--token-aliases '[...]']\nbennett-isa-ref reverse <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]>] [--adjoint]\nbennett-isa-ref run-action <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]> | --arg value...] [--adjoint]\nbennett-isa-ref run-program <object> <cc-entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--tape-out file] [--replay-tape file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex] [--reverse] [--target file]";
+const USAGE:&str="bennett-isa-ref check <object>\nbennett-isa-ref hash <object>\nbennett-isa-ref run-oracle <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--mem name=hex | --mem-file name=path] [--arg value] [--token-aliases '[...]']\nbennett-isa-ref step-check <object> <oracle> (--exhaustive [--max-bits N] | --suite | --samples N) [--seed a,b,c,d] [--budget B[,heap,stack,depth]] [--mem name=hex | --mem-file name=path] [--arg value] [--token-aliases '[...]']\nbennett-isa-ref run-cc <object> <entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--tape-out file] [--replay-tape file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex | --mem-file global=path]\nbennett-isa-ref reverse <object> <entry> [run-cc options] [--steps N]\nbennett-isa-ref reverse <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--steps N] [--mem name=hex | --mem-file name=path] [--arg value] [--token-aliases '[...]']\nbennett-isa-ref reverse <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex | --mem-file name=path] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]>] [--adjoint]\nbennett-isa-ref run-action <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex | --mem-file name=path] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]> | --arg value...] [--adjoint]\nbennett-isa-ref run-program <object> <cc-entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--tape-out file] [--replay-tape file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex | --mem-file global=path] [--reverse] [--target file]\n--mem-file reads raw bytes.";
 fn fail(message: impl std::fmt::Display) -> Error {
     Error::new(message.to_string())
 }
@@ -137,6 +137,27 @@ fn parse_hex(s: &str) -> Result<Vec<u8>> {
         out.push(u8::from_str_radix(&s[i..i + 2], 16).map_err(fail)?);
     }
     Ok(out)
+}
+fn parse_memory<'a>(
+    option: &str,
+    value: &str,
+    existing_names: impl IntoIterator<Item = &'a str>,
+) -> Result<(String, Vec<u8>)> {
+    let (syntax, load): (&str, fn(&str) -> Result<Vec<u8>>) = match option {
+        "--mem" => ("name=hex", parse_hex),
+        "--mem-file" => ("name=path", |path| {
+            std::fs::read(path).map_err(|e| fail(format!("{path}: {e}")))
+        }),
+        _ => unreachable!("caller must match a memory option"),
+    };
+    let (name, data) = value
+        .split_once('=')
+        .ok_or_else(|| fail(format!("{option} requires {syntax}")))?;
+    if existing_names.into_iter().any(|existing| existing == name) {
+        return Err(fail(format!("duplicate {option} region {name}")));
+    }
+    let bytes = load(data).map_err(|e| fail(format!("{option} {name}: {e}")))?;
+    Ok((name.into(), bytes))
 }
 /// A binary64 as a canonical JSON number (RFC 8785 via `Json::parse`).
 fn float_json(v: f64) -> Result<Json> {
@@ -424,14 +445,13 @@ fn parse_cc_options(
                 options.fuel = limits.steps;
                 options.token_defaults = limits;
             }
-            "--mem" => {
-                let (name, hex) = value
-                    .split_once('=')
-                    .ok_or_else(|| fail("--mem requires name=hex"))?;
-                if options.mem.iter().any(|(n, _)| n == name) {
-                    return Err(fail(format!("duplicate --mem {name}")));
-                }
-                options.mem.push((name.into(), parse_hex(hex)?));
+            "--mem" | "--mem-file" => {
+                let memory = parse_memory(
+                    option,
+                    value,
+                    options.mem.iter().map(|(name, _)| name.as_str()),
+                )?;
+                options.mem.push(memory);
             }
             "--steps" => {
                 if command != "reverse" {
@@ -1125,14 +1145,13 @@ fn parse_action_options(args: &[String], start: usize) -> Result<ActionOptions> 
                 }
                 options.state = Some(value.clone());
             }
-            "--mem" => {
-                let (name, hex) = value
-                    .split_once('=')
-                    .ok_or_else(|| fail("--mem requires name=hex"))?;
-                if options.mem.iter().any(|(n, _)| n == name) {
-                    return Err(fail(format!("duplicate --mem {name}")));
-                }
-                options.mem.push((name.into(), parse_hex(hex)?));
+            "--mem" | "--mem-file" => {
+                let memory = parse_memory(
+                    option,
+                    value,
+                    options.mem.iter().map(|(name, _)| name.as_str()),
+                )?;
+                options.mem.push(memory);
             }
             "--args" => {
                 if list_form || single_form {
@@ -1618,13 +1637,10 @@ fn parse_oracle_options(
             "--steps" => {
                 steps = Some(uint(value).and_then(|n| u64::try_from(n).map_err(fail))?);
             }
-            "--mem" => {
-                let (region, hex) = value
-                    .split_once('=')
-                    .ok_or_else(|| fail("--mem requires name=hex"))?;
-                if regions.insert(region.into(), parse_hex(hex)?).is_some() {
-                    return Err(fail("duplicate --mem region"));
-                }
+            "--mem" | "--mem-file" => {
+                let (name, bytes) =
+                    parse_memory(option, value, regions.keys().map(String::as_str))?;
+                regions.insert(name, bytes);
             }
             "--arg" => {
                 let arg = if let Some(s) = value.strip_prefix("token:") {
@@ -2173,23 +2189,11 @@ fn run() -> Result<()> {
                 }
                 seed = [words[0], words[1], words[2], words[3]];
             }
-            "--mem" => {
-                let (name, hex) = value
-                    .split_once('=')
-                    .ok_or_else(|| fail("--mem requires name=hex"))?;
-                if hex.len() % 2 != 0 || !hex.bytes().all(|c| c.is_ascii_hexdigit()) {
-                    return Err(fail(
-                        "§16.1: invalid memory HEX (even-length hexadecimal expected)",
-                    ));
-                }
-                let bytes = (0..hex.len())
-                    .step_by(2)
-                    .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).map_err(fail))
-                    .collect::<Result<Vec<_>>>()?;
-                if input.regions.insert(name.into(), bytes).is_some() {
-                    return Err(fail("duplicate --mem region"));
-                }
-                fixed_regions.push(name.to_string());
+            "--mem" | "--mem-file" => {
+                let (name, bytes) =
+                    parse_memory(option, value, input.regions.keys().map(String::as_str))?;
+                fixed_regions.push(name.clone());
+                input.regions.insert(name, bytes);
             }
             "--arg" => {
                 let arg = if let Some(s) = value.strip_prefix("token:") {

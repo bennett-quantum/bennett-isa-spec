@@ -142,7 +142,79 @@ fn decimal(value: &BitVector) -> Json {
     Json::String(value.to_decimal())
 }
 
+/// K73 compares interface slots, not source identities or implementation bounds.
+/// The same caller-owned systems (and their classes) bind corresponding slots;
+/// an expected reference body does not select a different realised frame.
+fn same_interface(subject: &Function, expected: &Function) -> Result<bool> {
+    fn slots(f: &Function) -> Result<Vec<(&str, &Type)>> {
+        let groups = match f.kind.as_str() {
+            "oracle" => ["in", "tgt", "fault", "mem", "args"],
+            "action" | "perm_action" => ["mut", "in", "mem", "args", ""],
+            _ => return err("§12.1 K73", "expected program requires a region interface"),
+        };
+        f.params
+            .iter()
+            .zip(groups)
+            .flat_map(|(params, role)| {
+                params.iter().map(move |p| {
+                    let role = if matches!(p.ty, Type::Region(..)) {
+                        p.role.as_deref().ok_or_else(|| {
+                            Error::new("§12.1 K73: interface region lacks its role".into())
+                        })?
+                    } else {
+                        role
+                    };
+                    Ok((role, &p.ty))
+                })
+            })
+            .collect()
+    }
+    Ok(slots(subject)? == slots(expected)?)
+}
+
 impl Object {
+    fn expected_program09(&self, subject: &Function, hash: &str) -> Result<Option<&Function>> {
+        let identity = self.identity()?;
+        if identity
+            .closure_hashes
+            .values()
+            .any(|h| h.as_deref() == Some(hash))
+        {
+            let program = self.region_function(hash)?;
+            if !same_interface(subject, program)? {
+                return err(
+                    "§12.1 K73",
+                    "expected program has an incompatible ordered interface",
+                );
+            }
+            return Ok(Some(program));
+        }
+        if let Some(imports) = self.section("imports") {
+            for (name, import) in imports.object()? {
+                if import
+                    .object()?
+                    .get("pinned_closure_hash")
+                    .map(Json::string)
+                    .transpose()?
+                    == Some(hash)
+                {
+                    let declaration = Function::from_signature(name, import.get("signature")?)?;
+                    if !same_interface(subject, &declaration)? {
+                        return err(
+                            "§12.1 K73",
+                            "expected program has an incompatible ordered interface",
+                        );
+                    }
+                    return Ok(None);
+                }
+            }
+        }
+        err(
+            "§12.1 K73",
+            "expected program closure is neither local nor imported by pin",
+        )
+    }
+
     fn invocation09(&self, claim: &Json, f: &Function, closure: &str) -> Result<Invocation> {
         let subject = claim.get("subject")?;
         if subject.get("closure_hash")?.string()? != closure {
@@ -449,6 +521,47 @@ impl Object {
             .map_err(|_| crate::resource_error("§12.1 K13", "control count exceeds usize"))?;
         let resolved = self.domain09(claim, f)?;
         let domain = &resolved.domain;
+        let expected = claim.get("expected")?;
+        let table = expected
+            .object()?
+            .get("table")
+            .map(Json::array)
+            .transpose()?;
+        let program = if let Some(hash) = expected.object()?.get("program") {
+            let Some(program) = self.expected_program09(f, hash.string()?)? else {
+                return Ok(Outcome {
+                    verdict: ClaimVerdict::Unverified(
+                        "§12.1 K73: expected program requires a linked body".into(),
+                    ),
+                    coverage: None,
+                });
+            };
+            Some(program)
+        } else {
+            None
+        };
+        let mut program = if let Some(program) = program {
+            let Some(widths) = self.checked_borrow_lifetimes(&program.name)? else {
+                return Ok(Outcome {
+                    verdict: ClaimVerdict::Unverified(
+                        "§12.1 K73: expected program borrow inventory requires linked actions"
+                            .into(),
+                    ),
+                    coverage: None,
+                });
+            };
+            if widths != domain.borrowed_widths {
+                return err(
+                    "§12.1 K73",
+                    "expected program has incompatible checked borrow lifetimes",
+                );
+            }
+            let mut context = invocation.clone();
+            context.borrowed_widths = Some(widths);
+            Some((program, context))
+        } else {
+            None
+        };
         let sampled = claim.get("kind")?.string()? == "sampled";
         let elements = if sampled {
             let sampler = claim.get("sampler")?;
@@ -489,27 +602,10 @@ impl Object {
         } else {
             enumerate(domain)?
         };
-        let expected = claim.get("expected")?;
-        let table = expected
-            .object()?
-            .get("table")
-            .map(Json::array)
-            .transpose()?;
-        let program = expected
-            .object()?
-            .get("program")
-            .map(|p| self.region_function(p.string()?))
-            .transpose()?;
         if table.is_some_and(|table| table.len() != elements.len()) {
             return err(
                 "§12.1 K13",
                 "table must contain one row per distinct domain element",
-            );
-        }
-        if program.is_some_and(|p| p.signature() != f.signature()) {
-            return err(
-                "§12.1 K13",
-                "expected program has an incompatible signature",
             );
         }
         let borrowed_widths = &domain.borrowed_widths;
@@ -549,13 +645,14 @@ impl Object {
                     );
                 }
             }
-            if let Some(program) = program {
+            if let Some((program, context)) = &mut program {
+                context.controls.clone_from(&invocation.controls);
                 let other = self.execute_element_bound(
                     program,
                     &element,
-                    Some(invocation.budget),
+                    Some(context.budget),
                     None,
-                    Some(&invocation),
+                    Some(context),
                 )?;
                 if other != after {
                     return err("§12.1 K13", "expected program full tuple mismatch");

@@ -147,7 +147,16 @@ changed in response to the council's round-1 review
     zero-entry council fixtures still check; an interleaved polynomial-only
     prefix zero is rejected with §5.6. This supersedes the former reading
     that called the region-prefix symbolic domain the full frame domain.
-21. **Checking exhaustive and sampled claims (§12.1–§12.2)** *new (round 1)*. The
+21. **Checking exhaustive and sampled claims (§12.1–§12.2)** *new (round 1)*.
+    **Frozen ISA 0.8 reading.** The flat tuples and equal-signature shorthand
+    below do not govern ISA 0.9: §12.1 K13 supplies complete typed tuples,
+    K73 supplies ordered role/type/shape and checked-lifetime correspondence,
+    and §12.2 K85 supplies the exclusive replay outcomes. Implementation
+    bounds are body identity, not a correspondence requirement. Pins:
+    `isa09_claim_replay::k73_different_body_bounds_preserve_full_domain_proof`,
+    `k73_missing_expected_lifetime_rejects`, `k73_narrower_expected_lifetime_rejects`,
+    and `isa09_fixed_image::k73_fixed_image_expected_program_without_subject_borrow_rejects`.
+    The
     claim schema fixes neither the output tuple nor the table encoding, nor the
     budget of an oracle claim. Reading: a domain element's output tuple is the
     region's final interface in signature order (oracle: ins, tgt, fault,
@@ -362,3 +371,28 @@ changed in response to the council's round-1 review
     outcome nor causes rejection solely because checking is unavailable.”
     This records the interpreter's reading; it does not amend the published
     ISA text or claim completion of staged numerical/channel verification.
+
+35. **Classes for an unscheduled expected reference program (§12.1 K73)**
+    (bead `bennett-isa-spec-aqz`). K73 requires matching resolved classes,
+    but `expected: {program: H}` carries no second target, schedule, frame
+    context or per-source-lifetime class vector; a linked H needs no separate
+    certificate record. §9.4 borrow records describe physical realised frames,
+    whereas K70 numbers checked source lifetimes independently of storage
+    reuse. Source `qborrow any` is not a resolved target class (§17 item 10).
+
+    Reading: unscheduled reference comparison binds the same caller-owned
+    systems, with their common class binding, to corresponding interface slots
+    and checked lifetime positions. Each body retains its own source and
+    checked inventory; equal source bounds and producer frame identities are
+    not required. A separate certificate record for H describes its own
+    invocation and does not select a new realisation for this comparison.
+    No target class is guessed from an absent expected record or from raw
+    `any` spellings. Scheduled realised-program checks remain unestablished;
+    a reference theorem does not establish target/frame applicability.
+
+    Proposed clarification: state this common reference class binding explicitly,
+    and specify the target/context input and per-lifetime class constraint check
+    when concrete classes are supplied; alternatively publish the second class
+    binding required for independently selected realisations. This records the
+    oracle's reference-only reading without adding a producer rejection rule or
+    claiming staged target/schedule validation is complete.
