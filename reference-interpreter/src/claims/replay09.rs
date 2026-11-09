@@ -152,22 +152,22 @@ fn same_interface(subject: &Function, expected: &Function) -> Result<bool> {
             "action" | "perm_action" => ["mut", "in", "mem", "args", ""],
             _ => return err("§12.1 K73", "expected program requires a region interface"),
         };
-        Ok(f.params
+        f.params
             .iter()
             .zip(groups)
             .flat_map(|(params, role)| {
                 params.iter().map(move |p| {
-                    (
-                        if matches!(p.ty, Type::Region(..)) {
-                            p.role.as_deref().unwrap_or("in")
-                        } else {
-                            role
-                        },
-                        &p.ty,
-                    )
+                    let role = if matches!(p.ty, Type::Region(..)) {
+                        p.role.as_deref().ok_or_else(|| {
+                            Error::new("§12.1 K73: interface region lacks its role".into())
+                        })?
+                    } else {
+                        role
+                    };
+                    Ok((role, &p.ty))
                 })
             })
-            .collect())
+            .collect()
     }
     Ok(slots(subject)? == slots(expected)?)
 }
@@ -540,7 +540,7 @@ impl Object {
         } else {
             None
         };
-        let mut expected_invocation = if let Some(program) = program {
+        let mut program = if let Some(program) = program {
             let Some(widths) = self.checked_borrow_lifetimes(&program.name)? else {
                 return Ok(Outcome {
                     verdict: ClaimVerdict::Unverified(
@@ -558,7 +558,7 @@ impl Object {
             }
             let mut context = invocation.clone();
             context.borrowed_widths = Some(widths);
-            Some(context)
+            Some((program, context))
         } else {
             None
         };
@@ -645,12 +645,12 @@ impl Object {
                     );
                 }
             }
-            if let (Some(program), Some(context)) = (program, &mut expected_invocation) {
+            if let Some((program, context)) = &mut program {
                 context.controls.clone_from(&invocation.controls);
                 let other = self.execute_element_bound(
                     program,
                     &element,
-                    Some(invocation.budget),
+                    Some(context.budget),
                     None,
                     Some(context),
                 )?;
