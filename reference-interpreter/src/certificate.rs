@@ -694,6 +694,33 @@ impl Object {
                             return err("§12.3", "exactly one of frame/frame_contexts is required")
                         }
                     }
+                    if let Some(records) = r.object()?.get("resource_contexts") {
+                        let mut previous = None;
+                        for record in records.array()? {
+                            crate::ref_library::validate_context_key(record.get("context_key")?)?;
+                            let key = record.get("context_key")?.canonical();
+                            if previous.as_ref().is_some_and(|prior| prior >= &key) {
+                                return err(
+                                    "§12.3",
+                                    "resource context keys must be unique in canonical byte order",
+                                );
+                            }
+                            previous = Some(key);
+                            crate::target::canonical_rows(record.get("resources")?)?;
+                        }
+                        let first = records.array()?.first().ok_or_else(|| {
+                            Error::new("§12.3: resource context array must be nonempty".into())
+                        })?;
+                        if r.get("resources")? != first.get("resources")?
+                            || r.get("gates_used")? != first.get("gates_used")?
+                            || r.object()?.get("estimate") != first.object()?.get("estimate")
+                        {
+                            return err(
+                                "§12.3",
+                                "resource report projection differs from first canonical context",
+                            );
+                        }
+                    }
                 } else {
                     frame(r.get("frame")?)?;
                 }

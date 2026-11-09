@@ -32,3 +32,10 @@ pub use document::{NativeTarget, ResolvedNativeEntry};
 #[path = "target_model/frames.rs"]
 mod frames;
 pub use frames::frame_slot_classes;
+#[path = "target_model/resources.rs"]
+mod resources;
+pub(crate) use resources::canonical_rows;
+pub use resources::{
+    charged_wire_occupancy, resource_display, verify_resource_contexts, verify_resource_rows,
+    ResolvedResourceContext,
+};

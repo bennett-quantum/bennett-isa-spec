@@ -104,23 +104,25 @@ impl Object {
         }
         // Compare record coverage to the source tree, never to emitted leaves.
         for (closure, region) in regions {
-            if let Some(records) = region.object()?.get("frame_contexts") {
-                let mut expected = contexts
-                    .iter()
-                    .filter(|c| c.closure_hash == *closure)
-                    .map(|c| c.context_key.canonical())
-                    .collect::<Vec<_>>();
-                expected.sort();
-                let actual = records
-                    .array()?
-                    .iter()
-                    .map(|r| r.get("context_key").map(Json::canonical))
-                    .collect::<Result<Vec<_>>>()?;
-                if actual != expected {
-                    return err(
-                        "§12.3",
-                        "frame contexts do not equal complete reached context set",
-                    );
+            for field in ["frame_contexts", "resource_contexts"] {
+                if let Some(records) = region.object()?.get(field) {
+                    let mut expected = contexts
+                        .iter()
+                        .filter(|c| c.closure_hash == *closure)
+                        .map(|c| c.context_key.canonical())
+                        .collect::<Vec<_>>();
+                    expected.sort();
+                    let actual = records
+                        .array()?
+                        .iter()
+                        .map(|r| r.get("context_key").map(Json::canonical))
+                        .collect::<Result<Vec<_>>>()?;
+                    if actual != expected {
+                        return err(
+                            "§12.3",
+                            "frame contexts do not equal complete reached context set",
+                        );
+                    }
                 }
             }
         }
