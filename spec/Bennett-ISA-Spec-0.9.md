@@ -2052,17 +2052,19 @@ operand bits. Explicit control models give the full context matrix;
 a controlled_U rule instead gives a base matrix and constructs identity
 on disabled branches and that matrix on the all-enabled branch, retaining
 its global phase. In that form arity/basis describe the base matrix and
-control_models adds the resolved c control wires. All matrix dimensions
-must match the resolved basis. No environment is silently counted as an
+control_models adds the resolved distinct control wires (d below). All matrix
+dimensions must match the resolved basis. No environment is silently counted as an
 extra logical input or discarded from a claimed unitary interface.
 
 parameter_bindings uses the same resolved k, c and eps as cost/error
 matching and the exact angle binding (§3.1 and §11.1 K20). A finite
 binary64 theta denotes exactly that binary rational, not a rounded
-source decimal. An explicit operand-to-wire permutation maps the entry's
-own-controls-then-effective-controls order (§8.3) to §12.1's allocation
-basis, inherited controls first. Both data and control models use this
-map; wrong parameter, order, dimensions or context bindings reject.
+source decimal. Model binding first unions and deduplicates the entry's
+own and effective controls by resolved wire identity, as specified below;
+an operand-to-wire permutation maps the resulting distinct physical operands
+to §12.1's allocation basis, inherited controls first. Both data and control
+models use this map; wrong parameter, order, dimensions or context bindings
+reject. The matching values k and c are unchanged by deduplication.
 
 Complex matrix entries are [real,imaginary] exact expressions over
 rational constants, i, pi, sqrt, exp, sin and cos with finite expression
@@ -2083,6 +2085,7 @@ definition. An absent approximate model never licenses ideal self-comparison.
 Variables use {var:name}; constants pi and i use {op:name,args:[]}; function applications use {op:name,args:[...]}; rational leaves use the published reduced decimal-string pair.
 operand_map[j] gives model operand j's allocation-basis position; the own-control/inherited-control swap example encodes [1,0,2].
 For cx with own control a and inherited control q, controlled_U uses base basis [t] and c=2; entry order [a,q,t] maps to checker order [q,a,t].
+Here a precedes q in the distinct-control order defined below; d=2.
 
 
 For X, a concrete base model is below. This base-model fragment leaves the context-specific operand_map to the complete resolved model binding; it is not a complete target or bound schedule. Its rational/imaginary pairs are
@@ -2150,7 +2153,7 @@ except the single digit `0`; negative zero is not a rational spelling.
 Model = {"version":"bennett.native-model/1","kind":"unitary",
          "arity":Size,"basis":Basis,"parameter_bindings":Bindings,
          "operand_map":Map,"control_models":Control,"data":Data}
-Bindings = { <label>: "k" | "c" | "eps" | "theta", ... }
+Bindings = { <label>: "k" | "c" | "d" | "eps" | "theta", ... }
 Control = {"kind":"controlled_U","controls":"c","disabled":"identity"}
         | {"kind":"explicit","controls":"c"}
 Data (controlled_U) = Operation
@@ -2165,7 +2168,7 @@ Representation = {"kind":"kraus","operators":[Mat, ...]}
                   "state":Mat,"matrix":Mat}
 Basis = [label, ...] | {"controls":"c","targets":[label, ...]}
 Map = [uint, ...] | {"kind":"entry_to_allocation"}
-Size = uint | {"var":"k"|"c"}
+Size = uint | {"var":"k"|"c"|"d"}
      | {"op":"+"|"-"|"*","args":[Size,Size]}
      | {"op":"pow2","args":[Size]}
 Rat = ["<signed numerator>","<positive denominator>"]
@@ -2197,12 +2200,14 @@ and zero exactly `["0","1"]`; every expression is finite; divisions by zero,
 unbound variables and negative Size results reject. `Expr` has the ordinary
 complex analytic meanings, using the principal complex square root (on the
 negative real axis its imaginary part is positive). `[a,b]` denotes a + i b,
-including when either expression is complex. Bindings may alias the four
-resolved sources, but a key named k, c, eps or theta retains that same source.
-Only declared aliases occur in Expr; Size uses the resolved k and c directly.
+including when either expression is complex. Bindings may alias the five
+resolved sources, but a key named k, c, d, eps or theta retains that same source.
+Only declared aliases occur in Expr; Size uses the resolved k, c and d directly.
 An unavailable source rejects that context. In particular eps is available
 only at positive achieved epsilon, theta only for a parametric opcode and as
 the exact finite binary64 rational; k and c always retain §8.1's meanings.
+The model-only source d is derived from resolved operand identities below;
+it is not a new §8.1 matching, cost or scheme-template variable.
 
 Dense matrices have at least one row and column and equal row lengths.
 Rows index outputs and columns inputs. Matrix constructors have their usual
@@ -2217,26 +2222,46 @@ pad, truncate or transpose matrices. These constructors permit symbolic
 generation without a materialised-dimensional cap; they do not add cost
 expression operators to §8.1.
 
+At each resolved context form the physical control list D by taking the set
+union of own and effective controls, deduplicating by resolved physical wire
+identity. Its canonical order is allocation name in bytewise order, then
+numeric bit index within that resolved allocation; aliases use the resolved
+allocation identity, not the operand's spelling. This is the sorted union
+used for permutation-gate controls. The distinct-control count d is |D|.
+Overlap is permitted exactly as in §§3.3/11.1: an own and an effective control
+may name the same wire, while targets remain distinct from all controls and
+each other. Coinciding controls contribute one physical bit and no new
+independent input. This binding supports the legal operation in both forms,
+including at positive advertised epsilon; it is not a source rejection.
+
 For controlled_U, arity is the opcode's target count (one, or two for
 swap/cz); basis is an array containing exactly t, or exactly t and t2, in
-any order. For explicit, arity is c plus that target count; basis lists
-each c[0] through c[c-1] and every target exactly once. The template Basis
-expands to c[0],...,c[c-1] followed by its targets array and is available
-only in explicit form. Size and Basis are resolved anew at each context.
-The model reader MUST reject any arity/basis disagreement or non-permutation
+any order. For explicit, arity is d plus that target count; basis lists
+each c[0] through c[d-1] and every target exactly once. Within model Basis,
+c[j] names distinct control D[j]; these are model-local labels, not the
+possibly repeated entry-order c[j] scheme-template operands above. The
+template Basis expands to c[0],...,c[d-1] followed by its targets array and
+is available only in explicit form; d=0 contributes no control labels.
+Its literal "controls":"c", like that
+of Control, names the matching context; it does not require c independent
+control bits. Size and Basis are resolved anew at each context. The model
+reader MUST reject any arity/basis disagreement or non-permutation
 operand_map. Matrix basis bit 0 is the first listed bit and is the
 most-significant bit of a row/column index. This orders individual wires;
 the bits within a source bundle are still enumerated least-significant first.
 
-For controlled_U the complete model order is the entry's own controls,
-then effective controls, then the listed base basis. For explicit it is
-the expanded full basis; c[j] names the same §8.3 entry-order control j.
-operand_map maps each bit of this complete order to its allocation-order
-position among these operands, with inherited controls first. The generated
+For controlled_U the complete model order is D followed by the listed base
+basis. For explicit it is the expanded full basis over those same distinct
+physical operands. operand_map maps each bit of this complete order to its
+allocation-order position among these distinct operands, with inherited
+controls first and each resolved wire included once. The generated
 entry_to_allocation Map denotes exactly this permutation, derived from
 resolved operand identities, including target-basis permutations. The checker
 MUST compare a supplied permutation to those identities and apply it to both
 row and column indices of every logical matrix, never to environment bits.
+The map has length d plus target count; repeated entries, missing operands,
+out-of-range positions and a permutation disagreeing with resolved identities
+reject. There is no repeated logical-control space to embed or trace out.
 
 In explicit form the contexts list is nonempty, sorted by increasing min,
 with disjoint inclusive ranges and max >= min. The reader MUST select exactly
@@ -2245,9 +2270,33 @@ selection; an unbounded range is last. The row's expressions may depend on
 all its declared bindings, including k and theta. Its Operation describes
 the actual full context, including disabled branches and relative phase;
 it is not controlled again. In controlled_U form, each Operation describes
-the base operation and the target author binds diag(I,...,I,U) as the actual
-implementation, with no independent per-Kraus control construction. These
-rules apply to every admitted context, including c=0 and zero epsilon.
+the base operation and the target author binds diag(I,...,I,U), with 2^d
+blocks, as the actual implementation, with no independent per-Kraus control
+construction. Explicit rows may use {"var":"d"} in Size for their arity and
+matrix constructors, and a declared d alias in Expr. Context-row selection
+still uses the matching value c, not d; parameter/error/cost bindings k and c
+retain their published meanings, even when d<c. Both forms' phase, native
+epsilon and invocation-interface comparisons use the full unitary on the
+distinct physical operands, against the ideal operation on that same set.
+Representation checks use that same physical basis: controlled_U retains its
+base checks and binds the actual d-control unitary; explicit representations
+act directly on the d-plus-target basis, with only declared environment bits
+traced. These rules apply to every admitted context, including c=0 and zero
+epsilon.
+
+For distinct p,t, `qpred p; cx p t; qunpred p` has k=1,c=2 but d=1.
+The entry list [p,p,t] binds the physical model order [p,t], with
+operand_map [0,1] (also generated by entry_to_allocation), not [0,0,1].
+With base U=X, controlled_U constructs diag(I2,X); the same matrix in an
+explicit row selected at c=2 has arity 2 and basis [c[0],t]. Its symbolic
+form uses arity {"op":"+","args":[{"var":"d"},1]}, template Basis
+{"controls":"c","targets":["t"]}, and Mat
+{"kind":"controlled","controls":{"var":"d"},"matrix":<X>}.
+Both encode (p,t) -> (p,t XOR p): inputs (0,0),(0,1),(1,0),(1,1) yield
+outputs (0,0),(0,1),(1,1),(1,0). A native entry advertising epsilon 1/4
+with requested share 1/2 and this exact actual model is conformant: its
+physical operator error is zero. Omitting the positive-epsilon model does
+not establish that fact. The entry still matches c=2, not c=1.
 
 In either form `matrix` supplies the phase-bearing U of the represented
 logical dimension. An omitted representation denotes precisely Ad_U.
@@ -5696,19 +5745,35 @@ The vectors record source admission, complete output tuples and expanded source 
    no environmental output being mistaken for a discarded logical output.
 4. **Explicit controls (reader/checker).** Compare controlled_U X at c=0,1,2
    with explicit context rows for those counts, and a generated unbounded
-   full-context rule. At c=1 diag(I2,X) passes zero epsilon; diag(I2,-X)
+   full-context rule using d for physical dimensions. Include contexts with
+   d<c while selecting the row and matching the target at the original c.
+   At c=1 diag(I2,X) passes zero epsilon; diag(I2,-X)
    has operator error 2 and rejects epsilon 0 or 1, accepting 2 when the
    requested share permits it. Identity-disabled and phase-sensitive checks
    use full context matrices, irrespective of equal uncontrolled channels.
    Missing/overlapping contexts, wrong selected k/theta and double-control
    reconstruction reject.
-5. **Basis and permutation (checker).** For cx with own control a and
-   inherited q, entry order [a,q,t] maps to [q,a,t] by [1,0,2]; compare its
-   explicit c[0],c[1],t matrix with the base controlled_U model. Reverse
-   t,t2 in a two-target base and transform both rows and columns. Reject a
-   stale map, repeated/missing bit, swapped inherited control or environment
-   bit in operand_map; generated entry_to_allocation agrees with the explicit
-   identity-derived permutation.
+5. **Distinct physical basis and permutation (reader/checker).** For cx with
+   own control a and inherited q, a preceding q in distinct-control order,
+   model order [a,q,t] maps to [q,a,t] by [1,0,2]; compare its explicit
+   c[0],c[1],t matrix with the base controlled_U model. Reverse t,t2 in a
+   two-target base and transform both rows and columns. For the legal
+   `qpred p; cx p t; qunpred p`, observe k=1,c=2,d=1, physical order [p,t],
+   map [0,1] and outputs (0,0),(0,1),(1,1),(1,0) on the four inputs in order.
+   Reconstruct both controlled_U and explicit models (the latter selected
+   at c=2, arity 2, basis [c[0],t]), with literal and generated maps and
+   literal and d-dependent arity/matrices. Repeat at positive epsilon 1/4
+   and requested share 1/2: exact diag(I2,X) passes the physical accuracy
+   obligation, and no omitted-model fallback discharges it. At this overlap,
+   diag(I2,-X) has error 2 and rejects 1/4, accepting 2 when the share permits.
+   The unreduced map [0,0,1] rejects; deduplication does not legalise repeated
+   map positions or target/control overlap. Include several coinciding
+   controls, operand aliases, an own/effective order opposite the canonical
+   allocation-name order, and bit indices 2 and 10 in one allocation to
+   distinguish numeric index order from spelling order. Reject a stale map,
+   repeated/missing bit, swapped inherited control or environment bit in
+   operand_map; generated entry_to_allocation agrees with the explicit
+   identity-derived permutation on distinct physical operands.
 6. **Optional certificates (checker).** Accept exact Gram I for X only after
    recomputing X†X. Substituting 2X with the same claimed Gram rejects.
    Enclose X with degenerate rational boxes and a transcendental rotation
