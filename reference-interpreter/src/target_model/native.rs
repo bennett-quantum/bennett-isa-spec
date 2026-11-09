@@ -182,14 +182,14 @@ fn verify(
     if model.get("kind")?.string()? != "unitary" {
         return err("§8.3", "native model kind must be unitary");
     }
-    let basis_map = validate_basis_and_map(model, opcode, context)?;
-    let bindings = model_bindings(model.get("parameter_bindings")?, context, epsilon)?;
     let controls = model.get("control_models")?;
     if controls.get("kind")?.string()? != "controlled_U" {
         return Ok(ModelVerification::Unchecked(
             "§8.3: unsupported explicit control-model representation".into(),
         ));
     }
+    let basis_map = validate_basis_and_map(model, opcode, context)?;
+    let bindings = model_bindings(model.get("parameter_bindings")?, context, epsilon)?;
     controls.fields(&["kind", "controls", "disabled"], &[])?;
     if controls.get("controls")?.string()? != "c"
         || controls.get("disabled")?.string()? != "identity"

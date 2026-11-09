@@ -168,3 +168,29 @@ fn reordered_base_basis_is_applied_through_its_operand_map() {
         );
     }
 }
+
+#[test]
+fn unsupported_control_representation_is_not_validated_as_a_base_matrix() {
+    let mut opaque = model("1", 1, 0);
+    let Json::Object(fields) = &mut opaque else {
+        unreachable!()
+    };
+    fields.insert(
+        "control_models".into(),
+        Json::parse(r#"{"kind":"unpublished"}"#).unwrap(),
+    );
+    // Explicit controls describe a full context; applying controlled_U's
+    // base-arity rules to an unsupported representation would reject it.
+    fields.insert("arity".into(), Json::Number("2".into()));
+    let verdict = verify_native_model(
+        Some(&opaque),
+        "x",
+        &context(0, 1),
+        &Rational::integer(0),
+        64,
+    )
+    .unwrap();
+    assert!(
+        matches!(verdict, ModelVerification::Unchecked(reason) if reason.contains("unsupported"))
+    );
+}
