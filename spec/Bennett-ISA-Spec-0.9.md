@@ -3157,10 +3157,20 @@ and program associations until release completes; no copied sidecar or
 stale numeric id keeps a released live object usable.
 
 **Images, readers and remaining memory boundary.** The mixed launch provider
-MUST validate each Call image manifest against the selected program,
+MUST validate each selected Call image manifest against the selected program,
 reached subject and resolved invocation, and establish §12.3's actual fresh
 factor, copy, packing, context/handle association and mutation exclusion
 before its claimed use. A merely hash-matching old handle is insufficient.
+For each reached launch_copy use, candidates match its §12.3 device root's
+object/interface/closure/target/schedule and contain its copy
+context_key/mem_slot. Select the first candidate in Call.images
+(manifest-hash order) whose complete Invocation (args, budget, token_aliases)
+matches the resolved invocation of that manifest's device root (§12.3).
+All other manifests are unused for this use; never-reached claims cause no
+association mismatch. No candidates means no supplied image. Candidates with
+no matching Invocation, or failed selected copy/context/handle validation,
+constitute an association mismatch without fallback. Alternative invocations
+are not input conflicts; ordinary input validation still applies.
 The mixed launch provider MUST reject an image binding conflict decidable
 before run creation with `BENNETT_E_ARG`, with *out=0 and no run or effects.
 This includes an unrelated root/closure/target/schedule/invocation when
@@ -6115,7 +6125,27 @@ The vectors record source admission, complete output tuples and expanded source 
    and unload before unbind give BENNETT_E_INVALID_STATE without release;
    after close, unbind then unload succeed. Both cleanup paths operate
    without retracting or reissuing the external host interaction or changing
-   native main or unrelated runs. A launch pledge cannot authorize an
+   native main or unrelated runs.
+
+   Extend the same fixture with two otherwise-valid manifests M1 and M2,
+   canonically sorted by manifest hash, keeping this Call identical for both
+   replies. Each manifest binds the reached oracle as its device root, with
+   copy context_key=[] and the same mem_slot; their object/interface/closure,
+   target/schedule, tuple, budget and partition agree. M1 has
+   bindings.invocation.args=["1"] and image B1; M2 has
+   bindings.invocation.args=["2"] and a distinct image B2. Both images have
+   valid packing and hashes for the same region shape; the fault-free callee
+   restores either image. Reply 01 selects M1 and prepares B1; reply 02
+   selects M2 and prepares B2, regardless of which manifest sorts first.
+   In each run, mixed_run_v1 returns BENNETT_OK and a nonzero run id. The
+   first bennett_wait has status BENNETT_OK, *request_out set and
+   *result_out=NULL; bennett_reply has status BENNETT_OK. Both runs execute
+   the callee and successor and finish COMPLETED; the final bennett_wait
+   returns BENNETT_OK with *result_out set and *request_out=NULL,
+   bennett_result_nvalues is 0 and bennett_result_nfaults is 0. No fault 4 is
+   recorded; the unselected manifest causes neither preparation nor fault.
+
+   A launch pledge cannot authorize an
    unsupported independent reader; absent mechanics leave its obligation
    unchecked/unestablished. Root-relative [] and reached owner inventories
    stay separate; a certificate for one partition/root cannot cover another.
