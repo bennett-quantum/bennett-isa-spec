@@ -1,0 +1,17 @@
+{
+  "id": "D-k85-report-order",
+  "suite": "D",
+  "spec": "ISA0.9 §12.2 K85",
+  "derivation": "Producer lists aux before db; report uses mem:0 db, mem:1 aux. Fixed 17 bits give 1/131072. CLI check covers admission; portable checker APIs cover replay.",
+  "object": "../../../fixtures/accepted-k85-09/report-order.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "status": "ok"
+    }
+  }
+}

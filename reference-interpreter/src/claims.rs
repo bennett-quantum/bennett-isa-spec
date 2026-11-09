@@ -47,6 +47,31 @@ pub enum ClaimVerdict {
     /// Not checkable by this crate yet; the reason names the missing machinery.
     Unverified(String),
 }
+
+/// §12.2 K85: requests constrain the independently computed successful
+/// category. An unchecked claim has no successful category to advertise.
+fn check_requested_label(claim: &Json, verdict: &ClaimVerdict) -> Result<()> {
+    if matches!(verdict, ClaimVerdict::Unverified(_)) {
+        return Ok(());
+    }
+    let requested = claim.object()?.get("label").map(Json::string).transpose()?;
+    let matches = match requested {
+        None | Some("evidence") => true,
+        Some("proof") => *verdict == ClaimVerdict::Proof,
+        Some("proof_relative_to_image") => *verdict == ClaimVerdict::ProofRelativeToImage,
+        Some(other) => return err("§12.2 K85", format!("unknown requested label {other}")),
+    };
+    if !matches {
+        return err(
+            "§12.2 K85",
+            format!(
+                "requested {} differs from computed outcome",
+                requested.unwrap()
+            ),
+        );
+    }
+    Ok(())
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CertificateReport {
     pub claims: Vec<ClaimReport>,
@@ -87,6 +112,7 @@ enum Component {
     Cell(usize, usize, usize),
 }
 struct Domain {
+    borrowed_widths: Vec<usize>,
     components: Vec<(Component, usize, BitVector, BitVector)>,
     covers_d: bool,
 }
@@ -179,6 +205,7 @@ pub(crate) fn r21_resource_cases() {
     for width in [1, 2, 3, 62, 63, 64, 127, 128] {
         for count in [1, 2] {
             let d = Domain {
+                borrowed_widths: Vec::new(),
                 covers_d: true,
                 components: (0..count)
                     .map(|i| {
@@ -292,6 +319,16 @@ impl Object {
             .ok_or_else(|| Error::new(format!("§12: closure {closure} is not a function")))
     }
     fn domain(&self, f: &Function, d: &Json) -> Result<Domain> {
+        let borrowed_widths = if self.isa_version == crate::IsaVersion::V09 {
+            self.checked_borrow_lifetimes(&f.name)?.ok_or_else(|| {
+                Error::new(
+                    "§12.2 K70: checked borrow lifetime inventory requires linked actions".into(),
+                )
+            })?
+        } else {
+            // Frozen 0.8 tuples retain their explicitly supplied idle pool.
+            Vec::new()
+        };
         let mut components = Vec::new();
         let mut bundles = BTreeSet::new();
         let mut regions = BTreeSet::new();
@@ -301,6 +338,15 @@ impl Object {
                 let name = b.get("name")?.string()?.to_string();
                 let width = usize::try_from(b.get("width")?.uint()?)
                     .map_err(|_| Error::host_resource("§12.2: host limit: domain width".into()))?;
+                if self.isa_version == crate::IsaVersion::V09
+                    && borrowed
+                    && borrowed_widths.get(ordinal) != Some(&width)
+                {
+                    return err(
+                        "§12.2 K70/K72",
+                        "borrowed position or width differs from checked lifetime inventory",
+                    );
+                }
                 let lo = json_bits(b.get("lo")?, width)?;
                 let hi = json_bits(b.get("hi")?, width)?;
                 full &= lo.is_zero() && hi == ones(width)?;
@@ -365,6 +411,9 @@ impl Object {
                 }
             }
         }
+        if self.isa_version == crate::IsaVersion::V09 {
+            full &= d.get("borrowed")?.array()?.len() == borrowed_widths.len();
+        }
         // D: every interface bundle and every region in the region's input
         // domain (§5.2, §5.3; tgt/fault included for oracles).
         let groups = if f.kind == "oracle" { 4 } else { 3 };
@@ -379,6 +428,7 @@ impl Object {
                     })
                 });
         Ok(Domain {
+            borrowed_widths,
             components,
             covers_d,
         })
@@ -581,13 +631,62 @@ impl Object {
             );
         }
         let mut borrowed = Vec::new();
-        for (c, v) in element {
-            if let Component::Borrowed(ordinal, _) = c {
-                if *ordinal != borrowed.len() {
-                    return err("§12.2", "borrowed component position mismatch");
+        if self.isa_version == crate::IsaVersion::V08 {
+            // Preserve the frozen legacy flat-tuple/idle-pool encoding. K70/K71
+            // complete-lifetime replay below belongs to the 0.9 checker.
+            for (component, value) in element {
+                if let Component::Borrowed(ordinal, _) = component {
+                    if *ordinal != borrowed.len() {
+                        return err("§12.2", "borrowed component position mismatch");
+                    }
+                    let wires = q.allocate(value.width())?;
+                    set(&mut q, &wires, value)?;
+                    borrowed.push(wires.clone());
+                    b.borrowed.push(wires);
                 }
-                let wires = q.allocate(v.width())?;
-                set(&mut q, &wires, v)?;
+            }
+        } else {
+            let borrowed_widths = if let Some(context) = context {
+                context.borrowed_widths.clone().ok_or_else(|| {
+                    Error::new(
+                        "§12.2 K70: replay invocation has no checked borrow lifetime inventory"
+                            .into(),
+                    )
+                })?
+            } else {
+                self.checked_borrow_lifetimes(&f.name)?.ok_or_else(|| {
+                    Error::new(
+                        "§12.2 K70: checked borrow lifetime inventory requires linked actions"
+                            .into(),
+                    )
+                })?
+            };
+            crate::reserve_more(
+                &mut borrowed,
+                borrowed_widths.len(),
+                "§12.2 K70",
+                "borrowed replay systems",
+            )?;
+            for (ordinal, width) in borrowed_widths.iter().copied().enumerate() {
+                let value = element.iter().find_map(|(component, value)| {
+                    matches!(component, Component::Borrowed(position, _) if *position == ordinal).then_some(value)
+                });
+                let zero;
+                let value = match value {
+                    Some(value) if value.width() == width => value,
+                    Some(_) => {
+                        return err(
+                            "§12.2 K72",
+                            "borrowed replay width differs from checked lifetime",
+                        )
+                    }
+                    None => {
+                        zero = BitVector::zero(width)?;
+                        &zero
+                    }
+                };
+                let wires = q.allocate(width)?;
+                set(&mut q, &wires, value)?;
                 borrowed.push(wires.clone());
                 b.borrowed.push(wires);
             }
@@ -682,7 +781,21 @@ impl Object {
         if !active.insert((closure.to_string(), index)) {
             return err("§12", "cyclic claim reference");
         }
-        let result = self.verify_claim_inner(closure, index, active);
+        let result = self
+            .verify_claim_inner(closure, index, active)
+            .and_then(|verdict| {
+                let claim = &self
+                    .section("certificate")
+                    .unwrap()
+                    .get("regions")?
+                    .get(closure)?
+                    .get("claims")?
+                    .array()?[index];
+                if self.isa_version == crate::IsaVersion::V09 {
+                    check_requested_label(claim, &verdict)?;
+                }
+                Ok(verdict)
+            });
         active.remove(&(closure.to_string(), index));
         result
     }
@@ -1061,7 +1174,11 @@ impl Object {
                 .filter(|(c, _)| matches!(c, Component::Borrowed(..)))
                 .map(|(_, v)| v.to_decimal())
                 .collect();
-            let k = borrowed_in.len();
+            let k = if self.isa_version == crate::IsaVersion::V09 {
+                domain.borrowed_widths.len()
+            } else {
+                borrowed_in.len()
+            };
             let split = out
                 .len()
                 .checked_sub(k)
@@ -1111,6 +1228,7 @@ mod r20_tests {
             u64::MAX as u128,
         ] {
             let d = Domain {
+                borrowed_widths: Vec::new(),
                 covers_d: false,
                 components: vec![(
                     Component::Bundle(0, 0),

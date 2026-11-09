@@ -1,0 +1,17 @@
+{
+  "id": "D-k85-request-proof_relative_to_image",
+  "suite": "D",
+  "spec": "ISA0.9 §12.2 K85",
+  "derivation": "Requested label proof_relative_to_image is checked against the exclusive image-relative outcome. CLI check covers admission; portable checker APIs cover replay.",
+  "object": "../../../fixtures/accepted-k85-09/request-proof_relative_to_image.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "status": "ok"
+    }
+  }
+}

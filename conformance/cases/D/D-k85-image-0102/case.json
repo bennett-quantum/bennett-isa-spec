@@ -1,0 +1,17 @@
+{
+  "id": "D-k85-image-0102",
+  "suite": "D",
+  "spec": "ISA0.9 §12.2 K85",
+  "derivation": "t,f,a have 2*16*2=64 tuples; db has 65536 unrestricted images. qload/cx/qunload gives t XOR (db[a]&1), preserves f,a,db; n/|D|=64/4194304=1/65536. CLI check covers admission; portable checker APIs cover replay.",
+  "object": "../../../fixtures/accepted-k85-09/image-0102.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "status": "ok"
+    }
+  }
+}
