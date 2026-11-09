@@ -1,0 +1,17 @@
+{
+  "id": "D-k85-request-evidence",
+  "suite": "D",
+  "spec": "ISA0.9 §12.2 K85",
+  "derivation": "Requested label evidence is checked against the exclusive image-relative outcome. CLI check covers admission; portable checker APIs cover replay.",
+  "object": "../../../fixtures/accepted-k85-09/request-evidence.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "status": "ok"
+    }
+  }
+}

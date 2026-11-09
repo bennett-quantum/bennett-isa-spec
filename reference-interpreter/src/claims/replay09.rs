@@ -9,12 +9,52 @@ pub(super) struct Invocation {
     pub controls: Vec<BitVector>,
     pub adjoint: bool,
     pub budget: Budget,
+    pub borrowed_widths: Option<Vec<usize>>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fixed_cells_never_become_enumeration_components() {
+        let object = Object::parse(include_str!(
+            "../../../conformance/fixtures/accepted-k85-09/image-0102.bisa"
+        ))
+        .unwrap();
+        let certificate = object.section("certificate").unwrap();
+        let closure = certificate
+            .get("bindings")
+            .unwrap()
+            .get("closure_hash")
+            .unwrap()
+            .string()
+            .unwrap();
+        let claim = &certificate
+            .get("regions")
+            .unwrap()
+            .get(closure)
+            .unwrap()
+            .get("claims")
+            .unwrap()
+            .array()
+            .unwrap()[0];
+        let domain = object.domain09(claim, &object.functions["lookup"]).unwrap();
+        // Only t,f,a enumerate. db[0],db[1] fill the tuple independently.
+        assert_eq!(domain.domain.components.len(), 3);
+        assert!(domain
+            .domain
+            .components
+            .iter()
+            .all(|(c, ..)| !matches!(c, Component::Cell(..))));
+    }
 }
 
 struct ResolvedDomain {
     domain: Domain,
     relative_to_image: bool,
     images: Vec<FixedRegionBinding>,
+    fixed_cells: Vec<(Component, BitVector)>,
 }
 pub(super) struct Outcome {
     pub verdict: ClaimVerdict,
@@ -49,12 +89,10 @@ fn coverage(
                 })?;
         }
     }
-    for (c, width, ..) in &domain.domain.components {
-        if matches!(c, Component::Borrowed(..)) {
-            bits = bits.checked_add(*width).ok_or_else(|| {
-                crate::resource_error("§12.2 K74", "borrowed width exceeds usize")
-            })?;
-        }
+    for width in &domain.domain.borrowed_widths {
+        bits = bits
+            .checked_add(*width)
+            .ok_or_else(|| crate::resource_error("§12.2 K74", "borrowed width exceeds usize"))?;
     }
     let power = |exponent: usize| -> Result<String> {
         let width = exponent
@@ -104,7 +142,79 @@ fn decimal(value: &BitVector) -> Json {
     Json::String(value.to_decimal())
 }
 
+/// K73 compares interface slots, not source identities or implementation bounds.
+/// The same caller-owned systems (and their classes) bind corresponding slots;
+/// an expected reference body does not select a different realised frame.
+fn same_interface(subject: &Function, expected: &Function) -> Result<bool> {
+    fn slots(f: &Function) -> Result<Vec<(&str, &Type)>> {
+        let groups = match f.kind.as_str() {
+            "oracle" => ["in", "tgt", "fault", "mem", "args"],
+            "action" | "perm_action" => ["mut", "in", "mem", "args", ""],
+            _ => return err("§12.1 K73", "expected program requires a region interface"),
+        };
+        f.params
+            .iter()
+            .zip(groups)
+            .flat_map(|(params, role)| {
+                params.iter().map(move |p| {
+                    let role = if matches!(p.ty, Type::Region(..)) {
+                        p.role.as_deref().ok_or_else(|| {
+                            Error::new("§12.1 K73: interface region lacks its role".into())
+                        })?
+                    } else {
+                        role
+                    };
+                    Ok((role, &p.ty))
+                })
+            })
+            .collect()
+    }
+    Ok(slots(subject)? == slots(expected)?)
+}
+
 impl Object {
+    fn expected_program09(&self, subject: &Function, hash: &str) -> Result<Option<&Function>> {
+        let identity = self.identity()?;
+        if identity
+            .closure_hashes
+            .values()
+            .any(|h| h.as_deref() == Some(hash))
+        {
+            let program = self.region_function(hash)?;
+            if !same_interface(subject, program)? {
+                return err(
+                    "§12.1 K73",
+                    "expected program has an incompatible ordered interface",
+                );
+            }
+            return Ok(Some(program));
+        }
+        if let Some(imports) = self.section("imports") {
+            for (name, import) in imports.object()? {
+                if import
+                    .object()?
+                    .get("pinned_closure_hash")
+                    .map(Json::string)
+                    .transpose()?
+                    == Some(hash)
+                {
+                    let declaration = Function::from_signature(name, import.get("signature")?)?;
+                    if !same_interface(subject, &declaration)? {
+                        return err(
+                            "§12.1 K73",
+                            "expected program has an incompatible ordered interface",
+                        );
+                    }
+                    return Ok(None);
+                }
+            }
+        }
+        err(
+            "§12.1 K73",
+            "expected program closure is neither local nor imported by pin",
+        )
+    }
+
     fn invocation09(&self, claim: &Json, f: &Function, closure: &str) -> Result<Invocation> {
         let subject = claim.get("subject")?;
         if subject.get("closure_hash")?.string()? != closure {
@@ -124,7 +234,14 @@ impl Object {
             }
             bindings.get("invocation")?
         };
-        self.decode_invocation09(invocation, f)
+        let mut invocation = self.decode_invocation09(invocation, f)?;
+        invocation.borrowed_widths =
+            Some(self.checked_borrow_lifetimes(&f.name)?.ok_or_else(|| {
+                Error::new(
+                    "§12.2 K70: checked borrow lifetime inventory requires linked actions".into(),
+                )
+            })?);
+        Ok(invocation)
     }
 
     pub(super) fn decode_invocation09(
@@ -172,6 +289,9 @@ impl Object {
             controls: Vec::new(),
             adjoint: false,
             budget,
+            // K92 uses this decoder without replay or a linked borrow closure.
+            // Only invocation09 attaches a checked replay inventory.
+            borrowed_widths: None,
         })
     }
 
@@ -193,16 +313,16 @@ impl Object {
         let inherited = bundles.drain(..controls).collect::<Vec<_>>();
         let images = self.image_domains09(claim.get("domain")?, f)?;
         let mut unrestricted = source.clone();
-        for (value, full) in [(&mut source, false), (&mut unrestricted, true)] {
-            let Json::Object(fields) = value else {
-                unreachable!()
-            };
-            let Json::Array(regions) = fields.get_mut("regions").unwrap() else {
-                unreachable!()
-            };
-            for image in &images {
-                regions.push(image.entry(full)?);
-            }
+        let Json::Object(fields) = &mut unrestricted else {
+            unreachable!()
+        };
+        let Json::Array(regions) = fields.get_mut("regions").unwrap() else {
+            unreachable!()
+        };
+        let mut fixed_cells = Vec::new();
+        for image in &images {
+            regions.push(image.unrestricted_entry()?);
+            image.append_cells(&mut fixed_cells)?;
         }
         let mut domain = self.domain(f, &source)?;
         let mut relative_to_image = !images.is_empty() && self.domain(f, &unrestricted)?.covers_d;
@@ -223,6 +343,7 @@ impl Object {
             domain,
             relative_to_image,
             images: images.into_iter().map(|i| i.binding).collect(),
+            fixed_cells,
         })
     }
 
@@ -233,7 +354,7 @@ impl Object {
         f: &Function,
         flat: &[BitVector],
         controls: usize,
-        borrowed: usize,
+        borrowed_widths: &[usize],
     ) -> Result<Json> {
         let bundle_count = controls
             + f.params
@@ -260,8 +381,18 @@ impl Object {
                 offset = end;
             }
         }
-        if flat.len() != offset + borrowed {
+        if flat.len() != offset + borrowed_widths.len() {
             return err("§12.1 K13", "executor tuple length differs from interface");
+        }
+        if flat[offset..]
+            .iter()
+            .zip(borrowed_widths)
+            .any(|(value, width)| value.width() != *width)
+        {
+            return err(
+                "§12.1 K13",
+                "executor borrowed tuple width differs from checked lifetime",
+            );
         }
         Ok(Json::Object(BTreeMap::from([
             (
@@ -281,6 +412,7 @@ impl Object {
         f: &Function,
         element: &[(Component, BitVector)],
         controls: usize,
+        borrowed_widths: &[usize],
     ) -> Result<Vec<BitVector>> {
         let find = |component: Component, width| {
             element
@@ -289,6 +421,7 @@ impl Object {
                     (match (&component, c) {
                         (Component::Control(a), Component::Control(b)) => a == b,
                         (Component::Bundle(a, b), Component::Bundle(c, d)) => (a, b) == (c, d),
+                        (Component::Borrowed(a, _), Component::Borrowed(b, _)) => a == b,
                         (Component::Cell(a, b, c), Component::Cell(d, e, f)) => {
                             (a, b, c) == (d, e, f)
                         }
@@ -326,11 +459,9 @@ impl Object {
                 }
             }
         }
-        out.extend(
-            element
-                .iter()
-                .filter_map(|(c, v)| matches!(c, Component::Borrowed(..)).then_some(v.clone())),
-        );
+        for (ordinal, width) in borrowed_widths.iter().copied().enumerate() {
+            out.push(find(Component::Borrowed(ordinal, String::new()), width)?);
+        }
         Ok(out)
     }
 
@@ -341,6 +472,24 @@ impl Object {
         claim: &Json,
         f: &Function,
     ) -> Result<Outcome> {
+        let result = self.replay09(closure, index, claim, f);
+        match result {
+            Err(error)
+                if error.kind() == crate::ErrorKind::HostResource
+                    && claim.get("expected")? != &Json::String("inverse_pair".into()) =>
+            {
+                Ok(Outcome {
+                    verdict: ClaimVerdict::Unverified(format!(
+                        "§12.2 K75: unchecked (host limit): {error}"
+                    )),
+                    coverage: None,
+                })
+            }
+            result => result,
+        }
+    }
+
+    fn replay09(&self, closure: &str, index: usize, claim: &Json, f: &Function) -> Result<Outcome> {
         if claim.get("expected")? == &Json::String("inverse_pair".into()) {
             return Ok(Outcome {
                 verdict: self.verify_inverse_pair_claim09(f, index, claim)?,
@@ -359,11 +508,60 @@ impl Object {
                 coverage: None,
             });
         }
+        if self.checked_borrow_lifetimes(&f.name)?.is_none() {
+            return Ok(Outcome {
+                verdict: ClaimVerdict::Unverified(
+                    "§12.2 K70: checked borrow lifetime inventory requires linked actions".into(),
+                ),
+                coverage: None,
+            });
+        }
         let mut invocation = self.invocation09(claim, f, closure)?;
         let controls = usize::try_from(claim.get("subject")?.get("inherited_controls")?.uint()?)
             .map_err(|_| crate::resource_error("§12.1 K13", "control count exceeds usize"))?;
         let resolved = self.domain09(claim, f)?;
         let domain = &resolved.domain;
+        let expected = claim.get("expected")?;
+        let table = expected
+            .object()?
+            .get("table")
+            .map(Json::array)
+            .transpose()?;
+        let program = if let Some(hash) = expected.object()?.get("program") {
+            let Some(program) = self.expected_program09(f, hash.string()?)? else {
+                return Ok(Outcome {
+                    verdict: ClaimVerdict::Unverified(
+                        "§12.1 K73: expected program requires a linked body".into(),
+                    ),
+                    coverage: None,
+                });
+            };
+            Some(program)
+        } else {
+            None
+        };
+        let mut program = if let Some(program) = program {
+            let Some(widths) = self.checked_borrow_lifetimes(&program.name)? else {
+                return Ok(Outcome {
+                    verdict: ClaimVerdict::Unverified(
+                        "§12.1 K73: expected program borrow inventory requires linked actions"
+                            .into(),
+                    ),
+                    coverage: None,
+                });
+            };
+            if widths != domain.borrowed_widths {
+                return err(
+                    "§12.1 K73",
+                    "expected program has incompatible checked borrow lifetimes",
+                );
+            }
+            let mut context = invocation.clone();
+            context.borrowed_widths = Some(widths);
+            Some((program, context))
+        } else {
+            None
+        };
         let sampled = claim.get("kind")?.string()? == "sampled";
         let elements = if sampled {
             let sampler = claim.get("sampler")?;
@@ -404,42 +602,30 @@ impl Object {
         } else {
             enumerate(domain)?
         };
-        let expected = claim.get("expected")?;
-        let table = expected
-            .object()?
-            .get("table")
-            .map(Json::array)
-            .transpose()?;
-        let program = expected
-            .object()?
-            .get("program")
-            .map(|p| self.region_function(p.string()?))
-            .transpose()?;
         if table.is_some_and(|table| table.len() != elements.len()) {
             return err(
                 "§12.1 K13",
                 "table must contain one row per distinct domain element",
             );
         }
-        if program.is_some_and(|p| p.signature() != f.signature()) {
-            return err(
-                "§12.1 K13",
-                "expected program has an incompatible signature",
-            );
-        }
-        let borrowed = domain
-            .components
-            .iter()
-            .filter(|(c, ..)| matches!(c, Component::Borrowed(..)))
-            .count();
+        let borrowed_widths = &domain.borrowed_widths;
         for (row, values) in elements.iter().enumerate() {
-            let element = domain
+            let mut element = domain
                 .components
                 .iter()
                 .map(|c| c.0.clone())
                 .zip(values.iter().cloned())
                 .collect::<Vec<_>>();
-            let before = self.entry09(f, &element, controls)?;
+            // K85: fixed cells fill complete tuples but never add an
+            // enumeration component or consume sampler generator words.
+            crate::reserve_more(
+                &mut element,
+                resolved.fixed_cells.len(),
+                "§12.2 K85",
+                "replay fixed cells",
+            )?;
+            element.extend(resolved.fixed_cells.iter().cloned());
+            let before = self.entry09(f, &element, controls, borrowed_widths)?;
             invocation.controls = before[..controls].to_vec();
             let after = self.execute_element_bound(
                 f,
@@ -450,8 +636,8 @@ impl Object {
             )?;
             if let Some(table) = table {
                 let entry = &table[row];
-                if entry.get("before")? != &self.tuple09(f, &before, controls, borrowed)?
-                    || entry.get("after")? != &self.tuple09(f, &after, controls, borrowed)?
+                if entry.get("before")? != &self.tuple09(f, &before, controls, borrowed_widths)?
+                    || entry.get("after")? != &self.tuple09(f, &after, controls, borrowed_widths)?
                 {
                     return err(
                         "§12.1 K13",
@@ -459,13 +645,14 @@ impl Object {
                     );
                 }
             }
-            if let Some(program) = program {
+            if let Some((program, context)) = &mut program {
+                context.controls.clone_from(&invocation.controls);
                 let other = self.execute_element_bound(
                     program,
                     &element,
-                    Some(invocation.budget),
+                    Some(context.budget),
                     None,
-                    Some(&invocation),
+                    Some(context),
                 )?;
                 if other != after {
                     return err("§12.1 K13", "expected program full tuple mismatch");
@@ -481,22 +668,7 @@ impl Object {
                 elements: elements.len() as u128,
             }
         };
-        if claim.object()?.get("label") == Some(&Json::String("proof".into()))
-            && verdict != ClaimVerdict::Proof
-        {
-            return err(
-                "§12.2 K74",
-                "requested proof but replay covers only a slice of D",
-            );
-        }
-        if claim.object()?.get("label") == Some(&Json::String("proof_relative_to_image".into()))
-            && verdict != ClaimVerdict::ProofRelativeToImage
-        {
-            return err(
-                "§12.2 K85",
-                "requested proof_relative_to_image without complete remaining domain",
-            );
-        }
+        check_requested_label(claim, &verdict)?;
         Ok(Outcome {
             verdict,
             coverage: Some(coverage(f, controls, &resolved, elements.len())?),

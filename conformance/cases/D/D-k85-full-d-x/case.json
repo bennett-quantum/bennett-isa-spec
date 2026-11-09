@@ -1,0 +1,17 @@
+{
+  "id": "D-k85-full-d-x",
+  "suite": "D",
+  "spec": "ISA0.9 §12.2 K85",
+  "derivation": "X exchanges 0 and 1; n=|D|=2. CLI check covers admission; portable checker APIs cover replay.",
+  "object": "../../../fixtures/accepted-k85-09/full-d-x.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "status": "ok"
+    }
+  }
+}

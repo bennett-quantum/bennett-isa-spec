@@ -1,0 +1,64 @@
+# ISA 0.9 fixed-image checker vectors (§12.2 K85)
+
+`k85.json` is the portable manifest. Each `.bisa` contains a complete source
+object and certificate; the manifest gives its SHA256, independently derived
+outcome and exact coverage. The generator uses the published reference CLI
+only to resolve source identities. It never takes expected outputs or verdicts
+from that CLI. Both image certificates have identical executable identities.
+
+| Clause | Vector and hand derivation | Verified surface |
+| --- | --- | --- |
+| “proof iff ... unrestricted D” | `full-d-x`: X maps t to t XOR 1; 2/2 | Replay APIs |
+| “proof_relative_to_image” | `image-0102`, `image-0201`: t,f,a have 2×16×2=64 tuples; 16 fixed bits give 64/4194304=1/65536 | Replay APIs |
+| “in-role ... precisely ... A and W” | `mut-region`, `wrong-a`, `wrong-w` | Admission rejects |
+| “exactly ... raw bytes ... lowercase” | `short-image`, `long-image`, `uppercase` | Admission rejects |
+| “unused high bits ... zero” | `nonzero-padding`: 0xd1 in six useful bits, matching byte hash | Admission rejects |
+| “Cell i ... [iW,(i+1)W)” | `packing`: little-endian 0x011f = 31 + (8 << 5); two five-bit cells cross a byte | Replay APIs |
+| “SHA-256 of the raw bytes” | `swapped-hash`, `stale-hash`, `hex-text-hash` | Admission rejects |
+| “occurs exactly once ... MUST NOT also occur” | `duplicate-image`, `also-ranged`, `duplicate-bundle`, `duplicate-region`, `duplicate-cell` | Admission rejects |
+| “Omission-at-zero remains a strict slice” | `omit-t`, `omit-f`, `omit-a`: respectively 32,4,32 tuples, evidence | Replay APIs |
+| “Successful sampled claims always ... evidence” | `sampled-full-d`: seed (2^57,0,0,0) outputs 0 then 45; both bits drawn, 2/2 coverage, evidence | Replay APIs |
+| “A supplied label is a request” | `request-proof` rejects; `request-proof_relative_to_image` and `request-evidence` both independently compute image-relative proof | Replay APIs |
+| “signature order using mem slot identities” | `report-order`: producer lists aux,db; report gives mem:0 db then mem:1 aux; tuple arrays remain db,aux | Replay APIs |
+| “exact +1 basis-phase” | `phase`: S² adds -1 to output-one tuples despite matching basis outputs | Replay rejects |
+| “borrowed ... inherited controls ... external-reference” | `controlled-dirty` covers 256 tuples; `external-reference` also runs with controls, address and dirty wire each Bell-entangled with an untouched reference | Replay and exact state restoration |
+| “cannot discharge ... unrestricted borrow-frame” | Integration test attaches `controlled-dirty` to borrow_frames: standalone conditional theorem survives, full-D obligation rejects | Certificate API |
+| “(U−V)J_I ... reduced input ... complete output” | `restricted-map.json`: Z|0> = I|0>, restricted norm 0, unrestricted Frobenius norm 2; Choi difference is 2×2 for input 1/output 2. Its -I/I case has equal uncontrolled channels but phase-sensitive norm 2. | Independent exact integer/dyadic map test only |
+
+The action loads the selected byte, XORs its low bit into t and unloads it.
+It preserves f, a and both region cells. The complete before/after tables vary
+the target and all four f bits; these are interface bundles, not a projected
+target-only observation. Rows enumerate t outermost, f next, a fastest. Fixed
+cells never add an enumeration component or consume generator words.
+
+The Rust integration test `isa09_fixed_image` exercises both
+`Object::verify_claim` and `Object::verify_certificate`, including all table
+rows, exact coverage, requested-label exclusivity, structural-theorem requests,
+slot order and exact reference-system restoration. `conformance/tests/ref_k85.rs`
+independently reads the closed domain/image schema, recomputes raw SHA256 and
+checks both 64-row relations and the restricted-map arithmetic. Old ISA 0.8
+closed readers continue to reject `fixed_regions` and the third label.
+
+The suite-D CLI cases cover admission only: `check` does not replay a certificate.
+They deliberately do not claim to exercise the checker-report API through CLI.
+The manifest distinguishes `reject_admission` from `reject_replay`.
+
+## Remaining checker work
+
+The baseline has no rigorous numerical/channel checker or realised
+target/schedule executor. The published §12.1 payloads also lack a conditional
+domain field; §12.3 supplies no preparation-witness encoding. Those claims
+retain explicit `Unverified` results, and the map data is not an executable
+numerical certificate. The image-relative theorem alone never establishes that
+an actual invocation's input has been prepared, factorised and restored. Native
+manifest attachment, materialised transitive-closure comparison and executable
+preparation checking remain required by the published contract. See
+`b-isa-spec-qrc` and text-defect `bennett-isa-spec-rqn`; this publication does not
+close the complete K85 implementation task.
+
+Regenerate with `python3 -I conformance/fixtures/accepted-k85-09/generate.py
+--ref /path/to/bennett-isa-ref`; add `--check` to compare all generated bytes.
+Use a project-local `TMPDIR`. Run `cargo test --offline --manifest-path
+reference-interpreter/Cargo.toml --test isa09_fixed_image` and `cargo test
+--offline --manifest-path conformance/Cargo.toml --test ref_k85` for focused
+semantic checks.

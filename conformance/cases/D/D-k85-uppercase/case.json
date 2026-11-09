@@ -1,0 +1,18 @@
+{
+  "id": "D-k85-uppercase",
+  "suite": "D",
+  "spec": "ISA0.9 §12.2 K85",
+  "derivation": "Only the named fixed-image binding is invalid: uppercase. CLI check covers admission; portable checker APIs cover replay.",
+  "object": "../../../fixtures/accepted-k85-09/uppercase.bisa",
+  "command": [
+    "check",
+    "{object}"
+  ],
+  "expect": {
+    "exit": 1,
+    "stdout_empty": true,
+    "stderr_contains": [
+      "§12.2"
+    ]
+  }
+}

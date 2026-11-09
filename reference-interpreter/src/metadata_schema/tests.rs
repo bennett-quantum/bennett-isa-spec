@@ -5,6 +5,25 @@ use std::collections::{BTreeMap, BTreeSet};
 fn j(s: &str) -> Json {
     Json::parse(s).unwrap()
 }
+
+#[test]
+fn fixed_images_and_relative_label_are_explicitly_versioned_closed_fields() {
+    let domain = j(
+        r#"{"bundles":[],"borrowed":[],"regions":[],"fixed_regions":[{"name":"db","A":0,"W":1,"image":"00","sha256":"6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d"}]}"#,
+    );
+    validate_for(crate::IsaVersion::V09, "domain", &domain).unwrap();
+    assert!(validate_for(crate::IsaVersion::V08, "domain", &domain).is_err());
+    let label = j(r#""proof_relative_to_image""#);
+    validate_for(crate::IsaVersion::V09, "label", &label).unwrap();
+    assert!(validate_for(crate::IsaVersion::V08, "label", &label).is_err());
+    let mut malformed = domain;
+    let Json::Object(fields) = &mut malformed else {
+        panic!("domain")
+    };
+    fields.insert("image_prepared".into(), Json::Bool(true));
+    // K85 never grants a producer boolean authority to discharge preparation.
+    assert!(validate_for(crate::IsaVersion::V09, "domain", &malformed).is_err());
+}
 #[test]
 fn r15_translation_frame_is_first_and_last_point_tuple() {
     // Literal §12.1 cardinality oracle, independent of TABLE/samples/baseline.
