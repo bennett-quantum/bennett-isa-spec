@@ -24,6 +24,7 @@ mod images09;
 mod pairs09;
 mod qinplace09;
 mod replay09;
+mod source_qinplace09;
 pub use entry_union09::OrderedEntryUnion;
 pub use images09::FixedRegionBinding;
 

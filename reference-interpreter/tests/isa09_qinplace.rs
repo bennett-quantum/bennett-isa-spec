@@ -1226,7 +1226,7 @@ fn uncheckable_uniform_transitive_claim_keeps_applicability() {
 }
 
 #[test]
-fn scheduled_root_keeps_unchecked_tree_obligation_without_owners_or_claims() {
+fn scheduled_zero_trip_tree_establishes_absence_without_owners_or_claims() {
     use bennett_isa_ref::{json::Json, sha256_hex, QinplaceApplicability};
     let text = transitive_certificate(false);
     let original = Object::parse(&text).unwrap();
@@ -1281,7 +1281,10 @@ fn scheduled_root_keeps_unchecked_tree_obligation_without_owners_or_claims() {
     let report = Object::parse(&text).unwrap().verify_certificate().unwrap();
     assert!(report.claims.is_empty());
     assert!(
-        matches!(report.qinplace_applicability.get(&owner), Some(QinplaceApplicability::Unestablished(reason)) if reason.contains("realised invocation tree")),
+        matches!(
+            report.qinplace_applicability.get(&owner),
+            Some(QinplaceApplicability::Established)
+        ),
         "{report:?}"
     );
 }
@@ -1714,5 +1717,126 @@ fn assert_pinned_import_obligation(local_owner: bool) {
     assert_eq!(
         report.qinplace_applicability[identity.closure_hashes["missing"].as_ref().unwrap()],
         QinplaceApplicability::Established
+    );
+}
+
+fn resolved_outer_certificate(second_steps: u64, scheduled: bool) -> String {
+    use bennett_isa_ref::{json::Json, sha256_hex};
+    let original = Object::parse(&transitive_certificate(true)).unwrap();
+    let mut symbols = original.section("symbols").unwrap().clone();
+    let mut symbol = fields(&mut symbols)["2"].clone();
+    fields(&mut symbol).insert("name".into(), Json::String("outer".into()));
+    fields(fields(&mut symbol).get_mut("signature").unwrap())
+        .insert("args".into(), support::json(r#"["token","token","i2"]"#));
+    let index = fields(&mut symbols).len().to_string();
+    fields(&mut symbols).insert(index, symbol);
+    let raw=original.text.split("\nsection certificate\n").next().unwrap().replace(&original.section("symbols").unwrap().canonical(),&symbols.canonical())+"perm_action @outer (x:wire[2]) (y:wire[2] in) () (ta:token, tb:token, a:i2) ()\n^entry():\naction_call @inner (x) (y) () (ta, a)\naction_call @inner (x) (y) () (tb, a)\n";
+    let base = support::rehash(&raw);
+    let identities = base.identity().unwrap();
+    let outer = identities.closure_hashes["outer"].clone().unwrap();
+    let invocation = support::json(&format!(
+        r#"{{"args":[["3","0","0","0"],["{second_steps}","0","0","0"],"1"],"budget":["9","0","0","0"],"token_aliases":[0,1]}}"#
+    ));
+    let mut cert = original.section("certificate").unwrap().clone();
+    let b = fields(fields(&mut cert).get_mut("bindings").unwrap());
+    b.insert("object_hash".into(), Json::String(identities.object_hash));
+    for name in ["interface_hash", "closure_hash", "reference_program_hash"] {
+        b.insert(name.into(), Json::String(outer.clone()));
+    }
+    b.insert("invocation".into(), invocation.clone());
+    let schedule = if scheduled {
+        let params = sha256_hex(invocation.get("args").unwrap().canonical().as_bytes());
+        let s = support::json(&format!(
+            r#"{{"bindings":{{"budget":[9,0,0,0],"closure_hash":"{outer}","epsilon":0,"inherited_controls":0,"params_hash":"{params}","region":"outer","scheduler":{{"name":"conformance","version":"1"}},"target_hash":"{}","token_aliases":[0,1],"variant":"forward"}},"entries":[]}}"#,
+            "0".repeat(64)
+        ));
+        b.insert("target_hash".into(), Json::String("0".repeat(64)));
+        b.insert(
+            "schedule_hash".into(),
+            Json::String(sha256_hex(s.canonical().as_bytes())),
+        );
+        format!("\nsection schedule\n{}\n", s.canonical())
+    } else {
+        String::new()
+    };
+    format!(
+        "{}{schedule}\nsection certificate\n{}\n",
+        base.text,
+        cert.canonical()
+    )
+}
+
+#[test]
+fn complete_scheduled_and_reference_q_trees_check_both_actual_tokens_and_cache_scope() {
+    use bennett_isa_ref::QinplaceApplicability;
+    for scheduled in [false, true] {
+        for steps in [3, 2, 3] {
+            let object = Object::parse(&resolved_outer_certificate(steps, scheduled)).unwrap();
+            let report = object.verify_certificate();
+            if steps == 2 {
+                assert!(report
+                    .unwrap_err()
+                    .to_string()
+                    .contains("no covering inverse-pair entry in @inner"));
+            } else {
+                let report = report.unwrap();
+                let root = object.identity().unwrap().closure_hashes["outer"]
+                    .clone()
+                    .unwrap();
+                assert_eq!(
+                    report.qinplace_applicability.get(&root),
+                    Some(&QinplaceApplicability::Established)
+                );
+                let owner = object.identity().unwrap().closure_hashes["inner"]
+                    .clone()
+                    .unwrap();
+                assert_eq!(
+                    report.qinplace_applicability.get(&owner),
+                    Some(&QinplaceApplicability::Established)
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn scheduled_cleanup_carrier_uses_the_actual_root_budget_and_named_variant() {
+    use bennett_isa_ref::{json::Json, sha256_hex, QinplaceApplicability};
+    let text = resolved_outer_certificate(3, true);
+    let original = Object::parse(&text).unwrap();
+    let source = text
+        .split("\nsection schedule\n")
+        .next()
+        .unwrap()
+        .to_owned()
+        + "adj action_call @inner (x) (y) () (tb, a)\n";
+    let base = support::rehash(&source);
+    let identity = base.identity().unwrap();
+    let root = identity.closure_hashes["outer"].clone().unwrap();
+    let mut schedule = original.section("schedule").unwrap().clone();
+    let sb = fields(fields(&mut schedule).get_mut("bindings").unwrap());
+    sb.insert("closure_hash".into(), Json::String(root.clone()));
+    sb.insert("variant".into(), Json::String("named".into()));
+    let mut cert = original.section("certificate").unwrap().clone();
+    let cb = fields(fields(&mut cert).get_mut("bindings").unwrap());
+    cb.insert("object_hash".into(), Json::String(identity.object_hash));
+    for field in ["interface_hash", "closure_hash", "reference_program_hash"] {
+        cb.insert(field.into(), Json::String(root.clone()));
+    }
+    cb.insert(
+        "schedule_hash".into(),
+        Json::String(sha256_hex(schedule.canonical().as_bytes())),
+    );
+    let object = Object::parse(&format!(
+        "{}\nsection schedule\n{}\n\nsection certificate\n{}\n",
+        base.text,
+        schedule.canonical(),
+        cert.canonical()
+    ))
+    .unwrap();
+    let report = object.verify_certificate().unwrap();
+    assert_eq!(
+        report.qinplace_applicability.get(&root),
+        Some(&QinplaceApplicability::Established)
     );
 }

@@ -102,7 +102,13 @@ pub struct SourceLocation {
 }
 /// Non-emitting semantic call observation, including empty source bodies.
 #[derive(Clone, Debug)]
+pub struct SourceRootBinding {
+    pub budget: [u128; 4],
+    pub variant: String,
+}
+#[derive(Clone, Debug)]
 pub struct SourceInvocationRecord {
+    pub values: BTreeMap<String, Json>,
     pub path: Vec<SourceEdge>,
     pub steps: Vec<SourceStep>,
     pub invocations: Vec<SourceInvocation>,
@@ -635,6 +641,7 @@ pub struct Expander {
     source_step_plans: BTreeMap<(Vec<usize>, usize), StepPlan>,
     source_invocation_records: Vec<SourceInvocationRecord>,
     source_controls: Vec<Wire>,
+    source_root_binding: Option<SourceRootBinding>,
 
     registry: Registry,
     serial: usize,
@@ -731,6 +738,7 @@ impl Expander {
             source_step_plans: BTreeMap::new(),
             source_invocation_records: Vec::new(),
             source_controls: Vec::new(),
+            source_root_binding: None,
             registry,
             serial: 0,
             ordinals: BTreeMap::new(),
@@ -757,6 +765,7 @@ impl Expander {
             source_step_plans: BTreeMap::new(),
             source_invocation_records: Vec::new(),
             source_controls: Vec::new(),
+            source_root_binding: None,
             registry,
             serial: 0,
             ordinals: BTreeMap::new(),
@@ -766,6 +775,10 @@ impl Expander {
     /// wires, not callee slots, and follow the same constructor control path.
     pub fn with_source_controls(mut self, controls: Vec<Wire>) -> Self {
         self.source_controls = controls;
+        self
+    }
+    pub fn with_source_root_binding(mut self, binding: SourceRootBinding) -> Self {
+        self.source_root_binding = Some(binding);
         self
     }
     pub fn source_invocations(&self) -> &[SourceInvocationRecord] {
@@ -1330,9 +1343,9 @@ impl Expander {
                             frame.reverse = step.reverse;
                         }
                     }
-                    self.source_invocation_records
-                        .try_reserve(1)
-                        .map_err(|e| format!("host limit: source invocation records: {e}"))?;
+                    self.source_invocation_records.try_reserve(1).map_err(|e| {
+                        format!("{HOST_RESOURCE_LIMIT_PREFIX}source invocation records: {e}")
+                    })?;
                     self.source_invocation_records.push(record);
                 }
                 let mut locations = BTreeMap::new();
@@ -1475,6 +1488,12 @@ impl Expander {
                 }));
                 let binding = built.binding.map(|mut binding| {
                     binding.inherited_controls = c.controls.len();
+                    if c.source_invocations.is_empty() {
+                        if let Some(root) = &self.source_root_binding {
+                            binding.budget = root.budget;
+                            binding.variant = root.variant.clone();
+                        }
+                    }
                     binding
                 });
                 c.source_invocations.push(SourceInvocation {
@@ -1487,10 +1506,15 @@ impl Expander {
                     symbol: built.symbol.clone(),
                     oracle: built.oracle,
                 });
-                self.source_invocation_records
-                    .try_reserve(1)
-                    .map_err(|e| format!("host limit: source invocation records: {e}"))?;
+                self.source_invocation_records.try_reserve(1).map_err(|e| {
+                    format!("{HOST_RESOURCE_LIMIT_PREFIX}source invocation records: {e}")
+                })?;
                 self.source_invocation_records.push(SourceInvocationRecord {
+                    values: c
+                        .values
+                        .iter()
+                        .map(|(name, (value, _))| (name.clone(), value.clone()))
+                        .collect(),
                     path: c.source_edges.clone(),
                     steps: c.source_steps.clone(),
                     invocations: c.source_invocations.clone(),

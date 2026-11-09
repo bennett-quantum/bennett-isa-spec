@@ -77,6 +77,16 @@ impl RefLibrary {
             .map_err(|e| crate::Error::new(format!("§11.1: {e}")))
     }
 }
+pub(crate) struct SourceRootRequest<'a> {
+    pub budget: crate::Budget,
+    pub variant: &'a str,
+    pub controls: &'a [bennett_isa_conformance::ref_language::Wire],
+}
+#[derive(Default)]
+struct RootSourceContext<'a> {
+    controls: &'a [bennett_isa_conformance::ref_language::Wire],
+    binding: Option<bennett_isa_conformance::ref_language::SourceRootBinding>,
+}
 impl Object {
     /// Expand a checked structured source invocation with captured classical
     /// actuals. Source adjoints are formed before constructor instantiation.
@@ -87,8 +97,15 @@ impl Object {
         bundles: &[(&str, usize)],
         adjoint: bool,
     ) -> Result<Vec<Leaf>> {
-        self.expand_action_source_bound(name, args, bundles, adjoint, None, &[])
-            .map(|(leaves, _)| leaves)
+        self.expand_action_source_bound(
+            name,
+            args,
+            bundles,
+            adjoint,
+            None,
+            RootSourceContext::default(),
+        )
+        .map(|(leaves, _)| leaves)
     }
     /// Tuple-only token parameters require their canonical equality partition.
     pub fn expand_action_source_with_token_aliases(
@@ -99,8 +116,15 @@ impl Object {
         adjoint: bool,
         aliases: &[u64],
     ) -> Result<Vec<Leaf>> {
-        self.expand_action_source_bound(name, args, bundles, adjoint, Some(aliases), &[])
-            .map(|(leaves, _)| leaves)
+        self.expand_action_source_bound(
+            name,
+            args,
+            bundles,
+            adjoint,
+            Some(aliases),
+            RootSourceContext::default(),
+        )
+        .map(|(leaves, _)| leaves)
     }
     /// The complete source invocation inventory, independent of emitted leaves.
     pub fn source_action_invocations(
@@ -111,8 +135,14 @@ impl Object {
         adjoint: bool,
         aliases: Option<&[u64]>,
     ) -> Result<Vec<ResolvedSourceInvocation>> {
-        let (_, records) =
-            self.expand_action_source_bound(name, args, bundles, adjoint, aliases, &[])?;
+        let (_, records) = self.expand_action_source_bound(
+            name,
+            args,
+            bundles,
+            adjoint,
+            aliases,
+            RootSourceContext::default(),
+        )?;
         records.iter().map(resolve_source_invocation).collect()
     }
     pub fn source_action_invocations_with_controls(
@@ -124,8 +154,48 @@ impl Object {
         aliases: Option<&[u64]>,
         controls: &[bennett_isa_conformance::ref_language::Wire],
     ) -> Result<Vec<ResolvedSourceInvocation>> {
-        let (_, records) =
-            self.expand_action_source_bound(name, args, bundles, adjoint, aliases, controls)?;
+        let (_, records) = self.expand_action_source_bound(
+            name,
+            args,
+            bundles,
+            adjoint,
+            aliases,
+            RootSourceContext {
+                controls,
+                binding: None,
+            },
+        )?;
+        records.iter().map(resolve_source_invocation).collect()
+    }
+    pub(crate) fn source_action_invocations_at(
+        &self,
+        name: &str,
+        args: &[Value],
+        bundles: &[(&str, usize)],
+        aliases: &[u64],
+        request: SourceRootRequest<'_>,
+    ) -> Result<Vec<ResolvedSourceInvocation>> {
+        let budget = request.budget;
+        let root = bennett_isa_conformance::ref_language::SourceRootBinding {
+            budget: [
+                budget.steps as u128,
+                budget.heap,
+                budget.stack,
+                budget.depth,
+            ],
+            variant: request.variant.into(),
+        };
+        let (_, records) = self.expand_action_source_bound(
+            name,
+            args,
+            bundles,
+            false,
+            Some(aliases),
+            RootSourceContext {
+                controls: request.controls,
+                binding: Some(root),
+            },
+        )?;
         records.iter().map(resolve_source_invocation).collect()
     }
     fn expand_action_source_bound(
@@ -135,7 +205,7 @@ impl Object {
         bundles: &[(&str, usize)],
         adjoint: bool,
         aliases: Option<&[u64]>,
-        controls: &[bennett_isa_conformance::ref_language::Wire],
+        context: RootSourceContext<'_>,
     ) -> Result<(
         Vec<Leaf>,
         Vec<bennett_isa_conformance::ref_language::SourceInvocationRecord>,
@@ -179,7 +249,10 @@ impl Object {
             .with_registry(registry)
             .map_err(infeasible)?
             .with_source_factory(factory)
-            .with_source_controls(controls.to_vec());
+            .with_source_controls(context.controls.to_vec());
+        if let Some(binding) = context.binding {
+            e = e.with_source_root_binding(binding);
+        }
         let leaves = e
             .expand_bound(
                 "action_call",
@@ -199,6 +272,10 @@ impl Object {
     /// Resolve a concrete ref library without modifying canonical metadata.
     /// No 0.9 library is substituted for an accepted 0.8 binding.
     pub fn bound_ref_library(&self) -> Result<RefLibrary> {
+        self.require_ref_library_binding()?;
+        RefLibrary::published()
+    }
+    pub(crate) fn require_ref_library_binding(&self) -> Result<()> {
         if self.isa_version != IsaVersion::V09 {
             return err(
                 "§11.1",
@@ -213,7 +290,7 @@ impl Object {
         if (binding.name, binding.version, binding.hash) != ("ref", "0.9", Some(REF09_HASH)) {
             return Err(infeasible("bound expansion library is unavailable"));
         }
-        RefLibrary::published()
+        Ok(())
     }
 }
 
@@ -366,7 +443,7 @@ impl<'a> OracleInvocation<'a> {
         bundles: &[(&str, usize)],
         leaf_limit: usize,
     ) -> Result<Vec<Leaf>> {
-        self.expand_source_observed(library, bundles, leaf_limit, &[])
+        self.expand_source_observed(library, bundles, leaf_limit, &[], None)
             .map(|(leaves, _)| leaves)
     }
     pub fn source_invocations(
@@ -375,11 +452,22 @@ impl<'a> OracleInvocation<'a> {
         bundles: &[(&str, usize)],
         controls: &[bennett_isa_conformance::ref_language::Wire],
     ) -> Result<Vec<ResolvedSourceInvocation>> {
+        let variant = self
+            .object
+            .section("schedule")
+            .and_then(|s| s.get("bindings").ok())
+            .filter(|b| {
+                b.get("closure_hash").and_then(crate::json::Json::string)
+                    == Ok(self.closure_hash.as_str())
+            })
+            .map(|b| b.get("variant").and_then(crate::json::Json::string))
+            .transpose()?;
         let (_, records) = self.expand_source_observed(
             library,
             bundles,
             bennett_isa_conformance::ref_language::DEFAULT_SOURCE_LEAF_LIMIT,
             controls,
+            variant,
         )?;
         records.iter().map(resolve_source_invocation).collect()
     }
@@ -389,6 +477,7 @@ impl<'a> OracleInvocation<'a> {
         bundles: &[(&str, usize)],
         leaf_limit: usize,
         controls: &[bennett_isa_conformance::ref_language::Wire],
+        variant: Option<&str>,
     ) -> Result<(
         Vec<Leaf>,
         Vec<bennett_isa_conformance::ref_language::SourceInvocationRecord>,
@@ -425,6 +514,19 @@ impl<'a> OracleInvocation<'a> {
             .with_source_factory(factory)
             .with_source_leaf_limit(leaf_limit)
             .with_source_controls(controls.to_vec());
+        if let Some(variant) = variant {
+            expander = expander.with_source_root_binding(
+                bennett_isa_conformance::ref_language::SourceRootBinding {
+                    budget: [
+                        self.budget.steps as u128,
+                        self.budget.heap,
+                        self.budget.stack,
+                        self.budget.depth,
+                    ],
+                    variant: variant.into(),
+                },
+            );
+        }
         let leaves = expander
             .expand_bound(
                 "oracle_call",
@@ -568,6 +670,7 @@ pub struct ResolvedSourceInvocation {
     pub context_key: crate::json::Json,
     pub closure_hash: String,
     pub binding: bennett_isa_conformance::ref_language::SourceBinding,
+    pub values: std::collections::BTreeMap<String, Value>,
     pub wires: std::collections::BTreeMap<String, Vec<bennett_isa_conformance::ref_language::Wire>>,
 }
 fn resolve_source_invocation(
@@ -611,6 +714,7 @@ fn resolve_source_invocation(
         edges.push(Json::Object(fields));
     }
     Ok(ResolvedSourceInvocation {
+        values: record.values.clone(),
         context_key: Json::Array(edges),
         closure_hash: invocation.symbol.clone(),
         binding,
