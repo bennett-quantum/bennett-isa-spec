@@ -15,22 +15,30 @@ impl ClassicalMachine<'_> {
         let Some(certificate) = self.object.section("certificate") else {
             return Ok(());
         };
-        if !certificate
-            .get("regions")?
-            .object()?
+        let regions = certificate.get("regions")?.object()?;
+        let contextual = regions
             .values()
-            .any(|r| r.object().is_ok_and(|m| m.contains_key("frame_contexts")))
-        {
+            .any(|r| r.object().is_ok_and(|m| m.contains_key("frame_contexts")));
+        let complete = contextual
+            || certificate
+                .get("bindings")?
+                .object()?
+                .contains_key("schedule_hash");
+        let identity = self.object.identity()?;
+        let closure = identity.closure_hashes[&callee.name]
+            .as_deref()
+            .ok_or_else(|| Error::new("§12.3: unresolved frame root".into()))?;
+        if closure != certificate.get("bindings")?.get("closure_hash")?.string()? {
+            if contextual {
+                return err(
+                    "§12.3",
+                    "contextual frame certificate is bound to a different invocation root",
+                );
+            }
             return Ok(());
         }
-        let identity = self.object.identity()?;
-        if identity.closure_hashes[&callee.name].as_deref()
-            != Some(certificate.get("bindings")?.get("closure_hash")?.string()?)
-        {
-            return err(
-                "§12.3",
-                "contextual frame certificate is bound to a different invocation root",
-            );
+        if !complete && !regions.contains_key(closure) {
+            return Ok(());
         }
         let arguments =
             callee.params[if callee.kind == "oracle" { 4 } else { 3 }]
@@ -74,7 +82,19 @@ impl ClassicalMachine<'_> {
                         .copied()
                         .collect()
                 };
-                actuals.push(Value::Str(p.name.clone()));
+                actuals.push(match p.ty {
+                    Type::Region(a, w) => Value::Obj(BTreeMap::from([
+                        ("address".into(), Value::Num(a as f64)),
+                        ("cell".into(), Value::Num(w as f64)),
+                        (
+                            "role".into(),
+                            Value::Str(p.role.clone().unwrap_or_else(|| "in".into())),
+                        ),
+                        ("origin".into(), Value::Str(format!("interface:{}", p.name))),
+                        ("cells".into(), Value::Str(p.name.clone())),
+                    ])),
+                    _ => Value::Str(p.name.clone()),
+                });
                 bundles.push((p.name.clone(), wires.len()));
                 for (i, wire) in wires.iter().enumerate() {
                     logical.insert(*wire, (p.name.clone(), i));
@@ -125,7 +145,12 @@ impl ClassicalMachine<'_> {
                 &source_controls,
             )?
         };
-        self.object.select_invocation_frames(&contexts, classes)?;
+        if complete {
+            self.object.select_invocation_frames(&contexts, classes)?;
+        } else {
+            self.object
+                .select_provided_invocation_frames(&contexts, classes)?;
+        }
         Ok(())
     }
 }

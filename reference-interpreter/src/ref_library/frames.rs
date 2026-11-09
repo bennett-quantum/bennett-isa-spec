@@ -20,6 +20,10 @@ pub(crate) fn validate_context_key(key: &Json) -> Result<()> {
     Ok(())
 }
 
+enum FrameScope {
+    Complete,
+    Provided,
+}
 #[derive(Clone, Debug)]
 pub struct SelectedInvocationFrame {
     pub context_key: Json,
@@ -63,6 +67,21 @@ impl Object {
         &self,
         contexts: &[ResolvedSourceInvocation],
         root_classes: &[Vec<String>],
+    ) -> Result<Vec<SelectedInvocationFrame>> {
+        self.check_invocation_frame_scope(contexts, root_classes, FrameScope::Complete)
+    }
+    pub(crate) fn select_provided_invocation_frames(
+        &self,
+        contexts: &[ResolvedSourceInvocation],
+        root_classes: &[Vec<String>],
+    ) -> Result<Vec<SelectedInvocationFrame>> {
+        self.check_invocation_frame_scope(contexts, root_classes, FrameScope::Provided)
+    }
+    fn check_invocation_frame_scope(
+        &self,
+        contexts: &[ResolvedSourceInvocation],
+        root_classes: &[Vec<String>],
+        scope: FrameScope,
     ) -> Result<Vec<SelectedInvocationFrame>> {
         let certificate = self.section("certificate").ok_or_else(|| {
             Error::new("§12.3: frame checking requires certificate records".into())
@@ -128,9 +147,11 @@ impl Object {
         }
         let mut selected = Vec::new();
         for context in contexts {
-            let region = regions.get(&context.closure_hash).ok_or_else(|| {
-                Error::new("§12.3: reached invocation has no region frame".into())
-            })?;
+            let region = match regions.get(&context.closure_hash) {
+                Some(region) => region,
+                None if matches!(scope, FrameScope::Provided) => continue,
+                None => return err("§12.3", "reached invocation has no region frame"),
+            };
             let frame = select(region, &context.context_key)?;
             let name = identities
                 .closure_hashes

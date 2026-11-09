@@ -179,7 +179,13 @@ fn runtime_checks_nested_context_classes_before_any_gate_and_reverses_fault() {
     fields.insert("2".into(),support::json(r#"{"name":"launch","kind":"r","signature":{"abi":"0.9","kind":"r","params":["qreg[1]","qreg[1]"],"results":[],"tier":"r"},"interface_hash":"0000000000000000000000000000000000000000000000000000000000000000"}"#));
     let raw=original.text.split("\nsection certificate\n").next().unwrap().replace(&original.section("symbols").unwrap().canonical(),&symbols.canonical())+"fn r @launch (a:qreg[1], b:qreg[1]) () () () ()\n^entry():\naction_call @pair (a, b) () () ()\nret\n";
     let base = support::rehash(&raw);
-    for wrong in [false, true] {
+    enum Case {
+        Valid,
+        WrongContext,
+        WrongUniform,
+    }
+    for case in [Case::Valid, Case::WrongContext, Case::WrongUniform] {
+        let wrong = !matches!(case, Case::Valid);
         let mut cert = original.section("certificate").unwrap().clone();
         let Json::Object(c) = &mut cert else {
             unreachable!()
@@ -191,7 +197,7 @@ fn runtime_checks_nested_context_classes_before_any_gate_and_reverses_fault() {
             "object_hash".into(),
             Json::String(base.identity().unwrap().object_hash),
         );
-        if wrong {
+        if matches!(case, Case::WrongContext) {
             let Json::Object(regions) = c.get_mut("regions").unwrap() else {
                 unreachable!()
             };
@@ -218,6 +224,23 @@ fn runtime_checks_nested_context_classes_before_any_gate_and_reverses_fault() {
                 unreachable!()
             };
             slot.insert("class".into(), Json::String("B".into()));
+        }
+        if matches!(case, Case::WrongUniform) {
+            let Json::Object(regions) = c.get_mut("regions").unwrap() else {
+                unreachable!()
+            };
+            let child = regions
+                .values_mut()
+                .find(|r| r.object().unwrap().contains_key("frame_contexts"))
+                .unwrap();
+            let Json::Object(child) = child else {
+                unreachable!()
+            };
+            let contexts = child.remove("frame_contexts").unwrap();
+            child.insert(
+                "frame".into(),
+                contexts.array().unwrap()[0].get("frame").unwrap().clone(),
+            );
         }
         let object = Object::parse(&format!(
             "{}\nsection certificate\n{}\n",
