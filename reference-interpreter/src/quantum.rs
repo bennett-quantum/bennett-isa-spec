@@ -366,6 +366,42 @@ impl QuantumState {
     pub fn is_basis(&self) -> bool {
         matches!(self.state, State::Basis { .. })
     }
+    pub(crate) fn same_wire_layout(&self, other: &Self) -> bool {
+        self.ids == other.ids && self.next == other.next
+    }
+    pub(crate) fn set_basis_bits(&mut self, values: &[bool]) -> Result<()> {
+        if values.len() != self.ids.len() {
+            return err("§14.2", "batch basis width differs from the wire layout");
+        }
+        self.state = State::Basis {
+            bits: values.to_vec(),
+            phase: Complex::ONE,
+            exact: Amplitude::one(),
+        };
+        self.borrow_audit = None;
+        self.projected = false;
+        Ok(())
+    }
+    pub(crate) fn basis_snapshot(&self, layout: &Self) -> Option<(Vec<bool>, bool)> {
+        let (bits, positive) = match &self.state {
+            State::Basis { bits, exact, .. } => Some((bits.clone(), exact == &Amplitude::one())),
+            State::Vector { amplitudes } if amplitudes.len() == 1 => {
+                let (key, (_, exact)) = amplitudes.iter().next()?;
+                Some((key_bits(key, self.ids.len()), exact == &Amplitude::one()))
+            }
+            _ => None,
+        }?;
+        if self.ids == layout.ids {
+            Some((bits, positive))
+        } else {
+            let projected = layout
+                .ids
+                .iter()
+                .map(|wire| self.position(*wire).ok().map(|p| bits[p]))
+                .collect::<Option<Vec<_>>>()?;
+            Some((projected, positive))
+        }
+    }
     /// K13/T3 assertions require one exact basis component with amplitude +1,
     /// including global phase. Reading each interface bit alone loses phase.
     pub(crate) fn require_positive_basis(&self) -> Result<()> {

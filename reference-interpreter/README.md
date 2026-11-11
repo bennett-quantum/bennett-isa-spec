@@ -245,6 +245,12 @@ component, else null. Borrowed wires start in |0⟩ from the borrow pool and
 must be returned to |0⟩ on every component, else the run is a §5.6
 diagnostic.
 
+`reverse-action-batch` reuses admitted action setup for a JSONL tuple stream or
+an arbitrarily wide, shardable tuple range. It emits compact full forward and
+reversed tuples with exact phase, preservation and cleanup observations.
+The versioned binary/JSONL framing, ordering and independent consumer checks
+are specified in [BATCH-REVERSE.md](BATCH-REVERSE.md).
+
 `run-program <object> <cc-entry> [options]` is a one-shot §10 launch:
 `bennett_load` (parse and stored-hash verification), positional
 `bennett_run` of a device CC entry with the `run-cc` argument, entropy,

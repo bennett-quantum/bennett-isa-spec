@@ -7,12 +7,108 @@ use crate::{
     Result, Type,
 };
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::{Arc, Mutex};
+type OracleCache = Arc<Mutex<OracleMemo>>;
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+struct OracleKey {
+    name: String,
+    budget: (u64, u128, u128, u128),
+    controls: usize,
+    inputs: Vec<u8>,
+}
+struct OracleMemo {
+    entries: BTreeMap<OracleKey, Arc<(crate::BitVector, crate::BitVector)>>,
+    bytes: usize,
+    limit: usize,
+}
+impl Default for OracleMemo {
+    fn default() -> Self {
+        Self {
+            entries: BTreeMap::new(),
+            bytes: 0,
+            limit: 16 * 1024 * 1024,
+        }
+    }
+}
+#[cfg(test)]
+std::thread_local! { static ORACLE_EVALUATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
 
 struct Environment {
     bindings: QuantumBindings,
     predicates: Vec<Wire>,
     borrowed: BTreeMap<String, Vec<usize>>,
     borrow_used: BTreeSet<usize>,
+    oracle_cache: Option<OracleCache>,
+}
+
+/// Fixed source and lifetime-width setup shared by independent action runs.
+/// Quantum state and token resolution remain fresh for every invocation.
+pub struct PreparedAction<'a> {
+    object: &'a Object,
+    name: String,
+    bindings: QuantumBindings,
+    aliases: Option<Vec<u64>>,
+    plan: ActionPlan,
+    preserved: Vec<Wire>,
+    oracle_cache: OracleCache,
+}
+struct ActionPlan {
+    instructions: Vec<Instruction>,
+    widths: Vec<LifetimeWidths>,
+    regions: Vec<Instruction>,
+}
+/// Complete basis observations; a non-basis output has no packed tuple.
+pub struct BasisReverse {
+    pub forward: Option<Vec<bool>>,
+    pub reversed: Option<Vec<bool>>,
+    pub forward_positive: bool,
+    pub reversed_positive: bool,
+    pub workspace_clean: bool,
+    pub inputs_preserved: bool,
+    pub equals_entry: bool,
+}
+impl PreparedAction<'_> {
+    /// Execute both directions on a fresh state with the template's wire layout.
+    pub fn reverse_basis(
+        &self,
+        template: &QuantumState,
+        bits: &[bool],
+        adjoint: bool,
+    ) -> Result<BasisReverse> {
+        let mut state = template.clone();
+        state.set_basis_bits(bits)?;
+        let entry = state.clone();
+        self.execute(&mut state, adjoint)?;
+        let forward = state.basis_snapshot(&entry);
+        let workspace_clean = state.same_wire_layout(&entry);
+        let inputs_preserved = self
+            .preserved
+            .iter()
+            .all(|wire| state.read_basis(&[*wire]).ok() == entry.read_basis(&[*wire]).ok());
+        self.execute(&mut state, !adjoint)?;
+        let reversed = state.basis_snapshot(&entry);
+        Ok(BasisReverse {
+            forward_positive: forward.as_ref().is_some_and(|(_, positive)| *positive),
+            reversed_positive: reversed.as_ref().is_some_and(|(_, positive)| *positive),
+            forward: forward.map(|(bits, _)| bits),
+            reversed: reversed.map(|(bits, _)| bits),
+            workspace_clean,
+            inputs_preserved,
+            equals_entry: state == entry,
+        })
+    }
+    fn execute(&self, state: &mut QuantumState, adjoint: bool) -> Result<()> {
+        self.object.action_with_plan(
+            &self.name,
+            state,
+            &self.bindings,
+            adjoint,
+            &[],
+            self.aliases.as_deref(),
+            Some(&self.plan),
+            Some(&self.oracle_cache),
+        )
+    }
 }
 impl Environment {
     fn bundle(&self, n: &str) -> Result<Vec<Wire>> {
@@ -62,6 +158,111 @@ impl Environment {
     }
 }
 impl Object {
+    /// Admit one immutable action setup for a stream of fresh basis executions.
+    pub fn prepare_action<'a>(
+        &'a self,
+        name: &str,
+        bindings: &QuantumBindings,
+        aliases: Option<&[u64]>,
+    ) -> Result<PreparedAction<'a>> {
+        self.ensure_linked()?;
+        self.check_hashes()?;
+        let f = self
+            .functions
+            .get(name)
+            .filter(|f| matches!(f.kind.as_str(), "action" | "perm_action"))
+            .ok_or_else(|| Error::new(format!("§5.3: unknown action @{name}")))?;
+        let mut preserved = Vec::new();
+        for p in &f.params[1] {
+            preserved.extend(
+                bindings
+                    .bundles
+                    .get(&p.name)
+                    .ok_or_else(|| Error::new("§5.1: missing action input".into()))?,
+            );
+        }
+        for p in &f.params[2] {
+            if p.role.as_deref() == Some("in") {
+                preserved.extend(
+                    bindings
+                        .regions
+                        .get(&p.name)
+                        .ok_or_else(|| Error::new("§5.1: missing action region".into()))?
+                        .cells
+                        .iter()
+                        .flatten(),
+                );
+            }
+        }
+        preserved.extend(bindings.borrowed.iter().flatten());
+        for p in &f.params[3] {
+            crate::oracle::check_argument(
+                self,
+                &p.ty,
+                bindings
+                    .args
+                    .get(&p.name)
+                    .ok_or_else(|| Error::new("§5.1: missing action argument".into()))?,
+            )?;
+        }
+        if self.isa_version == crate::IsaVersion::V09 {
+            let args = f.params[3]
+                .iter()
+                .map(|p| bindings.args[&p.name].clone())
+                .collect::<Vec<_>>();
+            self.resolve_invocation_tokens(f, &args, None, None, aliases)?;
+        }
+        let instructions = f
+            .blocks
+            .iter()
+            .flat_map(|b| b.instructions.iter().cloned())
+            .collect::<Vec<_>>();
+        let mut declarations = Vec::new();
+        gather_regions(&instructions, &mut declarations);
+        let regions = declarations.into_iter().cloned().collect::<Vec<_>>();
+        let mut env = Environment {
+            bindings: bindings.clone(),
+            predicates: Vec::new(),
+            borrowed: BTreeMap::new(),
+            borrow_used: BTreeSet::new(),
+            oracle_cache: None,
+        };
+        for region in &regions {
+            env.bindings.regions.insert(
+                region.operands[0].clone(),
+                QuantumRegion {
+                    address_width: crate::object::host_count(
+                        &region.operands[1],
+                        "qregion address width",
+                    )?,
+                    cell_width: crate::object::host_count(
+                        &region.operands[2],
+                        "qregion cell width",
+                    )?,
+                    cells: Vec::new(),
+                },
+            );
+        }
+        let mut live = bindings
+            .bundles
+            .iter()
+            .map(|(n, w)| (n.clone(), w.len()))
+            .collect();
+        let widths = infer_widths(&instructions, &env, &mut live)?;
+        Ok(PreparedAction {
+            object: self,
+            name: name.into(),
+            bindings: bindings.clone(),
+            aliases: aliases.map(<[u64]>::to_vec),
+            plan: ActionPlan {
+                instructions,
+                widths,
+                regions,
+            },
+            preserved,
+            oracle_cache: Arc::new(Mutex::new(OracleMemo::default())),
+        })
+    }
     pub(crate) fn permutation_action_vectors(
         &self,
         name: &str,
@@ -241,6 +442,20 @@ impl Object {
         controls: &[(Wire, bool)],
         aliases: Option<&[u64]>,
     ) -> Result<()> {
+        self.action_with_plan(name, q, bindings, adjoint, controls, aliases, None, None)
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn action_with_plan(
+        &self,
+        name: &str,
+        q: &mut QuantumState,
+        bindings: &QuantumBindings,
+        adjoint: bool,
+        controls: &[(Wire, bool)],
+        aliases: Option<&[u64]>,
+        plan: Option<&ActionPlan>,
+        oracle_cache: Option<&OracleCache>,
+    ) -> Result<()> {
         let entry_next_wire = q.next_wire_id();
         let f = self
             .functions
@@ -337,10 +552,15 @@ impl Object {
             predicates: Vec::new(),
             borrowed: BTreeMap::new(),
             borrow_used: BTreeSet::new(),
+            oracle_cache: oracle_cache.cloned(),
         };
         let mut regions = Vec::new();
-        for b in &f.blocks {
-            gather_regions(&b.instructions, &mut regions);
+        if let Some(plan) = plan {
+            regions.extend(&plan.regions);
+        } else {
+            for b in &f.blocks {
+                gather_regions(&b.instructions, &mut regions);
+            }
         }
         let mut local = Vec::new();
         for i in regions {
@@ -378,18 +598,25 @@ impl Object {
             );
             local.push((wires, image));
         }
-        let mut live_widths = bindings
-            .bundles
-            .iter()
-            .map(|(n, w)| (n.clone(), w.len()))
-            .collect();
-        let instructions: Vec<_> = f
-            .blocks
-            .iter()
-            .flat_map(|b| b.instructions.iter().cloned())
-            .collect();
-        let widths = infer_widths(&instructions, &env, &mut live_widths)?;
-        self.action_sequence(&instructions, &widths, q, &mut env, adjoint, controls)?;
+        let owned;
+        let (instructions, widths) = if let Some(plan) = plan {
+            (&plan.instructions, &plan.widths)
+        } else {
+            let mut live = bindings
+                .bundles
+                .iter()
+                .map(|(n, w)| (n.clone(), w.len()))
+                .collect();
+            let instructions = f
+                .blocks
+                .iter()
+                .flat_map(|b| b.instructions.iter().cloned())
+                .collect::<Vec<_>>();
+            let widths = infer_widths(&instructions, &env, &mut live)?;
+            owned = (instructions, widths);
+            (&owned.0, &owned.1)
+        };
+        self.action_sequence(instructions, widths, q, &mut env, adjoint, controls)?;
         if !env.predicates.is_empty() || !env.borrowed.is_empty() {
             return err("§5.1", "action exited with unclosed predicate/borrow frame");
         }
@@ -419,12 +646,12 @@ impl Object {
         adjoint: bool,
         inherited: &[(Wire, bool)],
     ) -> Result<()> {
-        let indices: Vec<_> = if adjoint {
-            (0..sequence.len()).rev().collect()
-        } else {
-            (0..sequence.len()).collect()
-        };
-        for index in indices {
+        for cursor in 0..sequence.len() {
+            let index = if adjoint {
+                sequence.len() - 1 - cursor
+            } else {
+                cursor
+            };
             let i = &sequence[index];
             let width = &widths[index];
             let a = &i.operands;
@@ -759,7 +986,7 @@ impl Object {
                                 })
                             })
                             .collect::<Result<Vec<_>>>()?;
-                        self.oracle_quantum(
+                        self.oracle_quantum_cached(
                             callee,
                             q,
                             &ins,
@@ -776,6 +1003,7 @@ impl Object {
                                 }
                             }),
                             &c,
+                            e.oracle_cache.as_ref(),
                         )?;
                     } else {
                         let mut binding = QuantumBindings {
@@ -804,12 +1032,15 @@ impl Object {
                                 .args
                                 .insert(p.name.clone(), e.bindings.args[&n].clone());
                         }
-                        self.action_internal(
+                        self.action_with_plan(
                             &callee.name,
                             q,
                             &binding,
                             adjoint ^ call.adjoint,
                             &c,
+                            None,
+                            None,
+                            e.oracle_cache.as_ref(),
                         )?;
                     }
                 }
@@ -879,7 +1110,7 @@ impl Object {
                     let fw = gf.params[2][0].ty.width(self.ptr_width)? as usize;
                     let t = q.allocate(x.len())?;
                     let fault = q.allocate(fw)?;
-                    self.oracle_quantum(
+                    self.oracle_quantum_cached(
                         gf,
                         q,
                         &inputs,
@@ -890,9 +1121,10 @@ impl Object {
                         token,
                         primary,
                         &context,
+                        e.oracle_cache.as_ref(),
                     )?;
                     bundle_exchange(q, &x, &t, &context)?;
-                    self.oracle_quantum(
+                    self.oracle_quantum_cached(
                         gif,
                         q,
                         &inputs,
@@ -903,6 +1135,7 @@ impl Object {
                         token,
                         primary,
                         &context,
+                        e.oracle_cache.as_ref(),
                     )?;
                     q.release(&t)?;
                     q.release(&fault)?;
@@ -976,6 +1209,25 @@ impl Object {
         primary: Option<&crate::BudgetToken>,
         controls: &[(Wire, bool)],
     ) -> Result<()> {
+        self.oracle_quantum_cached(
+            callee, q, ins, target, fault, regions, args, budget, primary, controls, None,
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn oracle_quantum_cached(
+        &self,
+        callee: &Function,
+        q: &mut QuantumState,
+        ins: &[Vec<Wire>],
+        target: &[Wire],
+        fault: &[Wire],
+        regions: &BTreeMap<String, QuantumRegion>,
+        args: &[Argument],
+        budget: crate::Budget,
+        primary: Option<&crate::BudgetToken>,
+        controls: &[(Wire, bool)],
+        cache: Option<&OracleCache>,
+    ) -> Result<()> {
         let input_positions = ins
             .iter()
             .map(|w| w.iter().map(|w| q.position(*w)).collect::<Result<Vec<_>>>())
@@ -1040,31 +1292,100 @@ impl Object {
                     .collect::<Result<_>>()?;
                 input.regions.insert(n.clone(), bytes);
             }
-            let mut machine = crate::OracleVectorMachine::new_bound(
-                self,
-                &callee.name,
-                &input,
-                budget,
-                primary,
-                None,
-                controls.len(),
-            )?;
-            let entry = machine.snapshot();
-            for _ in 0..budget.steps {
-                machine.forward_step()?;
-            }
-            let outcome = machine.outcome()?;
-            for _ in 0..budget.steps {
-                machine.inverse_step()?;
-            }
-            if machine.snapshot() != entry || !machine.frames_clean() {
-                return err("§5.2", "oracle workspace failed prefix reversal");
-            }
+            // §5.2 F_B depends on source, complete inputs and budget, not on
+            // target/fault values. Cache only unscheduled 0.8 invocations with
+            // no classical/token/region arguments; all other cases fall through.
+            let key = cache.and_then(|_| {
+                if self.isa_version != crate::IsaVersion::V08
+                    || self.section("schedule").is_some()
+                    || !args.is_empty()
+                    || !regions.is_empty()
+                    || !callee.params[3].is_empty()
+                    || !callee.params[4].is_empty()
+                    || input.ins.len() != callee.params[0].len()
+                    || input
+                        .ins
+                        .iter()
+                        .zip(&callee.params[0])
+                        .any(|(v, p)| p.ty.bits(self.ptr_width).ok() != Some(v.width()))
+                {
+                    return None;
+                }
+                let bytes = input
+                    .ins
+                    .iter()
+                    .try_fold(0usize, |n, v| n.checked_add(v.width().div_ceil(8)))?;
+                if bytes > 16 * 1024 * 1024 {
+                    return None;
+                }
+                Some(OracleKey {
+                    name: callee.name.clone(),
+                    budget: (budget.steps, budget.heap, budget.stack, budget.depth),
+                    controls: controls.len(),
+                    inputs: input
+                        .ins
+                        .iter()
+                        .flat_map(crate::BitVector::to_le_bytes)
+                        .collect(),
+                })
+            });
+            let cached = key
+                .as_ref()
+                .and_then(|key| cache?.lock().ok()?.entries.get(key).cloned());
+            let fresh;
+            let outcome = if let Some(value) = &cached {
+                value.as_ref()
+            } else {
+                #[cfg(test)]
+                ORACLE_EVALUATIONS.with(|count| count.set(count.get() + 1));
+                let mut machine = crate::OracleVectorMachine::new_bound(
+                    self,
+                    &callee.name,
+                    &input,
+                    budget,
+                    primary,
+                    None,
+                    controls.len(),
+                )?;
+                let entry = machine.snapshot();
+                for _ in 0..budget.steps {
+                    machine.forward_step()?;
+                }
+                let outcome = machine.outcome()?;
+                for _ in 0..budget.steps {
+                    machine.inverse_step()?;
+                }
+                if machine.snapshot() != entry || !machine.frames_clean() {
+                    return err("§5.2", "oracle workspace failed prefix reversal");
+                }
+                fresh = (outcome.payload, outcome.code);
+                if let (Some(key), Some(cache)) = (key, cache) {
+                    if let Ok(mut memo) = cache.lock() {
+                        // Conservative retained-byte accounting; a full cache
+                        // changes throughput only, never the executed domain.
+                        let cost = key
+                            .inputs
+                            .capacity()
+                            .checked_add(key.name.capacity())
+                            .and_then(|n| n.checked_add(fresh.0.width().div_ceil(64) * 8))
+                            .and_then(|n| n.checked_add(fresh.1.width().div_ceil(64) * 8))
+                            .and_then(|n| n.checked_add(512));
+                        if let Some(total) = cost
+                            .and_then(|n| memo.bytes.checked_add(n))
+                            .filter(|n| *n <= memo.limit)
+                        {
+                            memo.entries.insert(key, Arc::new(fresh.clone()));
+                            memo.bytes = total;
+                        }
+                    }
+                }
+                &fresh
+            };
             for (i, p) in target.iter().enumerate() {
-                result[*p] ^= outcome.payload.bit(i)?;
+                result[*p] ^= outcome.0.bit(i)?;
             }
             for (i, p) in fault.iter().enumerate() {
-                result[*p] ^= outcome.code.bit(i)?;
+                result[*p] ^= outcome.1.bit(i)?;
             }
             Ok(result)
         })
@@ -1202,4 +1523,86 @@ fn bundle_exchange(
         q.controlled_gate("swap", &[*s, *t], None, context)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod prepared_oracle_tests {
+    use super::*;
+    #[test]
+    fn repeated_pure_inputs_reuse_only_verified_function_values() {
+        let object = Object::parse(include_str!("../tests/fixtures/r9-sol-qinplace.bisa")).unwrap();
+        let mut state = QuantumState::new();
+        let wires = state.allocate(2).unwrap();
+        let mut bindings = QuantumBindings::default();
+        bindings.bundles.insert("t".into(), vec![wires[0]]);
+        bindings.borrowed.push(vec![wires[1]]);
+        bindings
+            .args
+            .insert("tk".into(), Argument::Token(crate::Budget::steps(1)));
+        let prepared = object.prepare_action("a", &bindings, None).unwrap();
+        let before = ORACLE_EVALUATIONS.with(|count| count.get());
+        for value in [false, true, false, true] {
+            let result = prepared
+                .reverse_basis(&state, &[value, false], false)
+                .unwrap();
+            assert_eq!(result.forward, Some(vec![value, false]));
+            assert_eq!(result.reversed, Some(vec![value, false]));
+            assert!(result.equals_entry && result.workspace_clean && result.forward_positive);
+        }
+        assert_eq!(ORACLE_EVALUATIONS.with(|count| count.get()) - before, 2);
+    }
+    #[test]
+    fn budget_changes_and_fault_outcomes_are_part_of_the_function_key() {
+        let object = Object::parse(include_str!("../tests/fixtures/r9-sol-oracle.bisa")).unwrap();
+        let cache = Arc::new(Mutex::new(OracleMemo::default()));
+        let mut state = QuantumState::new();
+        let wires = state.allocate(6).unwrap();
+        state.gate("x", &[wires[0]], None, &[]).unwrap();
+        let before = ORACLE_EVALUATIONS.with(|count| count.get());
+        for (steps, t, e) in [(1, 1, 0), (0, 1, 1), (1, 0, 1), (0, 0, 0)] {
+            object
+                .oracle_quantum_cached(
+                    &object.functions["o"],
+                    &mut state,
+                    &[vec![wires[0]]],
+                    &[wires[1]],
+                    &wires[2..],
+                    &BTreeMap::new(),
+                    &[],
+                    crate::Budget::steps(steps),
+                    None,
+                    &[],
+                    Some(&cache),
+                )
+                .unwrap();
+            assert_eq!(state.read_basis(&[wires[1]]).unwrap(), t);
+            assert_eq!(state.read_basis(&wires[2..]).unwrap(), e);
+        }
+        assert_eq!(ORACLE_EVALUATIONS.with(|count| count.get()) - before, 2);
+        assert_eq!(cache.lock().unwrap().entries.len(), 2);
+    }
+    #[test]
+    fn exhausted_cache_falls_back_without_rejecting_or_omitting_tuples() {
+        let object = Object::parse(include_str!("../tests/fixtures/r9-sol-qinplace.bisa")).unwrap();
+        let mut state = QuantumState::new();
+        let wires = state.allocate(2).unwrap();
+        let mut bindings = QuantumBindings::default();
+        bindings.bundles.insert("t".into(), vec![wires[0]]);
+        bindings.borrowed.push(vec![wires[1]]);
+        bindings
+            .args
+            .insert("tk".into(), Argument::Token(crate::Budget::steps(1)));
+        let prepared = object.prepare_action("a", &bindings, None).unwrap();
+        prepared.oracle_cache.lock().unwrap().limit = 0;
+        let before = ORACLE_EVALUATIONS.with(|count| count.get());
+        for value in [false, true, false, true] {
+            let result = prepared
+                .reverse_basis(&state, &[value, true], false)
+                .unwrap();
+            assert_eq!(result.forward, Some(vec![value, true]));
+            assert!(result.equals_entry && result.inputs_preserved && result.forward_positive);
+        }
+        assert_eq!(ORACLE_EVALUATIONS.with(|count| count.get()) - before, 64);
+        assert!(prepared.oracle_cache.lock().unwrap().entries.is_empty());
+    }
 }

@@ -5,8 +5,9 @@ use bennett_isa_ref::{
     StepPoint, TapeEntry, Type, Xoshiro256,
 };
 use std::collections::VecDeque;
+mod batch_cli;
 
-const USAGE:&str="bennett-isa-ref check <object>\nbennett-isa-ref hash <object>\nbennett-isa-ref run-oracle <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--mem name=hex | --mem-file name=path] [--arg value] [--token-aliases '[...]']\nbennett-isa-ref step-check <object> <oracle> (--exhaustive [--max-bits N] | --suite | --samples N) [--seed a,b,c,d] [--budget B[,heap,stack,depth]] [--mem name=hex | --mem-file name=path] [--arg value] [--token-aliases '[...]']\nbennett-isa-ref run-cc <object> <entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--tape-out file] [--replay-tape file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex | --mem-file global=path]\nbennett-isa-ref reverse <object> <entry> [run-cc options] [--steps N]\nbennett-isa-ref reverse <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--steps N] [--mem name=hex | --mem-file name=path] [--arg value] [--token-aliases '[...]']\nbennett-isa-ref reverse <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex | --mem-file name=path] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]>] [--adjoint]\nbennett-isa-ref run-action <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex | --mem-file name=path] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]> | --arg value...] [--adjoint]\nbennett-isa-ref run-program <object> <cc-entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--tape-out file] [--replay-tape file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex | --mem-file global=path] [--reverse] [--target file]\n--mem-file reads raw bytes.";
+const USAGE:&str="bennett-isa-ref check <object>\nbennett-isa-ref hash <object>\nbennett-isa-ref run-oracle <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--mem name=hex | --mem-file name=path] [--arg value] [--token-aliases '[...]']\nbennett-isa-ref step-check <object> <oracle> (--exhaustive [--max-bits N] | --suite | --samples N) [--seed a,b,c,d] [--budget B[,heap,stack,depth]] [--mem name=hex | --mem-file name=path] [--arg value] [--token-aliases '[...]']\nbennett-isa-ref run-cc <object> <entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--tape-out file] [--replay-tape file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex | --mem-file global=path]\nbennett-isa-ref reverse <object> <entry> [run-cc options] [--steps N]\nbennett-isa-ref reverse <object> <oracle> --input <x[,y...]> [--budget B[,heap,stack,depth]] [--steps N] [--mem name=hex | --mem-file name=path] [--arg value] [--token-aliases '[...]']\nbennett-isa-ref reverse <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex | --mem-file name=path] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]>] [--adjoint]\nbennett-isa-ref reverse-action-batch <object> <action> [--range LO..HI] [--format binary|jsonl] [--flush-each] [--arg value... | --args values] [--token-aliases labels] [--adjoint]\nbennett-isa-ref run-action <object> <action> (--mut <v[,...]> [--in <v[,...]>] [--mem name=hex | --mem-file name=path] | --basis <bits> | --state <bits=re[,im];...>) [--args <a[,...]> | --arg value...] [--adjoint]\nbennett-isa-ref run-program <object> <cc-entry> [--args <a[,b...]> | --input <a[,b...]> | --arg value...] [--entropy hex] [--replies file] [--tape-out file] [--replay-tape file] [--draws <d[,e...]>] [--budget B[,heap,stack,depth]] [--mem global=hex | --mem-file global=path] [--reverse] [--target file]\n--mem-file reads raw bytes.";
 fn fail(message: impl std::fmt::Display) -> Error {
     Error::new(message.to_string())
 }
@@ -2013,6 +2014,7 @@ fn run() -> Result<()> {
         "reverse",
         "run-action",
         "run-program",
+        "reverse-action-batch",
     ]
     .contains(&command)
     {
@@ -2021,6 +2023,16 @@ fn run() -> Result<()> {
     let path = args.get(1).ok_or_else(|| fail(USAGE))?;
     let text = std::fs::read_to_string(path).map_err(|e| fail(format!("{path}: {e}")))?;
     let program = Object::parse(&text)?;
+    if command == "reverse-action-batch" {
+        let name = args
+            .get(2)
+            .ok_or_else(|| fail(USAGE))?
+            .trim_start_matches('@');
+        if !batch_cli::run(&program, name, &args)? {
+            return Err(fail("batch completed with failed basis/reversal checks"));
+        }
+        return Ok(());
+    }
     if matches!(command, "check" | "hash") {
         if args.len() != 2 {
             return Err(fail(USAGE));
