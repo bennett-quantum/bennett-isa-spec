@@ -2336,7 +2336,8 @@
 +{id, role, width, class} |
 +{id, role, width, fragments:[{offset, width, class}, ...]}
 +```
-+
+ 
+-## 10. Launch ABI (launch 0.8)
 +Each source slot still has exactly one record, its original id and role,
 +and its complete signature width. Exactly one of class and fragments
 +is present. class abbreviates one fragment at offset 0 covering width.
@@ -2388,8 +2389,7 @@
 +After v = qreg.slice t 1 1 on t with classes [A,B], binding v to a selected width-one A slot faults with FAULT_UB_TRAP (4) before effects or view consumption; t remains viewed and v remains live. Reversing the fault and slice restores the pre-slice ledger state.
 +
 +**FRAME witness**
- 
--## 10. Launch ABI (launch 0.8)
++
 +```json
 +{"ancillae":[{"class":"fast","id":"a","scheme":"controlled-x","state":"clean","width":{"var":"c"}}],"borrow":[{"class":"fast","id":"b","width":1}],"history":[{"class":"fast","id":"h","width":3}],"live_ranges":[{"end":2,"frame":"s","start":0},{"end":4,"frame":"s","start":2}],"scratch":[{"class":"fast","id":"s","state":"clean","width":{"args":[2,{"var":"c"}],"op":"+"}}],"slots":[{"class":"fast","id":"mut:0","role":"mut","width":2},{"class":"fast","id":"in:0","role":"in","width":1}]}
 +```
@@ -2516,7 +2516,7 @@
  size_t         bennett_estimate_nresources(const bennett_estimate_t*);
  bennett_status bennett_estimate_get(const bennett_estimate_t*, size_t i, const char** name, const char** value_decimal);
  const uint8_t* bennett_estimate_certificate(const bennett_estimate_t*, size_t* len);   void bennett_estimate_free(bennett_estimate_t*);
-@@ -1206,7 +2810,552 @@
+@@ -1206,7 +2810,580 @@
  const uint8_t* bennett_coverage_jcs(const bennett_coverage_t*, size_t* len);   void bennett_coverage_free(bennett_coverage_t*);
  ```
  
@@ -2970,6 +2970,11 @@
 +estimate. Every well-typed resolved argument vector is supported; the
 +interface bundles, arbitrary target/fault entries, dirty wires and
 +interface cells remain quantum inputs, not chosen basis values.
++The effective schedule's `params_hash` MUST be SHA-256 of the copied
++`params_jcs` bytes, the §12.3 JCS args array with no trailing LF.
++The outer budget and K91 token-alias partition are bound separately;
++neither is appended to that hash input. Equal args hashes do not
++establish equal complete invocation bindings.
 +
 +The caller supplies a nonempty `variant` and `inherited_controls` as
 +in §11; these are part of the request, not inferred from a different
@@ -3066,11 +3071,34 @@
 +argument `2` to `1` denotes a different request, even at the same budget.
 +No 0.8 request can transmit that distinction through §10's signature.
 +
++**LAUNCH-PARAMETER-HASH witness**
++
++```json
++{
++  "signature": ["token","token"],
++  "args": [["2","0","0","0"],["2","0","0","0"]],
++  "params_hash": "24fe2305ea820ce5e2f871e4326791253027dbb1db4c6b374a09c6316c22e21d",
++  "budget": ["2","0","0","0"],
++  "token_aliases": [[0,0,0],[0,1,2]],
++  "same_params_hash": true,
++  "same_invocation": false
++}
++```
++
++For an oracle with these two token arguments, occurrence zero is the
++primary token. The two listed partitions denote all three occurrences
++aliasing and all three distinct, respectively. Both are consistent with
++the equal tuples and have the displayed args hash; their complete
++invocation bindings differ. Changing only the outer budget also leaves
++the args hash unchanged, while changing an argument token tuple changes
++the hash. Each request still requires its own bound realisation and
++certificate; this identity witness supplies no resource estimate.
++
 +## 11. Scheduling interface (sched 0.9)
  
  ```c
  typedef struct bennett_sched_request_t bennett_sched_request_t;   typedef struct bennett_sched_response_t bennett_sched_response_t;
-@@ -1218,6 +3367,9 @@
+@@ -1218,6 +3395,9 @@
  bennett_status bennett_sched_request_set_params(bennett_sched_request_t*, const uint8_t* params_jcs, size_t);
  bennett_status bennett_sched_request_set_accuracy(bennett_sched_request_t*, const char* epsilon_decimal);
  bennett_status bennett_sched_request_set_capacity(bennett_sched_request_t*, const char* cls, uint64_t peak_qubits);
@@ -3080,7 +3108,7 @@
  void           bennett_sched_request_free(bennett_sched_request_t*);
  bennett_status bennett_sched_schedule(const bennett_sched_request_t*, bennett_sched_response_t** out);
  typedef enum { BENNETT_SCHED_OK, BENNETT_SCHED_INFEASIBLE, BENNETT_SCHED_UNSUPPORTED } bennett_sched_outcome;
-@@ -1247,69 +3399,1273 @@
+@@ -1247,69 +3427,1273 @@
  schedule MUST keep the ordinals of the operations they keep and MAY
  remove only operations the library marks removable.
  
@@ -3209,8 +3237,7 @@
 -against the object and executes verbatim or rejects (`E_SCHEDULE_
 -INFEASIBLE`).
 +scheduler version.
- 
--## 12. Certificate (cert 0.8; JCS)
++
 +**Validation stages (K55).** A consumer validates every binding and
 +every path against the object, including the maximal-match condition
 +at the stages specified here, and executes verbatim or rejects with
@@ -3450,7 +3477,8 @@
 +K80 assigns the fresh replay's caller leaves and calls to this pair's
 +carrier. Other target kinds retain their instruction-defined inverse
 +and §6.4's legality conditions.
-+
+ 
+-## 12. Certificate (cert 0.8; JCS)
 +**Intrinsic-boundary witness (K81).** The consumer's reduced source is:
 +
 +```
@@ -4386,7 +4414,7 @@
  `error` entry (§12.3) is a **common upper bound over all contexts** of
  its key; the multiplicity composition of §12.3 is sound for that reason.
  
-@@ -1325,7 +4681,10 @@
+@@ -1325,7 +4709,10 @@
  rejects): Y − J(Φ) ⪰ 0, Y + J(Φ) ⪰ 0, mu·I − Tr_out(Y) ⪰ 0 (partial trace
  over the output factor), and mu ≤ `bound`; then ‖Φ‖◇ ≤ mu (the dual of
  Watrous's SDP with Y₀ = Y₁ = Y; this is the diamond norm itself, not
@@ -4398,7 +4426,7 @@
  hi, im_lo, im_hi]` (decimal strings). **Positivity test.** The checker
  proves each of the three matrices **positive definite** by an interval
  Cholesky (or Hermitian LDL†) factorisation in which the interval lower
-@@ -1335,33 +4694,422 @@
+@@ -1335,33 +4722,422 @@
  strictly feasible by replacing Y with Y + δI and mu with mu′ = mu + δ·(d
  + 1) for a small rational δ > 0 (any mu′ > mu + δ·d suffices): then Y ±
  J(Φ) ⪰ δI ≻ 0 and, since Tr_out(Y + δI) = Tr_out(Y) + δ·d·I, mu′·I −
@@ -4830,7 +4858,7 @@
                                                     fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
              cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },
              error:   { "<variant>:<inherited_controls>": { local: { "operator_norm"?: v, "diamond"?: v }, inclusive: { "operator_norm"?: v, "diamond"?: v } } },
-@@ -1369,6 +5117,706 @@
+@@ -1369,6 +5145,706 @@
    composition { multiplicities: { "<hash>:<variant>:<inherited_controls>": n (from the realised schedule) }, epsilon_total: { "diamond": v }, method: "sum_over_multiplicities" }
  ```
  
@@ -5537,7 +5565,7 @@
  `inclusive(R, key) = local(R, key) + Σ_callees n_c × inclusive(c, key_c)`
  **per metric**, keyed like `cleanup` by `<variant>:<inherited_controls>`
  (the realised error depends on both); every `local` value is a verified
-@@ -1380,27 +5828,49 @@
+@@ -1380,27 +5856,49 @@
  variants) require `operator_norm` bounds throughout. A controlled
  unitary variant requires a `numerical` claim; an ε > 0 realisation
  compared as a channel requires a `channel` claim. Executable claims
@@ -5593,7 +5621,7 @@
  ### 14.2 Quantum state semantics
  
  The state of a Q region is a vector in ⊗ over live wires in allocation
-@@ -1422,10 +5892,20 @@
+@@ -1422,10 +5920,20 @@
  - **T3 (permutation theorem).** If the realised unitary V of a circuit on
    span(D) is a permutation matrix and the final basis tuple equals P(x)
    for every x ∈ D, then V|span(D) = P.
@@ -5618,7 +5646,7 @@
  - **T5.** As §6.3.
  - **T6 (executor agreement).** Two executors conforming to §3–§7 on one
    target with the same schedule produce on every x ∈ D the same final
-@@ -1437,16 +5917,428 @@
+@@ -1437,16 +5945,428 @@
  
  ## 15. Conformance suites
  
@@ -6054,7 +6082,7 @@
  
  ## 16. Canonical textual form (normative)
  
-@@ -1458,7 +6350,17 @@
+@@ -1458,7 +6378,17 @@
  `INT := -?(0|[1-9][0-9]*)`; `FLOAT :=` shortest round-trip decimal with
  `.` or exponent, finite; `STRING := "…"` with escapes `\"`, `\\`, `\n`;
  `HEX := ([0-9a-f]{2})*`. Metadata lines are RFC 8785 canonical JSON
@@ -6073,7 +6101,7 @@
  
  ### 16.2 Grammar
  
-@@ -1472,10 +6374,10 @@
+@@ -1472,10 +6402,10 @@
    dataline  := NAME SP HEX NL
    function  := fhead NL regs? block+
    fhead     := ("fn" SP ("cc"|"r") | "oracle" | "action" | "perm_action" | "lproc") SP "@" NAME SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")"
@@ -6087,7 +6115,7 @@
    regs      := "regs" SP "{" SP (NAME ":" type ("," SP NAME ":" type)*)? SP "}" (SP "bounds" SP "{" INT ("," SP INT)* "}")? NL
    block     := "^" NAME "(" plist "):" NL instr+
    instr     := (lhs SP "=" SP)? OPCODE (SP operand)* (SP "{" NL instr+ "}" (SP "{" NL instr+ "}")?)? NL
-@@ -1485,16 +6387,38 @@
+@@ -1485,16 +6415,38 @@
    VER       := INT "." INT
  ```
  
@@ -6129,7 +6157,7 @@
  
  section functions
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
-@@ -1509,9 +6433,9 @@
+@@ -1509,9 +6461,9 @@
  empty and its envelope is exactly these bytes (each line LF-terminated):
  
  ```
@@ -6141,7 +6169,7 @@
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
  regs { one:reg[8], r:reg[8] }
  ^entry():
-@@ -1521,17 +6445,19 @@
+@@ -1521,17 +6473,19 @@
  ```
  
  With B ≥ 3 every x yields `(x + 1 mod 256, 0)` (`result_val` = 0 ⊕ r);
@@ -6164,7 +6192,7 @@
  
  section functions
  oracle @sum_db (n:wire[8] in) (t:wire[8]) (f:wire[4]) (db:region[4,8] in) ()
-@@ -1590,13 +6516,13 @@
+@@ -1590,13 +6544,13 @@
  is SHA-256 of the ASCII `<scc_hash hex>:0`:
  
  ```
@@ -6181,7 +6209,7 @@
  lift.boundscheck zp 1
  zv = lift.load.i8 zp
  z = lift.icmp.eq n zv
-@@ -1614,21 +6540,392 @@
+@@ -1614,20 +6568,391 @@
  ^done():
  lift.ret acc
  data zero 00
@@ -6355,7 +6383,7 @@
 +**Example 6** (`adaptive`, BLK-2): a budget minted on the device from a
 +run-time value.
 +
-+```
+ ```
 +bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
 +
 +section symbols
@@ -6426,8 +6454,8 @@
 +^entry():
 +action_call @addya (x) (y) () (tk, a)
 +ret
- ```
- 
++```
++
 +Each oracle has three rows, so F_B = ((x + y + a) mod 4, 0), resp. ((x − y
 +− a) mod 4, 0), for B ≥ 3 and (0, `FAULT_BUDGET_STEPS`) for B ≤ 2; for each
 +(y, a) the two maps are mutually inverse bijections of [0, 4). The object
@@ -6576,11 +6604,10 @@
 +step 5, so B ≥ 5 gives (0, `FAULT_CALLEE`). The nested fault, stack
 +history, parameters and locations are cleared by prefix reversal; no
 +additional charge arises from forwarding, commit or reversal.
-+
+ 
  ## 17. Decisions deferred to implementation, with defaults
  
- Each item is one an implementer must decide to build; any decision is
-@@ -1652,15 +6949,60 @@
+@@ -1652,15 +6977,60 @@
     level. Default: the library `ref` published by `bennett-isa-spec`
     (ripple-carry adders and comparators, linear `inrange` scans,
     one-hot address dispatch, clean scratch released in reverse order);
@@ -6645,7 +6672,7 @@
  10. **`any`-class resolution** (§11). Default: the first class in JCS
      order with capacity.
  11. **Occupancy rate of a class absent from `rate`** (§8.2). Default: 1.
-@@ -1669,7 +7011,65 @@
+@@ -1669,7 +7039,65 @@
  13. **Suite sizes** (§15): the exhaustive widths of suite C and the
      sample counts of `sampled` claims. Default: exhaustive for ≤ 16
      interface bits; 2^16 samples above.

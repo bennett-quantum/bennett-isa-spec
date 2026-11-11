@@ -3259,6 +3259,11 @@ extra, mistyped or out-of-range argument is `E_ARG` before producing an
 estimate. Every well-typed resolved argument vector is supported; the
 interface bundles, arbitrary target/fault entries, dirty wires and
 interface cells remain quantum inputs, not chosen basis values.
+The effective schedule's `params_hash` MUST be SHA-256 of the copied
+`params_jcs` bytes, the §12.3 JCS args array with no trailing LF.
+The outer budget and K91 token-alias partition are bound separately;
+neither is appended to that hash input. Equal args hashes do not
+establish equal complete invocation bindings.
 
 The caller supplies a nonempty `variant` and `inherited_controls` as
 in §11; these are part of the request, not inferred from a different
@@ -3354,6 +3359,29 @@ makespan. The exact class peaks are 2 and 1, not a replacement scalar 3;
 occupancies are 2/3 and 1/3, and the idle class is present. Changing the
 argument `2` to `1` denotes a different request, even at the same budget.
 No 0.8 request can transmit that distinction through §10's signature.
+
+**LAUNCH-PARAMETER-HASH witness**
+
+```json
+{
+  "signature": ["token","token"],
+  "args": [["2","0","0","0"],["2","0","0","0"]],
+  "params_hash": "24fe2305ea820ce5e2f871e4326791253027dbb1db4c6b374a09c6316c22e21d",
+  "budget": ["2","0","0","0"],
+  "token_aliases": [[0,0,0],[0,1,2]],
+  "same_params_hash": true,
+  "same_invocation": false
+}
+```
+
+For an oracle with these two token arguments, occurrence zero is the
+primary token. The two listed partitions denote all three occurrences
+aliasing and all three distinct, respectively. Both are consistent with
+the equal tuples and have the displayed args hash; their complete
+invocation bindings differ. Changing only the outer budget also leaves
+the args hash unchanged, while changing an argument token tuple changes
+the hash. Each request still requires its own bound realisation and
+certificate; this identity witness supplies no resource estimate.
 
 ## 11. Scheduling interface (sched 0.9)
 
