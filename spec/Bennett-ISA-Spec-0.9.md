@@ -4271,6 +4271,90 @@ against the linked source declarations/layout before expansion:
   releasing the list in reverse order; source row/successor templates
   supply rows, never a replacement dispatcher or construction body. [deps: ISA-5.2-P3, ISA-3.6, ISA-11.1-P5, ISA-11.1-P22]
 
+**Classical pseudo-location storage (K24/K25).** Before acquiring any
+construction State record, prepare a separate ordered block of immutable
+argument storages. Visit the root oracle and each fixed-binding lproc
+instance in §3.6 index-space order, once per instance, and its bit-readable
+classical parameters in declaration order. Each `iN`, `ptr` or `f64`
+parameter has one distinct clean, class-`any` allocation declaration,
+symbolically `$argument/<instance>/<parameter>`, of width N, ptr_width or
+64 respectively. Here `<instance>` is the root's source name, or the
+lproc's source name followed, for a nonempty §3.7 binding key, by `#`
+and its decimal components joined with `_`. Distinct instance/parameter
+pairs have distinct declarations even when their resolved values agree.
+Tokens allocate no bit storage. Decode `iN` and `ptr` from their K24
+canonical unsigned decimal strings, and `f64` from its exact 64-bit
+encoding, preserving signed zero and NaN payloads.
+
+For each declaration in that order, emit its unconditional K27 acquire,
+then direct X gates on exactly its set bits in increasing LSB-first bit
+index. These are literal X leaves, with the invocation's effective
+inherited controls; they do not invoke `value.literal`. Bind every
+pseudo-location read to these same ordered wires throughout the oracle
+construction. After all State releases, visit the argument declarations
+in reverse order, undo their X gates in reverse bit order with the same
+controls, then unconditionally relinquish each clean allocation. This
+block is present also for unused parameters, zero values and B=0; no
+basis/control-value pruning removes its generated leaves.
+
+These storages are clean construction workspace in §9.4 `frame.scratch`,
+in first-allocation order before the State scratch. They carry no K27
+library-scratch mark; the State's existing marks remain unchanged.
+Charge their allocation/live intervals and every emitted gate by §8.2.
+They add no source rows, location ids, stack cells or R_f terms, and add
+no records to K25 State or its nonzero-initial exceptions. Their acquire
+and preparation leaves share the containing oracle's K64 `$construct`
+point and ordinal space, before the State subtree; teardown shares
+`$release` after that subtree. Both points use that oracle's closure
+hash with instance and source-iteration `[]`, and no step or phase at
+that oracle level; outer invocation edges retain their coordinates.
+Generated ordinals count every leaf in traversal order from zero within
+each pseudo-point, including these leaves. Reversing a complete expansion
+retains the forward identities and ordinals under K64. This source-binding
+rule leaves the ref catalog bytes and identity unchanged.
+
+**CLASSICAL-PSEUDO-LOCATION witness**
+
+```json
+{
+  "args": ["3"],
+  "budget": ["0","0","0","0"],
+  "symbol": "2caf814dc0211ab259967b1235851f519cbf62541e2826d2da1118b99389e2b3",
+  "point_instance": [], "point_iteration": [],
+  "construct": [
+    ["alloc","argument",2,0,false],
+    ["x","argument",0,1,false],
+    ["x","argument",1,2,false],
+    ["alloc","pc",1,3,true],
+    ["alloc","pc-prime",1,4,true],
+    ["alloc","faulted",1,5,true],
+    ["alloc","code",4,6,true],
+    ["alloc","result_val",2,7,true]
+  ],
+  "release": [
+    ["release","result_val",2,0,true],
+    ["release","code",4,1,true],
+    ["release","faulted",1,2,true],
+    ["release","pc-prime",1,3,true],
+    ["release","pc",1,4,true],
+    ["x","argument",1,5,false],
+    ["x","argument",0,6,false],
+    ["release","argument",2,7,false]
+  ],
+  "row_format": ["gate","storage","width_or_bit","generated","library_scratch"]
+}
+```
+
+The memoryless witness `oracle @argument () (t:wire[2]) (f:wire[4]) ()
+(a:i2)` has one row, `lift.retval a`. The displayed arrays are its
+complete `$construct` and `$release` projections at B=0, not its commit
+segment; `argument` names `$argument/argument/a`. Alloc/release rows give
+widths and X rows give bit indices. All controls are empty. At a=0 the
+argument acquire still precedes pc, now at construct ordinal 1, and its
+release still follows pc; there are no argument X leaves. A one-bit
+inherited control adds that control to both argument X gates and their
+inverses, leaving every acquire/release unconditional.
+
 Witness: byte records `(base=0,extent=1,cells=a[8])` and
 `(base=1,extent=2,cells=b[16])` bind addresses 0,1,2 to a[0..8),
 b[0..8),b[8..16), respectively. Visiting X on each first bit emits

@@ -2336,8 +2336,7 @@
 +{id, role, width, class} |
 +{id, role, width, fragments:[{offset, width, class}, ...]}
 +```
- 
--## 10. Launch ABI (launch 0.8)
++
 +Each source slot still has exactly one record, its original id and role,
 +and its complete signature width. Exactly one of class and fragments
 +is present. class abbreviates one fragment at offset 0 covering width.
@@ -2403,7 +2402,8 @@
 +Frame SHA-256: `f314eeef24a5a65a9c72f91e062aa3c83556358eaca166e689571700a72083ff`.
 +
 +## 10. Launch ABI (launch 0.9)
-+
+ 
+-## 10. Launch ABI (launch 0.8)
 +Register allocation through `bennett_qreg_new` remains a homogeneous request; §3.3 defines the ordered class vector, concat/slice bindings and complete ledger reversal (K88).
 +
 +The selected device object/root, fixed-image preparation, target models, resource/frame contexts, borrow proofs and token-alias launch bindings follow §12.3 (K85–K91). In particular its token_aliases mixed-object rule applies at this launch boundary; the general native-container/ordinary-pointer launch contract remains the explicit boundary work named there.
@@ -3108,7 +3108,7 @@
  void           bennett_sched_request_free(bennett_sched_request_t*);
  bennett_status bennett_sched_schedule(const bennett_sched_request_t*, bennett_sched_response_t** out);
  typedef enum { BENNETT_SCHED_OK, BENNETT_SCHED_INFEASIBLE, BENNETT_SCHED_UNSUPPORTED } bennett_sched_outcome;
-@@ -1247,69 +3427,1273 @@
+@@ -1247,69 +3427,1357 @@
  schedule MUST keep the ordinals of the operations they keep and MAY
  remove only operations the library marks removable.
  
@@ -3979,6 +3979,90 @@
 +  releasing the list in reverse order; source row/successor templates
 +  supply rows, never a replacement dispatcher or construction body. [deps: ISA-5.2-P3, ISA-3.6, ISA-11.1-P5, ISA-11.1-P22]
 +
++**Classical pseudo-location storage (K24/K25).** Before acquiring any
++construction State record, prepare a separate ordered block of immutable
++argument storages. Visit the root oracle and each fixed-binding lproc
++instance in §3.6 index-space order, once per instance, and its bit-readable
++classical parameters in declaration order. Each `iN`, `ptr` or `f64`
++parameter has one distinct clean, class-`any` allocation declaration,
++symbolically `$argument/<instance>/<parameter>`, of width N, ptr_width or
++64 respectively. Here `<instance>` is the root's source name, or the
++lproc's source name followed, for a nonempty §3.7 binding key, by `#`
++and its decimal components joined with `_`. Distinct instance/parameter
++pairs have distinct declarations even when their resolved values agree.
++Tokens allocate no bit storage. Decode `iN` and `ptr` from their K24
++canonical unsigned decimal strings, and `f64` from its exact 64-bit
++encoding, preserving signed zero and NaN payloads.
++
++For each declaration in that order, emit its unconditional K27 acquire,
++then direct X gates on exactly its set bits in increasing LSB-first bit
++index. These are literal X leaves, with the invocation's effective
++inherited controls; they do not invoke `value.literal`. Bind every
++pseudo-location read to these same ordered wires throughout the oracle
++construction. After all State releases, visit the argument declarations
++in reverse order, undo their X gates in reverse bit order with the same
++controls, then unconditionally relinquish each clean allocation. This
++block is present also for unused parameters, zero values and B=0; no
++basis/control-value pruning removes its generated leaves.
++
++These storages are clean construction workspace in §9.4 `frame.scratch`,
++in first-allocation order before the State scratch. They carry no K27
++library-scratch mark; the State's existing marks remain unchanged.
++Charge their allocation/live intervals and every emitted gate by §8.2.
++They add no source rows, location ids, stack cells or R_f terms, and add
++no records to K25 State or its nonzero-initial exceptions. Their acquire
++and preparation leaves share the containing oracle's K64 `$construct`
++point and ordinal space, before the State subtree; teardown shares
++`$release` after that subtree. Both points use that oracle's closure
++hash with instance and source-iteration `[]`, and no step or phase at
++that oracle level; outer invocation edges retain their coordinates.
++Generated ordinals count every leaf in traversal order from zero within
++each pseudo-point, including these leaves. Reversing a complete expansion
++retains the forward identities and ordinals under K64. This source-binding
++rule leaves the ref catalog bytes and identity unchanged.
++
++**CLASSICAL-PSEUDO-LOCATION witness**
++
++```json
++{
++  "args": ["3"],
++  "budget": ["0","0","0","0"],
++  "symbol": "2caf814dc0211ab259967b1235851f519cbf62541e2826d2da1118b99389e2b3",
++  "point_instance": [], "point_iteration": [],
++  "construct": [
++    ["alloc","argument",2,0,false],
++    ["x","argument",0,1,false],
++    ["x","argument",1,2,false],
++    ["alloc","pc",1,3,true],
++    ["alloc","pc-prime",1,4,true],
++    ["alloc","faulted",1,5,true],
++    ["alloc","code",4,6,true],
++    ["alloc","result_val",2,7,true]
++  ],
++  "release": [
++    ["release","result_val",2,0,true],
++    ["release","code",4,1,true],
++    ["release","faulted",1,2,true],
++    ["release","pc-prime",1,3,true],
++    ["release","pc",1,4,true],
++    ["x","argument",1,5,false],
++    ["x","argument",0,6,false],
++    ["release","argument",2,7,false]
++  ],
++  "row_format": ["gate","storage","width_or_bit","generated","library_scratch"]
++}
++```
++
++The memoryless witness `oracle @argument () (t:wire[2]) (f:wire[4]) ()
++(a:i2)` has one row, `lift.retval a`. The displayed arrays are its
++complete `$construct` and `$release` projections at B=0, not its commit
++segment; `argument` names `$argument/argument/a`. Alloc/release rows give
++widths and X rows give bit indices. All controls are empty. At a=0 the
++argument acquire still precedes pc, now at construct ordinal 1, and its
++release still follows pc; there are no argument X leaves. A one-bit
++inherited control adds that control to both argument X gates and their
++inverses, leaving every acquire/release unconditional.
++
 +Witness: byte records `(base=0,extent=1,cells=a[8])` and
 +`(base=1,extent=2,cells=b[16])` bind addresses 0,1,2 to a[0..8),
 +b[0..8),b[8..16), respectively. Visiting X on each first bit emits
@@ -4414,7 +4498,7 @@
  `error` entry (§12.3) is a **common upper bound over all contexts** of
  its key; the multiplicity composition of §12.3 is sound for that reason.
  
-@@ -1325,7 +4709,10 @@
+@@ -1325,7 +4793,10 @@
  rejects): Y − J(Φ) ⪰ 0, Y + J(Φ) ⪰ 0, mu·I − Tr_out(Y) ⪰ 0 (partial trace
  over the output factor), and mu ≤ `bound`; then ‖Φ‖◇ ≤ mu (the dual of
  Watrous's SDP with Y₀ = Y₁ = Y; this is the diamond norm itself, not
@@ -4426,7 +4510,7 @@
  hi, im_lo, im_hi]` (decimal strings). **Positivity test.** The checker
  proves each of the three matrices **positive definite** by an interval
  Cholesky (or Hermitian LDL†) factorisation in which the interval lower
-@@ -1335,33 +4722,422 @@
+@@ -1335,33 +4806,422 @@
  strictly feasible by replacing Y with Y + δI and mu with mu′ = mu + δ·(d
  + 1) for a small rational δ > 0 (any mu′ > mu + δ·d suffices): then Y ±
  J(Φ) ⪰ δI ≻ 0 and, since Tr_out(Y + δI) = Tr_out(Y) + δ·d·I, mu′·I −
@@ -4858,7 +4942,7 @@
                                                     fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
              cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },
              error:   { "<variant>:<inherited_controls>": { local: { "operator_norm"?: v, "diamond"?: v }, inclusive: { "operator_norm"?: v, "diamond"?: v } } },
-@@ -1369,6 +5145,706 @@
+@@ -1369,6 +5229,706 @@
    composition { multiplicities: { "<hash>:<variant>:<inherited_controls>": n (from the realised schedule) }, epsilon_total: { "diamond": v }, method: "sum_over_multiplicities" }
  ```
  
@@ -5565,7 +5649,7 @@
  `inclusive(R, key) = local(R, key) + Σ_callees n_c × inclusive(c, key_c)`
  **per metric**, keyed like `cleanup` by `<variant>:<inherited_controls>`
  (the realised error depends on both); every `local` value is a verified
-@@ -1380,27 +5856,49 @@
+@@ -1380,27 +5940,49 @@
  variants) require `operator_norm` bounds throughout. A controlled
  unitary variant requires a `numerical` claim; an ε > 0 realisation
  compared as a channel requires a `channel` claim. Executable claims
@@ -5621,7 +5705,7 @@
  ### 14.2 Quantum state semantics
  
  The state of a Q region is a vector in ⊗ over live wires in allocation
-@@ -1422,10 +5920,20 @@
+@@ -1422,10 +6004,20 @@
  - **T3 (permutation theorem).** If the realised unitary V of a circuit on
    span(D) is a permutation matrix and the final basis tuple equals P(x)
    for every x ∈ D, then V|span(D) = P.
@@ -5646,7 +5730,7 @@
  - **T5.** As §6.3.
  - **T6 (executor agreement).** Two executors conforming to §3–§7 on one
    target with the same schedule produce on every x ∈ D the same final
-@@ -1437,16 +5945,428 @@
+@@ -1437,16 +6029,428 @@
  
  ## 15. Conformance suites
  
@@ -6082,7 +6166,7 @@
  
  ## 16. Canonical textual form (normative)
  
-@@ -1458,7 +6378,17 @@
+@@ -1458,7 +6462,17 @@
  `INT := -?(0|[1-9][0-9]*)`; `FLOAT :=` shortest round-trip decimal with
  `.` or exponent, finite; `STRING := "…"` with escapes `\"`, `\\`, `\n`;
  `HEX := ([0-9a-f]{2})*`. Metadata lines are RFC 8785 canonical JSON
@@ -6101,7 +6185,7 @@
  
  ### 16.2 Grammar
  
-@@ -1472,10 +6402,10 @@
+@@ -1472,10 +6486,10 @@
    dataline  := NAME SP HEX NL
    function  := fhead NL regs? block+
    fhead     := ("fn" SP ("cc"|"r") | "oracle" | "action" | "perm_action" | "lproc") SP "@" NAME SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")"
@@ -6115,7 +6199,7 @@
    regs      := "regs" SP "{" SP (NAME ":" type ("," SP NAME ":" type)*)? SP "}" (SP "bounds" SP "{" INT ("," SP INT)* "}")? NL
    block     := "^" NAME "(" plist "):" NL instr+
    instr     := (lhs SP "=" SP)? OPCODE (SP operand)* (SP "{" NL instr+ "}" (SP "{" NL instr+ "}")?)? NL
-@@ -1485,16 +6415,38 @@
+@@ -1485,16 +6499,38 @@
    VER       := INT "." INT
  ```
  
@@ -6157,7 +6241,7 @@
  
  section functions
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
-@@ -1509,9 +6461,9 @@
+@@ -1509,9 +6545,9 @@
  empty and its envelope is exactly these bytes (each line LF-terminated):
  
  ```
@@ -6169,7 +6253,7 @@
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
  regs { one:reg[8], r:reg[8] }
  ^entry():
-@@ -1521,17 +6473,19 @@
+@@ -1521,17 +6557,19 @@
  ```
  
  With B ≥ 3 every x yields `(x + 1 mod 256, 0)` (`result_val` = 0 ⊕ r);
@@ -6192,7 +6276,7 @@
  
  section functions
  oracle @sum_db (n:wire[8] in) (t:wire[8]) (f:wire[4]) (db:region[4,8] in) ()
-@@ -1590,13 +6544,13 @@
+@@ -1590,13 +6628,13 @@
  is SHA-256 of the ASCII `<scc_hash hex>:0`:
  
  ```
@@ -6209,7 +6293,7 @@
  lift.boundscheck zp 1
  zv = lift.load.i8 zp
  z = lift.icmp.eq n zv
-@@ -1614,20 +6568,391 @@
+@@ -1614,21 +6652,392 @@
  ^done():
  lift.ret acc
  data zero 00
@@ -6383,7 +6467,7 @@
 +**Example 6** (`adaptive`, BLK-2): a budget minted on the device from a
 +run-time value.
 +
- ```
++```
 +bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
 +
 +section symbols
@@ -6579,8 +6663,8 @@
 +
 +section layout
 +{"A_tab":2,"H":6,"S_cells":4,"globals":{},"heap_base":32,"heap_limit_max":32,"interface_regions":{"plus_db":{"db":{"base":17}},"through":{"db":{"base":16}}},"null_size":16,"ptr_width":32}
-+```
-+
+ ```
+ 
 +The outer invocation's B is independent of `tk`'s tuple. The sole
 +`@worker` binding key is `[0,1,0]` (oracle argument positions 0 and 1,
 +region position 0). It has five locations (`x r fr zero bad`), so
@@ -6604,10 +6688,11 @@
 +step 5, so B ≥ 5 gives (0, `FAULT_CALLEE`). The nested fault, stack
 +history, parameters and locations are cleared by prefix reversal; no
 +additional charge arises from forwarding, commit or reversal.
- 
++
  ## 17. Decisions deferred to implementation, with defaults
  
-@@ -1652,15 +6977,60 @@
+ Each item is one an implementer must decide to build; any decision is
+@@ -1652,15 +7061,60 @@
     level. Default: the library `ref` published by `bennett-isa-spec`
     (ripple-carry adders and comparators, linear `inrange` scans,
     one-hot address dispatch, clean scratch released in reverse order);
@@ -6672,7 +6757,7 @@
  10. **`any`-class resolution** (§11). Default: the first class in JCS
      order with capacity.
  11. **Occupancy rate of a class absent from `rate`** (§8.2). Default: 1.
-@@ -1669,7 +7039,65 @@
+@@ -1669,7 +7123,65 @@
  13. **Suite sizes** (§15): the exhaustive widths of suite C and the
      sample counts of `sampled` claims. Default: exhaustive for ≤ 16
      interface bits; 2^16 samples above.
