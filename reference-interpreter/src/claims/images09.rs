@@ -50,7 +50,14 @@ impl ImageDomain {
 
 impl Object {
     pub(crate) fn validate_image_domains09(&self, domain: &Json, f: &Function) -> Result<()> {
-        self.image_domains09(domain, f).map(|_| ())
+        if let Some(products) = domain.object()?.get("entry_products") {
+            for product in products.array()? {
+                self.image_domains09(product, f)?;
+            }
+            Ok(())
+        } else {
+            self.image_domains09(domain, f).map(|_| ())
+        }
     }
 
     pub(super) fn image_domains09(&self, domain: &Json, f: &Function) -> Result<Vec<ImageDomain>> {

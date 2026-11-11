@@ -10,10 +10,12 @@ use crate::{err, json::Json, Error, Result};
 pub enum Shape {
     String,
     Text,
+    SourcePoint,
     Name,
     Hash,
     Hex,
     Uint,
+    PositiveUint,
     U64String,
     UnsignedDecimalString,
     Decimal,
@@ -227,7 +229,23 @@ static TABLE09: &[Entry] = &[
     entry!("alloc_payload", "§11 K14", obj!("class":"text","vertices?":"uints")),
     entry!("expected", "§12.1 K4", Union(&["oracle_expected","table_expected","program_expected","inverse_pair_expected09"])),
     entry!("inverse_pair_expected09", "§12.1 K4", Enum(&["inverse_pair"])),
-    entry!("domain", "§12.2 K4/K85", obj!("bundles":"bundles","borrowed":"bundles","regions":"domain_regions","args?":"bundles","fixed_regions?":"fixed_regions09")),
+    entry!("domain", "§12.2 K4/K85/K89", Union(&["product_domain09","entry_domain09"])),
+    entry!("ordinary_domain09", "§12.2 K4/K85", obj!("bundles":"bundles","borrowed":"bundles","regions":"domain_regions","args?":"bundles","fixed_regions?":"fixed_regions09")),
+    entry!("product_domain09", "§12.2 K89", obj!("bundles":"bundles","borrowed":"bundles","regions":"domain_regions","args?":"bundles","fixed_regions?":"fixed_regions09","workspace?":"workspace09")),
+    entry!("entry_domain09", "§12.2 K89", obj!("entry_products":"entry_products09")),
+    entry!("entry_products09", "§12.2 K89", Array("product_domain09")),
+    entry!("workspace09", "§12.2 K89", Array("workspace_component09")),
+    entry!("workspace_component09", "§12.2 K89", obj!("allocation":"allocation_occurrence09","offset":"uint","width":"uint","lo":"uint","hi":"uint")),
+    entry!("source_point09", "§12.2 K89 resolved source point", SourcePoint),
+    entry!("source_step09", "§12.2 K89 positive oracle step", PositiveUint),
+    entry!("source_context09", "§12.2 K89 resolved invocation key", Array("source_edge09")),
+    entry!("source_edge09", "§12.2 K89", Union(&["action_edge09","oracle_edge09"])),
+    entry!("action_edge09", "§12.2 K89", obj!("symbol":"hash","point":"source_point09","iteration":"uints","instance":"uints","call_index":"uint")),
+    entry!("oracle_edge09", "§12.2 K89", obj!("symbol":"hash","point":"source_point09","iteration":"uints","instance":"uints","call_index":"uint","step":"source_step09","phase":"resolved_phase09")),
+    entry!("source_occurrence09", "§12.2 K89", Union(&["action_occurrence09","oracle_occurrence09"])),
+    entry!("action_occurrence09", "§12.2 K89", obj!("context_key":"source_context09","symbol":"hash","point":"source_point09","iteration":"uints","instance":"uints")),
+    entry!("oracle_occurrence09", "§12.2 K89", obj!("context_key":"source_context09","symbol":"hash","point":"source_point09","iteration":"uints","instance":"uints","step":"source_step09","phase":"resolved_phase09")),
+    entry!("allocation_occurrence09", "§12.2 K89 forward acquisition", obj!("source":"source_occurrence09","allocation_ordinal":"uint")),
     entry!("fixed_regions09", "§12.2 K85", Array("fixed_region09")),
     entry!("fixed_region09", "§12.2 K85", obj!("name":"text","A":"uint","W":"uint","image":"string","sha256":"hash")),
     entry!("label", "§12.2 K85", Enum(&["proof","proof_relative_to_image","evidence"])),
@@ -271,11 +289,17 @@ static TABLE09: &[Entry] = &[
     entry!("uniform09", "§12.3 K13/K91", obj!("args":"all09","budget":"all09","token_aliases?":"all09")),
     entry!("claim_invocation09", "§12.3 K13", Union(&["invocation09","uniform09"])),
     entry!("reference_subject09", "§12.1 K13", obj!("closure_hash":"hash","variant":"text","inherited_controls":"uint","schedule_hash?":"hash")),
-    entry!("exhaustive", "§12.1 K4/K13", Union(&["tuple_exhaustive09","pair_exhaustive09"])),
+    entry!("exhaustive", "§12.1 K4/K13/K89", Union(&["tuple_exhaustive09","pair_exhaustive09","borrow_exhaustive09"])),
     entry!("tuple_expected09", "§12.1 K13", Union(&["oracle_expected","table_expected","program_expected"])),
-    entry!("tuple_exhaustive09", "§12.1 K13", obj!("kind":"exhaustive_kind","domain":"domain","expected":"tuple_expected09","label?":"label","subject":"reference_subject09","invocation?":"invocation09")),
-    entry!("pair_exhaustive09", "§12.1 K4", obj!("kind":"exhaustive_kind","domain":"domain","expected":"inverse_pair_expected09","label?":"label","subject?":"reference_subject09")),
-    entry!("sampled", "§12.1 K13", obj!("kind":"sampled_kind","domain":"domain","expected":"expected","subject":"reference_subject09","sampler":"sampler","label?":"label","invocation?":"invocation09")),
+    entry!("tuple_exhaustive09", "§12.1 K13", obj!("kind":"exhaustive_kind","domain":"ordinary_domain09","expected":"tuple_expected09","label?":"label","subject":"reference_subject09","invocation?":"invocation09")),
+    entry!("pair_exhaustive09", "§12.1 K4", obj!("kind":"exhaustive_kind","domain":"ordinary_domain09","expected":"inverse_pair_expected09","label?":"label","subject?":"reference_subject09")),
+    entry!("borrow_expected09", "§12.1 K89", Enum(&["borrow_frame"])),
+    entry!("borrow_frame09", "§12.1 K89", obj!("lifetime":"uint","first":"source_occurrence09","last":"source_occurrence09","context_key?":"source_context09")),
+    entry!("borrow_exhaustive09", "§12.1 K89", obj!("kind":"exhaustive_kind","domain":"domain","expected":"borrow_expected09","borrow_frame":"borrow_frame09","label?":"label","subject":"reference_subject09","invocation?":"invocation09")),
+    entry!("sampled", "§12.1 K13/K89", Union(&["tuple_sampled09","borrow_sampled09"])),
+    entry!("tuple_sampled09", "§12.1 K13", obj!("kind":"sampled_kind","domain":"ordinary_domain09","expected":"expected","subject":"reference_subject09","sampler":"sampler","label?":"label","invocation?":"invocation09")),
+    entry!("borrow_sampled09", "§12.1 K89", obj!("kind":"sampled_kind","domain":"domain","expected":"borrow_expected09","borrow_frame":"borrow_frame09","subject":"reference_subject09","sampler":"sampler","label?":"label","invocation?":"invocation09")),
+    entry!("fault_rate", "§12.3 K85", obj!("domain":"ordinary_domain09","faults_by_code":"faults_by_code","undefined_excluded":"uint","layout_dependent_excluded":"uint")),
     entry!("table", "§12.1 K13", Array("row09")),
     entry!("row09", "§12.1 K13", obj!("before":"tuple09","after":"tuple09")),
     entry!("tuple09", "§12.1 K13", obj!("bundles":"decimals09","borrowed":"decimals09","regions":"cells09")),
@@ -320,9 +344,10 @@ fn check(shape: Shape, v: &Json, version: crate::IsaVersion) -> Result<()> {
         String => {
             v.string()?;
         }
-        Text => {
-            if v.string()?.is_empty() {
-                return err("§9.1", "empty metadata identifier");
+        Text | SourcePoint => {
+            let s = v.string()?;
+            if s.is_empty() || (matches!(shape, SourcePoint) && s == "*") {
+                return err("§9.1", "empty or unresolved metadata identifier");
             }
         }
         Name => {
@@ -341,8 +366,11 @@ fn check(shape: Shape, v: &Json, version: crate::IsaVersion) -> Result<()> {
                 return err("§9.1/§9.2/§16.2", "invalid lowercase hex");
             }
         }
-        Uint => {
-            v.uint_text()?;
+        Uint | PositiveUint => {
+            let text = v.uint_text()?;
+            if matches!(shape, PositiveUint) && text == "0" {
+                return err("§12.2 K89", "oracle step must be positive");
+            }
         }
         UnsignedDecimalString => {
             let t = v.string()?;

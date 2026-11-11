@@ -109,6 +109,13 @@ impl DerivedWidths {
                 }
             }
         }
+        // ISA 0.9 §3.6: R4 scans every declared closure location, including
+        // locations absent from all listed captures and assignment write sets.
+        if object.isa_version == crate::IsaVersion::V09
+            && program.rows.iter().any(|(_, i)| i.op == "lift.ret")
+        {
+            widths.slots[0] = widths.slots[0].max(widths.w_max);
+        }
         Ok(widths)
     }
     /// §4.2 slot use of one row, in slot order.

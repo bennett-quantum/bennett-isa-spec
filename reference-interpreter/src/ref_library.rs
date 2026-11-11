@@ -13,15 +13,34 @@ pub use bennett_isa_conformance::{
     ref_language::{Leaf, Registry},
 };
 
+/// Frozen original snapshot, retained for explicit compatibility bindings.
 pub const REF09_HASH: &str = "5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197";
+/// Current ISA 0.9 default, with independent qjumpr address/successor widths.
+pub const REF09_R1_HASH: &str = "0be00e64de17699516a9b5bb5daf308ee0c59af7e39b6bf934bad5c628f48e7a";
 pub(crate) mod tokens;
 const CATALOG: &str = include_str!("../../spec/ref-0.9.json");
+const CATALOG_R1: &str = include_str!("../../spec/ref-0.9-r1.json");
 
 /// Only the published complete library can satisfy a ref@0.9 binding. Private
 /// witness catalogs cannot acquire its identity by supplying its descriptor.
 #[derive(Clone, Debug)]
 pub struct RefLibrary {
     expander: Expander,
+    hash: &'static str,
+    #[cfg(test)]
+    _clone_probe: CatalogCloneProbe,
+}
+#[cfg(test)]
+std::thread_local! { static CATALOG_CLONES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
+#[cfg(test)]
+#[derive(Debug)]
+struct CatalogCloneProbe;
+#[cfg(test)]
+impl Clone for CatalogCloneProbe {
+    fn clone(&self) -> Self {
+        CATALOG_CLONES.with(|count| count.set(count.get() + 1));
+        Self
+    }
 }
 fn infeasible(e: impl std::fmt::Display) -> crate::Error {
     let text = e.to_string();
@@ -35,15 +54,30 @@ fn infeasible(e: impl std::fmt::Display) -> crate::Error {
 }
 impl RefLibrary {
     pub fn published() -> Result<Self> {
+        Self::for_hash(REF09_R1_HASH)
+    }
+    fn for_hash(hash: &str) -> Result<Self> {
         static LIBRARY: std::sync::OnceLock<Result<RefLibrary>> = std::sync::OnceLock::new();
-        LIBRARY
-            .get_or_init(|| Self::bind("ref", "0.9", REF09_HASH, CATALOG))
-            .clone()
+        static ORIGINAL: std::sync::OnceLock<Result<RefLibrary>> = std::sync::OnceLock::new();
+        match hash {
+            REF09_R1_HASH => LIBRARY
+                .get_or_init(|| Self::bind("ref", "0.9", REF09_R1_HASH, CATALOG_R1))
+                .clone(),
+            REF09_HASH => ORIGINAL
+                .get_or_init(|| Self::bind("ref", "0.9", REF09_HASH, CATALOG))
+                .clone(),
+            _ => Err(infeasible("bound expansion library is unavailable")),
+        }
     }
     pub fn bind(name: &str, version: &str, hash: &str, bytes: &str) -> Result<Self> {
-        if (name, version, hash) != ("ref", "0.9", REF09_HASH) {
+        if (name, version) != ("ref", "0.9") {
             return Err(infeasible("bound expansion library is unavailable"));
         }
+        let hash = match hash {
+            REF09_HASH => REF09_HASH,
+            REF09_R1_HASH => REF09_R1_HASH,
+            _ => return Err(infeasible("bound expansion library is unavailable")),
+        };
         if envelope_hash(bytes) != hash {
             return Err(infeasible("catalog envelope does not match binding"));
         }
@@ -54,10 +88,15 @@ impl RefLibrary {
             ));
         }
         let expander = Expander::new(bytes, Registry::new()).map_err(infeasible)?;
-        Ok(Self { expander })
+        Ok(Self {
+            expander,
+            hash,
+            #[cfg(test)]
+            _clone_probe: CatalogCloneProbe,
+        })
     }
     pub fn hash(&self) -> &'static str {
-        REF09_HASH
+        self.hash
     }
 
     /// Expand typed actuals to leaves at a constructor fixpoint. Registry
@@ -75,6 +114,19 @@ impl RefLibrary {
             .with_registry(registry)
             .and_then(|mut e| e.expand(kind, args, bundles))
             .map_err(|e| crate::Error::new(format!("§11.1: {e}")))
+    }
+}
+
+#[cfg(test)]
+mod binding_cost_tests {
+    use super::*;
+    #[test]
+    fn metadata_binding_check_does_not_clone_the_complete_catalog() {
+        let source = include_str!("../tests/fixtures/inc8.bisa").replace("0.8", "0.9");
+        let object = Object::parse(&source).unwrap();
+        let before = CATALOG_CLONES.with(|count| count.get());
+        object.require_ref_library_binding().unwrap();
+        assert_eq!(CATALOG_CLONES.with(|count| count.get()), before);
     }
 }
 pub(crate) struct SourceRootRequest<'a> {
@@ -243,6 +295,7 @@ impl Object {
         let factory = std::sync::Arc::new(crate::source_constructor::LinkedSource::new(
             self.clone(),
             tokens.clone(),
+            library.hash(),
         )?);
         let mut e = library
             .expander
@@ -272,10 +325,9 @@ impl Object {
     /// Resolve a concrete ref library without modifying canonical metadata.
     /// No 0.9 library is substituted for an accepted 0.8 binding.
     pub fn bound_ref_library(&self) -> Result<RefLibrary> {
-        self.require_ref_library_binding()?;
-        RefLibrary::published()
+        RefLibrary::for_hash(self.ref_library_hash()?)
     }
-    pub(crate) fn require_ref_library_binding(&self) -> Result<()> {
+    fn ref_library_hash(&self) -> Result<&'static str> {
         if self.isa_version != IsaVersion::V09 {
             return err(
                 "§11.1",
@@ -285,12 +337,19 @@ impl Object {
         let binding = self.schedule_expansion()?.unwrap_or(ScheduleExpansion {
             name: "ref",
             version: "0.9",
-            hash: Some(REF09_HASH),
+            hash: Some(REF09_R1_HASH),
         });
-        if (binding.name, binding.version, binding.hash) != ("ref", "0.9", Some(REF09_HASH)) {
+        if (binding.name, binding.version) != ("ref", "0.9") {
             return Err(infeasible("bound expansion library is unavailable"));
         }
-        Ok(())
+        match binding.hash {
+            Some(REF09_HASH) => Ok(REF09_HASH),
+            Some(REF09_R1_HASH) => Ok(REF09_R1_HASH),
+            _ => Err(infeasible("bound expansion library is unavailable")),
+        }
+    }
+    pub(crate) fn require_ref_library_binding(&self) -> Result<()> {
+        self.ref_library_hash().map(|_| ())
     }
 }
 
@@ -506,6 +565,7 @@ impl<'a> OracleInvocation<'a> {
         let factory = std::sync::Arc::new(crate::source_constructor::LinkedSource::new(
             self.object.clone(),
             self.tokens.clone(),
+            library.hash(),
         )?);
         let mut expander = library
             .expander

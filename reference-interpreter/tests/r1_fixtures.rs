@@ -134,6 +134,11 @@ fn fixture_identities_are_pinned_as_literals() {
     // visible test failure rather than a silent re-derivation.
     let pinned: &[(&str, &str, &str)] = &[
         (
+            "jump-width-source-gap",
+            "root",
+            "36b366835ee485cc34ce608de846f422da6fb69c0e1482ddfbea9ca691c2d863",
+        ),
+        (
             "actions",
             "bell",
             "3b0881575762fa4e1fd5b2a160cd6abfcbfe60f011df3b1968df7e44de11e1d3",

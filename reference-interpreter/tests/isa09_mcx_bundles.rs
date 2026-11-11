@@ -217,9 +217,11 @@ fn original_witness_retains_published_byte_identities() {
         Some("e38d5da64f9a0ae89a66243bcbe5a321cb807a5bbabf83952b63d3465dfab346")
     );
     let library = object.bound_ref_library().unwrap();
+    // These source/closure bytes are unchanged; an omitted library binding
+    // now selects the published r1 default rather than the frozen original.
     assert_eq!(
         library.hash(),
-        "5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197"
+        "0be00e64de17699516a9b5bb5daf308ee0c59af7e39b6bf934bad5c628f48e7a"
     );
 }
 

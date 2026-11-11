@@ -1,6 +1,6 @@
 mod support;
 use bennett_isa_ref::{
-    ref_library::{RefLibrary, Registry, Value, REF09_HASH},
+    ref_library::{RefLibrary, Registry, Value, REF09_HASH, REF09_R1_HASH},
     Object,
 };
 
@@ -47,7 +47,7 @@ fn default_and_explicit_09_binding_use_full_library_without_rewriting_schedule()
     let implicit = Object::parse(&implicit_source.replace(&binding, "")).unwrap();
     assert_eq!(
         implicit.schedule_expansion().unwrap().unwrap().hash,
-        Some(REF09_HASH)
+        Some(REF09_R1_HASH)
     );
     implicit.bound_ref_library().unwrap();
     assert_eq!(explicit.identity().unwrap().object_hash, before.object_hash);
