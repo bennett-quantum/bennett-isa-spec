@@ -27,6 +27,20 @@ const CATALOG_R1: &str = include_str!("../../spec/ref-0.9-r1.json");
 pub struct RefLibrary {
     expander: Expander,
     hash: &'static str,
+    #[cfg(test)]
+    _clone_probe: CatalogCloneProbe,
+}
+#[cfg(test)]
+std::thread_local! { static CATALOG_CLONES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
+#[cfg(test)]
+#[derive(Debug)]
+struct CatalogCloneProbe;
+#[cfg(test)]
+impl Clone for CatalogCloneProbe {
+    fn clone(&self) -> Self {
+        CATALOG_CLONES.with(|count| count.set(count.get() + 1));
+        Self
+    }
 }
 fn infeasible(e: impl std::fmt::Display) -> crate::Error {
     let text = e.to_string();
@@ -74,7 +88,12 @@ impl RefLibrary {
             ));
         }
         let expander = Expander::new(bytes, Registry::new()).map_err(infeasible)?;
-        Ok(Self { expander, hash })
+        Ok(Self {
+            expander,
+            hash,
+            #[cfg(test)]
+            _clone_probe: CatalogCloneProbe,
+        })
     }
     pub fn hash(&self) -> &'static str {
         self.hash
@@ -95,6 +114,19 @@ impl RefLibrary {
             .with_registry(registry)
             .and_then(|mut e| e.expand(kind, args, bundles))
             .map_err(|e| crate::Error::new(format!("§11.1: {e}")))
+    }
+}
+
+#[cfg(test)]
+mod binding_cost_tests {
+    use super::*;
+    #[test]
+    fn metadata_binding_check_does_not_clone_the_complete_catalog() {
+        let source = include_str!("../tests/fixtures/inc8.bisa").replace("0.8", "0.9");
+        let object = Object::parse(&source).unwrap();
+        let before = CATALOG_CLONES.with(|count| count.get());
+        object.require_ref_library_binding().unwrap();
+        assert_eq!(CATALOG_CLONES.with(|count| count.get()), before);
     }
 }
 pub(crate) struct SourceRootRequest<'a> {
@@ -293,6 +325,9 @@ impl Object {
     /// Resolve a concrete ref library without modifying canonical metadata.
     /// No 0.9 library is substituted for an accepted 0.8 binding.
     pub fn bound_ref_library(&self) -> Result<RefLibrary> {
+        RefLibrary::for_hash(self.ref_library_hash()?)
+    }
+    fn ref_library_hash(&self) -> Result<&'static str> {
         if self.isa_version != IsaVersion::V09 {
             return err(
                 "§11.1",
@@ -307,14 +342,14 @@ impl Object {
         if (binding.name, binding.version) != ("ref", "0.9") {
             return Err(infeasible("bound expansion library is unavailable"));
         }
-        RefLibrary::for_hash(
-            binding
-                .hash
-                .ok_or_else(|| infeasible("missing expansion library hash"))?,
-        )
+        match binding.hash {
+            Some(REF09_HASH) => Ok(REF09_HASH),
+            Some(REF09_R1_HASH) => Ok(REF09_R1_HASH),
+            _ => Err(infeasible("bound expansion library is unavailable")),
+        }
     }
     pub(crate) fn require_ref_library_binding(&self) -> Result<()> {
-        self.bound_ref_library().map(|_| ())
+        self.ref_library_hash().map(|_| ())
     }
 }
 
