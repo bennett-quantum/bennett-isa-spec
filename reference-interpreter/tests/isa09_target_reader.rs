@@ -1,3 +1,5 @@
+#[path = "support/native_operands.rs"]
+mod native_operands;
 use bennett_isa_ref::{
     json::Json,
     sha256_hex,
@@ -28,6 +30,7 @@ fn evaluated_epsilon_requires_models_only_in_positive_contexts() {
     let document = NativeTarget::parse(&zero).unwrap();
     assert_eq!(document.hash(), sha256_hex(zero.as_bytes()));
     let ctx = ModelContext {
+        operands: native_operands::operands(0, 1, 1),
         own_controls: 0,
         total_controls: 1,
         requested_epsilon: Some(Rational::integer(2)),
@@ -67,6 +70,7 @@ fn zero_epsilon_cost_cannot_reintroduce_requested_eps() {
         Json::parse(r#"{"time":{"var":"eps"}}"#).unwrap(),
     );
     let ctx = ModelContext {
+        operands: native_operands::operands(0, 1, 1),
         own_controls: 0,
         total_controls: 1,
         requested_epsilon: Some(Rational::integer(1)),

@@ -1,3 +1,5 @@
+#[path = "support/native_operands.rs"]
+mod native_operands;
 use bennett_isa_ref::json::Json;
 use bennett_isa_ref::target::{verify_native_model, ModelContext, ModelVerification, Rational};
 
@@ -13,6 +15,7 @@ fn model(sign: &str, controls: usize, own: usize) -> Json {
 
 fn context(own: usize, total: usize) -> ModelContext {
     ModelContext {
+        operands: native_operands::operands(own, total, 1),
         own_controls: own,
         total_controls: total,
         requested_epsilon: Some(Rational::integer(3)),
@@ -160,7 +163,9 @@ fn reordered_base_basis_is_applied_through_its_operand_map() {
             Json::Array(rows),
         )])),
     );
-    let actual = checked(&m, "swap", &context(0, 0), 2);
+    let mut ctx = context(0, 0);
+    ctx.operands = native_operands::operands(0, 0, 2);
+    let actual = checked(&m, "swap", &ctx, 2);
     for col in 0..4 {
         assert_eq!(
             actual.entry(col ^ 1, col).unwrap().re.lower(),
@@ -170,7 +175,7 @@ fn reordered_base_basis_is_applied_through_its_operand_map() {
 }
 
 #[test]
-fn unsupported_control_representation_is_not_validated_as_a_base_matrix() {
+fn malformed_recognized_control_representation_is_rejected() {
     let mut opaque = model("1", 1, 0);
     let Json::Object(fields) = &mut opaque else {
         unreachable!()
@@ -188,9 +193,6 @@ fn unsupported_control_representation_is_not_validated_as_a_base_matrix() {
         &context(0, 1),
         &Rational::integer(0),
         64,
-    )
-    .unwrap();
-    assert!(
-        matches!(verdict, ModelVerification::Unchecked(reason) if reason.contains("unsupported"))
     );
+    assert!(verdict.is_err());
 }

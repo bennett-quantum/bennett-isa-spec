@@ -26,6 +26,8 @@ enum FrameScope {
 }
 #[derive(Clone, Debug)]
 pub struct SelectedInvocationFrame {
+    /// False when a source `any` class still requires target realisation.
+    pub interface_classes_established: bool,
     pub context_key: Json,
     pub closure_hash: String,
     pub frame: Json,
@@ -169,6 +171,7 @@ impl Object {
                 .iter()
                 .flatten()
                 .filter(|p| matches!(p.ty, Type::Wire(_) | Type::Region(..)));
+            let mut interface_classes_established = true;
             for (slot, p) in frame.get("slots")?.array()?.iter().zip(params) {
                 let wires = context.wires.get(&p.name).ok_or_else(|| {
                     Error::new(
@@ -179,8 +182,23 @@ impl Object {
                     slot,
                     context.binding.inherited_controls as u128,
                 )?;
+                if wires.len() != expected.len() {
+                    return err(
+                        "§9.4",
+                        "selected invocation slot width differs from actual wires",
+                    );
+                }
                 for (wire, class) in wires.iter().zip(expected) {
-                    let actual=classes.get(wire).ok_or_else(||Error::new("§9.4: local allocation class is unestablished without target realisation".into()))?;
+                    let actual = classes
+                        .get(wire)
+                        .or_else(|| context.allocation_classes.get(wire))
+                        .ok_or_else(|| {
+                            Error::new("§9.4: missing source allocation class".into())
+                        })?;
+                    if actual == "any" {
+                        interface_classes_established = false;
+                        continue;
+                    }
                     if *actual != class {
                         return err(
                             "§9.4",
@@ -190,6 +208,7 @@ impl Object {
                 }
             }
             selected.push(SelectedInvocationFrame {
+                interface_classes_established,
                 context_key: context.context_key.clone(),
                 closure_hash: context.closure_hash.clone(),
                 frame: frame.clone(),

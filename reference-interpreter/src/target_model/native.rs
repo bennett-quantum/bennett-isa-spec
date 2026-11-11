@@ -1,14 +1,84 @@
+use super::native_schema::{self, Grammar};
 use super::{
     exact_matrix::{dimension, ExactMatrix},
     ExactComplex, ExpressionBindings, IntervalMatrix, ModelExpression, Rational,
 };
 use crate::{err, json::Json, Result};
+use std::collections::BTreeSet;
+
+/// Resolved physical identities, including the independently resolved §12.1
+/// allocation order. Own/effective lists retain their logical occurrences.
+#[derive(Clone, Debug)]
+pub struct ModelOperands {
+    pub own_controls: Vec<(String, usize)>,
+    pub effective_controls: Vec<(String, usize)>,
+    pub targets: Vec<(String, usize)>,
+    pub allocation_order: Vec<(String, usize)>,
+}
+impl ModelOperands {
+    fn controls(&self) -> Vec<(String, usize)> {
+        self.own_controls
+            .iter()
+            .chain(&self.effective_controls)
+            .cloned()
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect()
+    }
+    fn validate(&self, own: usize, total: usize, arity: usize) -> Result<()> {
+        if self.own_controls.len() != own
+            || self.effective_controls.len().checked_add(own) != Some(total)
+            || self.targets.len() != arity
+        {
+            return err(
+                "§8.3",
+                "physical operands disagree with matching control/target counts",
+            );
+        }
+        let controls = self.controls().into_iter().collect::<BTreeSet<_>>();
+        let targets = self.targets.iter().cloned().collect::<BTreeSet<_>>();
+        let all = controls.union(&targets).cloned().collect::<BTreeSet<_>>();
+        let allocation = self
+            .allocation_order
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        if targets.len() != arity
+            || !controls.is_disjoint(&targets)
+            || all != allocation
+            || allocation.len() != self.allocation_order.len()
+        {
+            return err(
+                "§8.3",
+                "physical operands alias or allocation order is not a permutation",
+            );
+        }
+        let inherited = self
+            .effective_controls
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        if self.allocation_order[..inherited.len()]
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>()
+            != inherited
+        {
+            return err(
+                "§8.3",
+                "allocation order must place inherited controls first",
+            );
+        }
+        Ok(())
+    }
+}
 
 /// Concrete §8.1 bindings, obtained from the matched generated operation.
 #[derive(Clone, Debug)]
 pub struct ModelContext {
     pub own_controls: usize,
     pub total_controls: usize,
+    pub operands: ModelOperands,
     pub requested_epsilon: Option<Rational>,
     pub theta_bits: Option<u64>,
 }
@@ -73,6 +143,9 @@ impl Opcode {
         if context.total_controls < context.own_controls || expected != context.own_controls {
             return err("§8.1/§8.3", "incorrect own/total control binding");
         }
+        context
+            .operands
+            .validate(context.own_controls, context.total_controls, self.arity())?;
         let parametric = matches!(self, Self::Rx | Self::Ry | Self::Rz);
         if parametric != context.theta_bits.is_some() {
             return err("§8.3", "incorrect angle parameter binding");
@@ -116,7 +189,7 @@ impl Opcode {
                     == Rational::integer(0) => {}
             Self::H | Self::T | Self::Tdg | Self::Rx | Self::Ry | Self::Rz => return Ok(None),
         }
-        Ok(Some(out.controlled(context.total_controls)?))
+        Ok(Some(out.controlled(context.operands.controls().len())?))
     }
 }
 
@@ -182,45 +255,118 @@ fn verify(
     if model.get("kind")?.string()? != "unitary" {
         return err("§8.3", "native model kind must be unitary");
     }
-    let controls = model.get("control_models")?;
-    if controls.get("kind")?.string()? != "controlled_U" {
-        return Ok(ModelVerification::Unchecked(
-            "§8.3: unsupported explicit control-model representation".into(),
-        ));
-    }
-    let basis_map = validate_basis_and_map(model, opcode, context)?;
     let bindings = model_bindings(model.get("parameter_bindings")?, context, epsilon)?;
-    controls.fields(&["kind", "controls", "disabled"], &[])?;
-    if controls.get("controls")?.string()? != "c"
-        || controls.get("disabled")?.string()? != "identity"
-    {
-        return err(
-            "§8.3",
-            "incorrect controlled_U context/disabled branch binding",
-        );
+    let d = context.operands.controls().len();
+    let grammar = Grammar {
+        resolve_context: true,
+        k: context.own_controls,
+        c: context.total_controls,
+        d,
+        bindings: &bindings,
+    };
+    let controls = model.get("control_models")?;
+    let explicit = match controls.get("kind")?.string()? {
+        "controlled_U" => {
+            controls.fields(&["kind", "controls", "disabled"], &[])?;
+            if controls.get("disabled")?.string()? != "identity" {
+                return err("§8.3", "incorrect disabled branch binding");
+            }
+            false
+        }
+        "explicit" => {
+            controls.fields(&["kind", "controls"], &[])?;
+            true
+        }
+        _ => return err("§8.3", "unknown control-model kind"),
+    };
+    if controls.get("controls")?.string()? != "c" {
+        return err("§8.3", "incorrect control context binding");
     }
+    let full_map = validate_basis_and_map(model, opcode, context, explicit)?;
     let data = model.get("data")?;
-    if !data.object()?.contains_key("matrix") {
+    if explicit {
+        data.fields(&["contexts"], &[])?;
+        let rows = data.get("contexts")?.array()?;
+        if rows.is_empty() {
+            return err("§8.3", "empty explicit contexts");
+        }
+        let mut previous = None;
+        let mut selected = 0;
+        for row in rows {
+            row.fields(&["controls", "data"], &[])?;
+            let range = row.get("controls")?;
+            range.fields(&["min", "max"], &[])?;
+            let min = range.get("min")?.uint()?;
+            let max = if range.get("max")? == &Json::String("unbounded".into()) {
+                u128::MAX
+            } else {
+                range.get("max")?.uint()?
+            };
+            if min > max || previous.is_some_and(|p| p >= min) {
+                return err("§8.3", "overlapping or reversed explicit ranges");
+            }
+            previous = Some(max);
+            let reached =
+                min <= context.total_controls as u128 && context.total_controls as u128 <= max;
+            selected += usize::from(reached);
+            let row_grammar = Grammar {
+                resolve_context: reached,
+                ..grammar
+            };
+            row_grammar.operation(
+                row.get("data")?,
+                native_schema::power(2, (d + opcode.arity()) as u128)?,
+            )?;
+        }
+        if selected != 1 {
+            return err("§8.3", "missing explicit context selection");
+        }
         return Ok(ModelVerification::Unchecked(
-            "§8.3: unsupported native data representation".into(),
+            "§8.3: unsupported explicit control-model verification".into(),
         ));
     }
-    data.fields(&["matrix"], &[])?;
+    let unsupported = grammar.operation(data, native_schema::power(2, opcode.arity() as u128)?)?;
+    if matches!(data.get("matrix")?, Json::Object(_)) {
+        return Ok(ModelVerification::Unchecked(
+            "§8.3: unsupported matrix constructor, representation or certificate verification"
+                .into(),
+        ));
+    }
     let Some(base) = reconstruct(data.get("matrix")?, opcode.arity(), &bindings)? else {
         return Ok(ModelVerification::Unchecked(
             "§8.3: exact nonrational model identity not established".into(),
         ));
     };
     base.unitary()?;
-    let actual = base
-        .permute_basis(&basis_map)?
-        .controlled(context.total_controls)?;
+    let actual = base.controlled(d)?.permute_basis(&full_map)?;
     let Some(ideal) = opcode.ideal(context)? else {
         return Ok(ModelVerification::Unchecked(
             "§8.3: exact ideal nonrational identity not established".into(),
         ));
     };
+    // The ideal starts in D + logical target order, independently of the
+    // model's target basis; both are then placed in allocation order.
+    let ideal_map = context
+        .operands
+        .controls()
+        .iter()
+        .chain(context.operands.targets.iter())
+        .map(|wire| {
+            context
+                .operands
+                .allocation_order
+                .iter()
+                .position(|w| w == wire)
+                .expect("validated physical operands")
+        })
+        .collect::<Vec<_>>();
+    let ideal = ideal.permute_basis(&ideal_map)?;
     actual.accuracy(&ideal, epsilon)?;
+    if unsupported {
+        return Ok(ModelVerification::Unchecked(
+            "§8.3: unsupported representation or certificate verification".into(),
+        ));
+    }
     Ok(ModelVerification::Checked(actual.enclose(precision)?))
 }
 
@@ -254,7 +400,23 @@ fn enclose_ideal(
     precision: usize,
 ) -> Result<ModelVerification> {
     Ok(match opcode.ideal(context)? {
-        Some(ideal) => ModelVerification::Checked(ideal.enclose(precision)?),
+        Some(ideal) => {
+            let map = context
+                .operands
+                .controls()
+                .iter()
+                .chain(&context.operands.targets)
+                .map(|w| {
+                    context
+                        .operands
+                        .allocation_order
+                        .iter()
+                        .position(|a| a == w)
+                        .expect("validated operands")
+                })
+                .collect::<Vec<_>>();
+            ModelVerification::Checked(ideal.permute_basis(&map)?.enclose(precision)?)
+        }
         None => ModelVerification::Unchecked(
             "§8.3: exact ideal nonrational identity not established".into(),
         ),
@@ -265,68 +427,113 @@ fn validate_basis_and_map(
     model: &Json,
     opcode: Opcode,
     context: &ModelContext,
+    explicit: bool,
 ) -> Result<Vec<usize>> {
-    let arity = opcode.arity();
-    if model.get("arity")?.uint()? != arity as u128 {
+    let d = context.operands.controls();
+    let arity = opcode.arity() + if explicit { d.len() } else { 0 };
+    if native_schema::size(
+        model.get("arity")?,
+        context.own_controls,
+        context.total_controls,
+        d.len(),
+    )? != arity as u128
+    {
         return err("§8.3", "model arity disagrees with opcode");
     }
-    let expected = if arity == 1 {
-        vec!["t"]
+    let targets = if opcode.arity() == 1 {
+        vec!["t".to_owned()]
     } else {
-        vec!["t", "t2"]
+        vec!["t".to_owned(), "t2".to_owned()]
     };
-    let basis = model
-        .get("basis")?
-        .array()?
-        .iter()
-        .map(Json::string)
-        .collect::<Result<Vec<_>>>()?;
+    let expected = if explicit {
+        (0..d.len())
+            .map(|i| format!("c[{i}]"))
+            .chain(targets.clone())
+            .collect::<Vec<_>>()
+    } else {
+        targets.clone()
+    };
+    let basis = match model.get("basis")? {
+        Json::Array(a) => a
+            .iter()
+            .map(|v| Ok(v.string()?.to_owned()))
+            .collect::<Result<Vec<_>>>()?,
+        template if explicit => {
+            template.fields(&["controls", "targets"], &[])?;
+            if template.get("controls")?.string()? != "c" {
+                return err("§8.3", "invalid Basis control binding");
+            }
+            (0..d.len())
+                .map(|i| Ok(format!("c[{i}]")))
+                .chain(
+                    template
+                        .get("targets")?
+                        .array()?
+                        .iter()
+                        .map(|v| Ok(v.string()?.to_owned())),
+                )
+                .collect::<Result<Vec<_>>>()?
+        }
+        _ => return err("§8.3", "template Basis requires explicit controls"),
+    };
     if basis.len() != arity
         || expected
             .iter()
-            .any(|name| basis.iter().filter(|bit| *bit == name).count() != 1)
+            .any(|n| basis.iter().filter(|b| *b == n).count() != 1)
     {
         return err("§8.3", "model basis disagrees with logical operands");
     }
-    let total = context
-        .total_controls
-        .checked_add(arity)
-        .ok_or_else(|| crate::resource_error("§8.3", "operand count exceeds host range"))?;
-    let inherited = context.total_controls - context.own_controls;
-    let map = model.get("operand_map")?.array()?;
-    if map.len() != total {
-        return err(
-            "§8.3",
-            "operand_map length disagrees with resolved operands",
-        );
-    }
-    for (entry, expected) in map.iter().zip(
-        (inherited..context.total_controls)
-            .chain(0..inherited)
-            .chain(basis.iter().map(|bit| {
-                context.total_controls
-                    + expected
-                        .iter()
-                        .position(|name| name == bit)
-                        .expect("checked basis")
-            })),
-    ) {
-        if entry.uint()? != expected as u128 {
-            return err(
-                "§8.3",
-                "operand_map disagrees with own/inherited allocation order",
-            );
+    let basis_map = basis
+        .iter()
+        .map(|b| expected.iter().position(|n| n == b).expect("checked basis"))
+        .collect::<Vec<_>>();
+    let complete = if explicit {
+        basis_map.clone()
+    } else {
+        (0..d.len())
+            .chain(basis_map.iter().map(|i| d.len() + i))
+            .collect()
+    };
+    let physical = d
+        .iter()
+        .chain(&context.operands.targets)
+        .collect::<Vec<_>>();
+    let map = complete
+        .iter()
+        .map(|i| {
+            context
+                .operands
+                .allocation_order
+                .iter()
+                .position(|w| w == physical[*i])
+                .expect("validated operands")
+        })
+        .collect::<Vec<_>>();
+    match model.get("operand_map")? {
+        Json::Array(entries) => {
+            if entries.len() != map.len() {
+                return err(
+                    "§8.3",
+                    "operand_map length disagrees with distinct physical operands",
+                );
+            }
+            for (v, expected) in entries.iter().zip(&map) {
+                if v.uint()? != *expected as u128 {
+                    return err(
+                        "§8.3",
+                        "operand_map disagrees with resolved physical identities",
+                    );
+                }
+            }
+        }
+        generated => {
+            generated.fields(&["kind"], &[])?;
+            if generated.get("kind")?.string()? != "entry_to_allocation" {
+                return err("§8.3", "unknown operand_map kind");
+            }
         }
     }
-    Ok(basis
-        .iter()
-        .map(|bit| {
-            expected
-                .iter()
-                .position(|name| name == bit)
-                .expect("checked basis")
-        })
-        .collect())
+    Ok(map)
 }
 
 fn model_bindings(
@@ -336,8 +543,9 @@ fn model_bindings(
 ) -> Result<ExpressionBindings> {
     let mut bindings = ExpressionBindings::new();
     for (name, source) in declarations.object()? {
+        native_schema::label_check(name)?;
         let source = source.string()?;
-        if ["k", "c", "eps", "theta"].contains(&name.as_str()) && name != source {
+        if ["k", "c", "d", "eps", "theta"].contains(&name.as_str()) && name != source {
             return err(
                 "§8.3",
                 "model parameter/context binding must retain its declared meaning",
@@ -346,6 +554,7 @@ fn model_bindings(
         let value = match source {
             "k" => Rational::integer(context.own_controls as i128),
             "c" => Rational::integer(context.total_controls as i128),
+            "d" => Rational::integer(context.operands.controls().len() as i128),
             "eps" if *epsilon > Rational::integer(0) => {
                 context.requested_epsilon.clone().expect("validated share")
             }

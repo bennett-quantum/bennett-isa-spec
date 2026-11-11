@@ -1,3 +1,5 @@
+#[path = "support/native_operands.rs"]
+mod native_operands;
 use bennett_isa_ref::{
     json::Json,
     target::{verify_numerical_bound, ModelContext, ModelVerification, NativeTarget, Rational},
@@ -25,7 +27,10 @@ fn portable_vectors_check_every_model_outcome_and_phase_sensitive_process_bound(
         );
         let c = case.get("context").unwrap();
         let eps = c.get("requested_epsilon").unwrap().array().unwrap();
+        let own = c.get("own_controls").unwrap().uint().unwrap() as usize;
+        let total = c.get("total_controls").unwrap().uint().unwrap() as usize;
         let context = ModelContext {
+            operands: native_operands::operands(own, total, 1),
             own_controls: c.get("own_controls").unwrap().uint().unwrap() as usize,
             total_controls: c.get("total_controls").unwrap().uint().unwrap() as usize,
             requested_epsilon: Some(

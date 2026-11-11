@@ -23,7 +23,9 @@ pub use process::{
 mod exact_matrix;
 #[path = "target_model/native.rs"]
 mod native;
-pub use native::{verify_native_model, ModelContext, ModelVerification};
+#[path = "target_model/native_schema.rs"]
+mod native_schema;
+pub use native::{verify_native_model, ModelContext, ModelOperands, ModelVerification};
 #[path = "target_model/document.rs"]
 mod document;
 #[path = "target_model/document_schema.rs"]

@@ -135,7 +135,7 @@ impl Object {
         adjoint: bool,
         aliases: Option<&[u64]>,
     ) -> Result<Vec<ResolvedSourceInvocation>> {
-        let (_, records) = self.expand_action_source_bound(
+        let (leaves, records) = self.expand_action_source_bound(
             name,
             args,
             bundles,
@@ -143,7 +143,7 @@ impl Object {
             aliases,
             RootSourceContext::default(),
         )?;
-        records.iter().map(resolve_source_invocation).collect()
+        resolve_source_invocations(&records, &leaves)
     }
     pub fn source_action_invocations_with_controls(
         &self,
@@ -154,7 +154,7 @@ impl Object {
         aliases: Option<&[u64]>,
         controls: &[bennett_isa_conformance::ref_language::Wire],
     ) -> Result<Vec<ResolvedSourceInvocation>> {
-        let (_, records) = self.expand_action_source_bound(
+        let (leaves, records) = self.expand_action_source_bound(
             name,
             args,
             bundles,
@@ -165,7 +165,7 @@ impl Object {
                 binding: None,
             },
         )?;
-        records.iter().map(resolve_source_invocation).collect()
+        resolve_source_invocations(&records, &leaves)
     }
     pub(crate) fn source_action_invocations_at(
         &self,
@@ -185,7 +185,7 @@ impl Object {
             ],
             variant: request.variant.into(),
         };
-        let (_, records) = self.expand_action_source_bound(
+        let (leaves, records) = self.expand_action_source_bound(
             name,
             args,
             bundles,
@@ -196,7 +196,7 @@ impl Object {
                 binding: Some(root),
             },
         )?;
-        records.iter().map(resolve_source_invocation).collect()
+        resolve_source_invocations(&records, &leaves)
     }
     fn expand_action_source_bound(
         &self,
@@ -462,14 +462,14 @@ impl<'a> OracleInvocation<'a> {
             })
             .map(|b| b.get("variant").and_then(crate::json::Json::string))
             .transpose()?;
-        let (_, records) = self.expand_source_observed(
+        let (leaves, records) = self.expand_source_observed(
             library,
             bundles,
             bennett_isa_conformance::ref_language::DEFAULT_SOURCE_LEAF_LIMIT,
             controls,
             variant,
         )?;
-        records.iter().map(resolve_source_invocation).collect()
+        resolve_source_invocations(&records, &leaves)
     }
     fn expand_source_observed(
         &self,
@@ -667,11 +667,44 @@ pub(crate) fn source_parameters(object: &Object, function: &crate::Function) -> 
 /// key is fully resolved and contains no producer wildcard or storage address.
 #[derive(Clone, Debug)]
 pub struct ResolvedSourceInvocation {
+    /// Source-derived local allocation classes; `any` needs target realisation.
+    pub allocation_classes: std::sync::Arc<
+        std::collections::BTreeMap<bennett_isa_conformance::ref_language::Wire, String>,
+    >,
     pub context_key: crate::json::Json,
     pub closure_hash: String,
     pub binding: bennett_isa_conformance::ref_language::SourceBinding,
     pub values: std::collections::BTreeMap<String, Value>,
     pub wires: std::collections::BTreeMap<String, Vec<bennett_isa_conformance::ref_language::Wire>>,
+}
+// Allocation identities/classes come from the independent expansion, not a
+// producer frame. Retain them even for empty child bodies and inverse visits.
+fn resolve_source_invocations(
+    records: &[bennett_isa_conformance::ref_language::SourceInvocationRecord],
+    leaves: &[Leaf],
+) -> Result<Vec<ResolvedSourceInvocation>> {
+    let mut classes = std::collections::BTreeMap::new();
+    for leaf in leaves {
+        if let Some((allocation, width, class, _)) = &leaf.allocation {
+            for bit in 0..*width {
+                if classes
+                    .insert((allocation.clone(), bit), class.clone())
+                    .is_some_and(|previous| previous != *class)
+                {
+                    return err("§9.4", "allocation identity changes class");
+                }
+            }
+        }
+    }
+    let classes = std::sync::Arc::new(classes);
+    records
+        .iter()
+        .map(|record| {
+            let mut invocation = resolve_source_invocation(record)?;
+            invocation.allocation_classes = classes.clone();
+            Ok(invocation)
+        })
+        .collect()
 }
 fn resolve_source_invocation(
     record: &bennett_isa_conformance::ref_language::SourceInvocationRecord,
@@ -714,6 +747,7 @@ fn resolve_source_invocation(
         edges.push(Json::Object(fields));
     }
     Ok(ResolvedSourceInvocation {
+        allocation_classes: Default::default(),
         values: record.values.clone(),
         context_key: Json::Array(edges),
         closure_hash: invocation.symbol.clone(),
