@@ -234,6 +234,20 @@ void bennett_coverage_free(bennett_coverage_t*);
 /* ISA 0.9 §10.1 (K91) per-role feature-query C declaration. */
 bennett_status bennett_launch_features(const uint8_t** jcs_out, size_t* len_out);
 
+/* ISA 0.9 §10.1 mixed-launch/1 C declarations. */
+typedef struct bennett_mixed_t bennett_mixed_t;
+
+bennett_status bennett_mixed_bind_v1(
+    bennett_program_t* program, const uint8_t* container_jcs,
+    size_t container_len, uint64_t root_index, bennett_mixed_t** out);
+
+bennett_status bennett_mixed_run_v1(
+    bennett_mixed_t* binding, const bennett_args_t* args,
+    const uint8_t* entropy, size_t entropy_len,
+    const uint8_t* call_jcs, size_t call_len, bennett_run_id* out);
+
+bennett_status bennett_mixed_unbind_v1(bennett_mixed_t* binding);
+
 #ifdef __cplusplus
 }
 #endif

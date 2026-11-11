@@ -149,7 +149,7 @@ class HeaderFamilies(unittest.TestCase):
                 self.assertEqual(hashlib.sha256((INCLUDE / header).read_bytes()).hexdigest(), digest)
 
     def test_09_declarations_match_spec(self):
-        for role, header, count in zip(("launch", "sched"), HEADERS_09, (55, 20)):
+        for role, header, count in zip(("launch", "sched"), HEADERS_09, (59, 20)):
             with self.subTest(header=header):
                 expected = inventory(expected_declarations(9, role))
                 self.assertEqual(len(expected), count, "review changed normative inventory")
