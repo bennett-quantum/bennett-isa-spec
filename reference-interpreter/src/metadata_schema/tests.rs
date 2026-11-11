@@ -7,6 +7,146 @@ fn j(s: &str) -> Json {
 }
 
 #[test]
+fn k89_closed_occurrences_keep_forward_allocation_identity_and_reject_selectors() {
+    let vectors = j(include_str!(
+        "../../../conformance/cases/F/F-k89-closed-occurrences-09/occurrences.json"
+    ));
+    let domain = j(&format!(
+        r#"{{"bundles":[],"borrowed":[],"regions":[],"workspace":{}}}"#,
+        vectors.get("workspace").unwrap().canonical()
+    ));
+    validate_for(crate::IsaVersion::V09, "domain", &domain).unwrap();
+    assert!(validate_for(crate::IsaVersion::V08, "domain", &domain).is_err());
+    for name in ["nested", "oracle"] {
+        validate_for(
+            crate::IsaVersion::V09,
+            "source_occurrence09",
+            vectors.get(name).unwrap(),
+        )
+        .unwrap();
+    }
+    validate_for(
+        crate::IsaVersion::V09,
+        "allocation_occurrence09",
+        vectors.get("reacquisition").unwrap(),
+    )
+    .unwrap();
+    let source = vectors.get("borrow_frame").unwrap().get("first").unwrap();
+    for (key, value) in [
+        ("point", j(r#""*""#)),
+        ("iteration", j(r#""*""#)),
+        ("instance", j(r#""*""#)),
+        ("call_index", j("0")),
+        ("generated", j("0")),
+        ("step", j("1")),
+        ("phase", j(r#""fwd""#)),
+    ] {
+        let mut bad = source.clone();
+        let Json::Object(fields) = &mut bad else {
+            unreachable!()
+        };
+        fields.insert(key.into(), value);
+        assert!(
+            validate_for(crate::IsaVersion::V09, "source_occurrence09", &bad).is_err(),
+            "{}",
+            bad.canonical()
+        );
+    }
+    let mut zero_step = vectors.get("oracle").unwrap().clone();
+    let Json::Object(fields) = &mut zero_step else {
+        unreachable!()
+    };
+    fields.insert("step".into(), j("0"));
+    assert!(validate_for(crate::IsaVersion::V09, "source_occurrence09", &zero_step).is_err());
+    for key in ["context_key", "symbol", "point", "iteration", "instance"] {
+        let mut bad = source.clone();
+        let Json::Object(fields) = &mut bad else {
+            unreachable!()
+        };
+        fields.remove(key);
+        assert!(validate_for(crate::IsaVersion::V09, "source_occurrence09", &bad).is_err());
+    }
+    for value in [j(r#""01""#), j("-1"), j("1.5"), j("false")] {
+        let mut allocation = vectors.get("reacquisition").unwrap().clone();
+        let Json::Object(fields) = &mut allocation else {
+            unreachable!()
+        };
+        fields.insert("allocation_ordinal".into(), value);
+        assert!(validate_for(
+            crate::IsaVersion::V09,
+            "allocation_occurrence09",
+            &allocation
+        )
+        .is_err());
+    }
+    let mut large = source.clone();
+    let Json::Object(fields) = &mut large else {
+        unreachable!()
+    };
+    fields.insert("iteration".into(), j(r#"["9007199254740993"]"#));
+    validate_for(crate::IsaVersion::V09, "source_occurrence09", &large).unwrap();
+    for key in ["call_index", "step", "phase"] {
+        let mut bad = vectors.get("nested").unwrap().clone();
+        let Json::Object(fields) = &mut bad else {
+            unreachable!()
+        };
+        let Json::Array(edges) = fields.get_mut("context_key").unwrap() else {
+            unreachable!()
+        };
+        let Json::Object(edge) = &mut edges[0] else {
+            unreachable!()
+        };
+        edge.remove(key);
+        assert!(validate_for(crate::IsaVersion::V09, "source_occurrence09", &bad).is_err());
+    }
+}
+
+#[test]
+fn k89_union_and_product_domains_are_exclusive_and_only_for_frame_claims() {
+    let vectors = j(include_str!(
+        "../../../conformance/cases/F/F-k89-closed-occurrences-09/occurrences.json"
+    ));
+    let product = j(&format!(
+        r#"{{"bundles":[],"borrowed":[],"regions":[],"workspace":{}}}"#,
+        vectors.get("workspace").unwrap().canonical()
+    ));
+    let union = j(&format!(
+        r#"{{"entry_products":[{}]}}"#,
+        product.canonical()
+    ));
+    validate_for(crate::IsaVersion::V09, "domain", &union).unwrap();
+    assert!(validate_for(crate::IsaVersion::V08, "domain", &union).is_err());
+    for key in [
+        "bundles",
+        "borrowed",
+        "regions",
+        "workspace",
+        "args",
+        "fixed_regions",
+    ] {
+        let mut mixed = union.clone();
+        let Json::Object(fields) = &mut mixed else {
+            unreachable!()
+        };
+        fields.insert(key.into(), j("[]"));
+        assert!(validate_for(crate::IsaVersion::V09, "domain", &mixed).is_err());
+    }
+    let mut claim = j(&format!(
+        r#"{{"kind":"exhaustive","domain":{},"expected":"borrow_frame","borrow_frame":{},"subject":{{"closure_hash":"{}","variant":"forward","inherited_controls":0}}}}"#,
+        union.canonical(),
+        vectors.get("borrow_frame").unwrap().canonical(),
+        "f".repeat(64)
+    ));
+    validate_for(crate::IsaVersion::V09, "claim", &claim).unwrap();
+    let Json::Object(fields) = &mut claim else {
+        unreachable!()
+    };
+    fields.remove("borrow_frame");
+    fields.insert("expected".into(), j(r#"{"table":[]}"#));
+    assert!(validate_for(crate::IsaVersion::V09, "claim", &claim).is_err());
+}
+
+#[test]
 fn fixed_images_and_relative_label_are_explicitly_versioned_closed_fields() {
     let domain = j(
         r#"{"bundles":[],"borrowed":[],"regions":[],"fixed_regions":[{"name":"db","A":0,"W":1,"image":"00","sha256":"6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d"}]}"#,
@@ -59,6 +199,7 @@ fn samples(name: &str) -> Vec<Json> {
     match entry(name).shape {
         String => vec![j(r#""""#), j(r#""vendor.2026""#)],
         Text | Name => vec![j(r#""a.b""#)],
+        SourcePoint => vec![j(r#""entry:0""#)],
         Hash => vec![Json::String("0".repeat(64))],
         Hex => vec![j(r#""""#), j(r#""00ff""#)],
         Uint => vec![
@@ -69,6 +210,7 @@ fn samples(name: &str) -> Vec<Json> {
             j(r#""18446744073709551616""#),
             j(r#""340282366920938463463374607431768211456""#),
         ],
+        PositiveUint => vec![j("1"), j(r#""9007199254740993""#)],
         UnsignedDecimalString => vec![
             j(r#""0""#),
             j(r#""340282366920938463463374607431768211456""#),
@@ -212,6 +354,7 @@ fn kinds(name: &str) -> u8 {
     match entry(name).shape {
         String
         | Text
+        | SourcePoint
         | Name
         | Hash
         | Hex
@@ -219,7 +362,7 @@ fn kinds(name: &str) -> u8 {
         | UnsignedDecimalString
         | SignedDecimalString
         | Enum(_) => 2,
-        Uint | Decimal => 1 | 2,
+        Uint | PositiveUint | Decimal => 1 | 2,
         Number => 1,
         Null => 8,
         Object(_) | Map(..) => 32,
@@ -247,6 +390,8 @@ fn wrong(name: &str) -> Vec<Json> {
         .collect::<Vec<_>>();
     let extra: &[&str] = match entry(name).shape {
         Uint => &["-1", "1.5", r#""1""#, r#""01""#, r#""-1""#, r#""wrong""#],
+        PositiveUint => &["0", "-1", "1.5", r#""01""#],
+        SourcePoint => &[r#""""#, r#""*""#],
         U64String => &[r#""-1""#, r#""18446744073709551616""#, r#""wrong""#],
         Decimal => &[
             "-0.5",

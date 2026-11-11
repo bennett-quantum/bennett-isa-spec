@@ -374,6 +374,41 @@ pub(crate) fn domain_for(
     controls: u128,
     borrowed: Option<&[usize]>,
 ) -> Result<()> {
+    if version == crate::IsaVersion::V09 {
+        if let Some(products) = value.object()?.get("entry_products") {
+            let products = products.array()?;
+            for product in products {
+                domain_for(product, f, version, controls, borrowed)?;
+            }
+            return Ok(());
+        }
+        if let Some(workspace) = value.object()?.get("workspace") {
+            let mut intervals: BTreeMap<String, Vec<(u128, u128)>> = BTreeMap::new();
+            for component in workspace.array()? {
+                let allocation = component.get("allocation")?;
+                let offset = component.get("offset")?.uint()?;
+                let width = component.get("width")?.uint()?;
+                if width == 0 {
+                    return err("§12.2 K89", "zero-width workspace component");
+                }
+                let end = offset.checked_add(width).ok_or_else(|| {
+                    crate::resource_error("§12.2 K89", "workspace interval exceeds host capacity")
+                })?;
+                let prior = intervals.entry(allocation.canonical()).or_default();
+                if prior.iter().any(|(lo, hi)| offset < *hi && *lo < end) {
+                    return err("§12.2 K89", "overlapping workspace components");
+                }
+                prior.push((offset, end));
+                let lo = component.get("lo")?.uint_text()?;
+                let hi = component.get("hi")?.uint_text()?;
+                crate::object::unsigned_literal(lo, width)?;
+                crate::object::unsigned_literal(hi, width)?;
+                if (lo.len(), lo) > (hi.len(), hi) {
+                    return err("§12.2 K89", "workspace interval with lo > hi");
+                }
+            }
+        }
+    }
     let mut names = BTreeSet::new();
     for group in ["bundles", "borrowed"] {
         let entries = value.get(group)?.array()?;
