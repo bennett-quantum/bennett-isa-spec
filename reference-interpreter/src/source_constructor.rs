@@ -80,6 +80,7 @@ fn fixed_successor(p: usize, value: usize) -> Result<Vec<Value>> {
 
 pub(crate) fn oracle(
     call: &OracleInvocation<'_>,
+    catalog_hash: &str,
 ) -> Result<bennett_isa_conformance::ref_language::SourceBody> {
     let object = call.object();
     let root = call.function();
@@ -995,20 +996,22 @@ pub(crate) fn oracle(
                 }
                 "qjumpr" => {
                     let (first, end) = program.ranges[&f.name];
-                    row.push(invoke(
-                        op,
-                        [
-                            number(p)?,
-                            number(fault)?,
-                            number(first)?,
-                            number(end)?,
-                            text(read(&a[0])?),
-                            succ.clone(),
-                            flag.clone(),
-                            text("$faulted"),
-                            text("$code"),
-                        ],
-                    ));
+                    let mut args = vec![number(p)?];
+                    if catalog_hash == crate::ref_library::REF09_R1_HASH {
+                        let address = width(&a[0])?;
+                        args.extend([number(address)?, number(address.min(p))?]);
+                    }
+                    args.extend([
+                        number(fault)?,
+                        number(first)?,
+                        number(end)?,
+                        text(read(&a[0])?),
+                        succ.clone(),
+                        flag.clone(),
+                        text("$faulted"),
+                        text("$code"),
+                    ]);
+                    row.push(invoke(op, args));
                     next = Vec::new();
                     fallible = true;
                 }
@@ -1169,11 +1172,13 @@ pub(crate) struct LinkedSource {
     object: crate::Object,
     names: BTreeMap<String, String>,
     tokens: crate::ref_library::tokens::SourceTokens,
+    catalog_hash: &'static str,
 }
 impl LinkedSource {
     pub fn new(
         object: crate::Object,
         tokens: crate::ref_library::tokens::SourceTokens,
+        catalog_hash: &'static str,
     ) -> Result<Self> {
         let names = object
             .identity()?
@@ -1185,6 +1190,7 @@ impl LinkedSource {
             object,
             names,
             tokens,
+            catalog_hash,
         })
     }
 }
@@ -1278,7 +1284,7 @@ impl bennett_isa_conformance::ref_language::SourceFactory for LinkedSource {
                 None,
                 Some(tokens),
             )?;
-            oracle(&call)
+            oracle(&call, self.catalog_hash)
         };
         build().map_err(|e| {
             if e.kind() == crate::ErrorKind::HostResource {

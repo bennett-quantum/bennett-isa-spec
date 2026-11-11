@@ -13,15 +13,20 @@ pub use bennett_isa_conformance::{
     ref_language::{Leaf, Registry},
 };
 
+/// Frozen original snapshot, retained for explicit compatibility bindings.
 pub const REF09_HASH: &str = "5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197";
+/// Current ISA 0.9 default, with independent qjumpr address/successor widths.
+pub const REF09_R1_HASH: &str = "0be00e64de17699516a9b5bb5daf308ee0c59af7e39b6bf934bad5c628f48e7a";
 pub(crate) mod tokens;
 const CATALOG: &str = include_str!("../../spec/ref-0.9.json");
+const CATALOG_R1: &str = include_str!("../../spec/ref-0.9-r1.json");
 
 /// Only the published complete library can satisfy a ref@0.9 binding. Private
 /// witness catalogs cannot acquire its identity by supplying its descriptor.
 #[derive(Clone, Debug)]
 pub struct RefLibrary {
     expander: Expander,
+    hash: &'static str,
 }
 fn infeasible(e: impl std::fmt::Display) -> crate::Error {
     let text = e.to_string();
@@ -35,15 +40,30 @@ fn infeasible(e: impl std::fmt::Display) -> crate::Error {
 }
 impl RefLibrary {
     pub fn published() -> Result<Self> {
+        Self::for_hash(REF09_R1_HASH)
+    }
+    fn for_hash(hash: &str) -> Result<Self> {
         static LIBRARY: std::sync::OnceLock<Result<RefLibrary>> = std::sync::OnceLock::new();
-        LIBRARY
-            .get_or_init(|| Self::bind("ref", "0.9", REF09_HASH, CATALOG))
-            .clone()
+        static ORIGINAL: std::sync::OnceLock<Result<RefLibrary>> = std::sync::OnceLock::new();
+        match hash {
+            REF09_R1_HASH => LIBRARY
+                .get_or_init(|| Self::bind("ref", "0.9", REF09_R1_HASH, CATALOG_R1))
+                .clone(),
+            REF09_HASH => ORIGINAL
+                .get_or_init(|| Self::bind("ref", "0.9", REF09_HASH, CATALOG))
+                .clone(),
+            _ => Err(infeasible("bound expansion library is unavailable")),
+        }
     }
     pub fn bind(name: &str, version: &str, hash: &str, bytes: &str) -> Result<Self> {
-        if (name, version, hash) != ("ref", "0.9", REF09_HASH) {
+        if (name, version) != ("ref", "0.9") {
             return Err(infeasible("bound expansion library is unavailable"));
         }
+        let hash = match hash {
+            REF09_HASH => REF09_HASH,
+            REF09_R1_HASH => REF09_R1_HASH,
+            _ => return Err(infeasible("bound expansion library is unavailable")),
+        };
         if envelope_hash(bytes) != hash {
             return Err(infeasible("catalog envelope does not match binding"));
         }
@@ -54,10 +74,10 @@ impl RefLibrary {
             ));
         }
         let expander = Expander::new(bytes, Registry::new()).map_err(infeasible)?;
-        Ok(Self { expander })
+        Ok(Self { expander, hash })
     }
     pub fn hash(&self) -> &'static str {
-        REF09_HASH
+        self.hash
     }
 
     /// Expand typed actuals to leaves at a constructor fixpoint. Registry
@@ -243,6 +263,7 @@ impl Object {
         let factory = std::sync::Arc::new(crate::source_constructor::LinkedSource::new(
             self.clone(),
             tokens.clone(),
+            library.hash(),
         )?);
         let mut e = library
             .expander
@@ -272,10 +293,6 @@ impl Object {
     /// Resolve a concrete ref library without modifying canonical metadata.
     /// No 0.9 library is substituted for an accepted 0.8 binding.
     pub fn bound_ref_library(&self) -> Result<RefLibrary> {
-        self.require_ref_library_binding()?;
-        RefLibrary::published()
-    }
-    pub(crate) fn require_ref_library_binding(&self) -> Result<()> {
         if self.isa_version != IsaVersion::V09 {
             return err(
                 "§11.1",
@@ -285,12 +302,19 @@ impl Object {
         let binding = self.schedule_expansion()?.unwrap_or(ScheduleExpansion {
             name: "ref",
             version: "0.9",
-            hash: Some(REF09_HASH),
+            hash: Some(REF09_R1_HASH),
         });
-        if (binding.name, binding.version, binding.hash) != ("ref", "0.9", Some(REF09_HASH)) {
+        if (binding.name, binding.version) != ("ref", "0.9") {
             return Err(infeasible("bound expansion library is unavailable"));
         }
-        Ok(())
+        RefLibrary::for_hash(
+            binding
+                .hash
+                .ok_or_else(|| infeasible("missing expansion library hash"))?,
+        )
+    }
+    pub(crate) fn require_ref_library_binding(&self) -> Result<()> {
+        self.bound_ref_library().map(|_| ())
     }
 }
 
@@ -506,6 +530,7 @@ impl<'a> OracleInvocation<'a> {
         let factory = std::sync::Arc::new(crate::source_constructor::LinkedSource::new(
             self.object.clone(),
             self.tokens.clone(),
+            library.hash(),
         )?);
         let mut expander = library
             .expander

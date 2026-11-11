@@ -28,7 +28,7 @@ impl Object {
                 name: "ref",
                 version: self.isa_version.as_str(),
                 hash: (self.isa_version == crate::IsaVersion::V09)
-                    .then_some(crate::ref_library::REF09_HASH),
+                    .then_some(crate::ref_library::REF09_R1_HASH),
             }));
         };
         crate::metadata_schema::validate("expansion", expansion)?;
