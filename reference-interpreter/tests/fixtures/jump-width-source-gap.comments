@@ -1,0 +1,20 @@
+Hand derivation (ISA 0.9, independent qjumpr address and pc widths):
+The containing instance has rows 0=qjumpr a, 1=qjumpr b, 2=lift.retval x;
+HALT=3, so the minimal shared pc/successor width is P=2. Declared address
+widths A=3 and A=4 are both legal because 2^A>3. The r1 calls bind
+CopyWidth=min(A,P)=2, F=4, First=0, End=3. They compare all A address bits,
+then XOR the low two bits into succ; an invalid address still selects HALT
+and effective cause 4. Thus addresses 4 and 8 cannot alias row 0 silently.
+
+Input (a,b,x)=(1,2,1) visits rows 0,1,2 and returns payload 1/code 0 in
+three steps. Address a=2 reaches the return directly. Address a=0 legally
+loops at row 0 and exhausts a finite step budget. An address a>=3 faults
+on the first row; when a=1, b>=3 faults on the second row. The interface
+inputs are preserved; target/fault delivery is XOR, and inverse traversal
+restores every private bit. The source-constructor regression enumerates
+all 8*16*2=256 input tuples at B=3 with nonzero initial target/fault values.
+
+The original catalog's single-P qjumpr signature cannot bind both declared
+address widths; explicit original-hash compatibility is tested separately
+on a uniformly two-bit source. This witness's stored root interface hash
+is 36b366835ee485cc34ce608de846f422da6fb69c0e1482ddfbea9ca691c2d863.
