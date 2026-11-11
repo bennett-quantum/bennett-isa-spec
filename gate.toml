@@ -16,11 +16,17 @@ name = "crate target links (witness and tests address <crate>/target)"
 argv = ["sh", "-c", "for c in reference-interpreter conformance; do rm -rf \"$c/target\"; ln -s \"$CARGO_TARGET_DIR\" \"$c/target\"; done; mkdir -p \"$CARGO_TARGET_DIR\""]
 
 [[check]]
+name = "build (tests compiled, not run)"
+argv = ["sh", "-ec", "cargo test --offline --no-run --manifest-path reference-interpreter/Cargo.toml && cargo test --offline --no-run --manifest-path conformance/Cargo.toml"]
+
+[[check]]
 name = "cargo test reference-interpreter"
+tier = "post-merge"  # heavy: runs on main-health's cadence, not per push
 argv = ["sh", "-ec", "ulimit -v 8388608; ulimit -c 0; exec timeout 1800 cargo test --offline -j3 --manifest-path reference-interpreter/Cargo.toml -- --test-threads=4"]
 
 [[check]]
 name = "cargo test conformance"
+tier = "post-merge"  # heavy: runs on main-health's cadence, not per push
 argv = ["sh", "-ec", "ulimit -v 8388608; ulimit -c 0; exec timeout 1800 cargo test --offline -j3 --manifest-path conformance/Cargo.toml -- --test-threads=4"]
 
 [[check]]
