@@ -6869,7 +6869,7 @@
  
  ## 17. Decisions deferred to implementation, with defaults
  
-@@ -1652,15 +7235,64 @@
+@@ -1652,15 +7235,69 @@
     level. Default: the library `ref` published by `bennett-isa-spec`
     (ripple-carry adders and comparators, linear `inrange` scans,
     one-hot address dispatch, clean scratch released in reverse order);
@@ -6878,9 +6878,14 @@
 +   a schedule that names no `expansion` binds `ref` at the ISA version
 +   in the object's header, with the full-library envelope hash published
 +   for that version in §11.1. [deps: ISA-9.1, ISA-11.1-P3, ISA-11.1-P4]
-+   For a 0.9 object this is exactly
-+   `{"name":"ref","version":"0.9","hash":"0be00e64de17699516a9b5bb5daf308ee0c59af7e39b6bf934bad5c628f48e7a"}`,
-+   equally for omission and an explicit binding. [deps: ISA-11.1-P3, ISA-11.1-P4, ISA-11.1]
++   For a 0.9 object, omission/default selection binds exactly
++   `{"name":"ref","version":"0.9","hash":"0be00e64de17699516a9b5bb5daf308ee0c59af7e39b6bf934bad5c628f48e7a"}`.
++   An explicit binding may select that r1 snapshot or the original snapshot
++   by its original hash
++   `5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`,
++   retaining the original qjumpr parameters and semantics. Consumers bind
++   the selected snapshot's exact bytes; default selection never replaces
++   an explicit hash. [deps: ISA-11.1-P3, ISA-11.1-P4, ISA-11.1]
 +   §11.1 fixes its schema, ordinals, scratch identities, empty removable
 +   sets and deterministic decomposition algorithms. [deps: ISA-11.1]
 +   The current bound catalog is `spec/ref-0.9-r1.json`; the original
@@ -6938,7 +6943,7 @@
  10. **`any`-class resolution** (§11). Default: the first class in JCS
      order with capacity.
  11. **Occupancy rate of a class absent from `rate`** (§8.2). Default: 1.
-@@ -1669,7 +7301,65 @@
+@@ -1669,7 +7306,65 @@
  13. **Suite sizes** (§15): the exhaustive widths of suite C and the
      sample counts of `sampled` claims. Default: exhaustive for ≤ 16
      interface bits; 2^16 samples above.

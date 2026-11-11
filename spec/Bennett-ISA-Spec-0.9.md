@@ -7238,9 +7238,14 @@ the item is revised. Items 1–5 are asserted non-semantic.
    a schedule that names no `expansion` binds `ref` at the ISA version
    in the object's header, with the full-library envelope hash published
    for that version in §11.1. [deps: ISA-9.1, ISA-11.1-P3, ISA-11.1-P4]
-   For a 0.9 object this is exactly
-   `{"name":"ref","version":"0.9","hash":"0be00e64de17699516a9b5bb5daf308ee0c59af7e39b6bf934bad5c628f48e7a"}`,
-   equally for omission and an explicit binding. [deps: ISA-11.1-P3, ISA-11.1-P4, ISA-11.1]
+   For a 0.9 object, omission/default selection binds exactly
+   `{"name":"ref","version":"0.9","hash":"0be00e64de17699516a9b5bb5daf308ee0c59af7e39b6bf934bad5c628f48e7a"}`.
+   An explicit binding may select that r1 snapshot or the original snapshot
+   by its original hash
+   `5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`,
+   retaining the original qjumpr parameters and semantics. Consumers bind
+   the selected snapshot's exact bytes; default selection never replaces
+   an explicit hash. [deps: ISA-11.1-P3, ISA-11.1-P4, ISA-11.1]
    §11.1 fixes its schema, ordinals, scratch identities, empty removable
    sets and deterministic decomposition algorithms. [deps: ISA-11.1]
    The current bound catalog is `spec/ref-0.9-r1.json`; the original
