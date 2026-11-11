@@ -57,8 +57,19 @@ realization/resource/certificate obligations. Query, ownership and feature
 selection follow §10.1. This is a launch extension, not a sched feature or
 a change to either base ABI family's existing symbol inventory.
 
-The accuracy policy of the existing entry points without epsilon_decimal
-is explicitly pending in §10.1. This extension assigns them no default and
-no new rejection rule. The explicit entry point fully specifies requests
-with absent, matching and mismatched attached schedules; the pending legacy
-policy does not narrow source programs or that capability.
+For an otherwise valid resolved request to either existing entry point
+without epsilon_decimal, an attached schedule matching all other §5.4/§11
+request bindings supplies bindings.epsilon as the copied root accuracy.
+Preserve that schedule's exact value, bytes and hash, including a supplied
+zero. There is no separate legacy request epsilon to compare.
+
+If no such matching schedule supplies an accuracy, return BENNETT_E_ARG
+and report exactly the missing-accuracy request diagnostic
+`E_ESTIMATE_ACCURACY_REQUIRED: use bennett_estimate_run_at_accuracy with epsilon_decimal`.
+Set *out to NULL when its pointer is valid and produce no estimate or effect.
+The diagnostic identifier adds no bennett_status enumerator. The caller can
+supply the missing value through bennett_estimate_run_at_accuracy. Neither
+absence nor a mismatched schedule supplies a numerical default, including
+zero. This is a request diagnostic; full source-program estimation remains
+available through the explicit-accuracy API, without an exact-native-only
+restriction. All other argument/partition validation rules remain unchanged.

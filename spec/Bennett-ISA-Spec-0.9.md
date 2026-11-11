@@ -3280,13 +3280,23 @@ accuracy must equal the request's exact value under K60. This addition
 keeps the existing C signatures and base header inventories unchanged;
 its feature is `estimate_accuracy/1` on launch/0.9.
 
-**Pending legacy accuracy policy (bennett-vm-xz1).** The behavior of
-`bennett_estimate_run` and `bennett_estimate_run_with_token_aliases` when
-they carry no explicit root accuracy remains open. This extension sets
-neither a default nor a new rejection policy for those entries. An
-implementer must not infer epsilon=0, reuse an unrelated schedule's
-value, or replace the promised capability by an exact-native-only
-request subset. The explicit-accuracy request above is fully defined.
+**Legacy estimate accuracy (bennett-vm-xz1).** For an otherwise valid
+resolved request to `bennett_estimate_run` or
+`bennett_estimate_run_with_token_aliases`, an attached schedule matching
+all other §5.4/§11 request bindings supplies its `bindings.epsilon` as
+the copied root accuracy. There is no separate request epsilon to compare
+in these entries; preserve the matching schedule's exact value, bytes
+and hash, including when its supplied value is zero.
+
+When no such matching schedule supplies an accuracy, return
+`BENNETT_E_ARG` and report exactly the missing-accuracy request diagnostic
+`E_ESTIMATE_ACCURACY_REQUIRED: use bennett_estimate_run_at_accuracy with epsilon_decimal`.
+Set `*out` to NULL when the output pointer is valid; produce no estimate
+or effect. This diagnostic directs the caller to the additive API and
+does not add a bennett_status enumerator. No numerical root-accuracy
+default is defined: absence or a stale schedule never implies epsilon=0.
+The source program remains supported through the explicit-accuracy
+entry point; an exact-native-only subset cannot replace that capability.
 
 **ROOT-ACCURACY witness**
 
@@ -3298,7 +3308,9 @@ request subset. The explicit-accuracy request above is fully defined.
   "default_share": {"numerator":"1","denominator":"30"},
   "exact_native_default_share": "0",
   "explicit_zero": {"epsilon":"0","inexact_operations":0,"default_shares":["0"]},
-  "legacy_missing_accuracy": "pending"
+  "legacy_missing_accuracy": {"status":"BENNETT_E_ARG","diagnostic":"E_ESTIMATE_ACCURACY_REQUIRED: use bennett_estimate_run_at_accuracy with epsilon_decimal","out":null,"effects":false},
+  "legacy_entries": ["bennett_estimate_run","bennett_estimate_run_with_token_aliases"],
+  "legacy_cases": [{"schedule":null,"resolution":"missing"},{"schedule":{"epsilon":"0.9","other_bindings_match":false},"resolution":"missing"},{"schedule":{"epsilon":"0.10","other_bindings_match":true},"resolution":"bound","epsilon":"0.10","retains_schedule_bytes":true},{"schedule":{"epsilon":"0","other_bindings_match":true},"resolution":"bound","epsilon":"0","retains_schedule_bytes":true}]
 }
 ```
 
@@ -3334,10 +3346,9 @@ establish equal complete invocation bindings.
 The caller supplies a nonempty `variant` and `inherited_controls` as
 in §11; these are part of the request, not inferred from a different
 invocation. The request denotes that region/variant/control count at
-its explicit root accuracy under the extension above and those resolved
-parameters and budget; entries without that parameter retain the pending
-legacy policy above.
-It uses the object's schedule exactly when every §5.4/§11 binding
+the root accuracy resolved by the rules above and those resolved
+parameters and budget. Once accuracy is resolved, it uses the object's
+schedule exactly when every §5.4/§11 binding
 matches, otherwise the §11 defaults. The estimator MUST resolve the
 complete generated realisation and aggregate its scheduled leaf events
 and wire live intervals by §8.2; running one basis input, counting only

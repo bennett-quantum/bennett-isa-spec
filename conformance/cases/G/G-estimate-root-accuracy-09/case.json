@@ -2,16 +2,23 @@
   "id": "G-estimate-root-accuracy-09",
   "suite": "G",
   "spec": "ISA0.9 \u00a710.1 explicit root accuracy; bennett.estimate-accuracy/1; \u00a711 schedule matching; \u00a717.9 default epsilon_share",
-  "derivation": "The caller-supplied epsilon=1/10 survives absent and mismatched schedule bindings; a matching schedule may be reused only at the same exact rational accuracy. Three inexact operations receive default share 1/30. Zero is tested only as an explicit caller value. No legacy default is selected.",
+  "derivation": "The caller-supplied epsilon=1/10 survives absent and mismatched schedule bindings; a matching schedule may be reused only at the same exact rational accuracy. Three inexact operations receive default share 1/30. Legacy entries obtain accuracy only from a schedule matching all other bindings, retaining its bytes and explicit zero if present. Otherwise they return BENNETT_E_ARG with E_ESTIMATE_ACCURACY_REQUIRED and direct the caller to the additive API, with NULL estimate output and no effects. No numerical root-accuracy default is selected. Bound legacy rows establish accuracy resolution only, not a completed estimate.",
   "scenario": {
     "vectors": "accuracy.json",
     "verify": "python3 -I conformance/cases/G/G-estimate-root-accuracy-09/verify.py"
   },
   "expected_outcome": {
-    "old_entry_policy": "pending",
+    "old_entry_policy": "matching_schedule_or_accuracy_required",
     "root_accuracy_from_request": true,
     "certificate_binds_effective_epsilon": true,
-    "additive_symbol": "bennett_estimate_run_at_accuracy"
+    "additive_symbol": "bennett_estimate_run_at_accuracy",
+    "legacy_missing_accuracy": {
+      "status": "BENNETT_E_ARG",
+      "diagnostic": "E_ESTIMATE_ACCURACY_REQUIRED: use bennett_estimate_run_at_accuracy with epsilon_decimal",
+      "out": null,
+      "effects": false
+    },
+    "legacy_matching_schedule_supplies_epsilon": true
   },
   "unavailable": {
     "deliverable": 8,

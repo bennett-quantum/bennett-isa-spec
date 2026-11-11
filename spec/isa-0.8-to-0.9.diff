@@ -2540,7 +2540,7 @@
  size_t         bennett_estimate_nresources(const bennett_estimate_t*);
  bennett_status bennett_estimate_get(const bennett_estimate_t*, size_t i, const char** name, const char** value_decimal);
  const uint8_t* bennett_estimate_certificate(const bennett_estimate_t*, size_t* len);   void bennett_estimate_free(bennett_estimate_t*);
-@@ -1206,7 +2830,628 @@
+@@ -1206,7 +2830,639 @@
  const uint8_t* bennett_coverage_jcs(const bennett_coverage_t*, size_t* len);   void bennett_coverage_free(bennett_coverage_t*);
  ```
  
@@ -2995,13 +2995,23 @@
 +keeps the existing C signatures and base header inventories unchanged;
 +its feature is `estimate_accuracy/1` on launch/0.9.
 +
-+**Pending legacy accuracy policy (bennett-vm-xz1).** The behavior of
-+`bennett_estimate_run` and `bennett_estimate_run_with_token_aliases` when
-+they carry no explicit root accuracy remains open. This extension sets
-+neither a default nor a new rejection policy for those entries. An
-+implementer must not infer epsilon=0, reuse an unrelated schedule's
-+value, or replace the promised capability by an exact-native-only
-+request subset. The explicit-accuracy request above is fully defined.
++**Legacy estimate accuracy (bennett-vm-xz1).** For an otherwise valid
++resolved request to `bennett_estimate_run` or
++`bennett_estimate_run_with_token_aliases`, an attached schedule matching
++all other §5.4/§11 request bindings supplies its `bindings.epsilon` as
++the copied root accuracy. There is no separate request epsilon to compare
++in these entries; preserve the matching schedule's exact value, bytes
++and hash, including when its supplied value is zero.
++
++When no such matching schedule supplies an accuracy, return
++`BENNETT_E_ARG` and report exactly the missing-accuracy request diagnostic
++`E_ESTIMATE_ACCURACY_REQUIRED: use bennett_estimate_run_at_accuracy with epsilon_decimal`.
++Set `*out` to NULL when the output pointer is valid; produce no estimate
++or effect. This diagnostic directs the caller to the additive API and
++does not add a bennett_status enumerator. No numerical root-accuracy
++default is defined: absence or a stale schedule never implies epsilon=0.
++The source program remains supported through the explicit-accuracy
++entry point; an exact-native-only subset cannot replace that capability.
 +
 +**ROOT-ACCURACY witness**
 +
@@ -3013,7 +3023,9 @@
 +  "default_share": {"numerator":"1","denominator":"30"},
 +  "exact_native_default_share": "0",
 +  "explicit_zero": {"epsilon":"0","inexact_operations":0,"default_shares":["0"]},
-+  "legacy_missing_accuracy": "pending"
++  "legacy_missing_accuracy": {"status":"BENNETT_E_ARG","diagnostic":"E_ESTIMATE_ACCURACY_REQUIRED: use bennett_estimate_run_at_accuracy with epsilon_decimal","out":null,"effects":false},
++  "legacy_entries": ["bennett_estimate_run","bennett_estimate_run_with_token_aliases"],
++  "legacy_cases": [{"schedule":null,"resolution":"missing"},{"schedule":{"epsilon":"0.9","other_bindings_match":false},"resolution":"missing"},{"schedule":{"epsilon":"0.10","other_bindings_match":true},"resolution":"bound","epsilon":"0.10","retains_schedule_bytes":true},{"schedule":{"epsilon":"0","other_bindings_match":true},"resolution":"bound","epsilon":"0","retains_schedule_bytes":true}]
 +}
 +```
 +
@@ -3049,10 +3061,9 @@
 +The caller supplies a nonempty `variant` and `inherited_controls` as
 +in §11; these are part of the request, not inferred from a different
 +invocation. The request denotes that region/variant/control count at
-+its explicit root accuracy under the extension above and those resolved
-+parameters and budget; entries without that parameter retain the pending
-+legacy policy above.
-+It uses the object's schedule exactly when every §5.4/§11 binding
++the root accuracy resolved by the rules above and those resolved
++parameters and budget. Once accuracy is resolved, it uses the object's
++schedule exactly when every §5.4/§11 binding
 +matches, otherwise the §11 defaults. The estimator MUST resolve the
 +complete generated realisation and aggregate its scheduled leaf events
 +and wire live intervals by §8.2; running one basis input, counting only
@@ -3170,7 +3181,7 @@
  
  ```c
  typedef struct bennett_sched_request_t bennett_sched_request_t;   typedef struct bennett_sched_response_t bennett_sched_response_t;
-@@ -1218,6 +3463,9 @@
+@@ -1218,6 +3474,9 @@
  bennett_status bennett_sched_request_set_params(bennett_sched_request_t*, const uint8_t* params_jcs, size_t);
  bennett_status bennett_sched_request_set_accuracy(bennett_sched_request_t*, const char* epsilon_decimal);
  bennett_status bennett_sched_request_set_capacity(bennett_sched_request_t*, const char* cls, uint64_t peak_qubits);
@@ -3180,7 +3191,7 @@
  void           bennett_sched_request_free(bennett_sched_request_t*);
  bennett_status bennett_sched_schedule(const bennett_sched_request_t*, bennett_sched_response_t** out);
  typedef enum { BENNETT_SCHED_OK, BENNETT_SCHED_INFEASIBLE, BENNETT_SCHED_UNSUPPORTED } bennett_sched_outcome;
-@@ -1247,69 +3495,1398 @@
+@@ -1247,69 +3506,1398 @@
  schedule MUST keep the ordinals of the operations they keep and MAY
  remove only operations the library marks removable.
  
@@ -4611,7 +4622,7 @@
  `error` entry (§12.3) is a **common upper bound over all contexts** of
  its key; the multiplicity composition of §12.3 is sound for that reason.
  
-@@ -1325,7 +4902,10 @@
+@@ -1325,7 +4913,10 @@
  rejects): Y − J(Φ) ⪰ 0, Y + J(Φ) ⪰ 0, mu·I − Tr_out(Y) ⪰ 0 (partial trace
  over the output factor), and mu ≤ `bound`; then ‖Φ‖◇ ≤ mu (the dual of
  Watrous's SDP with Y₀ = Y₁ = Y; this is the diamond norm itself, not
@@ -4623,7 +4634,7 @@
  hi, im_lo, im_hi]` (decimal strings). **Positivity test.** The checker
  proves each of the three matrices **positive definite** by an interval
  Cholesky (or Hermitian LDL†) factorisation in which the interval lower
-@@ -1335,33 +4915,487 @@
+@@ -1335,33 +4926,487 @@
  strictly feasible by replacing Y with Y + δI and mu with mu′ = mu + δ·(d
  + 1) for a small rational δ > 0 (any mu′ > mu + δ·d suffices): then Y ±
  J(Φ) ⪰ δI ≻ 0 and, since Tr_out(Y + δI) = Tr_out(Y) + δ·d·I, mu′·I −
@@ -5120,7 +5131,7 @@
                                                     fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
              cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },
              error:   { "<variant>:<inherited_controls>": { local: { "operator_norm"?: v, "diamond"?: v }, inclusive: { "operator_norm"?: v, "diamond"?: v } } },
-@@ -1369,6 +5403,706 @@
+@@ -1369,6 +5414,706 @@
    composition { multiplicities: { "<hash>:<variant>:<inherited_controls>": n (from the realised schedule) }, epsilon_total: { "diamond": v }, method: "sum_over_multiplicities" }
  ```
  
@@ -5827,7 +5838,7 @@
  `inclusive(R, key) = local(R, key) + Σ_callees n_c × inclusive(c, key_c)`
  **per metric**, keyed like `cleanup` by `<variant>:<inherited_controls>`
  (the realised error depends on both); every `local` value is a verified
-@@ -1380,27 +6114,49 @@
+@@ -1380,27 +6125,49 @@
  variants) require `operator_norm` bounds throughout. A controlled
  unitary variant requires a `numerical` claim; an ε > 0 realisation
  compared as a channel requires a `channel` claim. Executable claims
@@ -5883,7 +5894,7 @@
  ### 14.2 Quantum state semantics
  
  The state of a Q region is a vector in ⊗ over live wires in allocation
-@@ -1422,10 +6178,20 @@
+@@ -1422,10 +6189,20 @@
  - **T3 (permutation theorem).** If the realised unitary V of a circuit on
    span(D) is a permutation matrix and the final basis tuple equals P(x)
    for every x ∈ D, then V|span(D) = P.
@@ -5908,7 +5919,7 @@
  - **T5.** As §6.3.
  - **T6 (executor agreement).** Two executors conforming to §3–§7 on one
    target with the same schedule produce on every x ∈ D the same final
-@@ -1437,16 +6203,428 @@
+@@ -1437,16 +6214,428 @@
  
  ## 15. Conformance suites
  
@@ -6344,7 +6355,7 @@
  
  ## 16. Canonical textual form (normative)
  
-@@ -1458,7 +6636,17 @@
+@@ -1458,7 +6647,17 @@
  `INT := -?(0|[1-9][0-9]*)`; `FLOAT :=` shortest round-trip decimal with
  `.` or exponent, finite; `STRING := "…"` with escapes `\"`, `\\`, `\n`;
  `HEX := ([0-9a-f]{2})*`. Metadata lines are RFC 8785 canonical JSON
@@ -6363,7 +6374,7 @@
  
  ### 16.2 Grammar
  
-@@ -1472,10 +6660,10 @@
+@@ -1472,10 +6671,10 @@
    dataline  := NAME SP HEX NL
    function  := fhead NL regs? block+
    fhead     := ("fn" SP ("cc"|"r") | "oracle" | "action" | "perm_action" | "lproc") SP "@" NAME SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")"
@@ -6377,7 +6388,7 @@
    regs      := "regs" SP "{" SP (NAME ":" type ("," SP NAME ":" type)*)? SP "}" (SP "bounds" SP "{" INT ("," SP INT)* "}")? NL
    block     := "^" NAME "(" plist "):" NL instr+
    instr     := (lhs SP "=" SP)? OPCODE (SP operand)* (SP "{" NL instr+ "}" (SP "{" NL instr+ "}")?)? NL
-@@ -1485,16 +6673,38 @@
+@@ -1485,16 +6684,38 @@
    VER       := INT "." INT
  ```
  
@@ -6419,7 +6430,7 @@
  
  section functions
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
-@@ -1509,9 +6719,9 @@
+@@ -1509,9 +6730,9 @@
  empty and its envelope is exactly these bytes (each line LF-terminated):
  
  ```
@@ -6431,7 +6442,7 @@
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
  regs { one:reg[8], r:reg[8] }
  ^entry():
-@@ -1521,17 +6731,19 @@
+@@ -1521,17 +6742,19 @@
  ```
  
  With B ≥ 3 every x yields `(x + 1 mod 256, 0)` (`result_val` = 0 ⊕ r);
@@ -6454,7 +6465,7 @@
  
  section functions
  oracle @sum_db (n:wire[8] in) (t:wire[8]) (f:wire[4]) (db:region[4,8] in) ()
-@@ -1590,13 +6802,13 @@
+@@ -1590,13 +6813,13 @@
  is SHA-256 of the ASCII `<scc_hash hex>:0`:
  
  ```
@@ -6471,7 +6482,7 @@
  lift.boundscheck zp 1
  zv = lift.load.i8 zp
  z = lift.icmp.eq n zv
-@@ -1614,20 +6826,391 @@
+@@ -1614,20 +6837,391 @@
  ^done():
  lift.ret acc
  data zero 00
@@ -6869,7 +6880,7 @@
  
  ## 17. Decisions deferred to implementation, with defaults
  
-@@ -1652,15 +7235,69 @@
+@@ -1652,15 +7246,69 @@
     level. Default: the library `ref` published by `bennett-isa-spec`
     (ripple-carry adders and comparators, linear `inrange` scans,
     one-hot address dispatch, clean scratch released in reverse order);
@@ -6943,7 +6954,7 @@
  10. **`any`-class resolution** (§11). Default: the first class in JCS
      order with capacity.
  11. **Occupancy rate of a class absent from `rate`** (§8.2). Default: 1.
-@@ -1669,7 +7306,65 @@
+@@ -1669,7 +7317,65 @@
  13. **Suite sizes** (§15): the exhaustive widths of suite C and the
      sample counts of `sampled` claims. Default: exhaustive for ≤ 16
      interface bits; 2^16 samples above.
