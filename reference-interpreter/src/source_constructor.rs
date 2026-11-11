@@ -91,11 +91,6 @@ pub(crate) fn oracle(
     if program.rows.iter().any(|(_, i)| i.op == "lift.alloc") {
         frame_slots[1] = frame_slots[1].max(2 * object.ptr_width as usize + 2);
     }
-    // R4's complete global-id delivery scan includes every declared width,
-    // including locations which this particular return cannot select.
-    if program.rows.iter().any(|(_, i)| i.op == "lift.ret") {
-        frame_slots[0] = frame_slots[0].max(widths.w_max);
-    }
     let slot_total = frame_slots.iter().try_fold(0usize, |n, w| {
         n.checked_add(*w)
             .ok_or_else(|| crate::resource_error("§11.1", "frame slot width overflow"))
