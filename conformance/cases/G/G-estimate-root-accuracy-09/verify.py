@@ -23,10 +23,36 @@ share = vectors["default_share"]
 assert Fraction(int(share["numerator"]), int(share["denominator"])) == requested / vectors["inexact_operations"]
 assert vectors["exact_native_default_share"] == "0"
 assert vectors["explicit_zero"] == {"epsilon": "0", "inexact_operations": 0, "default_shares": ["0"]}
-assert vectors["legacy_missing_accuracy"] == "pending"
-assert "Pending legacy accuracy policy" in draft
+diagnostic = "E_ESTIMATE_ACCURACY_REQUIRED: use bennett_estimate_run_at_accuracy with epsilon_decimal"
+assert vectors["legacy_missing_accuracy"] == {
+    "status": "BENNETT_E_ARG", "diagnostic": diagnostic, "out": None, "effects": False
+}
+assert vectors["legacy_entries"] == ["bennett_estimate_run", "bennett_estimate_run_with_token_aliases"]
+for entry in vectors["legacy_entries"]:
+    for row in vectors["legacy_cases"]:
+        schedule = row["schedule"]
+        matches_other_bindings = schedule is not None and schedule["other_bindings_match"]
+        assert row["resolution"] == ("bound" if matches_other_bindings else "missing")
+        if matches_other_bindings:
+            # Legacy requests have no independent accuracy to compare; the
+            # matching schedule supplies it, preserving zero and its bytes.
+            assert row["epsilon"] == schedule["epsilon"]
+            assert Fraction(row["epsilon"]) >= 0
+            assert row["retains_schedule_bytes"]
+        else:
+            assert "epsilon" not in row  # neither absent nor stale implies zero
+            assert vectors["legacy_missing_accuracy"]["status"] == "BENNETT_E_ARG"
+            assert "bennett_estimate_run_at_accuracy" in diagnostic
+assert "Pending legacy accuracy policy" not in draft
+legacy_rule = draft.split("**Legacy estimate accuracy", 1)[1].split("**ROOT-ACCURACY witness**", 1)[0]
+assert "`BENNETT_E_ARG`" in legacy_rule and diagnostic in legacy_rule
 
 supplement = (root / "spec/Launch-Estimate-Accuracy-1.md").read_text()
+assert diagnostic in supplement
+assert "explicitly pending" not in supplement and "pending legacy" not in supplement
+case = json.loads((here / "case.json").read_text())
+assert case["expected_outcome"]["old_entry_policy"] == "matching_schedule_or_accuracy_required"
+assert case["expected_outcome"]["legacy_missing_accuracy"] == vectors["legacy_missing_accuracy"]
 header = (root / "spec/bennett_estimate_accuracy_1.h").read_text()
 pattern = r"bennett_status\s+bennett_estimate_run_at_accuracy\s*\([^;]*\);"
 declaration = re.findall(pattern, supplement)
@@ -49,4 +75,4 @@ with tempfile.TemporaryDirectory(dir=scratch) as directory:
         source = Path(directory) / ("probe." + extension)
         source.write_text(probe)
         subprocess.run([compiler, "-std=" + standard, "-Werror", "-fsyntax-only", "-I" + str(root / "include"), "-I" + str(root / "spec"), str(source)], check=True)
-print("PASS: exact explicit accuracy, absent/mismatched schedules, rational shares and C/C++ extension signature")
+print("PASS: explicit/legacy accuracy resolution, missing-accuracy diagnostic, no implicit value, rational shares and C/C++ signature")

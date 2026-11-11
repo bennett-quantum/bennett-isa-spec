@@ -52,5 +52,45 @@
       "0"
     ]
   },
-  "legacy_missing_accuracy": "pending"
+  "legacy_missing_accuracy": {
+    "status": "BENNETT_E_ARG",
+    "diagnostic": "E_ESTIMATE_ACCURACY_REQUIRED: use bennett_estimate_run_at_accuracy with epsilon_decimal",
+    "out": null,
+    "effects": false
+  },
+  "legacy_entries": [
+    "bennett_estimate_run",
+    "bennett_estimate_run_with_token_aliases"
+  ],
+  "legacy_cases": [
+    {
+      "schedule": null,
+      "resolution": "missing"
+    },
+    {
+      "schedule": {
+        "epsilon": "0.9",
+        "other_bindings_match": false
+      },
+      "resolution": "missing"
+    },
+    {
+      "schedule": {
+        "epsilon": "0.10",
+        "other_bindings_match": true
+      },
+      "resolution": "bound",
+      "epsilon": "0.10",
+      "retains_schedule_bytes": true
+    },
+    {
+      "schedule": {
+        "epsilon": "0",
+        "other_bindings_match": true
+      },
+      "resolution": "bound",
+      "epsilon": "0",
+      "retains_schedule_bytes": true
+    }
+  ]
 }
