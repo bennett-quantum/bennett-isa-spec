@@ -23,6 +23,7 @@ mod quantum;
 pub mod ref_library;
 mod registers;
 mod retained;
+pub mod target;
 mod tokens;
 pub use retained::Retained;
 pub use tokens::BudgetToken;
@@ -33,7 +34,7 @@ pub use bits::BitVector;
 pub use borrow::validate_translation_lemma;
 pub use claims::{
     CertificateReport, ClaimCoverage, ClaimReport, ClaimVerdict, FixedRegionBinding,
-    QinplaceApplicability, Xoshiro256,
+    OrderedEntryUnion, QinplaceApplicability, Xoshiro256,
 };
 pub use classical::{
     ClassicalMachine, ClassicalOutcome, ClassicalSnapshot, ClassicalValue, RegisterDelta,

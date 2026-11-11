@@ -1,0 +1,38 @@
+bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"0d65d926275688cfebf2831c1de960b03a6b8ea6400866e6d9fef8f393ca2c2e","kind":"oracle","name":"g","signature":{"abi":"0.9","args":["i2"],"fault":4,"in":[2,2],"kind":"oracle","mem":[],"tgt":2,"tier":"q"}},"1":{"interface_hash":"786f1970ca3d78ef3d5de795411ee276286711c89b756872757c24f9bd569cc9","kind":"oracle","name":"ginv","signature":{"abi":"0.9","args":["i2"],"fault":4,"in":[2,2],"kind":"oracle","mem":[],"tgt":2,"tier":"q"}},"2":{"interface_hash":"2b184b98e15b15ffb5bed4a8236c563e3f510f58cbd120bc7f07bd43f0ff6bd9","kind":"perm_action","name":"addya","signature":{"abi":"0.9","args":["token","i2"],"bounds":[],"in":[2],"kind":"perm_action","mem":[],"mut":[2],"tier":"q"}},"3":{"interface_hash":"02b1afef93c1a615bccc7d79322d79ed84c318c010c5ba2865efb55a9aae0e33","kind":"cc","name":"run","signature":{"abi":"0.9","kind":"cc","params":["qreg[2]","qreg[2]","token","i2"],"results":[],"tier":"cc"}},"4":{"interface_hash":"4ebfbd0297c0558a32c3c60552232301ea2ad644e0ee909547974502b6833d07","kind":"perm_action","name":"inner","signature":{"abi":"0.9","args":["token","i2"],"bounds":[],"in":[2],"kind":"perm_action","mem":[],"mut":[2],"tier":"q"}},"5":{"interface_hash":"c53713446cf79072a2e42d6b5cc8999c3a7dfd9c2a18592ec16cc06d3cf87d65","kind":"perm_action","name":"outer","signature":{"abi":"0.9","args":["token","token","i2"],"bounds":[],"in":[2],"kind":"perm_action","mem":[],"mut":[2],"tier":"q"}}}
+
+section functions
+oracle @g (x:wire[2] in, y:wire[2] in) (t:wire[2]) (f:wire[4]) () (a:i2)
+regs { s:reg[2], r:reg[2] }
+^entry():
+s = lift.add x y
+r = lift.add s a
+lift.retval r
+oracle @ginv (x:wire[2] in, y:wire[2] in) (t:wire[2]) (f:wire[4]) () (a:i2)
+regs { s:reg[2], r:reg[2] }
+^entry():
+s = lift.sub x y
+r = lift.sub s a
+lift.retval r
+perm_action @addya (x:wire[2]) (y:wire[2] in) () (tk:token, a:i2) ()
+^entry():
+action_call @inner (x) (y) () (tk, a)
+fn cc @run (x:qreg[2], y:qreg[2], tk:token, a:i2) () () () ()
+^entry():
+action_call @addya (x) (y) () (tk, a)
+ret
+perm_action @inner (x:wire[2]) (y:wire[2] in) () (tk:token, a:i2) ()
+^entry():
+qinplace @g @ginv tk x (y) () (a)
+perm_action @outer (x:wire[2]) (y:wire[2] in) () (ta:token, tb:token, a:i2) ()
+^entry():
+action_call @inner (x) (y) () (ta, a)
+action_call @inner (x) (y) () (tb, a)
+
+section schedule
+{"bindings":{"budget":[9,0,0,0],"closure_hash":"c53713446cf79072a2e42d6b5cc8999c3a7dfd9c2a18592ec16cc06d3cf87d65","epsilon":0,"inherited_controls":0,"params_hash":"8d6452205af199b46d0cfe1a76c9c63813436cb951e60556081662ed02d48998","region":"outer","scheduler":{"name":"conformance","version":"1"},"target_hash":"0000000000000000000000000000000000000000000000000000000000000000","token_aliases":[0,1],"variant":"forward"},"entries":[]}
+
+section certificate
+{"bindings":{"closure_hash":"c53713446cf79072a2e42d6b5cc8999c3a7dfd9c2a18592ec16cc06d3cf87d65","dialect_mapping_version":"k84-vectors.1","interface_hash":"c53713446cf79072a2e42d6b5cc8999c3a7dfd9c2a18592ec16cc06d3cf87d65","invocation":{"args":[["3","0","0","0"],["3","0","0","0"],"1"],"budget":["9","0","0","0"],"token_aliases":[0,1]},"object_hash":"07703361d45835b90caa60cafd587dc016709fd36c012f3c1aa70f4df0732263","reference_program_hash":"c53713446cf79072a2e42d6b5cc8999c3a7dfd9c2a18592ec16cc06d3cf87d65","schedule_hash":"405be2275f2b3953c339dbf90388002dda4915cfbbdf8777c2d282078ca0bf7d","target_hash":"0000000000000000000000000000000000000000000000000000000000000000"},"composition":{"epsilon_total":{"diamond":0},"method":"sum_over_multiplicities","multiplicities":{}},"producer":{"materialisation":{"llvm_version":"none","normaliser_version":"1","pipeline":"k84-vectors"},"name":"conformance","version":"1"},"regions":{"2b184b98e15b15ffb5bed4a8236c563e3f510f58cbd120bc7f07bd43f0ff6bd9":{"bounds":[],"claims":[{"domain":{"args":[{"hi":3,"lo":0,"name":"a","width":2}],"borrowed":[],"bundles":[{"hi":3,"lo":0,"name":"x","width":2},{"hi":3,"lo":0,"name":"y","width":2}],"regions":[]},"expected":"inverse_pair","kind":"exhaustive"}],"cleanup":{},"definedness_assumptions":[],"error":{"forward:0":{"inclusive":{"operator_norm":0},"local":{"operator_norm":0}}},"frame":{"ancillae":[],"borrow":[],"history":[],"scratch":[],"slots":[{"class":"any","id":"mut:0","role":"mut","width":2},{"class":"any","id":"in:0","role":"in","width":2}]},"gates_used":{},"kind":"perm_action","resources":{},"signature":{"abi":"0.9","args":["token","i2"],"bounds":[],"in":[2],"kind":"perm_action","mem":[],"mut":[2],"tier":"q"},"verification":{"borrow_frames":[],"channel":[],"fault_rate":{"domain":{"borrowed":[],"bundles":[],"regions":[]},"faults_by_code":{},"layout_dependent_excluded":0,"undefined_excluded":0},"inverse_pairs":[{"budget":[3,0,0,0],"claim":0,"g":"0d65d926275688cfebf2831c1de960b03a6b8ea6400866e6d9fef8f393ca2c2e","ginv":"786f1970ca3d78ef3d5de795411ee276286711c89b756872757c24f9bd569cc9"}],"oracle":null,"unitary":[]}}},"versions":{"cert":"0.9","coverage":"0.9","isa":"0.9","launch":"0.9","object":"0.9","sched":"0.9","target":"0.9"}}

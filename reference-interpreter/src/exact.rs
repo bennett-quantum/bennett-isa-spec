@@ -15,6 +15,7 @@
 //! configuration", §4.3 qfree) is therefore decided exactly: no tolerance.
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
+mod integers;
 
 /// Signed arbitrary-precision integer, magnitude in little-endian u32 limbs.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]

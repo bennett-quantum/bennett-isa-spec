@@ -997,6 +997,7 @@ impl<'a> ClassicalMachine<'a> {
         // the very same register. Controls may share read-only inputs, so they
         // are checked separately against actual targets below.
         let mut interface_wires = std::collections::BTreeSet::new();
+        let mut interface_classes = Vec::new();
         let mut bind_wires = |wires: &[crate::quantum::Wire]| -> Result<()> {
             for w in wires {
                 if !interface_wires.insert(*w) {
@@ -1019,6 +1020,7 @@ impl<'a> ClassicalMachine<'a> {
                     )));
                 }
                 bind_wires(&wires)?;
+                interface_classes.push(self.state.quantum.classes(id)?.to_vec());
                 bindings.bundles.insert(p.name.clone(), wires);
                 if !ids.contains(&id) {
                     ids.push(id);
@@ -1042,6 +1044,7 @@ impl<'a> ClassicalMachine<'a> {
                 return err("§3.3", "qreg does not fill region dimensions");
             }
             bind_wires(wires)?;
+            interface_classes.push(self.state.quantum.classes(id)?.to_vec());
             bindings.regions.insert(
                 p.name.clone(),
                 QuantumRegion {
@@ -1123,6 +1126,35 @@ impl<'a> ClassicalMachine<'a> {
         } else {
             None
         };
+        if self.object.isa_version == crate::IsaVersion::V09 {
+            self.preflight_context_frames(
+                callee,
+                &bindings,
+                &controls,
+                &interface_classes,
+                call.adjoint,
+                budget.map(|b| (b, primary.as_ref())),
+            )
+            .map_err(trap)?;
+            if let Some(certificate) = self.object.section("certificate") {
+                let identity = self.object.identity()?;
+                if let Some(closure) = &identity.closure_hashes[name] {
+                    if let Some(region) = certificate.get("regions")?.object()?.get(closure) {
+                        if let Some(frame) = region.object()?.get("frame") {
+                            for (slot, actual) in
+                                frame.get("slots")?.array()?.iter().zip(&interface_classes)
+                            {
+                                if crate::target::frame_slot_classes(slot, controls.len() as u128)?
+                                    != *actual
+                                {
+                                    return Err(trap(Error::new("§3.3/§9.4: register class vector differs from selected frame".into())));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         self.object
             .precheck_qinplace09(callee, &bindings.args, budget, primary.as_ref())
             .map_err(trap)?;
@@ -2113,3 +2145,6 @@ mod checkpoint_tests {
         m.reverse().unwrap();
     }
 }
+
+#[path = "classical/frames09.rs"]
+mod frames09;

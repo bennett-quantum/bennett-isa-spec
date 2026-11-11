@@ -1,15 +1,10 @@
 //! Pre-effect K4/K91 coverage over the bound reference invocation tree. Q
 //! predicates cannot remove a visit; zero-trip loops have no dynamic visits.
+use super::source_qinplace09::InvocationScope;
 use super::*;
 use crate::{Argument, BudgetToken, Instruction};
 use pairs09::{args_domain, pair};
 
-struct Invocation {
-    name: String,
-    args: Vec<Argument>,
-    budget: Option<Budget>,
-    primary: Option<BudgetToken>,
-}
 fn qinplace_sites(f: &Function) -> Vec<&Instruction> {
     let mut work = f.instructions().collect::<Vec<_>>();
     let mut sites = Vec::new();
@@ -21,16 +16,6 @@ fn qinplace_sites(f: &Function) -> Vec<&Instruction> {
     }
     sites
 }
-fn values(f: &Function, args: &BTreeMap<String, Argument>) -> Result<Vec<Argument>> {
-    f.params[if f.kind == "oracle" { 4 } else { 3 }]
-        .iter()
-        .map(|p| {
-            args.get(&p.name)
-                .cloned()
-                .ok_or_else(|| Error::new(format!("§4.5 K92: unresolved argument {}", p.name)))
-        })
-        .collect()
-}
 fn token(args: &BTreeMap<String, Argument>, name: &str) -> Result<BudgetToken> {
     match args.get(name) {
         Some(Argument::DeviceToken(t)) => Ok(t.clone()),
@@ -39,30 +24,6 @@ fn token(args: &BTreeMap<String, Argument>, name: &str) -> Result<BudgetToken> {
             "qinplace coverage needs an actual token identity",
         ),
     }
-}
-fn push(
-    work: &mut Vec<Invocation>,
-    name: &str,
-    names: &[String],
-    args: &BTreeMap<String, Argument>,
-    primary: Option<BudgetToken>,
-) -> Result<()> {
-    let actuals = names
-        .iter()
-        .map(|n| {
-            args.get(n)
-                .cloned()
-                .ok_or_else(|| Error::new(format!("§4.5 K92: unresolved call argument {n}")))
-        })
-        .collect::<Result<_>>()?;
-    crate::reserve_more(work, 1, "§4.5 K92", "reference invocation contexts")?;
-    work.push(Invocation {
-        name: name.trim_start_matches('@').into(),
-        args: actuals,
-        budget: primary.as_ref().map(BudgetToken::tuple),
-        primary,
-    });
-    Ok(())
 }
 impl Object {
     fn qinplace_tree_needs_check09(&self) -> Result<bool> {
@@ -153,7 +114,15 @@ impl Object {
         let mut invocations = Vec::new();
         let mut unresolved = BTreeMap::new();
         if let Some(invocation) = bindings.object()?.get("invocation") {
-            invocations.push((root, invocation));
+            invocations.push((
+                root,
+                invocation,
+                if bindings.object()?.contains_key("schedule_hash") {
+                    InvocationScope::Scheduled
+                } else {
+                    InvocationScope::Reference(0)
+                },
+            ));
         }
         for (closure, record) in certificate.get("regions")?.object()? {
             for claim in record.get("claims")?.array()? {
@@ -161,7 +130,25 @@ impl Object {
                     // Parameter-uniform claims keep their universal theorem;
                     // proving applicability requires a separate uniform check.
                     if invocation.get("args")?.array().is_ok() {
-                        invocations.push((closure.as_str(), invocation));
+                        let scheduled = claim.object()?.get("subject").is_some_and(|s| {
+                            s.object().is_ok_and(|m| m.contains_key("schedule_hash"))
+                        });
+                        invocations.push((
+                            closure.as_str(),
+                            invocation,
+                            if scheduled {
+                                InvocationScope::Scheduled
+                            } else {
+                                InvocationScope::Reference(
+                                    claim
+                                        .object()?
+                                        .get("subject")
+                                        .map(|s| s.get("inherited_controls").and_then(Json::uint))
+                                        .transpose()?
+                                        .unwrap_or(0),
+                                )
+                            },
+                        ));
                     } else {
                         unresolved.insert(
                             closure.clone(),
@@ -174,7 +161,7 @@ impl Object {
             }
         }
         let mut checked = BTreeMap::new();
-        for (closure, binding) in invocations {
+        for (closure, binding, scope) in invocations {
             let f = self.region_function(closure)?;
             if !matches!(f.kind.as_str(), "oracle" | "action" | "perm_action") {
                 unresolved.insert(
@@ -193,13 +180,14 @@ impl Object {
                 .zip(invocation.args)
                 .map(|(p, value)| (p.name.clone(), value))
                 .collect();
-            match self.qinplace_coverage09(
+            match self.qinplace_source_coverage09(
                 f,
                 &args,
                 Some(invocation.budget),
                 invocation.primary.as_ref(),
+                scope,
             ) {
-                Ok(owners) if self.section("schedule").is_none() => {
+                Ok(owners) => {
                     for (owner, outcome) in owners {
                         if !matches!(
                             checked.get(&owner),
@@ -208,14 +196,6 @@ impl Object {
                             checked.insert(owner, outcome);
                         }
                     }
-                }
-                Ok(_) => {
-                    unresolved.insert(
-                        closure.to_string(),
-                        QinplaceApplicability::Unestablished(
-                            "complete realised invocation tree is not checked".into(),
-                        ),
-                    );
                 }
                 Err(error) if error.kind() == crate::ErrorKind::HostResource => {
                     unresolved.insert(
@@ -233,7 +213,7 @@ impl Object {
         outcomes.extend(unresolved);
         Ok(outcomes)
     }
-    fn check_qinplace_site09(
+    pub(super) fn check_qinplace_site09(
         &self,
         owner: &Function,
         i: &Instruction,
@@ -346,7 +326,10 @@ impl Object {
         budget: Option<Budget>,
         primary: Option<&BudgetToken>,
     ) -> Result<()> {
-        for outcome in self.qinplace_coverage09(f, args, budget, primary)?.values() {
+        for outcome in self
+            .qinplace_source_coverage09(f, args, budget, primary, InvocationScope::Reference(0))?
+            .values()
+        {
             if let QinplaceApplicability::Unestablished(reason) = outcome {
                 return err(
                     "§4.5 K4/K92",
@@ -355,186 +338,5 @@ impl Object {
             }
         }
         Ok(())
-    }
-    fn qinplace_coverage09(
-        &self,
-        f: &Function,
-        args: &BTreeMap<String, Argument>,
-        budget: Option<Budget>,
-        primary: Option<&BudgetToken>,
-    ) -> Result<BTreeMap<String, QinplaceApplicability>> {
-        if !self.qinplace_tree_needs_check09()? {
-            return Ok(BTreeMap::new());
-        }
-        let root = self.identity()?.closure_hashes[&f.name]
-            .clone()
-            .ok_or_else(|| Error::new("§12.3 K92: unresolved invocation root".into()))?;
-        let mut work = vec![Invocation {
-            name: f.name.clone(),
-            args: values(f, args)?,
-            budget,
-            primary: primary.cloned(),
-        }];
-        let mut visited = BTreeSet::new();
-        let mut owners = BTreeMap::new();
-        while let Some(invocation) = work.pop() {
-            let Some(f) = self.functions.get(&invocation.name) else {
-                owners.insert(
-                    root.clone(),
-                    QinplaceApplicability::Unestablished(format!(
-                        "missing linked body for @{}",
-                        invocation.name
-                    )),
-                );
-                continue;
-            };
-            let ids = invocation
-                .args
-                .iter()
-                .map(|a| {
-                    if let Argument::DeviceToken(t) = a {
-                        t.id()
-                    } else {
-                        0
-                    }
-                })
-                .collect::<Vec<_>>();
-            let key = format!(
-                "{}:{:?}:{:?}:{:?}:{}",
-                f.name,
-                invocation.budget,
-                invocation.primary.as_ref().map(BudgetToken::id),
-                ids,
-                crate::tokens::typed_arguments(&invocation.args).canonical()
-            );
-            if !visited.insert(key) {
-                continue;
-            }
-            if !qinplace_sites(f).is_empty() {
-                let closure = self.identity()?.closure_hashes[&f.name]
-                    .clone()
-                    .ok_or_else(|| Error::new("§12.3 K92: unresolved owner".into()))?;
-                owners
-                    .entry(closure)
-                    .or_insert(QinplaceApplicability::Established);
-            }
-            let args = f.params[if f.kind == "oracle" { 4 } else { 3 }]
-                .iter()
-                .zip(&invocation.args)
-                .map(|(p, a)| (p.name.clone(), a.clone()))
-                .collect::<BTreeMap<_, _>>();
-            if f.kind == "oracle" {
-                if invocation.budget.is_none_or(|b| b.steps == 0) {
-                    continue;
-                }
-                if let Some(imports) = self.section("imports") {
-                    if let Some(name) = imports
-                        .object()?
-                        .keys()
-                        .find(|name| !self.functions.contains_key(*name))
-                    {
-                        owners.insert(
-                            root.clone(),
-                            QinplaceApplicability::Unestablished(format!(
-                                "missing linked body for @{name}"
-                            )),
-                        );
-                        continue;
-                    }
-                }
-                let program = crate::oracle::Program::new(self, &f.name)?;
-                for (activation, i) in &program.rows {
-                    if !matches!(
-                        i.op.as_str(),
-                        "lift.oracle_call" | "lift.oracle_uncall" | "lift.perm_call"
-                    ) {
-                        continue;
-                    }
-                    let fixed = program.arguments(activation, &args)?;
-                    let a = &i.operands;
-                    let oracle = i.op != "lift.perm_call";
-                    push(
-                        &mut work,
-                        &a[0],
-                        &crate::object::list(&a[if oracle { 6 } else { 4 }])?,
-                        &fixed,
-                        if oracle {
-                            Some(token(&fixed, &a[1])?)
-                        } else {
-                            None
-                        },
-                    )?;
-                }
-            } else {
-                let mut sequences = f
-                    .blocks
-                    .iter()
-                    .map(|b| b.instructions.as_slice())
-                    .collect::<Vec<_>>();
-                while let Some(sequence) = sequences.pop() {
-                    for i in sequence {
-                        if i.op == "qloop"
-                            && crate::object::host_count(&i.operands[0], "qinplace loop count")?
-                                == 0
-                        {
-                            continue;
-                        }
-                        for body in &i.bodies {
-                            sequences.push(body);
-                        }
-                        let a = &i.operands;
-                        if i.op == "qinplace" {
-                            if let Some(name) = a[..2].iter().find(|name| {
-                                !self.functions.contains_key(name.trim_start_matches('@'))
-                            }) {
-                                owners.insert(
-                                    root.clone(),
-                                    QinplaceApplicability::Unestablished(format!(
-                                        "missing linked body for {name}"
-                                    )),
-                                );
-                                continue;
-                            }
-                            let outcome = self.check_qinplace_site09(f, i, &args)?;
-                            if let QinplaceApplicability::Unestablished(_) = outcome {
-                                let closure = self.identity()?.closure_hashes[&f.name]
-                                    .clone()
-                                    .ok_or_else(|| {
-                                        Error::new("§12.3 K92: unresolved owner".into())
-                                    })?;
-                                owners.insert(closure, outcome);
-                            }
-                            let names = if a.len() == 7 {
-                                crate::object::list(&a[6])?
-                            } else {
-                                Vec::new()
-                            };
-                            for name in &a[..2] {
-                                push(&mut work, name, &names, &args, Some(token(&args, &a[2])?))?;
-                            }
-                        } else if matches!(
-                            i.op.as_str(),
-                            "action_call" | "oracle_call" | "adj" | "ctl"
-                        ) {
-                            let call = crate::validation::normalize_call(i)?;
-                            let a = &call.instruction.operands;
-                            let oracle = call.instruction.op == "oracle_call";
-                            push(
-                                &mut work,
-                                &a[0],
-                                &crate::object::list(&a[if oracle { 6 } else { 4 }])?,
-                                &args,
-                                if oracle {
-                                    Some(token(&args, &a[1])?)
-                                } else {
-                                    None
-                                },
-                            )?;
-                        }
-                    }
-                }
-            }
-        }
-        Ok(owners)
     }
 }

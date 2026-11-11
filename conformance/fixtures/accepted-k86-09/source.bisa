@@ -1,0 +1,12 @@
+bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
+
+section symbols
+{"0":{"interface_hash":"df131e972083b8d3b3b7d9341342b55252ca7a1963c4b7b6f702b9cdf3fbde12","kind":"perm_action","name":"controlled","signature":{"abi":"0.9","args":[],"bounds":[],"in":[1],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}},"1":{"interface_hash":"7ff7153a2ad3b857ec9eb86ca99b9bcbc605f60093d28e99fb749ed16d13274b","kind":"perm_action","name":"flip","signature":{"abi":"0.9","args":[],"bounds":[],"in":[],"kind":"perm_action","mem":[],"mut":[1],"tier":"q"}}}
+
+section functions
+perm_action @controlled (t:wire mut) (c:wire in) () () ()
+^entry():
+ctl c action_call @flip (t) () () ()
+perm_action @flip (t:wire mut) () () () ()
+^entry():
+x t
