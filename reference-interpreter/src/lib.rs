@@ -1,5 +1,6 @@
 //! Executable reference semantics for the Bennett ISA, version 0.8.
 mod action;
+pub use action::{BasisReverse, PreparedAction};
 mod bits;
 mod borrow;
 mod call_discipline;

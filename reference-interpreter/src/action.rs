@@ -14,6 +14,74 @@ struct Environment {
     borrowed: BTreeMap<String, Vec<usize>>,
     borrow_used: BTreeSet<usize>,
 }
+
+/// Fixed source and lifetime-width setup shared by independent action runs.
+/// Quantum state and token resolution remain fresh for every invocation.
+pub struct PreparedAction<'a> {
+    object: &'a Object,
+    name: String,
+    bindings: QuantumBindings,
+    aliases: Option<Vec<u64>>,
+    plan: ActionPlan,
+    preserved: Vec<Wire>,
+}
+struct ActionPlan {
+    instructions: Vec<Instruction>,
+    widths: Vec<LifetimeWidths>,
+    regions: Vec<Instruction>,
+}
+/// Complete basis observations; a non-basis output has no packed tuple.
+pub struct BasisReverse {
+    pub forward: Option<Vec<bool>>,
+    pub reversed: Option<Vec<bool>>,
+    pub forward_positive: bool,
+    pub reversed_positive: bool,
+    pub workspace_clean: bool,
+    pub inputs_preserved: bool,
+    pub equals_entry: bool,
+}
+impl PreparedAction<'_> {
+    /// Execute both directions on a fresh state with the template's wire layout.
+    pub fn reverse_basis(
+        &self,
+        template: &QuantumState,
+        bits: &[bool],
+        adjoint: bool,
+    ) -> Result<BasisReverse> {
+        let mut state = template.clone();
+        state.set_basis_bits(bits)?;
+        let entry = state.clone();
+        self.execute(&mut state, adjoint)?;
+        let forward = state.basis_snapshot(&entry);
+        let workspace_clean = state.same_wire_layout(&entry);
+        let inputs_preserved = self
+            .preserved
+            .iter()
+            .all(|wire| state.read_basis(&[*wire]).ok() == entry.read_basis(&[*wire]).ok());
+        self.execute(&mut state, !adjoint)?;
+        let reversed = state.basis_snapshot(&entry);
+        Ok(BasisReverse {
+            forward_positive: forward.as_ref().is_some_and(|(_, positive)| *positive),
+            reversed_positive: reversed.as_ref().is_some_and(|(_, positive)| *positive),
+            forward: forward.map(|(bits, _)| bits),
+            reversed: reversed.map(|(bits, _)| bits),
+            workspace_clean,
+            inputs_preserved,
+            equals_entry: state == entry,
+        })
+    }
+    fn execute(&self, state: &mut QuantumState, adjoint: bool) -> Result<()> {
+        self.object.action_with_plan(
+            &self.name,
+            state,
+            &self.bindings,
+            adjoint,
+            &[],
+            self.aliases.as_deref(),
+            Some(&self.plan),
+        )
+    }
+}
 impl Environment {
     fn bundle(&self, n: &str) -> Result<Vec<Wire>> {
         if let Some((base, index)) = n.split_once('[') {
@@ -62,6 +130,109 @@ impl Environment {
     }
 }
 impl Object {
+    /// Admit one immutable action setup for a stream of fresh basis executions.
+    pub fn prepare_action<'a>(
+        &'a self,
+        name: &str,
+        bindings: &QuantumBindings,
+        aliases: Option<&[u64]>,
+    ) -> Result<PreparedAction<'a>> {
+        self.ensure_linked()?;
+        self.check_hashes()?;
+        let f = self
+            .functions
+            .get(name)
+            .filter(|f| matches!(f.kind.as_str(), "action" | "perm_action"))
+            .ok_or_else(|| Error::new(format!("§5.3: unknown action @{name}")))?;
+        let mut preserved = Vec::new();
+        for p in &f.params[1] {
+            preserved.extend(
+                bindings
+                    .bundles
+                    .get(&p.name)
+                    .ok_or_else(|| Error::new("§5.1: missing action input".into()))?,
+            );
+        }
+        for p in &f.params[2] {
+            if p.role.as_deref() == Some("in") {
+                preserved.extend(
+                    bindings
+                        .regions
+                        .get(&p.name)
+                        .ok_or_else(|| Error::new("§5.1: missing action region".into()))?
+                        .cells
+                        .iter()
+                        .flatten(),
+                );
+            }
+        }
+        preserved.extend(bindings.borrowed.iter().flatten());
+        for p in &f.params[3] {
+            crate::oracle::check_argument(
+                self,
+                &p.ty,
+                bindings
+                    .args
+                    .get(&p.name)
+                    .ok_or_else(|| Error::new("§5.1: missing action argument".into()))?,
+            )?;
+        }
+        if self.isa_version == crate::IsaVersion::V09 {
+            let args = f.params[3]
+                .iter()
+                .map(|p| bindings.args[&p.name].clone())
+                .collect::<Vec<_>>();
+            self.resolve_invocation_tokens(f, &args, None, None, aliases)?;
+        }
+        let instructions = f
+            .blocks
+            .iter()
+            .flat_map(|b| b.instructions.iter().cloned())
+            .collect::<Vec<_>>();
+        let mut declarations = Vec::new();
+        gather_regions(&instructions, &mut declarations);
+        let regions = declarations.into_iter().cloned().collect::<Vec<_>>();
+        let mut env = Environment {
+            bindings: bindings.clone(),
+            predicates: Vec::new(),
+            borrowed: BTreeMap::new(),
+            borrow_used: BTreeSet::new(),
+        };
+        for region in &regions {
+            env.bindings.regions.insert(
+                region.operands[0].clone(),
+                QuantumRegion {
+                    address_width: crate::object::host_count(
+                        &region.operands[1],
+                        "qregion address width",
+                    )?,
+                    cell_width: crate::object::host_count(
+                        &region.operands[2],
+                        "qregion cell width",
+                    )?,
+                    cells: Vec::new(),
+                },
+            );
+        }
+        let mut live = bindings
+            .bundles
+            .iter()
+            .map(|(n, w)| (n.clone(), w.len()))
+            .collect();
+        let widths = infer_widths(&instructions, &env, &mut live)?;
+        Ok(PreparedAction {
+            object: self,
+            name: name.into(),
+            bindings: bindings.clone(),
+            aliases: aliases.map(<[u64]>::to_vec),
+            plan: ActionPlan {
+                instructions,
+                widths,
+                regions,
+            },
+            preserved,
+        })
+    }
     pub(crate) fn permutation_action_vectors(
         &self,
         name: &str,
@@ -241,6 +412,19 @@ impl Object {
         controls: &[(Wire, bool)],
         aliases: Option<&[u64]>,
     ) -> Result<()> {
+        self.action_with_plan(name, q, bindings, adjoint, controls, aliases, None)
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn action_with_plan(
+        &self,
+        name: &str,
+        q: &mut QuantumState,
+        bindings: &QuantumBindings,
+        adjoint: bool,
+        controls: &[(Wire, bool)],
+        aliases: Option<&[u64]>,
+        plan: Option<&ActionPlan>,
+    ) -> Result<()> {
         let entry_next_wire = q.next_wire_id();
         let f = self
             .functions
@@ -339,8 +523,12 @@ impl Object {
             borrow_used: BTreeSet::new(),
         };
         let mut regions = Vec::new();
-        for b in &f.blocks {
-            gather_regions(&b.instructions, &mut regions);
+        if let Some(plan) = plan {
+            regions.extend(&plan.regions);
+        } else {
+            for b in &f.blocks {
+                gather_regions(&b.instructions, &mut regions);
+            }
         }
         let mut local = Vec::new();
         for i in regions {
@@ -378,18 +566,25 @@ impl Object {
             );
             local.push((wires, image));
         }
-        let mut live_widths = bindings
-            .bundles
-            .iter()
-            .map(|(n, w)| (n.clone(), w.len()))
-            .collect();
-        let instructions: Vec<_> = f
-            .blocks
-            .iter()
-            .flat_map(|b| b.instructions.iter().cloned())
-            .collect();
-        let widths = infer_widths(&instructions, &env, &mut live_widths)?;
-        self.action_sequence(&instructions, &widths, q, &mut env, adjoint, controls)?;
+        let owned;
+        let (instructions, widths) = if let Some(plan) = plan {
+            (&plan.instructions, &plan.widths)
+        } else {
+            let mut live = bindings
+                .bundles
+                .iter()
+                .map(|(n, w)| (n.clone(), w.len()))
+                .collect();
+            let instructions = f
+                .blocks
+                .iter()
+                .flat_map(|b| b.instructions.iter().cloned())
+                .collect::<Vec<_>>();
+            let widths = infer_widths(&instructions, &env, &mut live)?;
+            owned = (instructions, widths);
+            (&owned.0, &owned.1)
+        };
+        self.action_sequence(instructions, widths, q, &mut env, adjoint, controls)?;
         if !env.predicates.is_empty() || !env.borrowed.is_empty() {
             return err("§5.1", "action exited with unclosed predicate/borrow frame");
         }
@@ -419,12 +614,12 @@ impl Object {
         adjoint: bool,
         inherited: &[(Wire, bool)],
     ) -> Result<()> {
-        let indices: Vec<_> = if adjoint {
-            (0..sequence.len()).rev().collect()
-        } else {
-            (0..sequence.len()).collect()
-        };
-        for index in indices {
+        for cursor in 0..sequence.len() {
+            let index = if adjoint {
+                sequence.len() - 1 - cursor
+            } else {
+                cursor
+            };
             let i = &sequence[index];
             let width = &widths[index];
             let a = &i.operands;
