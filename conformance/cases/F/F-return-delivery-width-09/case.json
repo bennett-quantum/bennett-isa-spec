@@ -1,0 +1,51 @@
+{
+  "id": "F-return-delivery-width-09",
+  "suite": "F",
+  "spec": "ISA0.9 \u00a73.6 frame layout and \u00a711.1 K25 complete lift.ret Globals delivery scan",
+  "derivation": "An unused eight-bit global location requires W_1=max(4,8)=8 when the instantiated closure contains lift.ret, even though listed call/return slots have maxima [4,4,2]. With P=3 the frame has 2*3+8+4+2+1=21 bits and four frames retain 84 bits. The unchanged lift.ret recipe must bind N=8 and the complete Globals list.",
+  "object": "return.bisa",
+  "command": [
+    "run-oracle",
+    "{object}",
+    "root",
+    "--input",
+    "",
+    "--budget",
+    "4,1,8,1"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "payload": 1,
+      "code": 0,
+      "steps": 4
+    }
+  },
+  "scenario": {
+    "widths": "widths.json",
+    "recipe_test": "verify.rs"
+  },
+  "expected_outcome": {
+    "listed_slot_maxima": [
+      4,
+      4,
+      2
+    ],
+    "W_max": 8,
+    "contains_lift_ret": true,
+    "P": 3,
+    "slots": [
+      8,
+      4,
+      2
+    ],
+    "frame_width": 21,
+    "B": 4,
+    "history_bits": 84,
+    "no_return_slots": [
+      4,
+      4,
+      2
+    ]
+  }
+}

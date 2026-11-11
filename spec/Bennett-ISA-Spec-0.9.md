@@ -658,6 +658,26 @@ when a `lift.faultif` literal C is 0).
 **Frame layout** (fixed per oracle): `(old_pc : wire[P], disp_1..disp_
 {k_max}, flag : wire, succ : wire[P])`, `k_max` and widths `W_j` from the
 widest write sets used (§4.2 lists each row's slot use).
+If the instantiated lproc closure contains `lift.ret`, set
+`W_1 = max(listed-slot maximum, W_max)` (§3.7), including declared
+locations absent from every row's write set. Bind the ref `lift.ret`
+formal N to this complete W_1-bit delivery slot. Every frame retains
+that width, so the complete K25 Globals delivery scan is well-typed at
+every location. Other W_j remain the maxima of their listed captures
+and assignments. This rule changes neither the lproc result width nor
+the set/order of Globals; no width-limited replacement scan is permitted.
+
+**LIFT-RETURN-WIDTH witness**
+
+```json
+{"listed_slot_maxima":[4,4,2],"W_max":8,"contains_lift_ret":true,"P":3,"slots":[8,4,2],"frame_width":21,"B":4,"history_bits":84,"no_return_slots":[4,4,2]}
+```
+
+An unused ghost:reg[8] in the oracle closure still contributes W_max=8.
+With listed call slots (4,4,2) and return slots (1,4,2), lift.ret uses
+N=8, and the frame width is 2P+W_1+W_2+W_3+1=21. Four retained frames
+have 84 bits. Without any lift.ret in the instantiated closure, the
+additional W_max bound is absent and the listed maxima remain (4,4,2).
 
 **Forward machine step** t (1 ≤ t ≤ B), reads referring to the state at
 the start of the step:
