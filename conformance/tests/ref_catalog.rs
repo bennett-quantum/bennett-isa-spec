@@ -456,10 +456,18 @@ fn independent_canonical_bytes_and_envelope_hashes() {
         .as_arr()
         .unwrap()
         .len();
+    // The draft's default ("Complete catalog") is the repaired r1 catalog (99n); the original catalog stays a
+    // retained compatibility snapshot selectable by its own hash (§11.1, §17.7).
+    const R1: &str = include_str!("../../spec/ref-0.9-r1.json");
+    assert_eq!(canonical(&json::parse(R1).unwrap()).unwrap(), R1);
+    let r1_hash = envelope_hash(R1);
+    let r1_count = json::parse(R1).unwrap().get("recipes").unwrap().as_arr().unwrap().len();
+    assert_eq!(r1_count, count);
     assert!(draft.contains(&format!(
-        "Complete catalog: **{count} recipes**; envelope SHA-256\n`{hash}`."
+        "Complete catalog: **{r1_count} recipes**; envelope SHA-256\n`{r1_hash}`."
     )));
-    println!("Rust and Python complete draft library: {count} recipes; envelope SHA-256 {hash}");
+    assert!(draft.contains(&hash), "original catalog hash {hash} must stay named in the draft");
+    println!("Rust and Python complete draft library: {count} recipes; original envelope SHA-256 {hash}; default r1 {r1_hash}");
 }
 #[test]
 fn linear_scan_full_domain() {
