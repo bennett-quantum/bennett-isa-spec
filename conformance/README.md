@@ -10,20 +10,20 @@ spec-defined outcome fields.
 Rust 2021, standard library only. Work headless (CLAUDE.md rule 11):
 `DISPLAY`, `WAYLAND_DISPLAY`, `DBUS_SESSION_BUS_ADDRESS`, `BROWSER`
 unset — the harness strips them for child processes itself — and
-`TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/.tmp` (created by the harness/tests).
+`TMPDIR=<isa-spec checkout>/conformance/.tmp` (created by the harness/tests).
 
 ## Run it
 
 ```sh
-mkdir -p /home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/.tmp
-env -u DISPLAY -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u BROWSER TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/.tmp cargo test --offline --manifest-path /home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/Cargo.toml
-env -u DISPLAY -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u BROWSER TMPDIR=/home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/.tmp cargo run --offline --manifest-path /home/tobias/Projects/bennett-workspace/bennett-isa-spec/conformance/Cargo.toml -- --bin /home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/target/debug/bennett-isa-ref
+mkdir -p <isa-spec checkout>/conformance/.tmp
+env -u DISPLAY -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u BROWSER TMPDIR=<isa-spec checkout>/conformance/.tmp cargo test --offline --manifest-path <isa-spec checkout>/conformance/Cargo.toml
+env -u DISPLAY -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u BROWSER TMPDIR=<isa-spec checkout>/conformance/.tmp cargo run --offline --manifest-path <isa-spec checkout>/conformance/Cargo.toml -- --bin <isa-spec checkout>/reference-interpreter/target/debug/bennett-isa-ref
 ```
 
 `--bin` selects the binary under test; the default is
 `$BENNETT_CONFORMANCE_BIN`, else
 `reference-interpreter/target/debug/bennett-isa-ref`. Build that
-first (`cargo build --offline --manifest-path /home/tobias/Projects/bennett-workspace/bennett-isa-spec/reference-interpreter/Cargo.toml`) — a missing binary is a hard failure, never a skip.
+first (`cargo build --offline --manifest-path <isa-spec checkout>/reference-interpreter/Cargo.toml`) — a missing binary is a hard failure, never a skip.
 
 Exit status: `0` when every case passes and none is unavailable, `1`
 when any case fails (including an empty case directory), `2` when nothing fails but at least one case is
