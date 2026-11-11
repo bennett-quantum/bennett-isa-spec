@@ -14,6 +14,16 @@ then its inverse. Execution, faults, cleanup and exact amplitude arithmetic use
 the same interpreter as `reverse`; no native result or sampled shortcut is used.
 Classical argument spellings and alias rules are those of `run-action`.
 
+Prepared execution may reuse verified pure `F_B` values for unscheduled ISA 0.8
+oracles without classical/region arguments. The cache belongs to one prepared
+object and keys the callee, complete input vectors, all four budget components
+and control count. Only payload/fault values are retained, after the literal
+forward/inverse machine has restored every private field and frame. Target and
+initial fault bits are excluded by §5.2's XOR-delivery contract. Every tuple
+still executes its own forward/inverse map on fresh state and is fully checked.
+The data cache is bounded; ineligible calls and misses beyond its capacity use
+the literal path. No tuple, fault, phase or reversal check is sampled or omitted.
+
 Without `--range`, stdin is JSONL. Each line has **exactly** these four keys:
 
 ```json
