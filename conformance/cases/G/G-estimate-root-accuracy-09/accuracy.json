@@ -1,0 +1,56 @@
+{
+  "request_epsilon": "0.1",
+  "cases": [
+    {
+      "schedule": null,
+      "effective": "default",
+      "epsilon": "0.1"
+    },
+    {
+      "schedule": {
+        "epsilon": "0.1",
+        "other_bindings_match": true
+      },
+      "effective": "attached",
+      "epsilon": "0.1"
+    },
+    {
+      "schedule": {
+        "epsilon": "0.10",
+        "other_bindings_match": true
+      },
+      "effective": "attached",
+      "epsilon": "0.1"
+    },
+    {
+      "schedule": {
+        "epsilon": "0.9",
+        "other_bindings_match": false
+      },
+      "effective": "default",
+      "epsilon": "0.1"
+    },
+    {
+      "schedule": {
+        "epsilon": "0.2",
+        "other_bindings_match": true
+      },
+      "effective": "default",
+      "epsilon": "0.1"
+    }
+  ],
+  "inexact_operations": 3,
+  "default_share": {
+    "numerator": "1",
+    "denominator": "30"
+  },
+  "exact_native_default_share": "0",
+  "explicit_zero": {
+    "epsilon": "0",
+    "inexact_operations": 0,
+    "default_shares": [
+      "0"
+    ]
+  },
+  "legacy_missing_accuracy": "pending"
+}

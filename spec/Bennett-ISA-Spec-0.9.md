@@ -3264,7 +3264,53 @@ follows the existing binding and hash rules of §§9.2, 10.1 and 11.
 With unchanged envelopes, args/params_hash, source/interface/closure/object
 and ref catalog identities remain unchanged.
 
-**Resolved request.** `bennett_estimate_run` MUST copy and
+**Explicit root accuracy.** The additive versioned contract
+`bennett.estimate-accuracy/1` is defined normatively in
+[Launch-Estimate-Accuracy-1.md](Launch-Estimate-Accuracy-1.md), with its
+separate declaration header `spec/bennett_estimate_accuracy_1.h`.
+Its `bennett_estimate_run_at_accuracy` takes all alias-aware request
+parameters plus the required copied `epsilon_decimal` root value.
+All K12/K13/K91 parameter, partition and certificate obligations apply.
+Decode accuracy exactly as a nonnegative finite decimal; an explicit
+zero remains zero, while absence supplies no value. The new entry point
+uses that value for schedule matching, §17.9 default shares, the explicit
+default schedule's bindings.epsilon and certificate accuracy, even when
+an attached schedule is absent or mismatched. A matching schedule's
+accuracy must equal the request's exact value under K60. This addition
+keeps the existing C signatures and base header inventories unchanged;
+its feature is `estimate_accuracy/1` on launch/0.9.
+
+**Pending legacy accuracy policy (bennett-vm-xz1).** The behavior of
+`bennett_estimate_run` and `bennett_estimate_run_with_token_aliases` when
+they carry no explicit root accuracy remains open. This extension sets
+neither a default nor a new rejection policy for those entries. An
+implementer must not infer epsilon=0, reuse an unrelated schedule's
+value, or replace the promised capability by an exact-native-only
+request subset. The explicit-accuracy request above is fully defined.
+
+**ROOT-ACCURACY witness**
+
+```json
+{
+  "request_epsilon": "0.1",
+  "cases": [{"schedule":null,"effective":"default","epsilon":"0.1"},{"schedule":{"epsilon":"0.1","other_bindings_match":true},"effective":"attached","epsilon":"0.1"},{"schedule":{"epsilon":"0.10","other_bindings_match":true},"effective":"attached","epsilon":"0.1"},{"schedule":{"epsilon":"0.9","other_bindings_match":false},"effective":"default","epsilon":"0.1"},{"schedule":{"epsilon":"0.2","other_bindings_match":true},"effective":"default","epsilon":"0.1"}],
+  "inexact_operations": 3,
+  "default_share": {"numerator":"1","denominator":"30"},
+  "exact_native_default_share": "0",
+  "explicit_zero": {"epsilon":"0","inexact_operations":0,"default_shares":["0"]},
+  "legacy_missing_accuracy": "pending"
+}
+```
+
+With requested epsilon=0.1, a stale schedule carrying 0.9 cannot retarget
+an unscheduled/default realization; a schedule differing only in epsilon
+also fails matching. The three inexact operations get exact default
+share 1/30. Spelling 0.10 compares equal to 0.1 without rewriting a
+matching attached schedule. The zero case is an explicit caller request,
+not a legacy default. These are binding/share vectors, not resource
+estimates from an unimplemented realization.
+
+**Resolved request.** Each launch-estimate entry point MUST copy and
 validate `params_jcs`, the JCS array of **all** classical arguments in
 signature order, encoded as §12.3 specifies; `params_len` is its UTF-8
 byte length, excluding any NUL terminator. The separately supplied
@@ -3288,7 +3334,9 @@ establish equal complete invocation bindings.
 The caller supplies a nonempty `variant` and `inherited_controls` as
 in §11; these are part of the request, not inferred from a different
 invocation. The request denotes that region/variant/control count at
-its declared accuracy and those resolved parameters and budget.
+its explicit root accuracy under the extension above and those resolved
+parameters and budget; entries without that parameter retain the pending
+legacy policy above.
 It uses the object's schedule exactly when every §5.4/§11 binding
 matches, otherwise the §11 defaults. The estimator MUST resolve the
 complete generated realisation and aggregate its scheduled leaf events
@@ -7209,6 +7257,9 @@ the item is revised. Items 1–5 are asserted non-semantic.
    remainder bound is below 2^−(`precision_bits` + 2), argument reduced
    modulo 2π with an outward-rounded enclosure of π.
 9. **Default `epsilon_share`** (§8.1, §11) when a schedule assigns none.
+   For an explicit-accuracy launch estimate, bindings.epsilon in the
+   effective schedule is fixed by that request (§10.1), including when
+   the attached schedule is absent or fails matching.
    Default: the exact rational `bindings.epsilon / N`, where N is the
    number of gate operations in the bound-library expansion of one
    invocation of `bindings.region`, including every nested invocation,

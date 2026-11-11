@@ -1,0 +1,20 @@
+{
+  "id": "G-estimate-root-accuracy-09",
+  "suite": "G",
+  "spec": "ISA0.9 \u00a710.1 explicit root accuracy; bennett.estimate-accuracy/1; \u00a711 schedule matching; \u00a717.9 default epsilon_share",
+  "derivation": "The caller-supplied epsilon=1/10 survives absent and mismatched schedule bindings; a matching schedule may be reused only at the same exact rational accuracy. Three inexact operations receive default share 1/30. Zero is tested only as an explicit caller value. No legacy default is selected.",
+  "scenario": {
+    "vectors": "accuracy.json",
+    "verify": "python3 -I conformance/cases/G/G-estimate-root-accuracy-09/verify.py"
+  },
+  "expected_outcome": {
+    "old_entry_policy": "pending",
+    "root_accuracy_from_request": true,
+    "certificate_binds_effective_epsilon": true,
+    "additive_symbol": "bennett_estimate_run_at_accuracy"
+  },
+  "unavailable": {
+    "deliverable": 8,
+    "reason": "Full launch realisation/resource/certificate implementation remains bennett-vm-hsd. These are contract and C/C++ declaration vectors, not an estimate implementation verdict."
+  }
+}
