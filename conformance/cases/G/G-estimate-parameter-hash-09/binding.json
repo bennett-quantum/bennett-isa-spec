@@ -1,0 +1,41 @@
+{
+  "signature": [
+    "token",
+    "token"
+  ],
+  "args": [
+    [
+      "2",
+      "0",
+      "0",
+      "0"
+    ],
+    [
+      "2",
+      "0",
+      "0",
+      "0"
+    ]
+  ],
+  "params_hash": "24fe2305ea820ce5e2f871e4326791253027dbb1db4c6b374a09c6316c22e21d",
+  "budget": [
+    "2",
+    "0",
+    "0",
+    "0"
+  ],
+  "token_aliases": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      1,
+      2
+    ]
+  ],
+  "same_params_hash": true,
+  "same_invocation": false
+}

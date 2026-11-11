@@ -1,0 +1,23 @@
+{
+  "id": "G-estimate-parameter-hash-09",
+  "suite": "G",
+  "spec": "ISA 0.9 \u00a710.1 K12 launch params_hash; \u00a712.3 K13 argument encoding and K91 token identity",
+  "derivation": "params_hash covers the JCS args array only. Two token arguments with the same tuple have identical args bytes for the all-alias and all-distinct partitions; the primary token is occurrence zero. K91 binds the partition separately, so the two complete invocations differ. The resolved outer budget is not part of params_hash. This is an identity witness, not a launch-estimator implementation verdict.",
+  "scenario": {
+    "binding": "binding.json",
+    "rounding": "existing \u00a710.1 LAUNCH-ESTIMATE witness",
+    "command": "python3 -I conformance/cases/G/G-estimate-parameter-hash-09/verify.py"
+  },
+  "expected_outcome": {
+    "params_hash": "24fe2305ea820ce5e2f871e4326791253027dbb1db4c6b374a09c6316c22e21d",
+    "aliases_change_invocation_not_params_hash": true,
+    "outer_budget_changes_invocation_not_params_hash": true,
+    "changed_token_tuple_changes_params_hash": true,
+    "resource_class_rows": "escaped separately, including zeros",
+    "resource_decimal": "exact rational then upward 34 significant digits"
+  },
+  "unavailable": {
+    "deliverable": 8,
+    "reason": "No reference launch-estimate CLI exists; K12 exact realisation and certificate generation remain bennett-vm-hsd. The independently executable publication-vector check is verify.py; it does not establish a launch-estimate result."
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "E-classical-pseudo-locations-09",
+  "suite": "E",
+  "spec": "ISA 0.9 \u00a7\u00a74.7,9.4,11 K64 and \u00a711.1 K24/K25 classical pseudo-location preparation; bennett-sched-r28",
+  "derivation": "One i2 argument a=3 emits acquire, X(bit0), X(bit1) before all State acquisitions; reverse X(bit1), X(bit0), release follows all State releases. With B=0 there are five State records and no frame, giving the exact construct/release generated ordinals in trace.json. The argument allocation is clean construction workspace with library_scratch=false; State allocations retain their existing library-scratch marks. The pointer/binary64 vectors prepare exact bits even for unused arguments; tokens allocate nothing.",
+  "object": "argument.bisa",
+  "command": [
+    "run-oracle",
+    "{object}",
+    "argument",
+    "--input",
+    "",
+    "--arg",
+    "3",
+    "--budget",
+    "1,0,0,0"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_json": {
+      "payload": 3,
+      "code": 0,
+      "steps": 1
+    }
+  },
+  "scenario": {
+    "trace": "trace.json",
+    "typed_object": "typed.bisa",
+    "reference_expansion_check": "cargo test --offline --manifest-path conformance/cases/E/E-classical-pseudo-locations-09/Cargo.toml"
+  },
+  "expected_outcome": {
+    "trace": "trace.json",
+    "a_zero_construct_prefix": [
+      "acquire argument",
+      "acquire pc"
+    ],
+    "a_three_construct_prefix": [
+      "acquire argument",
+      "X argument[0]",
+      "X argument[1]",
+      "acquire pc"
+    ],
+    "same_allocation_on_release": true
+  }
+}
