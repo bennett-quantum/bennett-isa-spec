@@ -2410,10 +2410,10 @@
 +Accept for the A/B witness; changing the second offset to 2 rejects for incomplete and out-of-range coverage. Outputs for t=0,1,2,3 are 3,2,1,0. Inverse execution restores the original wires, ordered class vectors, ids and live/consumed states. With sequential unit-time X leaves and unit class rates, time=2, peak[A]=peak[B]=1 and qubit_second[A]=qubit_second[B]=2.
 +
 +After v = qreg.slice t 1 1 on t with classes [A,B], binding v to a selected width-one A slot faults with FAULT_UB_TRAP (4) before effects or view consumption; t remains viewed and v remains live. Reversing the fault and slice restores the pre-slice ledger state.
++
++**FRAME witness**
  
 -## 10. Launch ABI (launch 0.8)
-+**FRAME witness**
-+
 +```json
 +{"ancillae":[{"class":"fast","id":"a","scheme":"controlled-x","state":"clean","width":{"var":"c"}}],"borrow":[{"class":"fast","id":"b","width":1}],"history":[{"class":"fast","id":"h","width":3}],"live_ranges":[{"end":2,"frame":"s","start":0},{"end":4,"frame":"s","start":2}],"scratch":[{"class":"fast","id":"s","state":"clean","width":{"args":[2,{"var":"c"}],"op":"+"}}],"slots":[{"class":"fast","id":"mut:0","role":"mut","width":2},{"class":"fast","id":"in:0","role":"in","width":1}]}
 +```
@@ -3132,7 +3132,7 @@
  void           bennett_sched_request_free(bennett_sched_request_t*);
  bennett_status bennett_sched_schedule(const bennett_sched_request_t*, bennett_sched_response_t** out);
  typedef enum { BENNETT_SCHED_OK, BENNETT_SCHED_INFEASIBLE, BENNETT_SCHED_UNSUPPORTED } bennett_sched_outcome;
-@@ -1247,69 +3447,1357 @@
+@@ -1247,69 +3447,1398 @@
  schedule MUST keep the ordinals of the operations they keep and MAY
  remove only operations the library marks removable.
  
@@ -3601,10 +3601,17 @@
 +
 +**ISA-REF-LIB** (K11; b-isa-spec-8r4, from bennett-vm-47t).
 +This is the decided 0.9 contract. The catalog bound as ref version 0.9
-+is the file `spec/ref-0.9.json` whose four-line envelope hashes to
-+`5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`.
-+It publishes the complete 219-recipe catalog, byte-identical to the
-+accepted catalog snapshot. Consumers lacking the bound library report
++is the complete repaired snapshot `spec/ref-0.9-r1.json` whose four-line envelope hashes to
++`0be00e64de17699516a9b5bb5daf308ee0c59af7e39b6bf934bad5c628f48e7a`.
++It publishes all 219 recipes; only qjumpr differs from the original
++accepted snapshot, by the independent-width binding below. The original
++`spec/ref-0.9.json`, envelope `5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`,
++remains a frozen compatibility snapshot for previously bound artifacts.
++The new default is r1; hashes distinguish the two snapshots even though
++both use catalog name ref, version 0.9 and ISA 0.9. Consumers MUST bind
++the exact bytes named by the hash; no in-place substitution is valid.
++Source/interface/closure/object identities are unchanged; affected
++schedules and certificates must bind the new catalog and be regenerated. Consumers lacking the bound library report
 +`E_SCHEDULE_INFEASIBLE` as §11 requires. The witness below is not a
 +full-library hash.
 +
@@ -3862,6 +3869,40 @@
 +binding rule does not replace §3.3's source interface region shape/role
 +validation or the §9.2 linker obligation that the registry interface and
 +body match the supplied closure hash.
++
++**Independent qjumpr widths** (§3.3, §3.6). In the r1 catalog, qjumpr's
++ordered integer formals are `P, A, CopyWidth, F, First, End`, followed by
++`a:wire[A], succ:wire[P], flag:wire, faulted:wire, code:wire[F]`.
++P is the containing oracle's common pc/successor width; A is the source
++address operand's declared width, satisfying 2^A > n. Bind
++`CopyWidth = min(A,P)`, First to the containing fixed-binding instance's
++first canonical row index, and End to First plus that instance's row
++count. Source formation MUST check these exact bindings before expansion.
++Do not resize the source operand or allocate a normalization buffer.
++
++Compare the complete A-bit address against First and End at width A.
++Retain the recipe's flag `(a < First) or (a >= End)` and its effective
++fault writes. XOR just the low CopyWidth address bits into succ; higher
++succ bits remain unchanged (zero for the initially clean frame.succ).
++The §3.6 flagged successor still selects HALT on a fault. Thus a high
++out-of-range address bit is checked even when A>P, and a legal narrow
++address can feed a wider shared pc when P>A. The copy loop alone uses
++CopyWidth; every former P-wide address comparison, bound literal and
++comparison scratch uses A, while succ retains width P. Other recipes
++are byte-identical. `python3 -I spec/ref-0.9-r1.py --check` reproduces
++and checks the complete published repair from the frozen snapshot.
++
++**QJUMPR-WIDTH witness**
++
++```json
++{"width_pairs":[{"P":2,"A":3,"CopyWidth":2},{"P":2,"A":4,"CopyWidth":2},{"P":4,"A":2,"CopyWidth":2}],"First":1,"End":3,"valid_addresses":[1,2],"out_of_range":[0,3],"high_bit_faults":[4,8],"cause":4}
++```
++
++At P=2,A=3 or 4, high-bit addresses 4 or 8 respectively fault even
++though their low two bits are zero. At P=4,A=2 the valid addresses leave
++the high two clean successor bits zero. Full-width comparisons and low
++copy have their ordinary reversible gates/ordinals; this repair inserts
++no source normalization storage and narrows no legal source width.
 +
 +**Oracle invocation context (K77).** An oracle's catalog argument vector
 +contains exactly its declared parameters, flattened in header-group order
@@ -4287,7 +4328,7 @@
 +every input required by the row and cleaning scratch; circuit correctness must still be checked
 +against full-domain T3 witnesses and §5.7, not inferred from costs or
 +names. Complete catalog: **219 recipes**; envelope SHA-256
-+`5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`. [deps: ISA-11.1-P2, ISA-11.1-P3, ISA-11.1-P28, ISA-11.1-P29]
++`0be00e64de17699516a9b5bb5daf308ee0c59af7e39b6bf934bad5c628f48e7a`. [deps: ISA-11.1-P2, ISA-11.1-P3, ISA-11.1-P28, ISA-11.1-P29]
 +Publication follows acceptance. [deps: ISA-11.1-P1, ISA-11.1-P2] In particular this is
 +not permission to publish a partial library that omits division, stack,
 +coherent control, memory or any instruction.
@@ -4522,7 +4563,7 @@
  `error` entry (§12.3) is a **common upper bound over all contexts** of
  its key; the multiplicity composition of §12.3 is sound for that reason.
  
-@@ -1325,7 +4813,10 @@
+@@ -1325,7 +4854,10 @@
  rejects): Y − J(Φ) ⪰ 0, Y + J(Φ) ⪰ 0, mu·I − Tr_out(Y) ⪰ 0 (partial trace
  over the output factor), and mu ≤ `bound`; then ‖Φ‖◇ ≤ mu (the dual of
  Watrous's SDP with Y₀ = Y₁ = Y; this is the diamond norm itself, not
@@ -4534,7 +4575,7 @@
  hi, im_lo, im_hi]` (decimal strings). **Positivity test.** The checker
  proves each of the three matrices **positive definite** by an interval
  Cholesky (or Hermitian LDL†) factorisation in which the interval lower
-@@ -1335,33 +4826,486 @@
+@@ -1335,33 +4867,487 @@
  strictly feasible by replacing Y with Y + δI and mu with mu′ = mu + δ·(d
  + 1) for a small rational δ > 0 (any mu′ > mu + δ·d suffices): then Y ±
  J(Φ) ⪰ δI ≻ 0 and, since Tr_out(Y + δI) = Tr_out(Y) + δ·d·I, mu′·I −
@@ -4705,8 +4746,9 @@
 +```
 +
 +These records are UTF-8 JCS, with significant array order and no other
-+keys; uint is a nonnegative JSON integer and hash is 64 lowercase hex
-+digits. `context_key` is the complete resolved §12.1 invocation key,
++keys; uint uses §9.1's nonnegative integer encoding (a JSON number below
++2^53, otherwise a canonical unsigned decimal string); hash is 64 lowercase
++hex digits. `context_key` is the complete resolved §12.1 invocation key,
 +outermost first, [] at the root. Its edges include every K63 call_index;
 +`lift.call` adds no edge. Terminal symbol/point/iteration/instance use
 +exactly the source identities and coordinates of §11 K63/K64. Both
@@ -5030,7 +5072,7 @@
                                                     fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
              cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },
              error:   { "<variant>:<inherited_controls>": { local: { "operator_norm"?: v, "diamond"?: v }, inclusive: { "operator_norm"?: v, "diamond"?: v } } },
-@@ -1369,6 +5313,706 @@
+@@ -1369,6 +5355,706 @@
    composition { multiplicities: { "<hash>:<variant>:<inherited_controls>": n (from the realised schedule) }, epsilon_total: { "diamond": v }, method: "sum_over_multiplicities" }
  ```
  
@@ -5737,7 +5779,7 @@
  `inclusive(R, key) = local(R, key) + Σ_callees n_c × inclusive(c, key_c)`
  **per metric**, keyed like `cleanup` by `<variant>:<inherited_controls>`
  (the realised error depends on both); every `local` value is a verified
-@@ -1380,27 +6024,49 @@
+@@ -1380,27 +6066,49 @@
  variants) require `operator_norm` bounds throughout. A controlled
  unitary variant requires a `numerical` claim; an ε > 0 realisation
  compared as a channel requires a `channel` claim. Executable claims
@@ -5793,7 +5835,7 @@
  ### 14.2 Quantum state semantics
  
  The state of a Q region is a vector in ⊗ over live wires in allocation
-@@ -1422,10 +6088,20 @@
+@@ -1422,10 +6130,20 @@
  - **T3 (permutation theorem).** If the realised unitary V of a circuit on
    span(D) is a permutation matrix and the final basis tuple equals P(x)
    for every x ∈ D, then V|span(D) = P.
@@ -5818,7 +5860,7 @@
  - **T5.** As §6.3.
  - **T6 (executor agreement).** Two executors conforming to §3–§7 on one
    target with the same schedule produce on every x ∈ D the same final
-@@ -1437,16 +6113,428 @@
+@@ -1437,16 +6155,428 @@
  
  ## 15. Conformance suites
  
@@ -6254,7 +6296,7 @@
  
  ## 16. Canonical textual form (normative)
  
-@@ -1458,7 +6546,17 @@
+@@ -1458,7 +6588,17 @@
  `INT := -?(0|[1-9][0-9]*)`; `FLOAT :=` shortest round-trip decimal with
  `.` or exponent, finite; `STRING := "…"` with escapes `\"`, `\\`, `\n`;
  `HEX := ([0-9a-f]{2})*`. Metadata lines are RFC 8785 canonical JSON
@@ -6273,7 +6315,7 @@
  
  ### 16.2 Grammar
  
-@@ -1472,10 +6570,10 @@
+@@ -1472,10 +6612,10 @@
    dataline  := NAME SP HEX NL
    function  := fhead NL regs? block+
    fhead     := ("fn" SP ("cc"|"r") | "oracle" | "action" | "perm_action" | "lproc") SP "@" NAME SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")"
@@ -6287,7 +6329,7 @@
    regs      := "regs" SP "{" SP (NAME ":" type ("," SP NAME ":" type)*)? SP "}" (SP "bounds" SP "{" INT ("," SP INT)* "}")? NL
    block     := "^" NAME "(" plist "):" NL instr+
    instr     := (lhs SP "=" SP)? OPCODE (SP operand)* (SP "{" NL instr+ "}" (SP "{" NL instr+ "}")?)? NL
-@@ -1485,16 +6583,38 @@
+@@ -1485,16 +6625,38 @@
    VER       := INT "." INT
  ```
  
@@ -6329,7 +6371,7 @@
  
  section functions
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
-@@ -1509,9 +6629,9 @@
+@@ -1509,9 +6671,9 @@
  empty and its envelope is exactly these bytes (each line LF-terminated):
  
  ```
@@ -6341,7 +6383,7 @@
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
  regs { one:reg[8], r:reg[8] }
  ^entry():
-@@ -1521,17 +6641,19 @@
+@@ -1521,17 +6683,19 @@
  ```
  
  With B ≥ 3 every x yields `(x + 1 mod 256, 0)` (`result_val` = 0 ⊕ r);
@@ -6364,7 +6406,7 @@
  
  section functions
  oracle @sum_db (n:wire[8] in) (t:wire[8]) (f:wire[4]) (db:region[4,8] in) ()
-@@ -1590,13 +6712,13 @@
+@@ -1590,13 +6754,13 @@
  is SHA-256 of the ASCII `<scc_hash hex>:0`:
  
  ```
@@ -6381,7 +6423,7 @@
  lift.boundscheck zp 1
  zv = lift.load.i8 zp
  z = lift.icmp.eq n zv
-@@ -1614,20 +6736,391 @@
+@@ -1614,21 +6778,392 @@
  ^done():
  lift.ret acc
  data zero 00
@@ -6626,8 +6668,8 @@
 +^entry():
 +action_call @addya (x) (y) () (tk, a)
 +ret
-+```
-+
+ ```
+ 
 +Each oracle has three rows, so F_B = ((x + y + a) mod 4, 0), resp. ((x − y
 +− a) mod 4, 0), for B ≥ 3 and (0, `FAULT_BUDGET_STEPS`) for B ≤ 2; for each
 +(y, a) the two maps are mutually inverse bijections of [0, 4). The object
@@ -6685,7 +6727,7 @@
 +
 +**Example 9** (`zero_cause`, effective cause): a literal fault code 0.
 +
- ```
++```
 +bennett-object isa=0.9 object=0.9 launch=0.9 sched=0.9 cert=0.9 coverage=0.9 target=0.9 ptr_width=32
 +
 +section symbols
@@ -6776,10 +6818,11 @@
 +step 5, so B ≥ 5 gives (0, `FAULT_CALLEE`). The nested fault, stack
 +history, parameters and locations are cleared by prefix reversal; no
 +additional charge arises from forwarding, commit or reversal.
- 
++
  ## 17. Decisions deferred to implementation, with defaults
  
-@@ -1652,15 +7145,60 @@
+ Each item is one an implementer must decide to build; any decision is
+@@ -1652,15 +7187,61 @@
     level. Default: the library `ref` published by `bennett-isa-spec`
     (ripple-carry adders and comparators, linear `inrange` scans,
     one-hot address dispatch, clean scratch released in reverse order);
@@ -6789,11 +6832,12 @@
 +   in the object's header, with the full-library envelope hash published
 +   for that version in §11.1. [deps: ISA-9.1, ISA-11.1-P3, ISA-11.1-P4]
 +   For a 0.9 object this is exactly
-+   `{"name":"ref","version":"0.9","hash":"5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197"}`,
++   `{"name":"ref","version":"0.9","hash":"0be00e64de17699516a9b5bb5daf308ee0c59af7e39b6bf934bad5c628f48e7a"}`,
 +   equally for omission and an explicit binding. [deps: ISA-11.1-P3, ISA-11.1-P4, ISA-11.1]
 +   §11.1 fixes its schema, ordinals, scratch identities, empty removable
 +   sets and deterministic decomposition algorithms. [deps: ISA-11.1]
-+   The bound catalog is published as `spec/ref-0.9.json`. The worked
++   The current bound catalog is `spec/ref-0.9-r1.json`; the original
++   `spec/ref-0.9.json` remains the frozen compatibility snapshot. The worked
 +   `ctl` action fixture (zsw.4) is in
 +   `conformance/fixtures/controlled-action-09/`: `controlled.bisa`,
 +   `target.json`, `leaves.json`, `schedule.json`, `frame.json` and
@@ -6844,7 +6888,7 @@
  10. **`any`-class resolution** (§11). Default: the first class in JCS
      order with capacity.
  11. **Occupancy rate of a class absent from `rate`** (§8.2). Default: 1.
-@@ -1669,7 +7207,65 @@
+@@ -1669,7 +7250,65 @@
  13. **Suite sizes** (§15): the exhaustive widths of suite C and the
      sample counts of `sampled` claims. Default: exhaustive for ≤ 16
      interface bits; 2^16 samples above.

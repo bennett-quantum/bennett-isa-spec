@@ -3889,10 +3889,17 @@ caller ordinals 3/2/1/0 without renumbering.
 
 **ISA-REF-LIB** (K11; b-isa-spec-8r4, from bennett-vm-47t).
 This is the decided 0.9 contract. The catalog bound as ref version 0.9
-is the file `spec/ref-0.9.json` whose four-line envelope hashes to
-`5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`.
-It publishes the complete 219-recipe catalog, byte-identical to the
-accepted catalog snapshot. Consumers lacking the bound library report
+is the complete repaired snapshot `spec/ref-0.9-r1.json` whose four-line envelope hashes to
+`0be00e64de17699516a9b5bb5daf308ee0c59af7e39b6bf934bad5c628f48e7a`.
+It publishes all 219 recipes; only qjumpr differs from the original
+accepted snapshot, by the independent-width binding below. The original
+`spec/ref-0.9.json`, envelope `5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`,
+remains a frozen compatibility snapshot for previously bound artifacts.
+The new default is r1; hashes distinguish the two snapshots even though
+both use catalog name ref, version 0.9 and ISA 0.9. Consumers MUST bind
+the exact bytes named by the hash; no in-place substitution is valid.
+Source/interface/closure/object identities are unchanged; affected
+schedules and certificates must bind the new catalog and be regenerated. Consumers lacking the bound library report
 `E_SCHEDULE_INFEASIBLE` as §11 requires. The witness below is not a
 full-library hash.
 
@@ -4150,6 +4157,40 @@ token, or an arguments vector for a different closure rejects. This
 binding rule does not replace §3.3's source interface region shape/role
 validation or the §9.2 linker obligation that the registry interface and
 body match the supplied closure hash.
+
+**Independent qjumpr widths** (§3.3, §3.6). In the r1 catalog, qjumpr's
+ordered integer formals are `P, A, CopyWidth, F, First, End`, followed by
+`a:wire[A], succ:wire[P], flag:wire, faulted:wire, code:wire[F]`.
+P is the containing oracle's common pc/successor width; A is the source
+address operand's declared width, satisfying 2^A > n. Bind
+`CopyWidth = min(A,P)`, First to the containing fixed-binding instance's
+first canonical row index, and End to First plus that instance's row
+count. Source formation MUST check these exact bindings before expansion.
+Do not resize the source operand or allocate a normalization buffer.
+
+Compare the complete A-bit address against First and End at width A.
+Retain the recipe's flag `(a < First) or (a >= End)` and its effective
+fault writes. XOR just the low CopyWidth address bits into succ; higher
+succ bits remain unchanged (zero for the initially clean frame.succ).
+The §3.6 flagged successor still selects HALT on a fault. Thus a high
+out-of-range address bit is checked even when A>P, and a legal narrow
+address can feed a wider shared pc when P>A. The copy loop alone uses
+CopyWidth; every former P-wide address comparison, bound literal and
+comparison scratch uses A, while succ retains width P. Other recipes
+are byte-identical. `python3 -I spec/ref-0.9-r1.py --check` reproduces
+and checks the complete published repair from the frozen snapshot.
+
+**QJUMPR-WIDTH witness**
+
+```json
+{"width_pairs":[{"P":2,"A":3,"CopyWidth":2},{"P":2,"A":4,"CopyWidth":2},{"P":4,"A":2,"CopyWidth":2}],"First":1,"End":3,"valid_addresses":[1,2],"out_of_range":[0,3],"high_bit_faults":[4,8],"cause":4}
+```
+
+At P=2,A=3 or 4, high-bit addresses 4 or 8 respectively fault even
+though their low two bits are zero. At P=4,A=2 the valid addresses leave
+the high two clean successor bits zero. Full-width comparisons and low
+copy have their ordinary reversible gates/ordinals; this repair inserts
+no source normalization storage and narrows no legal source width.
 
 **Oracle invocation context (K77).** An oracle's catalog argument vector
 contains exactly its declared parameters, flattened in header-group order
@@ -4575,7 +4616,7 @@ The permutation algorithms define exact permutation circuits, preserving
 every input required by the row and cleaning scratch; circuit correctness must still be checked
 against full-domain T3 witnesses and §5.7, not inferred from costs or
 names. Complete catalog: **219 recipes**; envelope SHA-256
-`5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`. [deps: ISA-11.1-P2, ISA-11.1-P3, ISA-11.1-P28, ISA-11.1-P29]
+`0be00e64de17699516a9b5bb5daf308ee0c59af7e39b6bf934bad5c628f48e7a`. [deps: ISA-11.1-P2, ISA-11.1-P3, ISA-11.1-P28, ISA-11.1-P29]
 Publication follows acceptance. [deps: ISA-11.1-P1, ISA-11.1-P2] In particular this is
 not permission to publish a partial library that omits division, stack,
 coherent control, memory or any instruction.
@@ -4987,8 +5028,9 @@ AllocationOccurrence = {"source":SourceOccurrence,"allocation_ordinal":uint}
 ```
 
 These records are UTF-8 JCS, with significant array order and no other
-keys; uint is a nonnegative JSON integer and hash is 64 lowercase hex
-digits. `context_key` is the complete resolved §12.1 invocation key,
+keys; uint uses §9.1's nonnegative integer encoding (a JSON number below
+2^53, otherwise a canonical unsigned decimal string); hash is 64 lowercase
+hex digits. `context_key` is the complete resolved §12.1 invocation key,
 outermost first, [] at the root. Its edges include every K63 call_index;
 `lift.call` adds no edge. Terminal symbol/point/iteration/instance use
 exactly the source identities and coordinates of §11 K63/K64. Both
@@ -7149,11 +7191,12 @@ the item is revised. Items 1–5 are asserted non-semantic.
    in the object's header, with the full-library envelope hash published
    for that version in §11.1. [deps: ISA-9.1, ISA-11.1-P3, ISA-11.1-P4]
    For a 0.9 object this is exactly
-   `{"name":"ref","version":"0.9","hash":"5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197"}`,
+   `{"name":"ref","version":"0.9","hash":"0be00e64de17699516a9b5bb5daf308ee0c59af7e39b6bf934bad5c628f48e7a"}`,
    equally for omission and an explicit binding. [deps: ISA-11.1-P3, ISA-11.1-P4, ISA-11.1]
    §11.1 fixes its schema, ordinals, scratch identities, empty removable
    sets and deterministic decomposition algorithms. [deps: ISA-11.1]
-   The bound catalog is published as `spec/ref-0.9.json`. The worked
+   The current bound catalog is `spec/ref-0.9-r1.json`; the original
+   `spec/ref-0.9.json` remains the frozen compatibility snapshot. The worked
    `ctl` action fixture (zsw.4) is in
    `conformance/fixtures/controlled-action-09/`: `controlled.bisa`,
    `target.json`, `leaves.json`, `schedule.json`, `frame.json` and

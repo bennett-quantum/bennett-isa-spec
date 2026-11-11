@@ -13,7 +13,9 @@ assert vectors == json.loads(draft.split(marker, 1)[1].split("\n```", 1)[0])
 
 
 def uint(value):
-    return type(value) is int and value >= 0
+    return ((type(value) is int and 0 <= value < 2**53) or
+            (type(value) is str and re.fullmatch("[1-9][0-9]*", value) is not None
+             and int(value) >= 2**53))
 
 
 def coordinate(value, edge=False):
@@ -30,7 +32,7 @@ def coordinate(value, edge=False):
         assert uint(value["call_index"])
     assert ("step" in value) == ("phase" in value)
     if "step" in value:
-        assert uint(value["step"]) and value["step"] > 0
+        assert uint(value["step"]) and int(value["step"]) > 0
         assert value["phase"] in ["fwd", "rev"]
 
 
@@ -55,6 +57,9 @@ source(frame["first"])
 source(frame["last"])
 source(vectors["nested"])
 source(vectors["oracle"])
+large = deepcopy(frame["first"])
+large["iteration"] = ["9007199254740993"]
+source(large)
 first = vectors["workspace"][0]["allocation"]
 allocation(first)
 allocation(vectors["reacquisition"])

@@ -1,0 +1,13 @@
+[package]
+name = "bennett-qjumpr-independent-width-vectors"
+version = "0.0.0"
+edition = "2021"
+publish = false
+[dependencies]
+bennett-isa-conformance = { path = "../../../" }
+[[test]]
+name = "qjumpr-widths"
+path = "verify.rs"
+[profile.test]
+opt-level = 1
+debug = "line-tables-only"
