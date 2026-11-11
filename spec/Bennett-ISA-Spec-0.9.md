@@ -658,6 +658,26 @@ when a `lift.faultif` literal C is 0).
 **Frame layout** (fixed per oracle): `(old_pc : wire[P], disp_1..disp_
 {k_max}, flag : wire, succ : wire[P])`, `k_max` and widths `W_j` from the
 widest write sets used (§4.2 lists each row's slot use).
+If the instantiated lproc closure contains `lift.ret`, set
+`W_1 = max(listed-slot maximum, W_max)` (§3.7), including declared
+locations absent from every row's write set. Bind the ref `lift.ret`
+formal N to this complete W_1-bit delivery slot. Every frame retains
+that width, so the complete K25 Globals delivery scan is well-typed at
+every location. Other W_j remain the maxima of their listed captures
+and assignments. This rule changes neither the lproc result width nor
+the set/order of Globals; no width-limited replacement scan is permitted.
+
+**LIFT-RETURN-WIDTH witness**
+
+```json
+{"listed_slot_maxima":[4,4,2],"W_max":8,"contains_lift_ret":true,"P":3,"slots":[8,4,2],"frame_width":21,"B":4,"history_bits":84,"no_return_slots":[4,4,2]}
+```
+
+An unused ghost:reg[8] in the oracle closure still contributes W_max=8.
+With listed call slots (4,4,2) and return slots (1,4,2), lift.ret uses
+N=8, and the frame width is 2P+W_1+W_2+W_3+1=21. Four retained frames
+have 84 bits. Without any lift.ret in the instantiated closure, the
+additional W_max bound is absent and the listed maxima remain (4,4,2).
 
 **Forward machine step** t (1 ≤ t ≤ B), reads referring to the state at
 the start of the step:
@@ -3244,7 +3264,53 @@ follows the existing binding and hash rules of §§9.2, 10.1 and 11.
 With unchanged envelopes, args/params_hash, source/interface/closure/object
 and ref catalog identities remain unchanged.
 
-**Resolved request.** `bennett_estimate_run` MUST copy and
+**Explicit root accuracy.** The additive versioned contract
+`bennett.estimate-accuracy/1` is defined normatively in
+[Launch-Estimate-Accuracy-1.md](Launch-Estimate-Accuracy-1.md), with its
+separate declaration header `spec/bennett_estimate_accuracy_1.h`.
+Its `bennett_estimate_run_at_accuracy` takes all alias-aware request
+parameters plus the required copied `epsilon_decimal` root value.
+All K12/K13/K91 parameter, partition and certificate obligations apply.
+Decode accuracy exactly as a nonnegative finite decimal; an explicit
+zero remains zero, while absence supplies no value. The new entry point
+uses that value for schedule matching, §17.9 default shares, the explicit
+default schedule's bindings.epsilon and certificate accuracy, even when
+an attached schedule is absent or mismatched. A matching schedule's
+accuracy must equal the request's exact value under K60. This addition
+keeps the existing C signatures and base header inventories unchanged;
+its feature is `estimate_accuracy/1` on launch/0.9.
+
+**Pending legacy accuracy policy (bennett-vm-xz1).** The behavior of
+`bennett_estimate_run` and `bennett_estimate_run_with_token_aliases` when
+they carry no explicit root accuracy remains open. This extension sets
+neither a default nor a new rejection policy for those entries. An
+implementer must not infer epsilon=0, reuse an unrelated schedule's
+value, or replace the promised capability by an exact-native-only
+request subset. The explicit-accuracy request above is fully defined.
+
+**ROOT-ACCURACY witness**
+
+```json
+{
+  "request_epsilon": "0.1",
+  "cases": [{"schedule":null,"effective":"default","epsilon":"0.1"},{"schedule":{"epsilon":"0.1","other_bindings_match":true},"effective":"attached","epsilon":"0.1"},{"schedule":{"epsilon":"0.10","other_bindings_match":true},"effective":"attached","epsilon":"0.1"},{"schedule":{"epsilon":"0.9","other_bindings_match":false},"effective":"default","epsilon":"0.1"},{"schedule":{"epsilon":"0.2","other_bindings_match":true},"effective":"default","epsilon":"0.1"}],
+  "inexact_operations": 3,
+  "default_share": {"numerator":"1","denominator":"30"},
+  "exact_native_default_share": "0",
+  "explicit_zero": {"epsilon":"0","inexact_operations":0,"default_shares":["0"]},
+  "legacy_missing_accuracy": "pending"
+}
+```
+
+With requested epsilon=0.1, a stale schedule carrying 0.9 cannot retarget
+an unscheduled/default realization; a schedule differing only in epsilon
+also fails matching. The three inexact operations get exact default
+share 1/30. Spelling 0.10 compares equal to 0.1 without rewriting a
+matching attached schedule. The zero case is an explicit caller request,
+not a legacy default. These are binding/share vectors, not resource
+estimates from an unimplemented realization.
+
+**Resolved request.** Each launch-estimate entry point MUST copy and
 validate `params_jcs`, the JCS array of **all** classical arguments in
 signature order, encoded as §12.3 specifies; `params_len` is its UTF-8
 byte length, excluding any NUL terminator. The separately supplied
@@ -3268,7 +3334,9 @@ establish equal complete invocation bindings.
 The caller supplies a nonempty `variant` and `inherited_controls` as
 in §11; these are part of the request, not inferred from a different
 invocation. The request denotes that region/variant/control count at
-its declared accuracy and those resolved parameters and budget.
+its explicit root accuracy under the extension above and those resolved
+parameters and budget; entries without that parameter retain the pending
+legacy policy above.
 It uses the object's schedule exactly when every §5.4/§11 binding
 matches, otherwise the §11 defaults. The estimator MUST resolve the
 complete generated realisation and aggregate its scheduled leaf events
@@ -3869,10 +3937,17 @@ caller ordinals 3/2/1/0 without renumbering.
 
 **ISA-REF-LIB** (K11; b-isa-spec-8r4, from bennett-vm-47t).
 This is the decided 0.9 contract. The catalog bound as ref version 0.9
-is the file `spec/ref-0.9.json` whose four-line envelope hashes to
-`5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`.
-It publishes the complete 219-recipe catalog, byte-identical to the
-accepted catalog snapshot. Consumers lacking the bound library report
+is the complete repaired snapshot `spec/ref-0.9-r1.json` whose four-line envelope hashes to
+`0be00e64de17699516a9b5bb5daf308ee0c59af7e39b6bf934bad5c628f48e7a`.
+It publishes all 219 recipes; only qjumpr differs from the original
+accepted snapshot, by the independent-width binding below. The original
+`spec/ref-0.9.json`, envelope `5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`,
+remains a frozen compatibility snapshot for previously bound artifacts.
+The new default is r1; hashes distinguish the two snapshots even though
+both use catalog name ref, version 0.9 and ISA 0.9. Consumers MUST bind
+the exact bytes named by the hash; no in-place substitution is valid.
+Source/interface/closure/object identities are unchanged; affected
+schedules and certificates must bind the new catalog and be regenerated. Consumers lacking the bound library report
 `E_SCHEDULE_INFEASIBLE` as §11 requires. The witness below is not a
 full-library hash.
 
@@ -4130,6 +4205,40 @@ token, or an arguments vector for a different closure rejects. This
 binding rule does not replace §3.3's source interface region shape/role
 validation or the §9.2 linker obligation that the registry interface and
 body match the supplied closure hash.
+
+**Independent qjumpr widths** (§3.3, §3.6). In the r1 catalog, qjumpr's
+ordered integer formals are `P, A, CopyWidth, F, First, End`, followed by
+`a:wire[A], succ:wire[P], flag:wire, faulted:wire, code:wire[F]`.
+P is the containing oracle's common pc/successor width; A is the source
+address operand's declared width, satisfying 2^A > n. Bind
+`CopyWidth = min(A,P)`, First to the containing fixed-binding instance's
+first canonical row index, and End to First plus that instance's row
+count. Source formation MUST check these exact bindings before expansion.
+Do not resize the source operand or allocate a normalization buffer.
+
+Compare the complete A-bit address against First and End at width A.
+Retain the recipe's flag `(a < First) or (a >= End)` and its effective
+fault writes. XOR just the low CopyWidth address bits into succ; higher
+succ bits remain unchanged (zero for the initially clean frame.succ).
+The §3.6 flagged successor still selects HALT on a fault. Thus a high
+out-of-range address bit is checked even when A>P, and a legal narrow
+address can feed a wider shared pc when P>A. The copy loop alone uses
+CopyWidth; every former P-wide address comparison, bound literal and
+comparison scratch uses A, while succ retains width P. Other recipes
+are byte-identical. `python3 -I spec/ref-0.9-r1.py --check` reproduces
+and checks the complete published repair from the frozen snapshot.
+
+**QJUMPR-WIDTH witness**
+
+```json
+{"width_pairs":[{"P":2,"A":3,"CopyWidth":2},{"P":2,"A":4,"CopyWidth":2},{"P":4,"A":2,"CopyWidth":2}],"First":1,"End":3,"valid_addresses":[1,2],"out_of_range":[0,3],"high_bit_faults":[4,8],"cause":4}
+```
+
+At P=2,A=3 or 4, high-bit addresses 4 or 8 respectively fault even
+though their low two bits are zero. At P=4,A=2 the valid addresses leave
+the high two clean successor bits zero. Full-width comparisons and low
+copy have their ordinary reversible gates/ordinals; this repair inserts
+no source normalization storage and narrows no legal source width.
 
 **Oracle invocation context (K77).** An oracle's catalog argument vector
 contains exactly its declared parameters, flattened in header-group order
@@ -4555,7 +4664,7 @@ The permutation algorithms define exact permutation circuits, preserving
 every input required by the row and cleaning scratch; circuit correctness must still be checked
 against full-domain T3 witnesses and §5.7, not inferred from costs or
 names. Complete catalog: **219 recipes**; envelope SHA-256
-`5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`. [deps: ISA-11.1-P2, ISA-11.1-P3, ISA-11.1-P28, ISA-11.1-P29]
+`0be00e64de17699516a9b5bb5daf308ee0c59af7e39b6bf934bad5c628f48e7a`. [deps: ISA-11.1-P2, ISA-11.1-P3, ISA-11.1-P28, ISA-11.1-P29]
 Publication follows acceptance. [deps: ISA-11.1-P1, ISA-11.1-P2] In particular this is
 not permission to publish a partial library that omits division, stack,
 coherent control, memory or any instruction.
@@ -4951,6 +5060,71 @@ workspace:[{allocation:<resolved allocation occurrence>,offset:n,
 For a non-Cartesian D_F, additionally permit
 `domain:{entry_products:[<product-domain>,...]}` instead of one product;
 each product has the existing component fields plus `workspace` above.
+
+**Closed source and allocation occurrences (K89).** The resolved source
+occurrences in `borrow_frame.first`/`last` and the resolved allocation
+occurrences in `workspace.allocation` have exactly these JSON productions:
+
+```text
+SourceOccurrence = {"context_key":[InvocationEdge,...],"symbol":hash,
+                    "point":source_point,"iteration":[uint,...],
+                    "instance":[uint,...],"step"?:uint,"phase"?:"fwd"|"rev"}
+InvocationEdge = {"symbol":hash,"point":source_point,"iteration":[uint,...],
+                  "instance":[uint,...],"call_index":uint,
+                  "step"?:uint,"phase"?:"fwd"|"rev"}
+AllocationOccurrence = {"source":SourceOccurrence,"allocation_ordinal":uint}
+```
+
+These records are UTF-8 JCS, with significant array order and no other
+keys; uint uses §9.1's nonnegative integer encoding (a JSON number below
+2^53, otherwise a canonical unsigned decimal string); hash is 64 lowercase
+hex digits. `context_key` is the complete resolved §12.1 invocation key,
+outermost first, [] at the root. Its edges include every K63 call_index;
+`lift.call` adds no edge. Terminal symbol/point/iteration/instance use
+exactly the source identities and coordinates of §11 K63/K64. Both
+vectors are present even when empty. `step` and `phase` are present
+together exactly for coordinates inside an oracle step (step in 1..B);
+they are absent at that level for action points and oracle support
+outside steps. Outer edges retain their own step/phase. Source points
+must resolve in the linked source; wildcard selectors, `generated`,
+terminal `call_index`, omitted required fields and unknown keys reject.
+These are source occurrences, distinct from §12.3 image-preparation
+Occurrence/Allocation records that address individual expansion leaves.
+
+`allocation_ordinal` is the zero-based ordinal of an allocation/acquire
+at that exact resolved SourceOccurrence in forward instantiated source
+constructor traversal, before target-scheme expansion. Count every such
+acquisition, including those in repeated helper bodies; declarations and
+releases do not increment it. It is independent of gate-leaf ordinals
+and counts no target-scheme ancillas. Each acquisition, including a
+reacquisition of one declaration, starts a distinct lifetime. Releases
+and raw reversal retain the paired forward acquisition's source and
+ordinal. A checker MUST reconstruct this pairing, resolve exactly one
+acquisition and require its lifetime to be live at the checked frame's
+entry; matching a reused storage address or declaration is insufficient.
+Corresponding local components across visits use that source acquisition
+identity and bit position, retaining K78's union rule. These encodings
+supply K89's missing bytes without changing D_F or its coverage test.
+
+**K89-OCCURRENCE witness**
+
+```json
+{
+  "borrow_frame": {"lifetime":0,"first":{"context_key":[],"symbol":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","point":"entry:2","iteration":[],"instance":[]},"last":{"context_key":[],"symbol":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","point":"entry:2","iteration":[],"instance":[]},"context_key":[]},
+  "workspace": [{"allocation":{"source":{"context_key":[],"symbol":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","point":"entry:0","iteration":[],"instance":[]},"allocation_ordinal":0},"offset":0,"width":1,"lo":0,"hi":0}],
+  "reacquisition": {"source":{"context_key":[],"symbol":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","point":"entry:0","iteration":[],"instance":[]},"allocation_ordinal":1},
+  "nested": {"context_key":[{"symbol":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","point":"entry:4","iteration":[],"instance":[],"call_index":1,"step":2,"phase":"fwd"}],"symbol":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","point":"entry:2","iteration":[],"instance":[]},
+  "oracle": {"context_key":[],"symbol":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","point":"entry:2","iteration":[],"instance":[],"step":3,"phase":"rev"}
+}
+```
+
+The illustrative linked source symbol is ffff…ffff and the outer
+caller aaaa…aaaa. The entry:2/entry:0 records encode K89's clean-c,
+dirty-b single-CX witness. At frame entry ordinal 0 is live; replacing
+it by the shown reacquisition ordinal 1 rejects even if storage is
+reused. The nested example distinguishes call_index 1 at outer forward
+step 2; the oracle example selects reverse step 3. Actual certificates
+must bind the linked source hashes and reconstructed live occurrences.
 
 A borrow_frame claim identifies the checked borrowed lifetime k in
 K69/K70 allocation order and the exact maximal §5.6 frame realisation
@@ -7064,12 +7238,18 @@ the item is revised. Items 1–5 are asserted non-semantic.
    a schedule that names no `expansion` binds `ref` at the ISA version
    in the object's header, with the full-library envelope hash published
    for that version in §11.1. [deps: ISA-9.1, ISA-11.1-P3, ISA-11.1-P4]
-   For a 0.9 object this is exactly
-   `{"name":"ref","version":"0.9","hash":"5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197"}`,
-   equally for omission and an explicit binding. [deps: ISA-11.1-P3, ISA-11.1-P4, ISA-11.1]
+   For a 0.9 object, omission/default selection binds exactly
+   `{"name":"ref","version":"0.9","hash":"0be00e64de17699516a9b5bb5daf308ee0c59af7e39b6bf934bad5c628f48e7a"}`.
+   An explicit binding may select that r1 snapshot or the original snapshot
+   by its original hash
+   `5de4e4995350313e50217880ba1b95de39cd043283b726337d4894efb005d197`,
+   retaining the original qjumpr parameters and semantics. Consumers bind
+   the selected snapshot's exact bytes; default selection never replaces
+   an explicit hash. [deps: ISA-11.1-P3, ISA-11.1-P4, ISA-11.1]
    §11.1 fixes its schema, ordinals, scratch identities, empty removable
    sets and deterministic decomposition algorithms. [deps: ISA-11.1]
-   The bound catalog is published as `spec/ref-0.9.json`. The worked
+   The current bound catalog is `spec/ref-0.9-r1.json`; the original
+   `spec/ref-0.9.json` remains the frozen compatibility snapshot. The worked
    `ctl` action fixture (zsw.4) is in
    `conformance/fixtures/controlled-action-09/`: `controlled.bisa`,
    `target.json`, `leaves.json`, `schedule.json`, `frame.json` and
@@ -7082,6 +7262,9 @@ the item is revised. Items 1–5 are asserted non-semantic.
    remainder bound is below 2^−(`precision_bits` + 2), argument reduced
    modulo 2π with an outward-rounded enclosure of π.
 9. **Default `epsilon_share`** (§8.1, §11) when a schedule assigns none.
+   For an explicit-accuracy launch estimate, bindings.epsilon in the
+   effective schedule is fixed by that request (§10.1), including when
+   the attached schedule is absent or fails matching.
    Default: the exact rational `bindings.epsilon / N`, where N is the
    number of gate operations in the bound-library expansion of one
    invocation of `bindings.region`, including every nested invocation,

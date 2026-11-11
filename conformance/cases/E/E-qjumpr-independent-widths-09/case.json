@@ -1,0 +1,42 @@
+{
+  "id": "E-qjumpr-independent-widths-09",
+  "suite": "E",
+  "spec": "ISA0.9 \u00a73.3 legal qjumpr widths; \u00a711.1 independent A/P formals and ref-0.9-r1 catalog",
+  "derivation": "For n=3 the shared pc width P=2 coexists with source address widths A=3 and A=4. Full-A-bit comparisons detect high out-of-range bits; only min(A,P) low bits enter succ. A=2,P=4 also leaves high successor bits zero. Exhaustive small address domains, enabled/disabled controls, arbitrary code/faulted and successor targets reverse exactly.",
+  "scenario": {
+    "catalog": "spec/ref-0.9-r1.json",
+    "parameters": [
+      "P",
+      "A",
+      "CopyWidth",
+      "F",
+      "First",
+      "End"
+    ],
+    "width_pairs": [
+      [
+        2,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        4,
+        2
+      ]
+    ],
+    "verify": "Cargo.toml"
+  },
+  "expected_outcome": {
+    "copy_width": "min(A,P)",
+    "full_address_fault_checks": true,
+    "unchanged_other_recipes": 218,
+    "new_envelope_hash": true
+  },
+  "unavailable": {
+    "deliverable": 10,
+    "reason": "Published catalog vectors use the independent constructor expander; the reference source adapter adopts the new binding in the bph implementation lane. No current reference source-reader success is claimed."
+  }
+}

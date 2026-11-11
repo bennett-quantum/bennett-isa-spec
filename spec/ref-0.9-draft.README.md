@@ -278,3 +278,12 @@ constructors still reverse expanded machine rows. The scheduled private
 qinplace adjoint retains t-then-f allocation/release and fresh instruction
 ordinals. The K28 one-CX callees are synthetic constructor fixtures, not
 full ref oracle.construct expansions.
+
+
+The independent-qjumpr-width repair is the complete `ref-0.9-r1.json`
+snapshot, reproduced by `python3 -I spec/ref-0.9-r1.py --check`. ISA 0.9
+§11.1 and §17.7 publish its default binding and envelope hash. The original
+`ref-0.9.json` and its generator remain frozen for earlier explicit bindings
+and byte-locked vectors. The r1 recipe adds integer A and CopyWidth after
+P, compares at A, copies min(A,P) low bits into the P-bit successor and
+leaves all other 218 recipes unchanged. Catalog hashes must never be aliased.

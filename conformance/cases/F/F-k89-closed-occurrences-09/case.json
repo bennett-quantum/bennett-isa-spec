@@ -1,0 +1,20 @@
+{
+  "id": "F-k89-closed-occurrences-09",
+  "suite": "F",
+  "spec": "ISA0.9 \u00a712.2 K89 SourceOccurrence / AllocationOccurrence; \u00a711 K63/K64",
+  "derivation": "Entry:2 selects the one CX frame, allocation entry:0 ordinal0 selects the clean local c lifetime. Reacquiring the same declaration at the same resolved source occurrence has allocation_ordinal1 and cannot denote the earlier lifetime. Nested call occurrence and oracle step/phase are explicit; no wildcard or generated leaf selector is admitted.",
+  "scenario": {
+    "vectors": "occurrences.json",
+    "verify": "python3 -I conformance/cases/F/F-k89-closed-occurrences-09/verify.py"
+  },
+  "expected_outcome": {
+    "closed_records": true,
+    "stale_lifetime_rejects": true,
+    "entry_frame": "entry:2",
+    "entry_allocation": "entry:0"
+  },
+  "unavailable": {
+    "deliverable": 8,
+    "reason": "K89 reference reader/replay adoption follows this publication in b-isa-spec-t9l; this is an independently checked contract vector, not a reader acceptance verdict."
+  }
+}

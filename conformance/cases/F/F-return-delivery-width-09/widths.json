@@ -1,0 +1,23 @@
+{
+  "listed_slot_maxima": [
+    4,
+    4,
+    2
+  ],
+  "W_max": 8,
+  "contains_lift_ret": true,
+  "P": 3,
+  "slots": [
+    8,
+    4,
+    2
+  ],
+  "frame_width": 21,
+  "B": 4,
+  "history_bits": 84,
+  "no_return_slots": [
+    4,
+    4,
+    2
+  ]
+}
