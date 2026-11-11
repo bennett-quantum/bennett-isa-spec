@@ -4952,6 +4952,70 @@ For a non-Cartesian D_F, additionally permit
 `domain:{entry_products:[<product-domain>,...]}` instead of one product;
 each product has the existing component fields plus `workspace` above.
 
+**Closed source and allocation occurrences (K89).** The resolved source
+occurrences in `borrow_frame.first`/`last` and the resolved allocation
+occurrences in `workspace.allocation` have exactly these JSON productions:
+
+```text
+SourceOccurrence = {"context_key":[InvocationEdge,...],"symbol":hash,
+                    "point":source_point,"iteration":[uint,...],
+                    "instance":[uint,...],"step"?:uint,"phase"?:"fwd"|"rev"}
+InvocationEdge = {"symbol":hash,"point":source_point,"iteration":[uint,...],
+                  "instance":[uint,...],"call_index":uint,
+                  "step"?:uint,"phase"?:"fwd"|"rev"}
+AllocationOccurrence = {"source":SourceOccurrence,"allocation_ordinal":uint}
+```
+
+These records are UTF-8 JCS, with significant array order and no other
+keys; uint is a nonnegative JSON integer and hash is 64 lowercase hex
+digits. `context_key` is the complete resolved §12.1 invocation key,
+outermost first, [] at the root. Its edges include every K63 call_index;
+`lift.call` adds no edge. Terminal symbol/point/iteration/instance use
+exactly the source identities and coordinates of §11 K63/K64. Both
+vectors are present even when empty. `step` and `phase` are present
+together exactly for coordinates inside an oracle step (step in 1..B);
+they are absent at that level for action points and oracle support
+outside steps. Outer edges retain their own step/phase. Source points
+must resolve in the linked source; wildcard selectors, `generated`,
+terminal `call_index`, omitted required fields and unknown keys reject.
+These are source occurrences, distinct from §12.3 image-preparation
+Occurrence/Allocation records that address individual expansion leaves.
+
+`allocation_ordinal` is the zero-based ordinal of an allocation/acquire
+at that exact resolved SourceOccurrence in forward instantiated source
+constructor traversal, before target-scheme expansion. Count every such
+acquisition, including those in repeated helper bodies; declarations and
+releases do not increment it. It is independent of gate-leaf ordinals
+and counts no target-scheme ancillas. Each acquisition, including a
+reacquisition of one declaration, starts a distinct lifetime. Releases
+and raw reversal retain the paired forward acquisition's source and
+ordinal. A checker MUST reconstruct this pairing, resolve exactly one
+acquisition and require its lifetime to be live at the checked frame's
+entry; matching a reused storage address or declaration is insufficient.
+Corresponding local components across visits use that source acquisition
+identity and bit position, retaining K78's union rule. These encodings
+supply K89's missing bytes without changing D_F or its coverage test.
+
+**K89-OCCURRENCE witness**
+
+```json
+{
+  "borrow_frame": {"lifetime":0,"first":{"context_key":[],"symbol":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","point":"entry:2","iteration":[],"instance":[]},"last":{"context_key":[],"symbol":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","point":"entry:2","iteration":[],"instance":[]},"context_key":[]},
+  "workspace": [{"allocation":{"source":{"context_key":[],"symbol":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","point":"entry:0","iteration":[],"instance":[]},"allocation_ordinal":0},"offset":0,"width":1,"lo":0,"hi":0}],
+  "reacquisition": {"source":{"context_key":[],"symbol":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","point":"entry:0","iteration":[],"instance":[]},"allocation_ordinal":1},
+  "nested": {"context_key":[{"symbol":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","point":"entry:4","iteration":[],"instance":[],"call_index":1,"step":2,"phase":"fwd"}],"symbol":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","point":"entry:2","iteration":[],"instance":[]},
+  "oracle": {"context_key":[],"symbol":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","point":"entry:2","iteration":[],"instance":[],"step":3,"phase":"rev"}
+}
+```
+
+The illustrative linked source symbol is ffff…ffff and the outer
+caller aaaa…aaaa. The entry:2/entry:0 records encode K89's clean-c,
+dirty-b single-CX witness. At frame entry ordinal 0 is live; replacing
+it by the shown reacquisition ordinal 1 rejects even if storage is
+reused. The nested example distinguishes call_index 1 at outer forward
+step 2; the oracle example selects reverse step 3. Actual certificates
+must bind the linked source hashes and reconstructed live occurrences.
+
 A borrow_frame claim identifies the checked borrowed lifetime k in
 K69/K70 allocation order and the exact maximal §5.6 frame realisation
 being checked. Source occurrences include the full

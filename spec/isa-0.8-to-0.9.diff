@@ -2392,7 +2392,8 @@
 +```json
 +{"ancillae":[{"class":"fast","id":"a","scheme":"controlled-x","state":"clean","width":{"var":"c"}}],"borrow":[{"class":"fast","id":"b","width":1}],"history":[{"class":"fast","id":"h","width":3}],"live_ranges":[{"end":2,"frame":"s","start":0},{"end":4,"frame":"s","start":2}],"scratch":[{"class":"fast","id":"s","state":"clean","width":{"args":[2,{"var":"c"}],"op":"+"}}],"slots":[{"class":"fast","id":"mut:0","role":"mut","width":2},{"class":"fast","id":"in:0","role":"in","width":1}]}
 +```
-+
+ 
+-## 10. Launch ABI (launch 0.8)
 +At `c = 2`, the slot widths total 3, scratch width is 4, retained
 +history width is 3, borrow width is 1 and scheme ancilla width is 2.
 +The two half-open uses of `s` meet at 2 and do not overlap. This is a
@@ -2402,8 +2403,7 @@
 +Frame SHA-256: `f314eeef24a5a65a9c72f91e062aa3c83556358eaca166e689571700a72083ff`.
 +
 +## 10. Launch ABI (launch 0.9)
- 
--## 10. Launch ABI (launch 0.8)
++
 +Register allocation through `bennett_qreg_new` remains a homogeneous request; §3.3 defines the ordered class vector, concat/slice bindings and complete ledger reversal (K88).
 +
 +The selected device object/root, fixed-image preparation, target models, resource/frame contexts, borrow proofs and token-alias launch bindings follow §12.3 (K85–K91). In particular its token_aliases mixed-object rule applies at this launch boundary; the general native-container/ordinary-pointer launch contract remains the explicit boundary work named there.
@@ -4510,7 +4510,7 @@
  hi, im_lo, im_hi]` (decimal strings). **Positivity test.** The checker
  proves each of the three matrices **positive definite** by an interval
  Cholesky (or Hermitian LDL†) factorisation in which the interval lower
-@@ -1335,33 +4806,422 @@
+@@ -1335,33 +4806,486 @@
  strictly feasible by replacing Y with Y + δI and mu with mu′ = mu + δ·(d
  + 1) for a small rational δ > 0 (any mu′ > mu + δ·d suffices): then Y ±
  J(Φ) ⪰ δI ≻ 0 and, since Tr_out(Y + δI) = Tr_out(Y) + δ·d·I, mu′·I −
@@ -4665,6 +4665,70 @@
 +For a non-Cartesian D_F, additionally permit
 +`domain:{entry_products:[<product-domain>,...]}` instead of one product;
 +each product has the existing component fields plus `workspace` above.
++
++**Closed source and allocation occurrences (K89).** The resolved source
++occurrences in `borrow_frame.first`/`last` and the resolved allocation
++occurrences in `workspace.allocation` have exactly these JSON productions:
++
++```text
++SourceOccurrence = {"context_key":[InvocationEdge,...],"symbol":hash,
++                    "point":source_point,"iteration":[uint,...],
++                    "instance":[uint,...],"step"?:uint,"phase"?:"fwd"|"rev"}
++InvocationEdge = {"symbol":hash,"point":source_point,"iteration":[uint,...],
++                  "instance":[uint,...],"call_index":uint,
++                  "step"?:uint,"phase"?:"fwd"|"rev"}
++AllocationOccurrence = {"source":SourceOccurrence,"allocation_ordinal":uint}
++```
++
++These records are UTF-8 JCS, with significant array order and no other
++keys; uint is a nonnegative JSON integer and hash is 64 lowercase hex
++digits. `context_key` is the complete resolved §12.1 invocation key,
++outermost first, [] at the root. Its edges include every K63 call_index;
++`lift.call` adds no edge. Terminal symbol/point/iteration/instance use
++exactly the source identities and coordinates of §11 K63/K64. Both
++vectors are present even when empty. `step` and `phase` are present
++together exactly for coordinates inside an oracle step (step in 1..B);
++they are absent at that level for action points and oracle support
++outside steps. Outer edges retain their own step/phase. Source points
++must resolve in the linked source; wildcard selectors, `generated`,
++terminal `call_index`, omitted required fields and unknown keys reject.
++These are source occurrences, distinct from §12.3 image-preparation
++Occurrence/Allocation records that address individual expansion leaves.
++
++`allocation_ordinal` is the zero-based ordinal of an allocation/acquire
++at that exact resolved SourceOccurrence in forward instantiated source
++constructor traversal, before target-scheme expansion. Count every such
++acquisition, including those in repeated helper bodies; declarations and
++releases do not increment it. It is independent of gate-leaf ordinals
++and counts no target-scheme ancillas. Each acquisition, including a
++reacquisition of one declaration, starts a distinct lifetime. Releases
++and raw reversal retain the paired forward acquisition's source and
++ordinal. A checker MUST reconstruct this pairing, resolve exactly one
++acquisition and require its lifetime to be live at the checked frame's
++entry; matching a reused storage address or declaration is insufficient.
++Corresponding local components across visits use that source acquisition
++identity and bit position, retaining K78's union rule. These encodings
++supply K89's missing bytes without changing D_F or its coverage test.
++
++**K89-OCCURRENCE witness**
++
++```json
++{
++  "borrow_frame": {"lifetime":0,"first":{"context_key":[],"symbol":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","point":"entry:2","iteration":[],"instance":[]},"last":{"context_key":[],"symbol":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","point":"entry:2","iteration":[],"instance":[]},"context_key":[]},
++  "workspace": [{"allocation":{"source":{"context_key":[],"symbol":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","point":"entry:0","iteration":[],"instance":[]},"allocation_ordinal":0},"offset":0,"width":1,"lo":0,"hi":0}],
++  "reacquisition": {"source":{"context_key":[],"symbol":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","point":"entry:0","iteration":[],"instance":[]},"allocation_ordinal":1},
++  "nested": {"context_key":[{"symbol":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","point":"entry:4","iteration":[],"instance":[],"call_index":1,"step":2,"phase":"fwd"}],"symbol":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","point":"entry:2","iteration":[],"instance":[]},
++  "oracle": {"context_key":[],"symbol":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","point":"entry:2","iteration":[],"instance":[],"step":3,"phase":"rev"}
++}
++```
++
++The illustrative linked source symbol is ffff…ffff and the outer
++caller aaaa…aaaa. The entry:2/entry:0 records encode K89's clean-c,
++dirty-b single-CX witness. At frame entry ordinal 0 is live; replacing
++it by the shown reacquisition ordinal 1 rejects even if storage is
++reused. The nested example distinguishes call_index 1 at outer forward
++step 2; the oracle example selects reverse step 3. Actual certificates
++must bind the linked source hashes and reconstructed live occurrences.
 +
 +A borrow_frame claim identifies the checked borrowed lifetime k in
 +K69/K70 allocation order and the exact maximal §5.6 frame realisation
@@ -4942,7 +5006,7 @@
                                                     fault_rate: { domain, faults_by_code, undefined_excluded, layout_dependent_excluded } },
              cleanup: { "<variant>:<inherited_controls>": [ { path, realisation } ] },
              error:   { "<variant>:<inherited_controls>": { local: { "operator_norm"?: v, "diamond"?: v }, inclusive: { "operator_norm"?: v, "diamond"?: v } } },
-@@ -1369,6 +5229,706 @@
+@@ -1369,6 +5293,706 @@
    composition { multiplicities: { "<hash>:<variant>:<inherited_controls>": n (from the realised schedule) }, epsilon_total: { "diamond": v }, method: "sum_over_multiplicities" }
  ```
  
@@ -5649,7 +5713,7 @@
  `inclusive(R, key) = local(R, key) + Σ_callees n_c × inclusive(c, key_c)`
  **per metric**, keyed like `cleanup` by `<variant>:<inherited_controls>`
  (the realised error depends on both); every `local` value is a verified
-@@ -1380,27 +5940,49 @@
+@@ -1380,27 +6004,49 @@
  variants) require `operator_norm` bounds throughout. A controlled
  unitary variant requires a `numerical` claim; an ε > 0 realisation
  compared as a channel requires a `channel` claim. Executable claims
@@ -5705,7 +5769,7 @@
  ### 14.2 Quantum state semantics
  
  The state of a Q region is a vector in ⊗ over live wires in allocation
-@@ -1422,10 +6004,20 @@
+@@ -1422,10 +6068,20 @@
  - **T3 (permutation theorem).** If the realised unitary V of a circuit on
    span(D) is a permutation matrix and the final basis tuple equals P(x)
    for every x ∈ D, then V|span(D) = P.
@@ -5730,7 +5794,7 @@
  - **T5.** As §6.3.
  - **T6 (executor agreement).** Two executors conforming to §3–§7 on one
    target with the same schedule produce on every x ∈ D the same final
-@@ -1437,16 +6029,428 @@
+@@ -1437,16 +6093,428 @@
  
  ## 15. Conformance suites
  
@@ -6166,7 +6230,7 @@
  
  ## 16. Canonical textual form (normative)
  
-@@ -1458,7 +6462,17 @@
+@@ -1458,7 +6526,17 @@
  `INT := -?(0|[1-9][0-9]*)`; `FLOAT :=` shortest round-trip decimal with
  `.` or exponent, finite; `STRING := "…"` with escapes `\"`, `\\`, `\n`;
  `HEX := ([0-9a-f]{2})*`. Metadata lines are RFC 8785 canonical JSON
@@ -6185,7 +6249,7 @@
  
  ### 16.2 Grammar
  
-@@ -1472,10 +6486,10 @@
+@@ -1472,10 +6550,10 @@
    dataline  := NAME SP HEX NL
    function  := fhead NL regs? block+
    fhead     := ("fn" SP ("cc"|"r") | "oracle" | "action" | "perm_action" | "lproc") SP "@" NAME SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")" SP "(" plist ")"
@@ -6199,7 +6263,7 @@
    regs      := "regs" SP "{" SP (NAME ":" type ("," SP NAME ":" type)*)? SP "}" (SP "bounds" SP "{" INT ("," SP INT)* "}")? NL
    block     := "^" NAME "(" plist "):" NL instr+
    instr     := (lhs SP "=" SP)? OPCODE (SP operand)* (SP "{" NL instr+ "}" (SP "{" NL instr+ "}")?)? NL
-@@ -1485,16 +6499,38 @@
+@@ -1485,16 +6563,38 @@
    VER       := INT "." INT
  ```
  
@@ -6241,7 +6305,7 @@
  
  section functions
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
-@@ -1509,9 +6545,9 @@
+@@ -1509,9 +6609,9 @@
  empty and its envelope is exactly these bytes (each line LF-terminated):
  
  ```
@@ -6253,7 +6317,7 @@
  oracle @inc8 (x:wire[8] in) (t:wire[8]) (f:wire[4]) () ()
  regs { one:reg[8], r:reg[8] }
  ^entry():
-@@ -1521,17 +6557,19 @@
+@@ -1521,17 +6621,19 @@
  ```
  
  With B ≥ 3 every x yields `(x + 1 mod 256, 0)` (`result_val` = 0 ⊕ r);
@@ -6276,7 +6340,7 @@
  
  section functions
  oracle @sum_db (n:wire[8] in) (t:wire[8]) (f:wire[4]) (db:region[4,8] in) ()
-@@ -1590,13 +6628,13 @@
+@@ -1590,13 +6692,13 @@
  is SHA-256 of the ASCII `<scc_hash hex>:0`:
  
  ```
@@ -6293,7 +6357,7 @@
  lift.boundscheck zp 1
  zv = lift.load.i8 zp
  z = lift.icmp.eq n zv
-@@ -1614,21 +6652,392 @@
+@@ -1614,21 +6716,392 @@
  ^done():
  lift.ret acc
  data zero 00
@@ -6496,8 +6560,8 @@
 +one = lift.const.i8 1
 +r = lift.add x one
 +lift.retval r
-+```
-+
+ ```
+ 
 +`@inc8` is example 1's oracle. With b = 1 the token's tuple is (3, 0, 0,
 +0) and, on basis inputs, t ⊕= (x + 1) mod 256 with f unchanged; with b = 0
 +it is (2, 0, 0, 0): t unchanged, f ⊕= `FAULT_BUDGET_STEPS` (example 1's
@@ -6663,8 +6727,8 @@
 +
 +section layout
 +{"A_tab":2,"H":6,"S_cells":4,"globals":{},"heap_base":32,"heap_limit_max":32,"interface_regions":{"plus_db":{"db":{"base":17}},"through":{"db":{"base":16}}},"null_size":16,"ptr_width":32}
- ```
- 
++```
++
 +The outer invocation's B is independent of `tk`'s tuple. The sole
 +`@worker` binding key is `[0,1,0]` (oracle argument positions 0 and 1,
 +region position 0). It has five locations (`x r fr zero bad`), so
@@ -6692,7 +6756,7 @@
  ## 17. Decisions deferred to implementation, with defaults
  
  Each item is one an implementer must decide to build; any decision is
-@@ -1652,15 +7061,60 @@
+@@ -1652,15 +7125,60 @@
     level. Default: the library `ref` published by `bennett-isa-spec`
     (ripple-carry adders and comparators, linear `inrange` scans,
     one-hot address dispatch, clean scratch released in reverse order);
@@ -6757,7 +6821,7 @@
  10. **`any`-class resolution** (§11). Default: the first class in JCS
      order with capacity.
  11. **Occupancy rate of a class absent from `rate`** (§8.2). Default: 1.
-@@ -1669,7 +7123,65 @@
+@@ -1669,7 +7187,65 @@
  13. **Suite sizes** (§15): the exhaustive widths of suite C and the
      sample counts of `sampled` claims. Default: exhaustive for ≤ 16
      interface bits; 2^16 samples above.

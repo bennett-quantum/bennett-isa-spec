@@ -1,0 +1,74 @@
+{
+  "borrow_frame": {
+    "lifetime": 0,
+    "first": {
+      "context_key": [],
+      "symbol": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "point": "entry:2",
+      "iteration": [],
+      "instance": []
+    },
+    "last": {
+      "context_key": [],
+      "symbol": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "point": "entry:2",
+      "iteration": [],
+      "instance": []
+    },
+    "context_key": []
+  },
+  "workspace": [
+    {
+      "allocation": {
+        "source": {
+          "context_key": [],
+          "symbol": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "point": "entry:0",
+          "iteration": [],
+          "instance": []
+        },
+        "allocation_ordinal": 0
+      },
+      "offset": 0,
+      "width": 1,
+      "lo": 0,
+      "hi": 0
+    }
+  ],
+  "reacquisition": {
+    "source": {
+      "context_key": [],
+      "symbol": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "point": "entry:0",
+      "iteration": [],
+      "instance": []
+    },
+    "allocation_ordinal": 1
+  },
+  "nested": {
+    "context_key": [
+      {
+        "symbol": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "point": "entry:4",
+        "iteration": [],
+        "instance": [],
+        "call_index": 1,
+        "step": 2,
+        "phase": "fwd"
+      }
+    ],
+    "symbol": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "point": "entry:2",
+    "iteration": [],
+    "instance": []
+  },
+  "oracle": {
+    "context_key": [],
+    "symbol": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "point": "entry:2",
+    "iteration": [],
+    "instance": [],
+    "step": 3,
+    "phase": "rev"
+  }
+}
