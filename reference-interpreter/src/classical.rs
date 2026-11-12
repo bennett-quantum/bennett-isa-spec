@@ -72,6 +72,33 @@ struct Activation {
     bindings: Vec<String>,
     segment: Option<usize>,
 }
+// A step changes the active frame; inactive callers are immutable until a
+// call/return changes the stack. Retain that shared prefix rather than cloning
+// every caller (including its strings) into every instruction's undo record.
+#[derive(Clone, Debug)]
+struct ControlPoint {
+    callers: std::sync::Arc<Vec<Activation>>,
+    active: Activation,
+}
+impl ControlPoint {
+    fn capture(control: &[Activation], callers: &mut std::sync::Arc<Vec<Activation>>) -> Self {
+        let (active, prefix) = control.split_last().expect("running control");
+        // This is a content-checked memo, outside machine state. A transaction
+        // rollback or an uncall can leave any previous prefix cached here.
+        if callers.as_slice() != prefix {
+            *callers = std::sync::Arc::new(prefix.to_vec());
+        }
+        Self {
+            callers: callers.clone(),
+            active: active.clone(),
+        }
+    }
+    fn restore(&self) -> Vec<Activation> {
+        let mut control = self.callers.as_ref().clone();
+        control.push(self.active.clone());
+        control
+    }
+}
 type Key = (u64, String);
 /// One §7.3 effect-tape entry: `(dev, op, args)` and the byte string the
 /// operation transferred (console output, clock bytes, entropy bytes, or a
@@ -290,7 +317,7 @@ impl ClassicalSnapshot {
 #[derive(Clone, Debug)]
 struct Undo {
     minted_token: Option<u64>,
-    control: Vec<Activation>,
+    control: ControlPoint,
     next_id: u64,
     definitions: Vec<Key>,
     bytes: Retained<(u128, u8)>,
@@ -302,7 +329,7 @@ struct Undo {
     finished: Option<Retained<ClassicalValue>>,
     pending: Option<HostRequest>,
     registers: Vec<RegisterUndo>,
-    region: Option<RegionRecord>,
+    region: Option<Box<RegionRecord>>,
 }
 #[derive(Clone, Debug)]
 struct RegionRecord {
@@ -380,6 +407,8 @@ pub struct HostExchange {
 pub struct ClassicalMachine<'a> {
     token_run: std::sync::Arc<crate::tokens::TokenRun>,
     object: &'a Object,
+    block_indices: BTreeMap<&'a str, crate::object::BlockIndex<'a>>,
+    control_callers: std::sync::Arc<Vec<Activation>>,
     state: ClassicalSnapshot,
     history: Vec<HistoryFrame>,
     segments: Vec<Segment>,
@@ -567,6 +596,12 @@ impl<'a> ClassicalMachine<'a> {
             token_run: std::sync::Arc::new(crate::tokens::TokenRun::new(run_id)),
             object,
             state: state.clone(),
+            block_indices: object
+                .functions
+                .iter()
+                .map(|(name, function)| (name.as_str(), crate::object::BlockIndex::new(function)))
+                .collect(),
+            control_callers: std::sync::Arc::new(Vec::new()),
             history: Vec::new(),
             segments: Vec::new(),
             entropy: entropy.into(),
@@ -890,7 +925,7 @@ impl<'a> ClassicalMachine<'a> {
         // a segment cancelled by a later uncall (codex B09).
         if let Some(first) = self.history.first() {
             let entry = first.undo.clone();
-            self.state.control = entry.control;
+            self.state.control = entry.control.restore();
             self.state.next_id = entry.next_id;
             self.state.fault = entry.fault;
             self.state.finished = entry.finished;
@@ -1296,7 +1331,7 @@ impl<'a> ClassicalMachine<'a> {
                 }
             }
         }
-        self.state.control = undo.control;
+        self.state.control = undo.control.restore();
         self.state.next_id = undo.next_id;
         self.state.fault = undo.fault;
         self.state.finished = undo.finished;
@@ -1515,7 +1550,7 @@ impl<'a> ClassicalMachine<'a> {
         let a = &i.operands;
         let mut undo = Undo {
             minted_token: None,
-            control: self.state.control.clone(),
+            control: ControlPoint::capture(&self.state.control, &mut self.control_callers),
             next_id: self.state.next_id,
             definitions: Vec::new(),
             bytes: Retained::default(),
@@ -1697,9 +1732,11 @@ impl<'a> ClassicalMachine<'a> {
                             .iter()
                             .map(|n| self.read(n))
                             .collect::<Result<Vec<_>>>()?;
-                        let block = f.blocks.iter().position(|b| b.name == n).ok_or_else(|| {
-                            Error::new(format!("§3.4: unknown branch target {n}"))
-                        })?;
+                        let block = self.block_indices[current.function.as_str()]
+                            .get(n)
+                            .ok_or_else(|| {
+                                Error::new(format!("§3.4: unknown branch target {n}"))
+                            })?;
                         if object.isa_version == crate::IsaVersion::V09 {
                             for (p, v) in f.blocks[block].params.iter().zip(&values) {
                                 self.register_transfer09(v, &p.ty)?;
@@ -1900,7 +1937,7 @@ impl<'a> ClassicalMachine<'a> {
                         self.execute_region(&record, false)?;
                         undo.registers
                             .push(self.state.quantum.complete_call_recorded(&ids)?);
-                        undo.region = Some(record);
+                        undo.region = Some(Box::new(record));
                     }
                     _ => return err("§4.8", format!("unimplemented classical opcode {op}")),
                 }
@@ -1921,7 +1958,7 @@ impl<'a> ClassicalMachine<'a> {
             if object.isa_version == crate::IsaVersion::V09 {
                 // K5: only the terminal record is published. Retain the
                 // failing point and every open activation, not a successor.
-                self.state.control = undo.control.clone();
+                self.state.control = undo.control.restore();
             }
             self.state.fault = Some(code);
         } else if let Some(v) = output {
@@ -2148,3 +2185,44 @@ mod checkpoint_tests {
 
 #[path = "classical/frames09.rs"]
 mod frames09;
+
+#[cfg(test)]
+mod control_retention_tests {
+    use super::*;
+
+    #[test]
+    fn retained_control_shares_callers_and_restores_exactly_after_cache_changes() {
+        let frame = |id| Activation {
+            id,
+            function: format!("f{id}"),
+            block: 2,
+            ip: 3,
+            bindings: vec!["result".into()],
+            segment: Some(4),
+        };
+        let mut control: Vec<_> = (0..32).map(frame).collect();
+        let mut cache = std::sync::Arc::new(Vec::new());
+        let first = ControlPoint::capture(&control, &mut cache);
+        let original = control.clone();
+        for ip in 0..4096 {
+            control.last_mut().unwrap().ip = ip;
+            let point = ControlPoint::capture(&control, &mut cache);
+            assert!(std::sync::Arc::ptr_eq(&point.callers, &first.callers));
+            assert_eq!(point.restore(), control);
+        }
+        control.pop();
+        let returned = ControlPoint::capture(&control, &mut cache);
+        assert!(!std::sync::Arc::ptr_eq(&returned.callers, &first.callers));
+        assert_eq!(returned.restore(), control);
+        assert_eq!(first.restore(), original);
+        // Simulate transaction rollback / uncall after the memo changed.
+        let restored = ControlPoint::capture(&original, &mut cache);
+        assert_eq!(restored.restore(), original);
+        assert_eq!(returned.restore(), control);
+        // Rare region payloads must not occupy every ordinary history frame.
+        assert!(
+            std::mem::size_of::<Option<Box<RegionRecord>>>()
+                < std::mem::size_of::<Option<RegionRecord>>()
+        );
+    }
+}

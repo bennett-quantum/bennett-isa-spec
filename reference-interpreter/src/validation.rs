@@ -2,7 +2,7 @@
 //! by executors; accepting a text object does not waive those obligations.
 use crate::{
     err,
-    object::{is_binop, is_div, list, name},
+    object::{is_binop, is_div, list, name, BlockIndex},
     Error, Function, Instruction, Object, Result, Type,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -16,7 +16,7 @@ impl Object {
         &self,
         f: &Function,
         types: &mut BTreeMap<String, Type>,
-        labels: &BTreeSet<&String>,
+        labels: &BlockIndex<'_>,
     ) -> Result<()> {
         if matches!(f.kind.as_str(), "cc" | "r") {
             return self.validate_classical(f, types, labels);
@@ -853,7 +853,7 @@ impl Object {
         &self,
         f: &Function,
         types: &mut BTreeMap<String, Type>,
-        labels: &BTreeSet<&String>,
+        labels: &BlockIndex<'_>,
     ) -> Result<()> {
         for b in &f.blocks {
             for p in &b.params {
@@ -906,7 +906,7 @@ impl Object {
             }
             pending = retry;
         }
-        self.validate_handle_views(f, types)
+        self.validate_handle_views(f, types, labels)
     }
     /// The §4.1/§4.8 schema of one classical instruction; returns its definitions.
     fn classical_instruction(
@@ -915,7 +915,7 @@ impl Object {
         b: &crate::Block,
         ordinal: usize,
         types: &BTreeMap<String, Type>,
-        labels: &BTreeSet<&String>,
+        labels: &BlockIndex<'_>,
     ) -> Result<Vec<(String, Type)>> {
         let i = &b.instructions[ordinal];
         let mut defs = Vec::new();
@@ -1086,15 +1086,12 @@ impl Object {
                         let (label, args) = label.split_once('(').ok_or_else(|| {
                             Error::new("§4.8: br target needs argument list".into())
                         })?;
-                        if !labels.iter().any(|l| l.as_str() == label) {
+                        let target = labels.get(label);
+                        if target.is_none() {
                             return err("§3.4", "unknown branch label");
                         }
                         let vs = list(&format!("({args}"))?;
-                        let block = f
-                            .blocks
-                            .iter()
-                            .find(|b| b.name == label)
-                            .expect("label checked");
+                        let block = &f.blocks[target.expect("label checked")];
                         if vs.len() != block.params.len() {
                             return err("§3.3", "branch argument count mismatch");
                         }

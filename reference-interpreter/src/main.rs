@@ -2037,10 +2037,11 @@ fn run() -> Result<()> {
         if args.len() != 2 {
             return Err(fail(USAGE));
         }
-        if command == "check" {
-            program.check_hashes()?;
-        }
-        let identity = program.identity()?;
+        let identity = if command == "check" {
+            program.checked_identity()?
+        } else {
+            program.identity()?
+        };
         let symbols = object(identity.interface_hashes.into_iter().map(|(name, hash)| {
             let closure = identity.closure_hashes[&name]
                 .clone()

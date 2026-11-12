@@ -10,6 +10,7 @@ impl Object {
         &self,
         f: &Function,
         types: &BTreeMap<String, Type>,
+        labels: &crate::object::BlockIndex<'_>,
     ) -> Result<()> {
         let mut work = vec![(0usize, Views::default())];
         let mut seen = BTreeSet::new();
@@ -81,11 +82,7 @@ impl Object {
                             .trim_start_matches('^')
                             .split_once('(')
                             .ok_or_else(|| Error::new("§3.4: malformed branch".into()))?;
-                        let target = f
-                            .blocks
-                            .iter()
-                            .position(|b| b.name == label)
-                            .expect("validated block");
+                        let target = labels.get(label).expect("validated block");
                         work.push((target, views.clone()));
                     }
                 }

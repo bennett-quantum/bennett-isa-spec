@@ -217,6 +217,11 @@ impl Object {
         })
     }
     pub fn check_hashes(&self) -> Result<()> {
+        self.checked_identity().map(|_| ())
+    }
+    /// Compute identity and perform the same interface-hash checks as check_hashes.
+    /// Callers reporting that identity can reuse it without hashing the object again.
+    pub fn checked_identity(&self) -> Result<Identity> {
         let identity = self.identity()?;
         for s in self.symbols()?.values() {
             let n = s.get("name")?.string()?;
@@ -230,7 +235,7 @@ impl Object {
                 );
             }
         }
-        Ok(())
+        Ok(identity)
     }
     fn envelope(
         &self,
@@ -382,7 +387,13 @@ struct HashPass {
     scc_hashes: BTreeMap<String, String>,
 }
 pub(crate) fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::new();
+    for byte in bytes {
+        out.push(DIGITS[(byte >> 4) as usize] as char);
+        out.push(DIGITS[(byte & 15) as usize] as char);
+    }
+    out
 }
 /// A dotted rendering is not injective (§16.1 permits dots in NAME).
 /// Keep structural identity through selection and emit every leaf once.
@@ -479,4 +490,17 @@ fn components(graph: &BTreeMap<String, Vec<String>>) -> Vec<Vec<String>> {
         }
     }
     t.result
+}
+
+#[cfg(test)]
+mod hex_tests {
+    #[test]
+    fn identity_hex_matches_formatted_bytes() {
+        let bytes: Vec<_> = (0..=255).collect();
+        assert_eq!(
+            super::hex(&bytes),
+            bytes.iter().map(|b| format!("{b:02x}")).collect::<String>()
+        );
+        assert_eq!(super::hex(&[]), "");
+    }
 }

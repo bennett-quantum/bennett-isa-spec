@@ -165,6 +165,42 @@ pub struct Function {
     pub blocks: Vec<Block>,
     pub lines: Vec<String>,
 }
+// Kept outside Function: callers can mutate its public blocks between checks.
+// Each validation pass / machine builds an index over its immutable borrow.
+pub(crate) struct BlockIndex<'a> {
+    entries: Vec<(&'a str, usize)>,
+}
+impl<'a> BlockIndex<'a> {
+    pub(crate) fn new(function: &'a Function) -> Self {
+        let mut entries: Vec<_> = function
+            .blocks
+            .iter()
+            .enumerate()
+            .map(|(i, b)| (b.name.as_str(), i))
+            .collect();
+        // Stable ordering preserves the first block for unchecked duplicate names.
+        entries.sort_by_key(|e| e.0);
+        Self { entries }
+    }
+    pub(crate) fn get(&self, name: &str) -> Option<usize> {
+        let end = self.entries.partition_point(|(label, _)| {
+            #[cfg(test)]
+            BLOCK_COMPARISONS.with(|n| n.set(n.get() + 1));
+            *label < name
+        });
+        self.entries
+            .get(end)
+            .filter(|e| {
+                #[cfg(test)]
+                BLOCK_COMPARISONS.with(|n| n.set(n.get() + 1));
+                e.0 == name
+            })
+            .map(|e| e.1)
+    }
+}
+#[cfg(test)]
+thread_local! { static BLOCK_COMPARISONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
+
 impl Function {
     fn validate_body_shape(&self) -> Result<()> {
         if self.blocks.is_empty() {
@@ -1156,6 +1192,7 @@ impl Object {
                 return err("§3.7", "lifted blocks have no parameters");
             }
         }
+        let labels = BlockIndex::new(f);
         if lifted {
             for b in &f.blocks {
                 for (i, ins) in b.instructions.iter().enumerate() {
@@ -1246,7 +1283,7 @@ impl Object {
         f: &Function,
         i: &Instruction,
         types: &BTreeMap<String, Type>,
-        labels: &BTreeSet<&String>,
+        labels: &BlockIndex<'_>,
     ) -> Result<()> {
         let op = i.op.as_str();
         let args = &i.operands;
@@ -1302,9 +1339,7 @@ impl Object {
             }
         };
         let label = |s: &str| -> Result<()> {
-            if s.strip_prefix('^')
-                .is_none_or(|s| !labels.iter().any(|x| x.as_str() == s))
-            {
+            if s.strip_prefix('^').is_none_or(|s| labels.get(s).is_none()) {
                 err("§3.6", format!("unknown label {s}"))
             } else {
                 Ok(())
@@ -1984,4 +2019,126 @@ fn validate_ranges(ranges: &[(u128, u128, String)], h: u128) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod block_index_tests {
+    use super::*;
+
+    #[test]
+    fn block_lookup_work_is_logarithmic() {
+        let mut function = Function {
+            kind: "cc".into(),
+            name: "indexed".into(),
+            params: std::array::from_fn(|_| vec![]),
+            regs: vec![],
+            bounds: vec![],
+            blocks: (0..4096)
+                .map(|i| Block {
+                    name: format!("b{i:04}"),
+                    params: vec![],
+                    instructions: vec![],
+                })
+                .collect(),
+            lines: vec![],
+        };
+        // Text order need not agree with lexical label order.
+        function.blocks.reverse();
+        let index = BlockIndex::new(&function);
+        BLOCK_COMPARISONS.with(|n| n.set(0));
+        for (ordinal, block) in function.blocks.iter().enumerate() {
+            assert_eq!(index.get(&block.name), Some(ordinal));
+        }
+        assert_eq!(index.get("absent"), None);
+        assert_eq!(index.get("z"), None);
+        let comparisons = BLOCK_COMPARISONS.with(|n| n.get());
+        assert!(
+            comparisons <= (function.blocks.len() + 2) * 14,
+            "{comparisons} label comparisons for {} lookups",
+            function.blocks.len() + 2
+        );
+    }
+
+    #[test]
+    fn block_checks_and_execution_bound_comparisons_per_branch() {
+        let mut object =
+            Object::parse(include_str!("../tests/fixtures/r21/cc-length.bisa")).unwrap();
+        let function = object.functions.get_mut("f").unwrap();
+        function.blocks = (0..4096)
+            .map(|i| Block {
+                name: format!("b{i:04}"),
+                params: vec![],
+                instructions: if i == 4095 {
+                    vec![
+                        Instruction {
+                            lhs: vec!["v".into()],
+                            op: "const.i64".into(),
+                            operands: vec!["0".into()],
+                            bodies: vec![],
+                            line: 0,
+                        },
+                        Instruction {
+                            lhs: vec![],
+                            op: "ret".into(),
+                            operands: vec!["v".into()],
+                            bodies: vec![],
+                            line: 0,
+                        },
+                    ]
+                } else {
+                    vec![Instruction {
+                        lhs: vec![],
+                        op: "br".into(),
+                        operands: vec![format!("^b{:04}()", i + 1)],
+                        bodies: vec![],
+                        line: 0,
+                    }]
+                },
+            })
+            .collect();
+        BLOCK_COMPARISONS.with(|n| n.set(0));
+        object.validate_function(&object.functions["f"]).unwrap();
+        let comparisons = BLOCK_COMPARISONS.with(|n| n.get());
+        assert!(
+            comparisons <= 4096 * 28,
+            "validation made {comparisons} comparisons"
+        );
+        let mut machine = crate::ClassicalMachine::new(&object, "f", &[], &[]).unwrap();
+        let initial = machine.snapshot();
+        BLOCK_COMPARISONS.with(|n| n.set(0));
+        let result = machine.run(4097).unwrap();
+        assert_eq!(result.steps, 4097);
+        assert_eq!(result.fault, None);
+        assert_eq!(result.values.as_ref(), &[crate::ClassicalValue::Int(64, 0)]);
+        let comparisons = BLOCK_COMPARISONS.with(|n| n.get());
+        assert!(
+            comparisons <= 4096 * 14,
+            "execution made {comparisons} comparisons"
+        );
+        machine.reverse().unwrap();
+        assert_eq!(machine.snapshot(), initial);
+    }
+
+    #[test]
+    fn block_index_preserves_first_match_and_rebuilds_after_edits() {
+        let mut function = Function {
+            kind: "cc".into(),
+            name: "mutable".into(),
+            params: std::array::from_fn(|_| vec![]),
+            regs: vec![],
+            bounds: vec![],
+            blocks: ["b", "a", "b"]
+                .into_iter()
+                .map(|name| Block {
+                    name: name.into(),
+                    params: vec![],
+                    instructions: vec![],
+                })
+                .collect(),
+            lines: vec![],
+        };
+        assert_eq!(BlockIndex::new(&function).get("b"), Some(0));
+        function.blocks.swap(0, 1);
+        assert_eq!(BlockIndex::new(&function).get("b"), Some(1));
+    }
 }
