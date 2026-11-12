@@ -144,7 +144,8 @@ fn parse_memory<'a>(
     value: &str,
     existing_names: impl IntoIterator<Item = &'a str>,
 ) -> Result<(String, Vec<u8>)> {
-    let (syntax, load): (&str, fn(&str) -> Result<Vec<u8>>) = match option {
+    type MemoryLoader = fn(&str) -> Result<Vec<u8>>;
+    let (syntax, load): (&str, MemoryLoader) = match option {
         "--mem" => ("name=hex", parse_hex),
         "--mem-file" => ("name=path", |path| {
             std::fs::read(path).map_err(|e| fail(format!("{path}: {e}")))

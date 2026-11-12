@@ -461,12 +461,21 @@ fn independent_canonical_bytes_and_envelope_hashes() {
     const R1: &str = include_str!("../../spec/ref-0.9-r1.json");
     assert_eq!(canonical(&json::parse(R1).unwrap()).unwrap(), R1);
     let r1_hash = envelope_hash(R1);
-    let r1_count = json::parse(R1).unwrap().get("recipes").unwrap().as_arr().unwrap().len();
+    let r1_count = json::parse(R1)
+        .unwrap()
+        .get("recipes")
+        .unwrap()
+        .as_arr()
+        .unwrap()
+        .len();
     assert_eq!(r1_count, count);
     assert!(draft.contains(&format!(
         "Complete catalog: **{r1_count} recipes**; envelope SHA-256\n`{r1_hash}`."
     )));
-    assert!(draft.contains(&hash), "original catalog hash {hash} must stay named in the draft");
+    assert!(
+        draft.contains(&hash),
+        "original catalog hash {hash} must stay named in the draft"
+    );
     println!("Rust and Python complete draft library: {count} recipes; original envelope SHA-256 {hash}; default r1 {r1_hash}");
 }
 #[test]
